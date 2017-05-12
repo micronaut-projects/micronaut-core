@@ -1,4 +1,4 @@
-package org.particleframework.inject.factory
+package org.particleframework.inject.constructor
 
 import org.particleframework.context.Context
 import org.particleframework.context.DefaultContext
@@ -13,12 +13,12 @@ import javax.inject.Singleton
  */
 class ConstructorFactorySpec extends Specification {
 
-    void "test injection with constructor"() {
+    void "test injection with constructor supplied by a provider"() {
         given:
         Context context = new DefaultContext()
         context.start()
 
-        when:"A bean is obtained that has a constructor with @Inject"
+        when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"
         B b =  context.getBean(B)
 
         then:"The implementation is injected"
