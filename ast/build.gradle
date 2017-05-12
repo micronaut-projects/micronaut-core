@@ -1,0 +1,7 @@
+configurations.all {
+    it.exclude(group:"org.slf4j",module:"jcl-over-slf4j")
+}
+dependencies {
+    compile project(":inject")
+}
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -46,7 +46,9 @@ subprojects {
     }
     else {
         apply from:"${commonBuild}/common-project.gradle"
-        apply from:"${commonBuild}/common-publishing.gradle"
+        if(!it.name.contains('test-suite')) {
+            apply from:"${commonBuild}/common-publishing.gradle"
+        }
     }
 
 }
