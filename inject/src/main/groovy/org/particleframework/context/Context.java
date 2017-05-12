@@ -30,8 +30,9 @@ public interface Context extends LifeCycle {
      * Inject an existing instance
      *
      * @param instance The instance to inject
+     * @return The instance
      */
-    void inject(Object instance);
+    <T> T inject(T instance);
 
     /**
      * Creates a new instance of the given bean performing dependency injection and returning a new instance.

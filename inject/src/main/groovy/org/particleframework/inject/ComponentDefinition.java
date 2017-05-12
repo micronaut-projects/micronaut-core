@@ -1,7 +1,5 @@
 package org.particleframework.inject;
 
-import org.particleframework.context.Context;
-
 /**
  * Defines a component and its requirements
  *
@@ -45,12 +43,4 @@ public interface ComponentDefinition<T> {
      */
     Iterable<MethodInjectionPoint> getPreDestroyMethods();
 
-    /**
-     * Inject the given bean with the context
-     *
-     * @param context The context
-     * @param bean The bean
-     * @return The injected bean
-     */
-    T inject(Context context, T bean);
 }

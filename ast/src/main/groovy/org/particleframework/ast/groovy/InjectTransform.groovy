@@ -19,14 +19,17 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
 import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstClassUtils
+import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.context.Context
 import org.particleframework.context.DefaultComponentDefinitionClass
 import org.particleframework.context.DefaultComponentDefinition
 import org.particleframework.inject.ComponentDefinition
 import org.particleframework.inject.ComponentDefinitionClass
 import org.particleframework.inject.ComponentFactory
+import org.particleframework.inject.InjectableComponentDefinition
 
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Scope
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -44,7 +47,8 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
-    public static final String FACTORY_INSTANCE_VAR_NAME = '$instance'
+    private static final String FACTORY_INSTANCE_VAR_NAME = '$instance'
+
     CompilationUnit unit
 
     @Override
@@ -84,11 +88,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final SourceUnit sourceUnit
         final Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
 
+        boolean isProvider = false
         ClassNode currentComponentDef = null
         BlockStatement currentConstructorBody = null
-        BlockStatement currentFactoryBody = null
+        BlockStatement currentBuildBody = null
+        BlockStatement currentInjectBody = null
         Parameter currentContextParam = null
-        VariableExpression currentFactoryInstance = null
+        VariableExpression currentBuildInstance = null
+        VariableExpression currentInjectInstance = null
         AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
         InjectVisitor(SourceUnit sourceUnit) {
@@ -101,11 +108,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 defineComponentDefinitionClass(node)
             }
             super.visitClass(node)
-            if(currentFactoryBody != null) {
-                def injectArgs = args( varX(currentContextParam), currentFactoryInstance, ConstantExpression.TRUE )
-                currentFactoryBody.addStatement(
-                    stmt( callX(varX("this"), "injectBean", injectArgs) )
+            if(currentBuildBody != null) {
+                def injectArgs = args( varX(currentContextParam), currentBuildInstance )
+                currentBuildBody.addStatement(
+                    stmt(callX(varX("this"), "inject", injectArgs))
                 )
+                if(isProvider) {
+                    currentBuildBody.addStatement(
+                        returnS(callX(currentBuildInstance, "get"))
+                    )
+                }
+                def injectBeanArgs = args( varX(currentContextParam), currentInjectInstance, ConstantExpression.TRUE )
+                currentInjectBody.addStatement(stmt( callX(varX("this"), "injectBean", injectBeanArgs) ))
             }
         }
 
@@ -155,10 +169,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, Parameter... parameterTypes) {
-            if (currentFactoryInstance != null) {
+            if (currentInjectInstance != null) {
                 Expression methodArgs = buildBeanLookupArguments(declaringClass, methodName, parameterTypes)
-                currentFactoryBody.addStatement(
-                    stmt(callX(currentFactoryInstance, methodName, methodArgs ))
+                currentInjectBody.addStatement(
+                    stmt(callX(currentInjectInstance, methodName, methodArgs ))
                 )
             }
 
@@ -181,20 +195,28 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void defineComponentDefinitionClass(ClassNode classNode) {
-            String componentDefinitionName = classNode.name + "ComponentDefinition"
             if (!componentDefinitionClassNodes.containsKey(classNode)) {
-                currentFactoryBody = block()
-                currentComponentDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, GenericsUtils.makeClassSafeWithGenerics(DefaultComponentDefinition, classNode),
-                                                    [GenericsUtils.makeClassSafeWithGenerics(ComponentFactory, classNode)] as ClassNode[], null)
+                ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
+                isProvider = providerGenericType != null
+                ClassNode targetClassNode = isProvider ? providerGenericType : classNode
+                String componentDefinitionName = classNode.name + "ComponentDefinition"
+                currentBuildBody = block()
+                currentInjectBody = block()
+                ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(ComponentFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableComponentDefinition, classNode)] as ClassNode[]
+                ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(DefaultComponentDefinition, targetClassNode)
+                currentComponentDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
+                        interfaceNodes, null)
                 currentContextParam = param(makeCached(Context), '$context')
-                currentComponentDef.addMethod("build", Modifier.PUBLIC, classNode.plainNodeReference, params(currentContextParam, param(GenericsUtils.makeClassSafeWithGenerics(ComponentDefinition, classNode), '$definition')), null, currentFactoryBody)
+
+                // add the build method
+                currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, params(currentContextParam, param(GenericsUtils.makeClassSafeWithGenerics(ComponentDefinition, targetClassNode), '$definition')), null, currentBuildBody)
                 currentComponentDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
                 List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
                 ClassExpression classNodeExpr = classX(classNode.plainNodeReference)
                 BlockStatement constructorBody
                 if (constructors.isEmpty()) {
-                    currentFactoryInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
-                    currentFactoryBody.addStatement(declS(currentFactoryInstance, ctorX(classNode)))
+                    currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                    currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode)))
                     constructorBody = block(
                         ctorSuperS(args(classNodeExpr, callX(classNodeExpr, "getConstructor")))
                     )
@@ -205,8 +227,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         MethodNode constructorNode = publicConstructors[0]
                         ArgumentListExpression ctorTypeArgs = paramTypesToArguments(constructorNode.parameters)
                         ArgumentListExpression ctorArgs = buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
-                        currentFactoryInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
-                        currentFactoryBody.addStatement(declS(currentFactoryInstance, ctorX(classNode, ctorArgs)))
+                        currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                        currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode, ctorArgs)))
                         constructorBody = block(
                                 ctorSuperS(args(classNodeExpr, callX(classNodeExpr, "getConstructor", ctorTypeArgs)))
                         )
@@ -215,6 +237,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
+
+                // add the inject method
+                def currentInjectInstanceParam = param(classNode.plainNodeReference, FACTORY_INSTANCE_VAR_NAME)
+                currentInjectInstance = varX(currentInjectInstanceParam)
+                def injectParams = params(currentContextParam, currentInjectInstanceParam)
+                currentComponentDef.addMethod("inject", Modifier.PUBLIC, classNode.plainNodeReference, injectParams, null, currentInjectBody)
+
 
                 if (constructorBody != null) {
                     currentConstructorBody = constructorBody

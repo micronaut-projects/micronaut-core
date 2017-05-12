@@ -74,9 +74,12 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return Collections.unmodifiableCollection(preDestroyMethods);
     }
 
-    @Override
     public T inject(Context context, T bean) {
-        return injectBean(context, bean, false);
+        return (T) injectBean(context, bean, false);
+    }
+
+    protected Object injectBean(Context context, Object bean) {
+        return injectBean(context, bean, true);
     }
 
     protected DefaultComponentDefinition addInjectionPoint(Method method) {
@@ -98,7 +101,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return addMethodInjectionPointInternal(method, preDestroyMethods);
     }
 
-    protected T injectBean(Context context, T bean, boolean onlyNonPublic) {
+    protected Object injectBean(Context context, Object bean, boolean onlyNonPublic) {
         for (FieldInjectionPoint fieldInjectionPoint : getRequiredFields()) {
             Class componentType = fieldInjectionPoint.getComponentType();
             Field field = fieldInjectionPoint.getField();

@@ -4,10 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
-import org.particleframework.inject.ComponentDefinition;
-import org.particleframework.inject.ComponentDefinitionClass;
-import org.particleframework.inject.ComponentFactory;
-import org.particleframework.inject.ConstructorInjectionPoint;
+import org.particleframework.inject.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -40,10 +37,6 @@ public class DefaultContext implements Context {
         this.componentDefinitionClassIterator = resolveComponentDefinitionClasses().iterator();
     }
 
-    protected Iterable<ComponentDefinitionClass> resolveComponentDefinitionClasses() {
-        return ServiceLoader.load(ComponentDefinitionClass.class, classLoader);
-    }
-
     @Override
     public <T> T getBean(Class<T> beanType) {
         T bean = (T) singletonObjects.get(beanType);
@@ -74,109 +67,19 @@ public class DefaultContext implements Context {
         throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
     }
 
-    private <T> void registerSingletonBean(Class<T> beanType, T createdBean) {
-        // for only one candidate create link to bean type as singleton
-        singletonObjects.put(beanType, createdBean);
-        singletonObjects.put(createdBean.getClass(), createdBean);
-    }
-
-    private <T> T doCreateBean(Class<T> beanType, ComponentDefinition<T> componentDefinition) {
-        T bean;
-
-        if (componentDefinition instanceof ComponentFactory) {
-            ComponentFactory<T> componentFactory = (ComponentFactory<T>) componentDefinition;
-            bean = componentFactory.build(this, componentDefinition);
-        } else {
-            ConstructorInjectionPoint<T> constructor = componentDefinition.getConstructor();
-            Class[] requiredConstructorArguments = constructor.getComponentTypes();
-            if (requiredConstructorArguments.length == 0) {
-                bean = constructor.invoke();
-            } else {
-                Object[] constructorArgs = new Object[requiredConstructorArguments.length];
-                for (int i = 0; i < requiredConstructorArguments.length; i++) {
-                    Class argument = requiredConstructorArguments[i];
-                    constructorArgs[i] = getBean(argument);
-                }
-                bean = constructor.invoke(constructorArgs);
-            }
-
-            componentDefinition.inject(this, bean);
-        }
-        if (bean != null) {
-            Collection<Object> initializedObjects = getOrInitializeObjectsForType(beanType);
-            if (componentDefinition.getType().equals(beanType)) {
-                getOrInitializeObjectsForType(beanType).add(bean);
-            }
-
-            initializedObjects.add(bean);
-        }
-        return bean;
-    }
-
     @Override
     public <T> Iterable<T> getBeansOfType(Class<T> beanType) {
         return getBeansOfTypeInternal(beanType);
     }
 
-    private <T> Collection<T> getBeansOfTypeInternal(Class<T> beanType) {
-        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
-        if (existing != null) {
-            return Collections.unmodifiableCollection(existing);
-        }
-
-        List<T> beansOfTypeList = new ArrayList<>();
-
-        consumeAllComponentDefinitionClasses();
-        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
-
-        if (!candidates.isEmpty()) {
-            for (ComponentDefinition<T> candidate : candidates) {
-                synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(beanType, candidate);
-                    registerSingletonBean(beanType, createdBean);
-                    beansOfTypeList.add(createdBean);
-                }
-            }
-            return Collections.unmodifiableList(beansOfTypeList);
-        } else {
-            return Collections.emptyList();
-        }
-    }
-
-    private <T> Collection<ComponentDefinition<T>> findBeanCandidates(Class<T> beanType) {
-        Collection<ComponentDefinition<T>> candidates = new HashSet<>();
-        // first traverse component definition classes and load candidates
-        for (Map.Entry<Class, ComponentDefinitionClass> componentDefinitionClassEntry : componentDefinitionsClasses.entrySet()) {
-            Class componentType = componentDefinitionClassEntry.getKey();
-            if (beanType.isAssignableFrom(componentType)) {
-                // load it
-                ComponentDefinitionClass componentDefinitionClass = componentDefinitionClassEntry.getValue();
-                ComponentDefinition<T> componentDefinition = componentDefinitionClass.load();
-                candidates.add(componentDefinition);
-            }
-        }
-        for (Map.Entry<Class, ComponentDefinition> componentDefinitionEntry : componentDefinitions.entrySet()) {
-            ComponentDefinition componentDefinition = componentDefinitionEntry.getValue();
-            if (!candidates.contains(componentDefinition) && beanType.isAssignableFrom(componentDefinition.getType())) {
-                candidates.add(componentDefinition);
-            }
-        }
-        for (ComponentDefinition<T> candidate : candidates) {
-            componentDefinitionsClasses.remove(candidate.getType());
-        }
-        return candidates;
-    }
-
-    private void consumeAllComponentDefinitionClasses() {
-        while (componentDefinitionClassIterator.hasNext()) {
-            ComponentDefinitionClass componentDefinitionClass = componentDefinitionClassIterator.next();
-            componentDefinitionsClasses.put(componentDefinitionClass.getComponentType(), componentDefinitionClass);
-        }
-    }
-
     @Override
-    public void inject(Object instance) {
-
+    public <T> T inject(T instance) {
+        Collection<? extends ComponentDefinition<?>> candidates = findBeanCandidates(instance.getClass());
+        if(!candidates.isEmpty()) {
+            ComponentDefinition definition = candidates.iterator().next();
+            injectionDefinitionIfPossible(definition, instance);
+        }
+        return instance;
     }
 
     @Override
@@ -205,6 +108,43 @@ public class DefaultContext implements Context {
         // TODO: run shutdown hooks
     }
 
+    protected Iterable<ComponentDefinitionClass> resolveComponentDefinitionClasses() {
+        return ServiceLoader.load(ComponentDefinitionClass.class, classLoader);
+    }
+
+    private <T> T doCreateBean(Class<T> beanType, ComponentDefinition<T> componentDefinition) {
+        T bean;
+
+        if (componentDefinition instanceof ComponentFactory) {
+            ComponentFactory<T> componentFactory = (ComponentFactory<T>) componentDefinition;
+            bean = componentFactory.build(this, componentDefinition);
+        } else {
+            ConstructorInjectionPoint<T> constructor = componentDefinition.getConstructor();
+            Class[] requiredConstructorArguments = constructor.getComponentTypes();
+            if (requiredConstructorArguments.length == 0) {
+                bean = constructor.invoke();
+            } else {
+                Object[] constructorArgs = new Object[requiredConstructorArguments.length];
+                for (int i = 0; i < requiredConstructorArguments.length; i++) {
+                    Class argument = requiredConstructorArguments[i];
+                    constructorArgs[i] = getBean(argument);
+                }
+                bean = constructor.invoke(constructorArgs);
+            }
+
+            injectionDefinitionIfPossible(componentDefinition, bean);
+        }
+        if (bean != null) {
+            Collection<Object> initializedObjects = getOrInitializeObjectsForType(beanType);
+            if (componentDefinition.getType().equals(beanType)) {
+                getOrInitializeObjectsForType(beanType).add(bean);
+            }
+
+            initializedObjects.add(bean);
+        }
+        return bean;
+    }
+
     private <T> Collection<Object> getOrInitializeObjectsForType(Class<T> beanType) {
         Collection<Object> initializedObjects = initializedObjectsByType.getIfPresent(beanType);
         if (initializedObjects == null) {
@@ -212,6 +152,77 @@ public class DefaultContext implements Context {
             initializedObjectsByType.put(beanType, initializedObjects);
         }
         return initializedObjects;
+    }
+
+    private <T> void registerSingletonBean(Class<T> beanType, T createdBean) {
+        // for only one candidate create link to bean type as singleton
+        singletonObjects.put(beanType, createdBean);
+        singletonObjects.put(createdBean.getClass(), createdBean);
+    }
+
+    private void consumeAllComponentDefinitionClasses() {
+        while (componentDefinitionClassIterator.hasNext()) {
+            ComponentDefinitionClass componentDefinitionClass = componentDefinitionClassIterator.next();
+            componentDefinitionsClasses.put(componentDefinitionClass.getComponentType(), componentDefinitionClass);
+        }
+    }
+
+    private <T> Collection<ComponentDefinition<T>> findBeanCandidates(Class<T> beanType) {
+        Collection<ComponentDefinition<T>> candidates = new HashSet<>();
+        // first traverse component definition classes and load candidates
+        for (Map.Entry<Class, ComponentDefinitionClass> componentDefinitionClassEntry : componentDefinitionsClasses.entrySet()) {
+            Class componentType = componentDefinitionClassEntry.getKey();
+            if (beanType.isAssignableFrom(componentType)) {
+                // load it
+                ComponentDefinitionClass componentDefinitionClass = componentDefinitionClassEntry.getValue();
+                ComponentDefinition<T> componentDefinition = componentDefinitionClass.load();
+                if(componentDefinition != null) {
+                    componentDefinitions.put(componentType, componentDefinition);
+                    candidates.add(componentDefinition);
+                }
+            }
+        }
+        for (Map.Entry<Class, ComponentDefinition> componentDefinitionEntry : componentDefinitions.entrySet()) {
+            ComponentDefinition componentDefinition = componentDefinitionEntry.getValue();
+            if (!candidates.contains(componentDefinition) && beanType.isAssignableFrom(componentDefinition.getType())) {
+                candidates.add(componentDefinition);
+            }
+        }
+        for (ComponentDefinition<T> candidate : candidates) {
+            componentDefinitionsClasses.remove(candidate.getType());
+        }
+        return candidates;
+    }
+
+    private <T> void injectionDefinitionIfPossible(ComponentDefinition definition, T instance) {
+        if(definition instanceof InjectableComponentDefinition) {
+            ((InjectableComponentDefinition)definition).inject(this, instance);
+        }
+    }
+
+    private <T> Collection<T> getBeansOfTypeInternal(Class<T> beanType) {
+        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
+        if (existing != null) {
+            return Collections.unmodifiableCollection(existing);
+        }
+
+        List<T> beansOfTypeList = new ArrayList<>();
+
+        consumeAllComponentDefinitionClasses();
+        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+
+        if (!candidates.isEmpty()) {
+            for (ComponentDefinition<T> candidate : candidates) {
+                synchronized (singletonObjects) {
+                    T createdBean = doCreateBean(beanType, candidate);
+                    registerSingletonBean(beanType, createdBean);
+                    beansOfTypeList.add(createdBean);
+                }
+            }
+            return Collections.unmodifiableList(beansOfTypeList);
+        } else {
+            return Collections.emptyList();
+        }
     }
 
 }
