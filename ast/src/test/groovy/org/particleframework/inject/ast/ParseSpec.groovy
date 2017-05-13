@@ -35,7 +35,7 @@ class FooService {}
         ComponentDefinition cdef = cdefc.load()
 
         then:
-        cdef.constructor.componentTypes.size() == 0
+        cdef.constructor.arguments.size() == 0
 
     }
 
@@ -71,7 +71,7 @@ class BarService {
         ComponentDefinition cdef = cdefc.load()
 
         then:
-        cdef.constructor.componentTypes.size() == 0
+        cdef.constructor.arguments.size() == 0
 
     }
 
@@ -108,7 +108,7 @@ class FooService {}
         ComponentDefinition cdef = cdefc.load()
 
         then:
-        cdef.constructor.componentTypes.size() == 0
+        cdef.constructor.arguments.size() == 0
 
     }
 
@@ -145,7 +145,7 @@ class BarService {
         ComponentDefinition cdef = cdefc.load()
 
         then:
-        cdef.constructor.componentTypes.size() == 0
+        cdef.constructor.arguments.size() == 0
 
     }
 
@@ -175,7 +175,7 @@ class FooService {
         ComponentDefinition cdef = cls.newInstance()
 
         then:
-        cdef.constructor.componentTypes.size() == 1
+        cdef.constructor.arguments.size() == 1
 
     }
 
@@ -210,7 +210,7 @@ class BarService {
         ComponentDefinition cdef = cls.newInstance()
 
         then:
-        cdef.constructor.componentTypes.size() == 0
+        cdef.constructor.arguments.size() == 0
         cdef.requiredFields.size() == 1
         cdef.requiredFields.first().name == 'anotherFooService'
         cdef.requiredProperties.size() == 1

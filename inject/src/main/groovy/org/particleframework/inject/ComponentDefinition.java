@@ -43,4 +43,8 @@ public interface ComponentDefinition<T> {
      */
     Iterable<MethodInjectionPoint> getPreDestroyMethods();
 
+    /**
+     * @return The class name
+     */
+    String getName();
 }

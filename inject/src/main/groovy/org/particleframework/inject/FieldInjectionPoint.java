@@ -24,7 +24,7 @@ public interface FieldInjectionPoint<T> {
     /**
      * The required component type
      */
-    Class<T> getComponentType();
+    Class<T> getType();
 
     /**
      * @param object The the field on the target object

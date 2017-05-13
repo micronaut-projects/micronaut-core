@@ -1,11 +1,14 @@
 package org.particleframework.context;
 
+import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Represents an injection point for a method
@@ -16,10 +19,12 @@ import java.util.Arrays;
 @Internal
 class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Method method;
+    private final Argument[] arguments;
 
-    DefaultMethodInjectionPoint(Method method) {
+    DefaultMethodInjectionPoint(Method method, LinkedHashMap<String, Class> arguments) {
         this.method = method;
         this.method.setAccessible(true);
+        this.arguments = DefaultArgument.from(arguments);
     }
 
     @Override
@@ -28,8 +33,8 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public Class[] getComponentTypes() {
-        return method.getParameterTypes();
+    public Argument[] getArguments() {
+        return arguments;
     }
 
     @Override
@@ -39,13 +44,13 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public Object invoke(Object instance, Object... args) {
-        Class[] componentTypes = getComponentTypes();
+        Argument[] componentTypes = getArguments();
         if(componentTypes.length != args.length) {
             throw new BeanInstantiationException("Invalid bean argument count specified. Required: "+componentTypes.length+" . Received: " + args.length);
         }
 
         for (int i = 0; i < componentTypes.length; i++) {
-            Class componentType = componentTypes[i];
+            Class componentType = componentTypes[i].getType();
             if(!componentType.isInstance(args[i])) {
                 throw new BeanInstantiationException("Invalid bean argument received ["+args[i]+"] at position ["+i+"]. Required type is: " + componentType.getName());
             }

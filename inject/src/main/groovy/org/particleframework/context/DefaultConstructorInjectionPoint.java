@@ -1,9 +1,12 @@
 package org.particleframework.context;
 
+import org.particleframework.inject.Argument;
 import org.particleframework.inject.ConstructorInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 import java.lang.reflect.Constructor;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * An injection point for a constructor
@@ -13,15 +16,17 @@ import java.lang.reflect.Constructor;
  */
 class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
     private final Constructor<T> constructor;
+    private final Argument[] arguments;
 
-    DefaultConstructorInjectionPoint(Constructor<T> constructor) {
+    DefaultConstructorInjectionPoint(Constructor<T> constructor, LinkedHashMap<String, Class> arguments) {
         this.constructor = constructor;
         this.constructor.setAccessible(true);
+        this.arguments = DefaultArgument.from(arguments);
     }
 
     @Override
-    public Class[] getComponentTypes() {
-        return constructor.getParameterTypes();
+    public Argument[] getArguments() {
+        return arguments;
     }
 
     @Override
@@ -31,7 +36,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
 
     @Override
     public T invoke(Object... args) {
-        Class[] componentTypes = getComponentTypes();
+        Argument[] componentTypes = getArguments();
         if(componentTypes.length == 0) {
             try {
                 return constructor.newInstance();
@@ -45,8 +50,8 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
             }
 
             for (int i = 0; i < componentTypes.length; i++) {
-                Class componentType = componentTypes[i];
-                if(!componentType.isInstance(args[i])) {
+                Argument componentType = componentTypes[i];
+                if(!componentType.getType().isInstance(args[i])) {
                     throw new BeanInstantiationException("Invalid bean argument received ["+args[i]+"] at position ["+i+"]. Required type is: " + componentType.getName());
                 }
             }

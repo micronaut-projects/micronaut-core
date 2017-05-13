@@ -34,7 +34,7 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public Class<T> getComponentType() {
+    public Class<T> getType() {
         return (Class<T>) this.field.getType();
     }
 

@@ -14,7 +14,7 @@ public interface ConstructorInjectionPoint<T> {
     /**
      * The required component types
      */
-    Class[] getComponentTypes();
+    Argument[] getArguments();
 
     /**
      * @return The setter to invoke to set said property

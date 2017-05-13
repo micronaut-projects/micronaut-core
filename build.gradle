@@ -46,6 +46,8 @@ subprojects {
     }
     else {
         apply from:"${commonBuild}/common-project.gradle"
+        sourceCompatibility = '1.8'
+        targetCompatibility = '1.8'
         if(!it.name.contains('test-suite')) {
             apply from:"${commonBuild}/common-publishing.gradle"
         }

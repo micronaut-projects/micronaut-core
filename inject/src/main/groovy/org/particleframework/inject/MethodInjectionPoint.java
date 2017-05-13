@@ -10,6 +10,11 @@ import java.lang.reflect.Method;
  */
 public interface MethodInjectionPoint {
     /**
+     * @return The setter to invoke to set said property
+     */
+    Method getMethod();
+
+    /**
      * @return The method name
      */
     String getName();
@@ -17,17 +22,12 @@ public interface MethodInjectionPoint {
     /**
      * The required component type
      */
-    Class[] getComponentTypes();
-
-    /**
-     * @return The setter to invoke to set said property
-     */
-    Method getMethod();
+    Argument[] getArguments();
 
     /**
      * Invokes the method
      *
-     * @param args The arguments. Should match the types of getComponentTypes()
+     * @param args The arguments. Should match the types of getArguments()
      * @return The new value
      */
     Object invoke(Object instance, Object...args);

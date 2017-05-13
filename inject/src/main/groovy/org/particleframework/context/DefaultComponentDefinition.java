@@ -3,10 +3,7 @@ package org.particleframework.context;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.inject.ComponentDefinition;
-import org.particleframework.inject.ConstructorInjectionPoint;
-import org.particleframework.inject.FieldInjectionPoint;
-import org.particleframework.inject.MethodInjectionPoint;
+import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 
 import java.lang.reflect.Array;
@@ -27,16 +24,17 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     private final Class<T> type;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
-    private final Collection<MethodInjectionPoint> methodInjectionPoints = new ArrayList<>(3);
-    private final Collection<FieldInjectionPoint> fieldInjectionPoints = new ArrayList<>(3);
-    private final Collection<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
-    private final Collection<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
+    protected final List<MethodInjectionPoint> methodInjectionPoints = new ArrayList<>(3);
+    protected final List<FieldInjectionPoint> fieldInjectionPoints = new ArrayList<>(3);
+    protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
+    protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
 
 
     protected DefaultComponentDefinition(  Class<T> type,
-                                            Constructor<T> constructor) {
+                                           Constructor<T> constructor,
+                                           LinkedHashMap<String, Class> arguments) {
         this.type = type;
-        this.constructor = new DefaultConstructorInjectionPoint<>(constructor);
+        this.constructor = new DefaultConstructorInjectionPoint<>(constructor, arguments);
     }
 
     @Override
@@ -74,43 +72,63 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return Collections.unmodifiableCollection(preDestroyMethods);
     }
 
+    @Override
+    public String getName() {
+        return getType().getName();
+    }
+
     public T inject(Context context, T bean) {
-        return (T) injectBean(context, bean, false);
+        return (T) injectBean(new DefaultComponentResolutionContext(context, this), context, bean, false);
     }
 
     protected Object injectBean(Context context, Object bean) {
-        return injectBean(context, bean, true);
+        return injectBean(new DefaultComponentResolutionContext(context, this), context, bean, true);
     }
 
-    protected DefaultComponentDefinition addInjectionPoint(Method method) {
-        Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(method, methodInjectionPoints);
-    }
-
+    /**
+     * Adds an injection point for a field. Typically called by a dynamically generated subclass.
+     *
+     * @param field The field
+     * @return this component definition
+     */
     protected DefaultComponentDefinition addInjectionPoint(Field field) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(field));
         return this;
     }
 
-    protected DefaultComponentDefinition addPostConstruct(Method method) {
-        return addMethodInjectionPointInternal(method, postConstructMethods);
+    /**
+     * Adds an injection point for a method. Typically called by a dynamically generated subclass.
+     *
+     * @param method The method
+     * @return this component definition
+     */
+    protected DefaultComponentDefinition addInjectionPoint(Method method, LinkedHashMap<String, Class> arguments) {
+        Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
+        return addMethodInjectionPointInternal(method, arguments, methodInjectionPoints);
     }
 
-    protected DefaultComponentDefinition addPreDestroy(Method method) {
-        return addMethodInjectionPointInternal(method, preDestroyMethods);
+    protected DefaultComponentDefinition addPostConstruct(Method method, LinkedHashMap<String, Class> arguments) {
+        return addMethodInjectionPointInternal(method, arguments, postConstructMethods);
     }
 
-    protected Object injectBean(Context context, Object bean, boolean onlyNonPublic) {
+    protected DefaultComponentDefinition addPreDestroy(Method method, LinkedHashMap<String, Class> arguments) {
+        return addMethodInjectionPointInternal(method, arguments, preDestroyMethods);
+    }
+
+    protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean, boolean onlyNonPublic) {
+        DefaultContext defaultContext = (DefaultContext) context;
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
         for (FieldInjectionPoint fieldInjectionPoint : getRequiredFields()) {
-            Class componentType = fieldInjectionPoint.getComponentType();
+            Class componentType = fieldInjectionPoint.getType();
             Field field = fieldInjectionPoint.getField();
             Class genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
 
             Object value;
             if (componentType.isArray()) {
                 Class arrayType = componentType.getComponentType();
-                Collection beans = (Collection)context.getBeansOfType(arrayType);
+                path.pushFieldResolve(this, fieldInjectionPoint);
+                Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext,arrayType);
                 Object[] newArray = (Object[]) Array.newInstance(arrayType, beans.size());
                 int i = 0;
                 for (Object foundBean : beans) {
@@ -119,7 +137,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                 value = newArray;
             } else if (Iterable.class.isAssignableFrom(componentType)) {
                 if (genericType != null) {
-                    Collection beans = (Collection)context.getBeansOfType(genericType);
+                    path.pushFieldResolve(this, fieldInjectionPoint);
+                    Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext, genericType);
                     if (componentType.isInstance(beans)) {
                         value = beans;
                     } else {
@@ -135,27 +154,32 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             } else {
                 Object beanValue;
                 try {
-                    beanValue = context.getBean(componentType);
+                    path.pushFieldResolve(this, fieldInjectionPoint);
+                    beanValue = defaultContext.getBean(resolutionContext, componentType);
                 } catch (NoSuchBeanException e) {
                     throw new DependencyInjectionException("Failed to inject value for field [" + field.getName() + "] of class: " + field.getDeclaringClass().getName(), e);
                 }
                 value = beanValue;
             }
+            path.pop();
             fieldInjectionPoint.set(bean, value);
         }
 
 
         for (MethodInjectionPoint methodInjectionPoint : getRequiredProperties()) {
             if (onlyNonPublic && !java.lang.reflect.Modifier.isPublic(methodInjectionPoint.getMethod().getModifiers())) {
-                Class[] methodArgumentTypes = methodInjectionPoint.getComponentTypes();
+                Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
                 Object[] methodArgs = new Object[methodArgumentTypes.length];
                 for (int i = 0; i < methodArgumentTypes.length; i++) {
-                    Class argument = methodArgumentTypes[i];
-                    if (argument.isArray()) {
-                        methodArgs[i] = context.getBeansOfType(argument.getComponentType());
+                    Argument argument = methodArgumentTypes[i];
+                    path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
+                    Class argumentType = argument.getType();
+                    if (argumentType.isArray()) {
+                        methodArgs[i] = defaultContext.getBeansOfType(resolutionContext, argumentType.getComponentType());
                     } else {
-                        methodArgs[i] = context.getBean(argument);
+                        methodArgs[i] = defaultContext.getBean(resolutionContext, argumentType);
                     }
+                    path.pop();
                 }
                 methodInjectionPoint.invoke(bean, methodArgs);
             }
@@ -164,21 +188,57 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return bean;
     }
 
-    protected <B> B getBeanForMethodArgument(Context context, Class<B> dependencyType, Class dependencyOwner, String methodName, String argName) {
+    /**
+     * Obtains a bean definition for the method at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param methodIndex The method index
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getBeanForMethodArgument(ComponentResolutionContext resolutionContext, Context context, int methodIndex, int argIndex) {
+        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
+        Argument argument = injectionPoint.getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
-            return context.getBean(dependencyType);
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType());
+            path.pop();
+            return bean;
         } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException("Failed to inject value for parameter ["+argName+"] of method [" + methodName + "] of class: " + dependencyOwner.getName() , e);
+            throw new DependencyInjectionException("Failed to inject value for parameter ["+argument.getName()+"] of method [" + injectionPoint.getName() + "] of class: " + this.getName() , e);
+        }
+
+    }
+
+    /**
+     * Obtains a bean definition for a constructor at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getBeanForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, int argIndex) {
+        Argument argument = getConstructor().getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushContructorResolve(this,  argument);
+        try {
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType());
+            path.pop();
+            return bean;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException("Failed to inject value for parameter ["+argument.getName()+"] of class: " + this.getName() , e);
         }
     }
 
-    protected <B> B getBeanForConstructorArgument(Context context, Class<B> dependencyType, Class dependencyOwner, String argName) {
-        try {
-            return context.getBean(dependencyType);
-        } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException("Failed to inject value for parameter ["+argName+"] of class: " + dependencyOwner.getName() , e);
-        }
-    }
     private Object coerceToType(Collection beans, Class<? extends Iterable> componentType) throws Exception {
         if (componentType == Set.class) {
             return new HashSet<>(beans);
@@ -191,9 +251,11 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             return null;
         }
     }
-    private DefaultComponentDefinition addMethodInjectionPointInternal(Method method, Collection<MethodInjectionPoint> methodInjectionPoints) {
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(method);
-        requiredComponents.addAll(Arrays.asList(methodInjectionPoint.getComponentTypes()));
+    private DefaultComponentDefinition addMethodInjectionPointInternal(Method method, LinkedHashMap<String, Class> arguments, Collection<MethodInjectionPoint> methodInjectionPoints) {
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(method, arguments);
+        for (Argument argument : methodInjectionPoint.getArguments()) {
+            requiredComponents.add(argument.getType());
+        }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
     }

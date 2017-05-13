@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The default context implementation
@@ -38,38 +40,23 @@ public class DefaultContext implements Context {
     }
 
     @Override
+    public void start() {
+        consumeAllComponentDefinitionClasses();
+    }
+
+    @Override
+    public void close() throws IOException {
+        // TODO: run shutdown hooks
+    }
+
+    @Override
     public <T> T getBean(Class<T> beanType) {
-        T bean = (T) singletonObjects.get(beanType);
-        if (bean != null) {
-            return bean;
-        }
-
-        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
-        if (existing != null && !existing.isEmpty()) {
-            return existing.iterator().next();
-        }
-
-        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
-
-        int size = candidates.size();
-        if (size > 0) {
-            if (size == 1) {
-                ComponentDefinition<T> definition = candidates.iterator().next();
-                synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(beanType, definition);
-                    registerSingletonBean(beanType, createdBean);
-                    return createdBean;
-                }
-            } else {
-                throw new NonUniqueBeanException(beanType, candidates);
-            }
-        }
-        throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+        return getBean(null, beanType);
     }
 
     @Override
     public <T> Iterable<T> getBeansOfType(Class<T> beanType) {
-        return getBeansOfTypeInternal(beanType);
+        return getBeansOfType(null, beanType);
     }
 
     @Override
@@ -90,7 +77,7 @@ public class DefaultContext implements Context {
         if (size > 0) {
             if (size == 1) {
                 ComponentDefinition<T> definition = candidates.iterator().next();
-                return doCreateBean(beanType, definition);
+                return doCreateBean(null, definition, beanType);
             } else {
                 throw new NonUniqueBeanException(beanType, candidates);
             }
@@ -98,35 +85,74 @@ public class DefaultContext implements Context {
         throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
     }
 
-    @Override
-    public void start() {
-        consumeAllComponentDefinitionClasses();
+    <T> Iterable<T> getBeansOfType(ComponentResolutionContext resolutionContext, Class<T> beanType) {
+        return getBeansOfTypeInternal(resolutionContext, beanType);
     }
 
-    @Override
-    public void close() throws IOException {
-        // TODO: run shutdown hooks
+    <T> T getBean(ComponentResolutionContext resolutionContext, Class<T> beanType) {
+        T bean = (T) singletonObjects.get(beanType);
+        if (bean != null) {
+            return bean;
+        }
+
+        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
+        if (existing != null && !existing.isEmpty()) {
+            return existing.iterator().next();
+        }
+
+        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+
+        int size = candidates.size();
+        if (size > 0) {
+            if (size == 1) {
+                ComponentDefinition<T> definition = candidates.iterator().next();
+                synchronized (singletonObjects) {
+                    T createdBean = doCreateBean(resolutionContext, definition, beanType);
+                    registerSingletonBean(beanType, createdBean);
+                    return createdBean;
+                }
+            } else {
+                Collection<ComponentDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
+                if(exactMatches.size() == 1) {
+                    ComponentDefinition<T> definition = candidates.iterator().next();
+                    synchronized (singletonObjects) {
+                        T createdBean = doCreateBean(resolutionContext, definition, beanType);
+                        registerSingletonBean(beanType, createdBean);
+                        return createdBean;
+                    }
+                }
+                else {
+                    throw new NonUniqueBeanException(beanType, candidates);
+                }
+            }
+        }
+        throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
     }
+
+
 
     protected Iterable<ComponentDefinitionClass> resolveComponentDefinitionClasses() {
         return ServiceLoader.load(ComponentDefinitionClass.class, classLoader);
     }
 
-    private <T> T doCreateBean(Class<T> beanType, ComponentDefinition<T> componentDefinition) {
+    private <T> T doCreateBean(ComponentResolutionContext resolutionContext, ComponentDefinition<T> componentDefinition, Class<T> beanType) {
         T bean;
+        if(resolutionContext == null) {
+            resolutionContext = new DefaultComponentResolutionContext(this, componentDefinition);
+        }
 
         if (componentDefinition instanceof ComponentFactory) {
             ComponentFactory<T> componentFactory = (ComponentFactory<T>) componentDefinition;
-            bean = componentFactory.build(this, componentDefinition);
+            bean = componentFactory.build(resolutionContext,this, componentDefinition);
         } else {
             ConstructorInjectionPoint<T> constructor = componentDefinition.getConstructor();
-            Class[] requiredConstructorArguments = constructor.getComponentTypes();
+            Argument[] requiredConstructorArguments = constructor.getArguments();
             if (requiredConstructorArguments.length == 0) {
                 bean = constructor.invoke();
             } else {
                 Object[] constructorArgs = new Object[requiredConstructorArguments.length];
                 for (int i = 0; i < requiredConstructorArguments.length; i++) {
-                    Class argument = requiredConstructorArguments[i];
+                    Class argument = requiredConstructorArguments[i].getType();
                     constructorArgs[i] = getBean(argument);
                 }
                 bean = constructor.invoke(constructorArgs);
@@ -142,6 +168,11 @@ public class DefaultContext implements Context {
 
             initializedObjects.add(bean);
         }
+        Deque<Object> objectsInCreation = resolutionContext.getObjectsInCreation();
+        Object head = objectsInCreation.peek();
+        if(head != null && head == bean) {
+            objectsInCreation.pop();
+        }
         return bean;
     }
 
@@ -152,6 +183,15 @@ public class DefaultContext implements Context {
             initializedObjectsByType.put(beanType, initializedObjects);
         }
         return initializedObjects;
+    }
+
+    private <T> Collection<ComponentDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<ComponentDefinition<T>> candidates) {
+        Stream<ComponentDefinition<T>> filteredResults = candidates
+                                                            .stream()
+                                                            .filter((ComponentDefinition<T> candidate) ->
+                                                                    candidate.getType().equals(beanType)
+                                                            );
+        return filteredResults.collect(Collectors.toList());
     }
 
     private <T> void registerSingletonBean(Class<T> beanType, T createdBean) {
@@ -200,7 +240,7 @@ public class DefaultContext implements Context {
         }
     }
 
-    private <T> Collection<T> getBeansOfTypeInternal(Class<T> beanType) {
+    private <T> Collection<T> getBeansOfTypeInternal(ComponentResolutionContext resolutionContext, Class<T> beanType) {
         Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
         if (existing != null) {
             return Collections.unmodifiableCollection(existing);
@@ -214,7 +254,7 @@ public class DefaultContext implements Context {
         if (!candidates.isEmpty()) {
             for (ComponentDefinition<T> candidate : candidates) {
                 synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(beanType, candidate);
+                    T createdBean = doCreateBean(resolutionContext, candidate, beanType);
                     registerSingletonBean(beanType, createdBean);
                     beansOfTypeList.add(createdBean);
                 }

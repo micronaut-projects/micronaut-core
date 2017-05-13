@@ -3,5 +3,6 @@ configurations.all {
 }
 dependencies {
     compile project(":inject")
+    testCompile "junit:junit:4.7"
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
