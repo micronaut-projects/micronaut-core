@@ -235,7 +235,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException("Failed to inject value for parameter ["+argument.getName()+"] of class: " + this.getName() , e);
+            throw new DependencyInjectionException(resolutionContext, argument , e);
         }
     }
 

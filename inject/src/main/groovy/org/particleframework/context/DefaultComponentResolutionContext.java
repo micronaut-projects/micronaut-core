@@ -93,7 +93,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         public String toString() {
             StringBuilder baseString = new StringBuilder("new ");
             ComponentDefinition declaringType = getDeclaringType();
-            baseString.append(declaringType.getClass().getSimpleName());
+            baseString.append(declaringType.getType().getSimpleName());
             outputArguments(declaringType, baseString);
             return baseString.toString();
         }
