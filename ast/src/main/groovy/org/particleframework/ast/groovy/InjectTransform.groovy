@@ -291,7 +291,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         MapExpression ctorParamsMap = paramsToMap(constructorNode.parameters)
                         ArgumentListExpression ctorArgs =  buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
                         currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode.plainNodeReference)
-                        currentBuildBody.addStatement(declS(currentBuildInstance, callX(classNode.plainNodeReference, "newInstance", ctorArgs)))
+                        currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
                         constructorBody = block(
                             ctorSuperS(args(classNodeExpr, callX(classNodeExpr, "getConstructor", ctorTypeArgs), ctorParamsMap ))
                         )
@@ -341,7 +341,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             int i = 0
             for (parameter in parameterTypes) {
                 Expression expressionToAdd = buildBeanLookupExpression(declaringClass, methodExpression, parameter, i++)
-                ctorArgs.addExpression(expressionToAdd)
+                ctorArgs.addExpression(castX(parameter.type, expressionToAdd))
             }
             return ctorArgs
         }
