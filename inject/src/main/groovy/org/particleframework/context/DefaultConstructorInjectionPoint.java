@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.inject.Argument;
+import org.particleframework.inject.ComponentDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
@@ -17,11 +18,18 @@ import java.util.Map;
 class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
     private final Constructor<T> constructor;
     private final Argument[] arguments;
+    private final ComponentDefinition declaringComponent;
 
-    DefaultConstructorInjectionPoint(Constructor<T> constructor, LinkedHashMap<String, Class> arguments) {
+    DefaultConstructorInjectionPoint(ComponentDefinition declaringComponent, Constructor<T> constructor, LinkedHashMap<String, Class> arguments) {
+        this.declaringComponent = declaringComponent;
         this.constructor = constructor;
         this.constructor.setAccessible(true);
         this.arguments = DefaultArgument.from(arguments);
+    }
+
+    @Override
+    public ComponentDefinition getDeclaringComponent() {
+        return this.declaringComponent;
     }
 
     @Override

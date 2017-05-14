@@ -6,6 +6,7 @@ import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.*;
 
+import javax.inject.Provider;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -89,6 +90,22 @@ public class DefaultContext implements Context {
         return getBeansOfTypeInternal(resolutionContext, beanType);
     }
 
+    <T> Provider<T> getBeanProvider(ComponentResolutionContext resolutionContext, Class<T> beanType) {
+        T bean = (T) singletonObjects.get(beanType);
+        if (bean != null) {
+            return new ResolvedProvider<>(bean);
+        }
+
+        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+        ComponentDefinition<T> definition = findConcreteCandidate(beanType);
+        if(definition != null) {
+            return new UnresolvedProvider<>(definition.getType(), this);
+        }
+        else {
+            throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+        }
+    }
+
     <T> T getBean(ComponentResolutionContext resolutionContext, Class<T> beanType) {
         T bean = (T) singletonObjects.get(beanType);
         if (bean != null) {
@@ -100,40 +117,25 @@ public class DefaultContext implements Context {
             return existing.iterator().next();
         }
 
-        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+        ComponentDefinition<T> definition = findConcreteCandidate(beanType);
 
-        int size = candidates.size();
-        if (size > 0) {
-            if (size == 1) {
-                ComponentDefinition<T> definition = candidates.iterator().next();
-                synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(resolutionContext, definition, beanType);
-                    registerSingletonBean(beanType, createdBean);
-                    return createdBean;
-                }
-            } else {
-                Collection<ComponentDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
-                if(exactMatches.size() == 1) {
-                    ComponentDefinition<T> definition = candidates.iterator().next();
-                    synchronized (singletonObjects) {
-                        T createdBean = doCreateBean(resolutionContext, definition, beanType);
-                        registerSingletonBean(beanType, createdBean);
-                        return createdBean;
-                    }
-                }
-                else {
-                    throw new NonUniqueBeanException(beanType, candidates);
-                }
+        if( definition != null ) {
+
+            synchronized (singletonObjects) {
+                T createdBean = doCreateBean(resolutionContext, definition, beanType);
+                registerSingletonBean(beanType, createdBean);
+                return createdBean;
             }
         }
-        throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+        else {
+            throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+        }
     }
-
-
 
     protected Iterable<ComponentDefinitionClass> resolveComponentDefinitionClasses() {
         return ServiceLoader.load(ComponentDefinitionClass.class, classLoader);
     }
+
 
     private <T> T doCreateBean(ComponentResolutionContext resolutionContext, ComponentDefinition<T> componentDefinition, Class<T> beanType) {
         T bean;
@@ -174,6 +176,27 @@ public class DefaultContext implements Context {
             objectsInCreation.pop();
         }
         return bean;
+    }
+
+    private <T> ComponentDefinition<T> findConcreteCandidate(Class<T> beanType) {
+        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+
+        int size = candidates.size();
+        ComponentDefinition<T> definition = null;
+        if (size > 0) {
+            if (size == 1) {
+                definition = candidates.iterator().next();
+            } else {
+                Collection<ComponentDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
+                if(exactMatches.size() == 1) {
+                    definition = candidates.iterator().next();
+                }
+                else {
+                    throw new NonUniqueBeanException(beanType, candidates);
+                }
+            }
+        }
+        return definition;
     }
 
     private <T> Collection<Object> getOrInitializeObjectsForType(Class<T> beanType) {

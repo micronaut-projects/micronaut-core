@@ -12,7 +12,12 @@ import java.lang.reflect.Method;
 public interface ConstructorInjectionPoint<T> {
 
     /**
-     * The required component types
+     * @return The component that declares this injection point
+     */
+    ComponentDefinition getDeclaringComponent();
+
+    /**
+     * The required argument types
      */
     Argument[] getArguments();
 

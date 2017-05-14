@@ -12,6 +12,11 @@ import java.lang.reflect.Field;
  */
 public interface FieldInjectionPoint<T> {
     /**
+     * @return The component that declares this injection point
+     */
+    ComponentDefinition getDeclaringComponent();
+
+    /**
      * @return The name of the field
      */
     String getName();

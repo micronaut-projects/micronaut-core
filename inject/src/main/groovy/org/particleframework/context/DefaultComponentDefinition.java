@@ -6,6 +6,7 @@ import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 
+import javax.inject.Provider;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -34,7 +35,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                                            Constructor<T> constructor,
                                            LinkedHashMap<String, Class> arguments) {
         this.type = type;
-        this.constructor = new DefaultConstructorInjectionPoint<>(constructor, arguments);
+        this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments);
     }
 
     @Override
@@ -93,7 +94,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      */
     protected DefaultComponentDefinition addInjectionPoint(Field field) {
         requiredComponents.add(field.getType());
-        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(field));
+        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field));
         return this;
     }
 
@@ -148,6 +149,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                             throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
                         }
                     }
+                } else {
+                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
+                }
+            } else if(Provider.class.isAssignableFrom(componentType)) {
+                if (genericType != null) {
+                    path.pushFieldResolve(this, fieldInjectionPoint);
+                    value = defaultContext.getBeanProvider(resolutionContext, genericType);
+                    path.pop();
                 } else {
                     throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
                 }
@@ -239,6 +248,60 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
 
+
+
+    /**
+     * Obtains a bean provider for the method at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param methodIndex The method index
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Provider getBeanProviderForMethodArgument(ComponentResolutionContext resolutionContext, Context context, Class providedType, int methodIndex, int argIndex) {
+        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
+        Argument argument = injectionPoint.getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushMethodArgumentResolve(this, injectionPoint, argument);
+        try {
+            Provider beanProvider = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType);
+            path.pop();
+            return beanProvider;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+        }
+
+    }
+
+    /**
+     * Obtains a bean provider for a constructor at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Provider getBeanProviderForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, Class providedType, int argIndex) {
+        Argument argument = getConstructor().getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushContructorResolve(this,  argument);
+        try {
+            Class type = argument.getType();
+            Provider beanProvider  = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType);
+            path.pop();
+            return beanProvider;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, argument , e);
+        }
+    }
+
     private Object coerceToType(Collection beans, Class<? extends Iterable> componentType) throws Exception {
         if (componentType == Set.class) {
             return new HashSet<>(beans);
@@ -252,7 +315,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
     private DefaultComponentDefinition addMethodInjectionPointInternal(Method method, LinkedHashMap<String, Class> arguments, Collection<MethodInjectionPoint> methodInjectionPoints) {
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(method, arguments);
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, arguments);
         for (Argument argument : methodInjectionPoint.getArguments()) {
             requiredComponents.add(argument.getType());
         }

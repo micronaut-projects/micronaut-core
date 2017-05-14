@@ -60,6 +60,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         InjectVisitor injectVisitor = new InjectVisitor(source)
         for (ClassNode classNode in moduleNode.getClasses()) {
+            if(classNode.isAbstract()) continue
             injectVisitor.visitClass(classNode)
         }
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
@@ -216,7 +217,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             ArgumentListExpression argExpr = args(methodName)
             argExpr = paramTypesToArguments(parameterTypes, argExpr)
-            MethodCallExpression getMethodCall = callX(declaringClass, "getMethod", argExpr)
+            MethodCallExpression getMethodCall = callX(declaringClass, "getDeclaredMethod", argExpr)
             MapExpression paramsMap = paramsToMap(parameterTypes)
             MethodCallExpression addInjectionPointMethod = callX(varX("this"), "addInjectionPoint", args(getMethodCall,paramsMap) )
             currentConstructorBody.addStatement(
@@ -358,10 +359,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             } else {
                 boolean isConstructor = methodExpression instanceof ClassExpression
-                String lookMethodName = isConstructor ? "getBeanForConstructorArgument" : "getBeanForMethodArgument"
+                boolean isProvider = AstClassUtils.implementsInterface(type, Provider) && type.genericsTypes
+                String lookMethodName
+                if(isProvider) {
+                    lookMethodName = isConstructor ? "getBeanProviderForConstructorArgument" : "getBeanProviderForMethodArgument"
+                }
+                else {
+                    lookMethodName = isConstructor ? "getBeanForConstructorArgument" : "getBeanForMethodArgument"
+                }
+
 
                 ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
-
+                if(isProvider) {
+                    lookupArgs.addExpression(classX(type.genericsTypes[0].type.plainNodeReference))
+                }
                 if(isConstructor) {
                     lookupArgs.addExpression(constX(parameterIndex))
                 }

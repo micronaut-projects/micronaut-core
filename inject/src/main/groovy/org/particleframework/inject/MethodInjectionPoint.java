@@ -10,6 +10,11 @@ import java.lang.reflect.Method;
  */
 public interface MethodInjectionPoint {
     /**
+     * @return The component that declares this injection point
+     */
+    ComponentDefinition getDeclaringComponent();
+
+    /**
      * @return The setter to invoke to set said property
      */
     Method getMethod();
@@ -20,7 +25,7 @@ public interface MethodInjectionPoint {
     String getName();
 
     /**
-     * The required component type
+     * The required component arguments
      */
     Argument[] getArguments();
 

@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.inject.Argument;
+import org.particleframework.inject.ComponentDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
@@ -20,11 +21,18 @@ import java.util.Map;
 class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Method method;
     private final Argument[] arguments;
+    private final ComponentDefinition declaringComponent;
 
-    DefaultMethodInjectionPoint(Method method, LinkedHashMap<String, Class> arguments) {
+    DefaultMethodInjectionPoint(ComponentDefinition declaringComponent, Method method, LinkedHashMap<String, Class> arguments) {
         this.method = method;
         this.method.setAccessible(true);
         this.arguments = DefaultArgument.from(arguments);
+        this.declaringComponent = declaringComponent;
+    }
+
+    @Override
+    public ComponentDefinition getDeclaringComponent() {
+        return this.declaringComponent;
     }
 
     @Override
