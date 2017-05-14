@@ -23,7 +23,10 @@ class ConsructorDependencyFailureSpec extends Specification {
 
         then:"The correct error is thrown"
         def e = thrown(DependencyInjectionException)
-        e.message == 'Failed to inject value for parameter [a] of class: org.particleframework.inject.failures.ConsructorDependencyFailureSpec$B'
+        e.message == '''\
+Failed to inject value for parameter [a] of class: org.particleframework.inject.failures.ConsructorDependencyFailureSpec$B
+
+Path Taken: new B([A a])'''
     }
 
     static interface A {

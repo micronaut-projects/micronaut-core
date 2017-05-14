@@ -145,11 +145,11 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                         try {
                             value = coerceToType(beans, componentType);
                         } catch (Exception e) {
-                            throw new DependencyInjectionException("Could not coerce beans to concrete type for field: " + field, e);
+                            throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
                         }
                     }
                 } else {
-                    throw new DependencyInjectionException("Cannot inject Iterable with missing generic type arguments for field: " + field);
+                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
                 }
             } else {
                 Object beanValue;
@@ -157,7 +157,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                     path.pushFieldResolve(this, fieldInjectionPoint);
                     beanValue = defaultContext.getBean(resolutionContext, componentType);
                 } catch (NoSuchBeanException e) {
-                    throw new DependencyInjectionException("Failed to inject value for field [" + field.getName() + "] of class: " + field.getDeclaringClass().getName(), e);
+                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
                 }
                 value = beanValue;
             }
@@ -210,7 +210,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException("Failed to inject value for parameter ["+argument.getName()+"] of method [" + injectionPoint.getName() + "] of class: " + this.getName() , e);
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
         }
 
     }
