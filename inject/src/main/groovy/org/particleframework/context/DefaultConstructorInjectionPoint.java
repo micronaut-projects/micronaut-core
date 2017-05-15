@@ -7,7 +7,6 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
 
 import java.lang.reflect.Constructor;
 import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * An injection point for a constructor
@@ -24,7 +23,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         this.declaringComponent = declaringComponent;
         this.constructor = constructor;
         this.constructor.setAccessible(true);
-        this.arguments = DefaultArgument.from(arguments);
+        this.arguments = DefaultArgument.from(arguments, null);
     }
 
     @Override

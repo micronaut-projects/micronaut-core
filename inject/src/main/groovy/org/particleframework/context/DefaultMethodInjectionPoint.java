@@ -6,6 +6,7 @@ import org.particleframework.inject.MethodInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -23,10 +24,13 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Argument[] arguments;
     private final ComponentDefinition declaringComponent;
 
-    DefaultMethodInjectionPoint(ComponentDefinition declaringComponent, Method method, LinkedHashMap<String, Class> arguments) {
+    DefaultMethodInjectionPoint(ComponentDefinition declaringComponent,
+                                Method method,
+                                LinkedHashMap<String, Class> arguments,
+                                LinkedHashMap<String, Annotation> qualifiers) {
         this.method = method;
         this.method.setAccessible(true);
-        this.arguments = DefaultArgument.from(arguments);
+        this.arguments = DefaultArgument.from(arguments, qualifiers);
         this.declaringComponent = declaringComponent;
     }
 

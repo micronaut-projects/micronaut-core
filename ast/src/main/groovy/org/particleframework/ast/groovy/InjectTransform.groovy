@@ -11,6 +11,7 @@ import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.tools.GeneralUtils
 import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -34,8 +35,11 @@ import org.particleframework.inject.InjectableComponentDefinition
 
 import javax.inject.Inject
 import javax.inject.Provider
+import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
@@ -178,7 +182,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                         Expression methodName = constX(methodNode.name)
                         ClassExpression declaringClass = classX(classNode.plainNodeReference)
-                        addMethodInjectionPoint(declaringClass, methodName, !methodNode.isPrivate(), methodNode.parameters)
+                        addMethodInjectionPoint(declaringClass, methodName, !methodNode.isPrivate(),null, methodNode.parameters)
                     }
                 }
             }
@@ -193,44 +197,74 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(!fieldNode.isStatic()) {
 
                         if (currentInjectInstance != null && !Modifier.isPrivate(fieldNode.getModifiers())) {
-                            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam), constX(fieldIndex) )
-                            Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX("getBeanForField", lookupArgs))
+                            boolean isProvider = AstClassUtils.implementsInterface(fieldNode.type, Provider) && fieldNode.type.genericsTypes
+                            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
+
+                            if(isProvider) {
+                                lookupArgs.addExpression(classX(fieldNode.type.genericsTypes[0].type.plainNodeReference))
+                            }
+                            lookupArgs.addExpression( constX(fieldIndex) )
+
+                            String methodName = "getBeanForField"
+                            if(isProvider) {
+                                methodName = "getBeanProviderForField"
+                            }
+                            Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX(methodName, lookupArgs))
                             currentInjectBody.addStatement(
                                     stmt(injectCall)
                             )
                         }
 
-                        MethodCallExpression getFieldCall = callX(
-                                classX(fieldNode.declaringClass.plainNodeReference),
-                                "getDeclaredField",
-                                args(constX(fieldNode.name)))
-                        MethodCallExpression addInjectionPointMethod = callX(varX("this"),"addInjectionPoint",getFieldCall)
+                        VariableExpression fieldVar = declareFieldVar('$field' + fieldIndex++, fieldNode)
+                        ArgumentListExpression methodArgs = args(fieldVar)
+                        AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
+                        AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
+                        if(qualifierAnn != null) {
+                            methodArgs.addExpression(callX(fieldVar, "getAnnotation", classX(qualifierAnn.classNode)))
+                        }
+                        MethodCallExpression addInjectionPointMethod = callX(varX("this"),"addInjectionPoint", methodArgs)
                         currentConstructorBody.addStatement(
                                 stmt(addInjectionPointMethod)
                         )
-                        fieldIndex++
                     }
                 }
             }
+        }
+
+        protected VariableExpression declareFieldVar(String name, FieldNode fieldNode) {
+            MethodCallExpression getFieldCall = callX(
+                    classX(fieldNode.declaringClass.plainNodeReference),
+                    "getDeclaredField",
+                    args(constX(fieldNode.name)))
+
+            def fieldVar = varX(name, makeCached(Field))
+            currentConstructorBody.addStatement(
+                    declS(fieldVar, getFieldCall)
+            )
+            fieldVar
         }
 
         @Override
         void visitProperty(PropertyNode propertyNode) {
-            if(propertyNode.field != null && stereoTypeFinder.hasStereoType(propertyNode.field, Inject)) {
+            FieldNode fieldNode = propertyNode.field
+            if(fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
                 if(!propertyNode.isStatic()) {
                     defineComponentDefinitionClass(propertyNode.declaringClass)
                     if (currentConstructorBody != null) {
+                        VariableExpression fieldVar = declareFieldVar('$method_field' + methodIndex,fieldNode)
                         ConstantExpression setterName = constX(getSetterName(propertyNode.name))
                         ClassExpression declaringClass = classX(propertyNode.declaringClass.plainNodeReference)
                         Expression propertyType = classX(propertyNode.type)
 
-                        addMethodInjectionPoint(declaringClass, setterName, !propertyNode.isPrivate(), param(propertyType.type, propertyNode.name))
+                        Parameter setterArg = param(propertyType.type, propertyNode.name)
+                        AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
+                        addMethodInjectionPoint(declaringClass, setterName, !propertyNode.isPrivate(), fieldVar, setterArg)
                     }
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, boolean notPrivate, Parameter... parameterTypes) {
+        private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
 
             if (currentInjectInstance != null && notPrivate) {
                 Expression methodArgs = buildBeanLookupArguments(declaringClass, methodName, parameterTypes)
@@ -246,8 +280,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ArgumentListExpression argExpr = args(methodName)
             argExpr = paramTypesToArguments(parameterTypes, argExpr)
             MethodCallExpression getMethodCall = callX(declaringClass, "getDeclaredMethod", argExpr)
+            def methodVar = varX('$method' + methodIndex, makeCached(Method))
+            currentConstructorBody.addStatement(
+                    declS(methodVar, getMethodCall)
+            )
             MapExpression paramsMap = paramsToMap(parameterTypes)
-            MethodCallExpression addInjectionPointMethod = callX(varX("this"), "addInjectionPoint", args(getMethodCall,paramsMap) )
+            Expression qualifiers = paramsToQualifiers(parameterTypes)
+
+            ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers)
+            if(field != null) {
+                addInjectionPointArgs.expressions.add(0, field)
+            }
+            MethodCallExpression addInjectionPointMethod = callThisX("addInjectionPoint", addInjectionPointArgs)
             currentConstructorBody.addStatement(
                     stmt(addInjectionPointMethod)
             )
@@ -455,6 +499,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 map.addMapEntryExpression( constX(p.name), classX(p.type.plainNodeReference) )
             }
             return map
+        }
+
+        private Expression paramsToQualifiers(Parameter[] parameters) {
+            MapExpression map = null
+            AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
+            for(p in parameters) {
+                AnnotationNode ann = stereoTypeFinder.findAnnotationWithStereoType(p, Qualifier)
+                if(ann != null) {
+                    if(map == null) map = new MapExpression()
+                    map.addMapEntryExpression( constX(p.name), classX(ann.classNode) )
+                }
+            }
+            if(map != null) {
+                return map
+            }
+            else {
+                return ConstantExpression.NULL
+            }
         }
 
         private ArgumentListExpression paramTypesToArguments(Parameter[] parameters, ArgumentListExpression args) {

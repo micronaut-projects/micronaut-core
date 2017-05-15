@@ -30,14 +30,14 @@ class Convertible implements Car {
     private Provider<Tire> constructorPlainTireProvider = nullProvider()
     private Provider<Tire> constructorSpareTireProvider = nullProvider()
 
-    @Inject Seat fieldPlainSeat
-    @Inject @Drivers Seat fieldDriversSeat
-    @Inject Tire fieldPlainTire
-    @Inject @Named("spare") Tire fieldSpareTire
-    @Inject Provider<Seat> fieldPlainSeatProvider = nullProvider()
-    @Inject @Drivers Provider<Seat> fieldDriversSeatProvider = nullProvider()
-    @Inject Provider<Tire> fieldPlainTireProvider = nullProvider()
-    @Inject @Named("spare") Provider<Tire> fieldSpareTireProvider = nullProvider()
+    @Inject protected Seat fieldPlainSeat
+    @Inject @Drivers protected Seat fieldDriversSeat
+    @Inject protected  Tire fieldPlainTire
+    @Inject @Named("spare") protected  Tire fieldSpareTire
+    @Inject protected Provider<Seat> fieldPlainSeatProvider = nullProvider()
+    @Inject @Drivers protected  Provider<Seat> fieldDriversSeatProvider = nullProvider()
+    @Inject protected Provider<Tire> fieldPlainTireProvider = nullProvider()
+    @Inject @Named("spare") protected  Provider<Tire> fieldSpareTireProvider = nullProvider()
 
     private Seat methodPlainSeat
     private Seat methodDriversSeat

@@ -2,7 +2,9 @@ package org.particleframework.context;
 
 import org.particleframework.inject.Argument;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,16 +17,20 @@ import java.util.Map;
 class DefaultArgument implements Argument {
     private final Class type;
     private final String name;
+    private final Annotation qualifier;
 
-    public DefaultArgument(Class type, String name) {
+    DefaultArgument(Class type, String name, Annotation qualifier) {
         this.type = type;
         this.name = name;
+        this.qualifier = qualifier;
     }
 
-    static Argument[] from(Map<String, Class> arguments) {
+    static Argument[] from(Map<String, Class> arguments, LinkedHashMap<String, Annotation> qualifiers) {
         List<Argument> args = new ArrayList<>(arguments.size());
         for (Map.Entry<String, Class> entry : arguments.entrySet()) {
-            args.add( new DefaultArgument(entry.getValue(), entry.getKey()));
+            String name = entry.getKey();
+            Annotation qualifier = qualifiers != null ? qualifiers.get(name) : null;
+            args.add( new DefaultArgument(entry.getValue(), name, qualifier));
         }
         return args.toArray(new Argument[arguments.size()]);
     }
@@ -32,6 +38,11 @@ class DefaultArgument implements Argument {
     @Override
     public Class getType() {
         return type;
+    }
+
+    @Override
+    public Annotation getQualifier() {
+        return this.qualifier;
     }
 
     @Override

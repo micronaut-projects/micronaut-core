@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import java.lang.annotation.Annotation;
+
 /**
  * Represents an argument to a method or constructor
  *
@@ -16,4 +18,9 @@ public interface Argument<T> {
      * @return The type of the argument
      */
     Class<T> getType();
+
+    /**
+     * @return The qualifier
+     */
+    Annotation getQualifier();
 }

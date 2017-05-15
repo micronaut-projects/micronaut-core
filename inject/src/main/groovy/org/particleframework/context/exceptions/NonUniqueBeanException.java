@@ -13,10 +13,10 @@ import java.util.Iterator;
  */
 public class NonUniqueBeanException extends NoSuchBeanException {
     private final Class targetType;
-    private final Collection possibleCandidates;
+    private final Iterator possibleCandidates;
 
 
-    public <T> NonUniqueBeanException(Class targetType, Collection<ComponentDefinition<T>> candidates) {
+    public <T> NonUniqueBeanException(Class targetType, Iterator<ComponentDefinition<T>> candidates) {
         super(buildMessage(candidates));
         this.targetType = targetType;
         this.possibleCandidates = candidates;
@@ -25,8 +25,8 @@ public class NonUniqueBeanException extends NoSuchBeanException {
     /**
      * @return The possible bean candidates
      */
-    public <T> Collection<ComponentDefinition<T>> getPossibleCandidates() {
-        return (Collection<ComponentDefinition<T>>)possibleCandidates;
+    public <T> Iterator<ComponentDefinition<T>> getPossibleCandidates() {
+        return possibleCandidates;
     }
 
     /**
@@ -37,13 +37,12 @@ public class NonUniqueBeanException extends NoSuchBeanException {
         return (Class<T>)targetType;
     }
 
-    private static <T> String buildMessage(Collection<ComponentDefinition<T>> possibleCandidates) {
+    private static <T> String buildMessage(Iterator<ComponentDefinition<T>> possibleCandidates) {
         final StringBuilder message = new StringBuilder("Multiple possible bean candidates found: [");
-        Iterator<ComponentDefinition<T>> i = possibleCandidates.iterator();
-        while (i.hasNext()) {
-            Class next = i.next().getType();
+        while (possibleCandidates.hasNext()) {
+            Class next = possibleCandidates.next().getType();
             message.append(next.getName());
-            if(i.hasNext()) {
+            if(possibleCandidates.hasNext()) {
                 message.append(", ");
             }
         }

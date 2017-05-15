@@ -1,5 +1,6 @@
 package org.particleframework.inject;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 
 /**
@@ -30,6 +31,11 @@ public interface FieldInjectionPoint<T> {
      * The required component type
      */
     Class<T> getType();
+
+    /**
+     * @return The qualifier
+     */
+    Annotation getQualifier();
 
     /**
      * @param object The the field on the target object

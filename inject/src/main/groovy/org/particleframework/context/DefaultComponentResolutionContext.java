@@ -125,7 +125,9 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
      */
     class FieldSegment extends AbstractSegment {
         public FieldSegment(ComponentDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
-            super(declaringClass, fieldInjectionPoint.getName(), DefaultArgument.from(Collections.singletonMap(fieldInjectionPoint.getName(), fieldInjectionPoint.getType()))[0]);
+            super(declaringClass,
+                    fieldInjectionPoint.getName(),
+                    new DefaultArgument(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
         }
         @Override
         public String toString() {

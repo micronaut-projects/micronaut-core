@@ -7,7 +7,6 @@ import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 
 import javax.inject.Provider;
-import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
@@ -105,11 +104,25 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * Adds an injection point for a field. Typically called by a dynamically generated subclass.
      *
      * @param field The field
+     * @param qualifier The qualifier, can be null
+     * @return this component definition
+     */
+    protected DefaultComponentDefinition addInjectionPoint(Field field, Annotation qualifier) {
+        requiredComponents.add(field.getType());
+        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, qualifier));
+        return this;
+    }
+
+
+    /**
+     * Adds an injection point for a field. Typically called by a dynamically generated subclass.
+     *
+     * @param field The field
      * @return this component definition
      */
     protected DefaultComponentDefinition addInjectionPoint(Field field) {
         requiredComponents.add(field.getType());
-        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field));
+        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, null));
         return this;
     }
 
@@ -117,19 +130,44 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * Adds an injection point for a method. Typically called by a dynamically generated subclass.
      *
      * @param method The method
+     * @param  arguments The arguments to the method
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(Method method, LinkedHashMap<String, Class> arguments) {
+    protected DefaultComponentDefinition addInjectionPoint(
+                                                Method method,
+                                                LinkedHashMap<String, Class> arguments,
+                                                LinkedHashMap<String, Class> qualifiers) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(method, arguments, methodInjectionPoints);
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, methodInjectionPoints);
     }
 
-    protected DefaultComponentDefinition addPostConstruct(Method method, LinkedHashMap<String, Class> arguments) {
-        return addMethodInjectionPointInternal(method, arguments, postConstructMethods);
+    /**
+     * Adds an injection point for a method. Typically called by a dynamically generated subclass.
+     *
+     * @param setter The method
+     * @param  arguments The arguments to the method
+     * @return this component definition
+     */
+    protected DefaultComponentDefinition addInjectionPoint(
+            Field field,
+            Method setter,
+            LinkedHashMap<String, Class> arguments,
+            LinkedHashMap<String, Class> qualifiers) {
+        Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
+        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, methodInjectionPoints);
     }
 
-    protected DefaultComponentDefinition addPreDestroy(Method method, LinkedHashMap<String, Class> arguments) {
-        return addMethodInjectionPointInternal(method, arguments, preDestroyMethods);
+
+    protected DefaultComponentDefinition addPostConstruct(Method method,
+                                                          LinkedHashMap<String, Class> arguments,
+                                                          LinkedHashMap<String, Class> qualifiers) {
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, postConstructMethods);
+    }
+
+    protected DefaultComponentDefinition addPreDestroy(Method method,
+                                                       LinkedHashMap<String, Class> arguments,
+                                                       LinkedHashMap<String, Class> qualifiers) {
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, preDestroyMethods);
     }
 
     protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean, boolean onlyNonPublic) {
@@ -181,7 +219,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                     Object beanValue;
                     try {
                         path.pushFieldResolve(this, fieldInjectionPoint);
-                        beanValue = defaultContext.getBean(resolutionContext, componentType);
+                        Qualifier qualifier = resolveQualifier(fieldInjectionPoint);
+                        beanValue = defaultContext.getBean(resolutionContext, componentType, qualifier);
                     } catch (NoSuchBeanException e) {
                         throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
                     }
@@ -204,7 +243,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                     if (argumentType.isArray()) {
                         methodArgs[i] = defaultContext.getBeansOfType(resolutionContext, argumentType.getComponentType());
                     } else {
-                        methodArgs[i] = defaultContext.getBean(resolutionContext, argumentType);
+                        Qualifier qualifier = resolveQualifier(argument);
+                        methodArgs[i] = defaultContext.getBean(resolutionContext, argumentType, qualifier);
                     }
                     path.pop();
                 }
@@ -233,7 +273,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         ComponentResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType());
+            Qualifier qualifier = resolveQualifier(argument);
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType(), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -241,6 +282,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
 
     }
+
 
     /**
      * Obtains a bean definition for the field at the given index and the argument at the given index
@@ -259,7 +301,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         Class beanType = injectionPoint.getType();
 
         try {
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, beanType);
+            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, beanType, qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -267,6 +310,52 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
 
     }
+
+    /**
+     * Obtains a bean definition for the field at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getBeanProviderForField(ComponentResolutionContext resolutionContext, Context context, Class providedType, int fieldIndex) {
+        FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushFieldResolve(this, injectionPoint);
+
+        try {
+            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Object bean = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
+            path.pop();
+            return bean;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+        }
+
+    }
+
+    private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {
+        Qualifier qualifier = null;
+        Annotation ann = injectionPoint.getQualifier();
+        if(ann != null) {
+            qualifier = Qualifiers.qualify(ann);
+        }
+        return qualifier;
+    }
+
+    private Qualifier resolveQualifier(Argument argument) {
+        Qualifier qualifier = null;
+        Annotation ann = argument.getQualifier();
+        if(ann != null) {
+            qualifier = Qualifiers.qualify(ann);
+        }
+        return qualifier;
+    }
+
+
 
     /**
      * Obtains a bean definition for a constructor at the given index
@@ -312,7 +401,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         ComponentResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
-            Provider beanProvider = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType);
+            Qualifier qualifier = resolveQualifier(argument);
+            Provider beanProvider = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType,qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -338,7 +428,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         path.pushContructorResolve(this,  argument);
         try {
             Class type = argument.getType();
-            Provider beanProvider  = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType);
+            Qualifier qualifier = resolveQualifier(argument);
+            Provider beanProvider  = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -358,13 +449,57 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             return null;
         }
     }
-    private DefaultComponentDefinition addMethodInjectionPointInternal(Method method, LinkedHashMap<String, Class> arguments, Collection<MethodInjectionPoint> methodInjectionPoints) {
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, arguments);
+
+    private DefaultComponentDefinition addMethodInjectionPointInternal(Field field, Method method, LinkedHashMap<String, Class> arguments, LinkedHashMap<String, Class> qualifierTypes, Collection<MethodInjectionPoint> methodInjectionPoints) {
+        LinkedHashMap<String, Annotation> qualifiers = null;
+        if(qualifierTypes != null && !qualifierTypes.isEmpty()) {
+            qualifiers = new LinkedHashMap<>();
+            if(field != null) {
+                Map.Entry<String, Class> entry = qualifierTypes.entrySet().iterator().next();
+                Annotation matchingAnnotation = findMatchingAnnotation(field.getAnnotations(), entry.getValue());
+                if(matchingAnnotation != null) {
+                    qualifiers.put(entry.getKey(), matchingAnnotation);
+                }
+                else {
+                    qualifiers.put(entry.getKey(), null);
+                }
+            }
+            else {
+                int i = 0;
+                Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+                for (Map.Entry<String, Class> entry : qualifierTypes.entrySet()) {
+                    Annotation[] annotations = parameterAnnotations[i];
+                    Annotation matchingAnnotation = null;
+                    if(annotations.length>0) {
+                        Class annotationType = entry.getValue();
+                        matchingAnnotation = findMatchingAnnotation(annotations, annotationType);
+                    }
+
+                    if(matchingAnnotation != null) {
+                        qualifiers.put(entry.getKey(), matchingAnnotation);
+                    }
+                    else {
+                        qualifiers.put(entry.getKey(), null);
+                    }
+                }
+            }
+
+        }
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, arguments, qualifiers);
         for (Argument argument : methodInjectionPoint.getArguments()) {
             requiredComponents.add(argument.getType());
         }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
+    }
+
+    private Annotation findMatchingAnnotation(Annotation[] annotations, Class annotationType) {
+        for (Annotation annotation : annotations) {
+            if(annotation.annotationType() == annotationType) {
+                return annotation;
+            }
+        }
+        return null;
     }
 
     @Override
