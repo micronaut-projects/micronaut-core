@@ -30,7 +30,7 @@ public interface Context extends LifeCycle {
      * Inject an existing instance
      *
      * @param instance The instance to inject
-     * @return
+     * @return The instance to inject
      */
     <T> T inject(T instance);
 

@@ -96,7 +96,6 @@ public class DefaultContext implements Context {
             return new ResolvedProvider<>(bean);
         }
 
-        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
         ComponentDefinition<T> definition = findConcreteCandidate(beanType);
         if(definition != null) {
             return new UnresolvedProvider<>(definition.getType(), this);
