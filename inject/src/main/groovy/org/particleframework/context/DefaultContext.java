@@ -121,10 +121,16 @@ public class DefaultContext implements Context {
 
         if( definition != null ) {
 
-            synchronized (singletonObjects) {
-                T createdBean = doCreateBean(resolutionContext, definition, beanType);
-                registerSingletonBean(beanType, createdBean);
-                return createdBean;
+            if(definition.isSingleton()) {
+
+                synchronized (singletonObjects) {
+                    T createdBean = doCreateBean(resolutionContext, definition, beanType);
+                    registerSingletonBean(definition, beanType, createdBean);
+                    return createdBean;
+                }
+            }
+            else {
+                return doCreateBean(resolutionContext, definition, beanType);
             }
         }
         else {
@@ -162,14 +168,7 @@ public class DefaultContext implements Context {
 
             injectionDefinitionIfPossible(componentDefinition, bean);
         }
-        if (bean != null) {
-            Collection<Object> initializedObjects = getOrInitializeObjectsForType(beanType);
-            if (componentDefinition.getType().equals(beanType)) {
-                getOrInitializeObjectsForType(beanType).add(bean);
-            }
 
-            initializedObjects.add(bean);
-        }
         Deque<Object> objectsInCreation = resolutionContext.getObjectsInCreation();
         Object head = objectsInCreation.peek();
         if(head != null && head == bean) {
@@ -217,10 +216,18 @@ public class DefaultContext implements Context {
         return filteredResults.collect(Collectors.toList());
     }
 
-    private <T> void registerSingletonBean(Class<T> beanType, T createdBean) {
+    private <T> void registerSingletonBean(ComponentDefinition componentDefinition, Class<T> beanType, T createdBean) {
         // for only one candidate create link to bean type as singleton
         singletonObjects.put(beanType, createdBean);
         singletonObjects.put(createdBean.getClass(), createdBean);
+        if (createdBean != null) {
+            Collection<Object> initializedObjects = getOrInitializeObjectsForType(beanType);
+            if (componentDefinition.getType().equals(beanType)) {
+                getOrInitializeObjectsForType(beanType).add(createdBean);
+            }
+
+            initializedObjects.add(createdBean);
+        }
     }
 
     private void consumeAllComponentDefinitionClasses() {
@@ -276,9 +283,15 @@ public class DefaultContext implements Context {
 
         if (!candidates.isEmpty()) {
             for (ComponentDefinition<T> candidate : candidates) {
-                synchronized (singletonObjects) {
+                if(candidate.isSingleton()) {
+                    synchronized (singletonObjects) {
+                        T createdBean = doCreateBean(resolutionContext, candidate, beanType);
+                        registerSingletonBean(candidate, beanType, createdBean);
+                        beansOfTypeList.add(createdBean);
+                    }
+                }
+                else {
                     T createdBean = doCreateBean(resolutionContext, candidate, beanType);
-                    registerSingletonBean(beanType, createdBean);
                     beansOfTypeList.add(createdBean);
                 }
             }

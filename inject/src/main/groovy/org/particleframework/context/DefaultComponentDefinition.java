@@ -7,6 +7,8 @@ import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 
 import javax.inject.Provider;
+import javax.inject.Scope;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -22,6 +24,8 @@ import java.util.*;
 @Internal
 public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
 
+    private final Annotation scope;
+    private final boolean singleton;
     private final Class<T> type;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
@@ -31,11 +35,25 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
 
 
-    protected DefaultComponentDefinition(  Class<T> type,
+    protected DefaultComponentDefinition(  Annotation scope,
+                                           boolean singleton,
+                                           Class<T> type,
                                            Constructor<T> constructor,
                                            LinkedHashMap<String, Class> arguments) {
+        this.scope = scope;
+        this.singleton = singleton;
         this.type = type;
         this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments);
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return singleton;
+    }
+
+    @Override
+    public Annotation getScope() {
+        return this.scope;
     }
 
     @Override

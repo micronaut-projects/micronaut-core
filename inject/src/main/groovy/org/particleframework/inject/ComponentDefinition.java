@@ -1,5 +1,8 @@
 package org.particleframework.inject;
 
+import javax.inject.Scope;
+import java.lang.annotation.Annotation;
+
 /**
  * Defines a component and its requirements
  *
@@ -7,6 +10,16 @@ package org.particleframework.inject;
  * @since 1.0
  */
 public interface ComponentDefinition<T> {
+
+    /**
+     * @return The scope of the component
+     */
+    Annotation getScope();
+
+    /**
+     * @return Whether the scope is singleton
+     */
+    boolean isSingleton();
 
     /**
      * @return The component type

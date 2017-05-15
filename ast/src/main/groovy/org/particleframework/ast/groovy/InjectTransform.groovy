@@ -19,6 +19,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
 import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
+import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstClassUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.context.ComponentResolutionContext
@@ -34,6 +35,7 @@ import org.particleframework.inject.InjectableComponentDefinition
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Scope
+import javax.inject.Singleton
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
@@ -269,12 +271,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
                 ClassExpression classNodeExpr = classX(classNode.plainNodeReference)
                 BlockStatement constructorBody
-
+                Expression scope
+                Expression singleton
+                def annotationStereoTypeFinder = new AnnotationStereoTypeFinder()
+                AnnotationNode scopeAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Scope.class)
+                if(scopeAnn != null) {
+                    scope = callX(classNodeExpr, "getAnnotation", classX(scopeAnn.classNode))
+                }
+                else {
+                    scope = ConstantExpression.NULL
+                }
+                AnnotationNode singletonAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Singleton.class)
+                singleton = singletonAnn != null ? ConstantExpression.TRUE : ConstantExpression.FALSE
                 if (constructors.isEmpty()) {
                     currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
                     currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode)))
                     constructorBody = block(
-                        ctorSuperS(args(classNodeExpr, callX(classNodeExpr, "getConstructor"), ctorX(makeCached(LinkedHashMap), constX(0))) )
+                        ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor"), ctorX(makeCached(LinkedHashMap), constX(0))) )
                     )
 
                 } else {
@@ -294,7 +307,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode.plainNodeReference)
                         currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
                         constructorBody = block(
-                            ctorSuperS(args(classNodeExpr, callX(classNodeExpr, "getConstructor", ctorTypeArgs), ctorParamsMap ))
+                            ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor", ctorTypeArgs), ctorParamsMap ))
                         )
                     }
                     else {

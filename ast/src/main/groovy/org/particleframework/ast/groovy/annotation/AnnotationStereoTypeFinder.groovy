@@ -32,4 +32,20 @@ class AnnotationStereoTypeFinder {
         }
         return false
     }
+
+    AnnotationNode findAnnotationWithStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
+        List<AnnotationNode> annotations = annotatedNode.getAnnotations()
+        for(AnnotationNode ann in annotations) {
+            ClassNode annotationClassNode = ann.classNode
+            if(annotationClassNode.name == stereotype.name) {
+                return ann
+            }
+            else if(!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
+                if(findAnnotationWithStereoType(ann.classNode, stereotype) != null) {
+                    return ann
+                }
+            }
+        }
+        return null
+    }
 }

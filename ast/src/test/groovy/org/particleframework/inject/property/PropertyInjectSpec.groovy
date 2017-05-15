@@ -19,8 +19,8 @@ class SimplePropertyInjectSpec extends Specification {
         then:
         controller != null
         controller.bookService != null
-        context.getBean(BookController).is(controller)
-        context.getBean(BookController2).is(controller2)
+        !context.getBean(BookController).is(controller)
+        !context.getBean(BookController2).is(controller2)
         context.getBeansOfType(BookService).contains(controller.bookService)
         controller.bookService.is(controller2.@bookService)
     }
