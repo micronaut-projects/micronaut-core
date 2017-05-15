@@ -39,6 +39,49 @@ class FooService {}
 
     }
 
+    void "test parse with abstract inheritance"() {
+        given:
+        def gcl = new GroovyClassLoader()
+
+        when:
+        gcl.parseClass('''
+import javax.inject.*
+
+    @Singleton
+    class A {
+
+    }
+
+    abstract class AbstractB {
+        // inject via field
+        @Inject protected A a
+        private A another
+        // inject via method
+        @Inject void setAnother(A a) {
+            this.another = a
+        }
+
+        A getA() {
+            return a
+        }
+
+        A getAnother() {
+            return another
+        }
+    }
+
+    @Singleton
+    class B extends AbstractB {
+
+    }
+''')
+
+        then:
+        gcl.loadedClasses.size() == 7
+
+
+    }
+
     void "test parse singleton with array injection"() {
         given:
         def gcl = new GroovyClassLoader()

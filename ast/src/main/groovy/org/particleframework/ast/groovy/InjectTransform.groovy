@@ -60,13 +60,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
 
-        InjectVisitor injectVisitor = new InjectVisitor(source)
+        Map<ClassNode, ClassNode> componentDefinitionClassNodes =[:]
+
         for (ClassNode classNode in moduleNode.getClasses()) {
-            if(classNode.isAbstract()) continue
+            if(classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
+                continue
+            }
+            InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
             injectVisitor.visitClass(classNode)
+            componentDefinitionClassNodes.putAll(injectVisitor.componentDefinitionClassNodes)
         }
+
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-        for (entry in injectVisitor.componentDefinitionClassNodes) {
+        for (entry in componentDefinitionClassNodes) {
             ClassNode newClass = entry.value
             ClassNode targetClass =entry.key
             moduleNode.addClass(newClass)
@@ -75,11 +81,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
             componentDefinitionClass.addConstructor(
-                new ConstructorNode(Modifier.PUBLIC, block(
-                    ctorSuperS(args(classX(newClass))),
-                    // set the meta class to null to save memory
-                    stmt(callX(varX("this"), "setMetaClass", ConstantExpression.NULL))
-                ))
+                    new ConstructorNode(Modifier.PUBLIC, block(
+                            ctorSuperS(args(classX(newClass))),
+                            // set the meta class to null to save memory
+                            stmt(callX(varX("this"), "setMetaClass", ConstantExpression.NULL))
+                    ))
             )
             componentDefinitionClass.setModule(moduleNode)
             generator.generate(componentDefinitionClass, ComponentDefinitionClass)
@@ -95,6 +101,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         final SourceUnit sourceUnit
         final Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
+        final ClassNode concreteClass
 
         boolean isProvider = false
         ClassNode currentComponentDef = null
@@ -103,13 +110,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         BlockStatement currentInjectBody = null
         Parameter currentContextParam = null
         int methodIndex = 0
+        int fieldIndex = 0
         Parameter currentResolutionContextParam = null
         VariableExpression currentBuildInstance = null
         VariableExpression currentInjectInstance = null
         AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
-        InjectVisitor(SourceUnit sourceUnit) {
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
             this.sourceUnit = sourceUnit
+            this.concreteClass = targetClassNode
         }
 
         @Override
@@ -118,6 +127,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 defineComponentDefinitionClass(node)
             }
             super.visitClass(node)
+            ClassNode superClass = node.getSuperClass()
+            while(superClass != null && superClass.isAbstract()) {
+                superClass.visitContents(this)
+                superClass = superClass.getSuperClass()
+            }
+            if(node.isAbstract()) return
+
             if(currentBuildBody != null && !currentComponentDef.getNodeMetaData("injected")) {
                 def thisX = varX("this")
                 // set the meta class to null to save memory
@@ -145,17 +161,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
             if (stereoTypeFinder.hasStereoType(methodNode, Inject)) {
-                defineComponentDefinitionClass(methodNode.declaringClass)
+                ClassNode classNode = methodNode.declaringClass
+                boolean isParent = classNode != concreteClass
+                if(!isParent) {
+                    defineComponentDefinitionClass(classNode)
+                }
 
                 if (!isConstructor && currentConstructorBody != null) {
                     if(!methodNode.isStatic()) {
-
+                        if(isParent) {
+                            boolean overridden = concreteClass.getDeclaredMethod(methodNode.name, methodNode.parameters) != null
+                            if(overridden) {
+                                // bail out if the method has been overridden, since it will have already been handled
+                                return
+                            }
+                        }
                         Expression methodName = constX(methodNode.name)
-                        ClassExpression declaringClass = classX(methodNode.declaringClass.plainNodeReference)
-                        addMethodInjectionPoint(declaringClass, methodName, methodNode.isPublic(), methodNode.parameters)
-                    }
-                    else {
-                        // TODO: handle static method injection?
+                        ClassExpression declaringClass = classX(classNode.plainNodeReference)
+                        addMethodInjectionPoint(declaringClass, methodName, !methodNode.isPrivate(), methodNode.parameters)
                     }
                 }
             }
@@ -169,6 +192,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (currentConstructorBody != null) {
                     if(!fieldNode.isStatic()) {
 
+                        if (currentInjectInstance != null && !Modifier.isPrivate(fieldNode.getModifiers())) {
+                            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam), constX(fieldIndex) )
+                            Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX("getBeanForField", lookupArgs))
+                            currentInjectBody.addStatement(
+                                    stmt(injectCall)
+                            )
+                        }
+
                         MethodCallExpression getFieldCall = callX(
                                 classX(fieldNode.declaringClass.plainNodeReference),
                                 "getDeclaredField",
@@ -177,9 +208,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         currentConstructorBody.addStatement(
                                 stmt(addInjectionPointMethod)
                         )
-                    }
-                    else {
-                        // TODO: Handle static field injection?
+                        fieldIndex++
                     }
                 }
             }
@@ -195,19 +224,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         ClassExpression declaringClass = classX(propertyNode.declaringClass.plainNodeReference)
                         Expression propertyType = classX(propertyNode.type)
 
-                        addMethodInjectionPoint(declaringClass, setterName, propertyNode.isPublic(), param(propertyType.type, propertyNode.name))
+                        addMethodInjectionPoint(declaringClass, setterName, !propertyNode.isPrivate(), param(propertyType.type, propertyNode.name))
                     }
-                }
-                else {
-                    // TODO: handle static property injection?
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, boolean isPublic, Parameter... parameterTypes) {
-            if (currentInjectInstance != null && isPublic) {
+        private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, boolean notPrivate, Parameter... parameterTypes) {
+
+            if (currentInjectInstance != null && notPrivate) {
                 Expression methodArgs = buildBeanLookupArguments(declaringClass, methodName, parameterTypes)
-                methodIndex++
                 def injectCall = callX(currentInjectInstance, methodName, methodArgs)
                 def methodTarget = declaringClass.type.getMethod(methodName.text, parameterTypes)
                 injectCall.setMethodTarget(methodTarget)
@@ -225,6 +251,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             currentConstructorBody.addStatement(
                     stmt(addInjectionPointMethod)
             )
+            methodIndex++
         }
 
         @Override
@@ -233,7 +260,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void defineComponentDefinitionClass(ClassNode classNode) {
-            if (!componentDefinitionClassNodes.containsKey(classNode)) {
+            if (!componentDefinitionClassNodes.containsKey(classNode) && !classNode.isAbstract()) {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 isProvider = providerGenericType != null
                 ClassNode targetClassNode = isProvider ? providerGenericType : classNode
@@ -344,7 +371,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     componentDefinitionClassNodes.put(classNode, currentComponentDef)
                 }
-            } else {
+            } else if(!classNode.isAbstract()) {
                 currentComponentDef = componentDefinitionClassNodes.get(classNode)
             }
         }

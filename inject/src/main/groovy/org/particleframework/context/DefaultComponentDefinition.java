@@ -9,10 +9,7 @@ import org.particleframework.core.annotation.Internal;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.*;
 
 /**
@@ -139,62 +136,65 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         DefaultContext defaultContext = (DefaultContext) context;
         ComponentResolutionContext.Path path = resolutionContext.getPath();
         for (FieldInjectionPoint fieldInjectionPoint : getRequiredFields()) {
-            Class componentType = fieldInjectionPoint.getType();
             Field field = fieldInjectionPoint.getField();
-            Class genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
+            if(Modifier.isPrivate(field.getModifiers())) {
+                Class componentType = fieldInjectionPoint.getType();
 
-            Object value;
-            if (componentType.isArray()) {
-                Class arrayType = componentType.getComponentType();
-                path.pushFieldResolve(this, fieldInjectionPoint);
-                Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext,arrayType);
-                Object[] newArray = (Object[]) Array.newInstance(arrayType, beans.size());
-                int i = 0;
-                for (Object foundBean : beans) {
-                    newArray[i++] = foundBean;
-                }
-                value = newArray;
-            } else if (Iterable.class.isAssignableFrom(componentType)) {
-                if (genericType != null) {
+                Class genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
+
+                Object value;
+                if (componentType.isArray()) {
+                    Class arrayType = componentType.getComponentType();
                     path.pushFieldResolve(this, fieldInjectionPoint);
-                    Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext, genericType);
-                    if (componentType.isInstance(beans)) {
-                        value = beans;
-                    } else {
-                        try {
-                            value = coerceToType(beans, componentType);
-                        } catch (Exception e) {
-                            throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
+                    Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext,arrayType);
+                    Object[] newArray = (Object[]) Array.newInstance(arrayType, beans.size());
+                    int i = 0;
+                    for (Object foundBean : beans) {
+                        newArray[i++] = foundBean;
+                    }
+                    value = newArray;
+                } else if (Iterable.class.isAssignableFrom(componentType)) {
+                    if (genericType != null) {
+                        path.pushFieldResolve(this, fieldInjectionPoint);
+                        Collection beans = (Collection)defaultContext.getBeansOfType(resolutionContext, genericType);
+                        if (componentType.isInstance(beans)) {
+                            value = beans;
+                        } else {
+                            try {
+                                value = coerceToType(beans, componentType);
+                            } catch (Exception e) {
+                                throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
+                            }
                         }
+                    } else {
+                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
+                    }
+                } else if(Provider.class.isAssignableFrom(componentType)) {
+                    if (genericType != null) {
+                        path.pushFieldResolve(this, fieldInjectionPoint);
+                        value = defaultContext.getBeanProvider(resolutionContext, genericType);
+                        path.pop();
+                    } else {
+                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
                     }
                 } else {
-                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
+                    Object beanValue;
+                    try {
+                        path.pushFieldResolve(this, fieldInjectionPoint);
+                        beanValue = defaultContext.getBean(resolutionContext, componentType);
+                    } catch (NoSuchBeanException e) {
+                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
+                    }
+                    value = beanValue;
                 }
-            } else if(Provider.class.isAssignableFrom(componentType)) {
-                if (genericType != null) {
-                    path.pushFieldResolve(this, fieldInjectionPoint);
-                    value = defaultContext.getBeanProvider(resolutionContext, genericType);
-                    path.pop();
-                } else {
-                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
-                }
-            } else {
-                Object beanValue;
-                try {
-                    path.pushFieldResolve(this, fieldInjectionPoint);
-                    beanValue = defaultContext.getBean(resolutionContext, componentType);
-                } catch (NoSuchBeanException e) {
-                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
-                }
-                value = beanValue;
+                path.pop();
+                fieldInjectionPoint.set(bean, value);
             }
-            path.pop();
-            fieldInjectionPoint.set(bean, value);
         }
 
 
         for (MethodInjectionPoint methodInjectionPoint : getRequiredProperties()) {
-            if (onlyNonPublic && !java.lang.reflect.Modifier.isPublic(methodInjectionPoint.getMethod().getModifiers())) {
+            if (onlyNonPublic && java.lang.reflect.Modifier.isPrivate(methodInjectionPoint.getMethod().getModifiers())) {
                 Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
                 Object[] methodArgs = new Object[methodArgumentTypes.length];
                 for (int i = 0; i < methodArgumentTypes.length; i++) {
@@ -238,6 +238,32 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             return bean;
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+        }
+
+    }
+
+    /**
+     * Obtains a bean definition for the field at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getBeanForField(ComponentResolutionContext resolutionContext, Context context, int fieldIndex) {
+        FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushFieldResolve(this, injectionPoint);
+        Class beanType = injectionPoint.getType();
+
+        try {
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, beanType);
+            path.pop();
+            return bean;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
         }
 
     }
