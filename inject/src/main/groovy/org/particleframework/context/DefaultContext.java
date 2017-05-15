@@ -201,7 +201,7 @@ public class DefaultContext implements Context {
                 else {
                     Collection<ComponentDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
                     if(exactMatches.size() == 1) {
-                        definition = candidates.iterator().next();
+                        definition = exactMatches.iterator().next();
                     }
                     else {
                         throw new NonUniqueBeanException(beanType, candidates.iterator());

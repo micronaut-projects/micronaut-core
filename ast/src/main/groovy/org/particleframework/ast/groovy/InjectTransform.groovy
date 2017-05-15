@@ -358,7 +358,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
                     currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode)))
                     constructorBody = block(
-                        ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor"), ctorX(makeCached(LinkedHashMap), constX(0))) )
+                        ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor")) )
                     )
 
                 } else {
@@ -374,11 +374,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(constructorNode != null) {
                         ArgumentListExpression ctorTypeArgs = paramTypesToArguments(constructorNode.parameters)
                         MapExpression ctorParamsMap = paramsToMap(constructorNode.parameters)
+                        Expression qualifiers = paramsToQualifiers(constructorNode.parameters)
                         ArgumentListExpression ctorArgs =  buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
                         currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode.plainNodeReference)
                         currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
+                        ArgumentListExpression constructorArgs = args(
+                                scope,
+                                singleton,
+                                classNodeExpr,
+                                callX(classNodeExpr, "getConstructor", ctorTypeArgs),
+                                ctorParamsMap,
+                                qualifiers)
                         constructorBody = block(
-                            ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor", ctorTypeArgs), ctorParamsMap ))
+                            ctorSuperS(constructorArgs)
                         )
                     }
                     else {

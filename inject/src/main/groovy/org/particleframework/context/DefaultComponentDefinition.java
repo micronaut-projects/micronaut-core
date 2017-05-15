@@ -20,6 +20,7 @@ import java.util.*;
 @Internal
 public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
 
+    private static final LinkedHashMap<String, Class> EMPTY_MAP = new LinkedHashMap<>(0);
     private final Annotation scope;
     private final boolean singleton;
     private final Class<T> type;
@@ -35,11 +36,24 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                                            boolean singleton,
                                            Class<T> type,
                                            Constructor<T> constructor,
-                                           LinkedHashMap<String, Class> arguments) {
+                                           LinkedHashMap<String, Class> arguments,
+                                           LinkedHashMap<String, Class> qualifiers) {
         this.scope = scope;
         this.singleton = singleton;
         this.type = type;
-        this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments);
+        LinkedHashMap<String, Annotation> qualifierMap = null;
+        if(qualifiers != null) {
+            qualifierMap = new LinkedHashMap<>();
+            populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, constructor.getParameterAnnotations());
+        }
+        this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments, qualifierMap);
+    }
+
+    protected DefaultComponentDefinition(  Annotation scope,
+                                           boolean singleton,
+                                           Class<T> type,
+                                           Constructor<T> constructor) {
+        this(scope, singleton, type, constructor, EMPTY_MAP, null);
     }
 
     @Override
@@ -373,7 +387,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         ComponentResolutionContext.Path path = resolutionContext.getPath();
         path.pushContructorResolve(this,  argument);
         try {
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType());
+            Qualifier qualifier = resolveQualifier(argument);
+            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType(), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -465,23 +480,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                 }
             }
             else {
-                int i = 0;
                 Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-                for (Map.Entry<String, Class> entry : qualifierTypes.entrySet()) {
-                    Annotation[] annotations = parameterAnnotations[i];
-                    Annotation matchingAnnotation = null;
-                    if(annotations.length>0) {
-                        Class annotationType = entry.getValue();
-                        matchingAnnotation = findMatchingAnnotation(annotations, annotationType);
-                    }
-
-                    if(matchingAnnotation != null) {
-                        qualifiers.put(entry.getKey(), matchingAnnotation);
-                    }
-                    else {
-                        qualifiers.put(entry.getKey(), null);
-                    }
-                }
+                populateQualifiersFromParameterAnnotations(arguments, qualifierTypes, qualifiers, parameterAnnotations);
             }
 
         }
@@ -491,6 +491,27 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
+    }
+
+    private void populateQualifiersFromParameterAnnotations(LinkedHashMap<String, Class> argumentTypes, LinkedHashMap<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
+        int i = 0;
+        for (Map.Entry<String, Class> entry : argumentTypes.entrySet()) {
+            Annotation[] annotations = parameterAnnotations[i++];
+            Annotation matchingAnnotation = null;
+            if(annotations.length>0) {
+                Class annotationType = qualifierTypes.get(entry.getKey());
+                if(annotationType != null) {
+                    matchingAnnotation = findMatchingAnnotation(annotations, annotationType);
+                }
+            }
+
+            if(matchingAnnotation != null) {
+                qualifiers.put(entry.getKey(), matchingAnnotation);
+            }
+            else {
+                qualifiers.put(entry.getKey(), null);
+            }
+        }
     }
 
     private Annotation findMatchingAnnotation(Annotation[] annotations, Class annotationType) {
