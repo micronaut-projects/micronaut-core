@@ -174,25 +174,33 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (!isConstructor && currentConstructorBody != null) {
                     if(!methodNode.isStatic()) {
-                        if(isParent && !methodNode.isPrivate()) {
-                            MethodNode overridenMethod = concreteClass.getMethod(methodNode.name, methodNode.parameters)
+                        boolean isPackagePrivate = isPackagePrivate(methodNode)
+                        boolean isPrivate = methodNode.isPrivate()
+                        MethodNode overriddenMethod = concreteClass.getMethod(methodNode.name, methodNode.parameters)
+                        boolean overridden = overriddenMethod.declaringClass != methodNode.declaringClass
+                        if(isParent && !isPrivate && !isPackagePrivate) {
 
-                            boolean overridden = overridenMethod != null && overridenMethod.declaringClass != methodNode.declaringClass
                             if(overridden) {
                                 // bail out if the method has been overridden, since it will have already been handled
                                 return
                             }
                         }
                         Expression methodName = constX(methodNode.name)
-                        boolean notPrivate = !methodNode.isPrivate()
-                        if(isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
-                            notPrivate = false
+                        boolean isPackagePrivateAndPackagesDiffer = (overriddenMethod.declaringClass.packageName != concreteClass.packageName) && isPackagePrivate
+                        boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
+                        if(!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
+                            requiresReflection = true
                         }
-                        addMethodInjectionPoint(classNode, methodName, notPrivate ,null, methodNode.parameters)
+                        addMethodInjectionPoint(classNode, methodName, requiresReflection ,null, methodNode.parameters)
                     }
                 }
             }
 
+        }
+
+        boolean isPackagePrivate(MethodNode methodNode) {
+            int modifiers = methodNode.getModifiers()
+            return  ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !methodNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override
@@ -271,17 +279,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Parameter setterArg = param(propertyType.type, propertyNode.name)
                         AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
-                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, !propertyNode.isPrivate(), fieldVar, setterArg)
+                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, propertyNode.isPrivate(), fieldVar, setterArg)
                     }
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
+        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, boolean requiresReflection, VariableExpression field, Parameter... parameterTypes) {
 
-            boolean requiresReflection = !notPrivate
-
-            if (currentInjectInstance != null && notPrivate) {
+            if (currentInjectInstance != null && !requiresReflection) {
                 boolean isParentMethod = declaringClass != concreteClass
                 Expression methodArgs = buildBeanLookupArguments(classX(declaringClass), methodName, parameterTypes)
                 MethodCallExpression injectCall = callX(currentInjectInstance, methodName, methodArgs)
@@ -325,8 +331,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         protected boolean isInheritedAndNotPublic(AnnotatedNode annotatedNode, ClassNode declaringClass, int modifiers) {
             return declaringClass != concreteClass &&
                     declaringClass.packageName != concreteClass.packageName &&
-                    ((Modifier.isProtected(modifiers) || !Modifier.isPublic(modifiers)) ||
-                    !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
+                    ((Modifier.isProtected(modifiers) || !Modifier.isPublic(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override

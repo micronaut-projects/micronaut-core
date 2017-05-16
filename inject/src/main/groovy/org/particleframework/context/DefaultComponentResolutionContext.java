@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.*;
 
 import java.util.*;
@@ -10,14 +11,15 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultComponentResolutionContext implements ComponentResolutionContext{
+@Internal
+class DefaultComponentResolutionContext implements ComponentResolutionContext{
 
     private final Context context;
     private final ComponentDefinition rootDefinition;
     private final Deque<Object> objectsInCreation;
     private final Path path;
 
-    public DefaultComponentResolutionContext(Context context, ComponentDefinition rootDefinition) {
+    DefaultComponentResolutionContext(Context context, ComponentDefinition rootDefinition) {
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.objectsInCreation = new LinkedList<>();

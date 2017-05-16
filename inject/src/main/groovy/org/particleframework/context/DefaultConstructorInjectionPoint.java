@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ComponentDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
     private final Constructor<T> constructor;
     private final Argument[] arguments;

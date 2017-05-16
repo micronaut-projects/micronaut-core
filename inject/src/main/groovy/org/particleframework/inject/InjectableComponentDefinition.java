@@ -3,9 +3,12 @@ package org.particleframework.inject;
 import org.particleframework.context.Context;
 
 /**
- * Created by graemerocher on 12/05/2017.
+ * A bean definition that is injectable
+ *
+ * @author Graeme Rocher
+ * @since 1.0
  */
-public interface InjectableComponentDefinition<T> {
+public interface InjectableComponentDefinition<T> extends ComponentDefinition<T> {
     /**
      * Inject the given bean with the context
      *

@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
@@ -14,6 +15,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultArgument implements Argument {
     private final Class type;
     private final String name;

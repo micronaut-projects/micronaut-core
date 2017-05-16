@@ -28,6 +28,7 @@ public interface ConstructorInjectionPoint<T> {
 
     /**
      * Invoke the constructor
+     *
      * @param args The arguments
      * @return The new value
      */

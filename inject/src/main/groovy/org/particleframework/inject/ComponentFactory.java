@@ -2,7 +2,6 @@ package org.particleframework.inject;
 
 import org.particleframework.context.ComponentResolutionContext;
 import org.particleframework.context.Context;
-import org.particleframework.context.DefaultComponentResolutionContext;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 /**
