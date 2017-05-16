@@ -2,6 +2,7 @@ package org.particleframework.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
@@ -123,16 +124,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
+            if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
+                defineComponentDefinitionClass(concreteClass)
+            }
         }
 
         @Override
         void visitClass(ClassNode node) {
-            if (stereoTypeFinder.hasStereoType(node, Scope)) {
-                defineComponentDefinitionClass(node)
-            }
+
             super.visitClass(node)
             ClassNode superClass = node.getSuperClass()
-            while(superClass != null && superClass.isAbstract()) {
+            while(superClass != null) {
                 superClass.visitContents(this)
                 superClass = superClass.getSuperClass()
             }
@@ -166,23 +168,26 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
             if (stereoTypeFinder.hasStereoType(methodNode, Inject)) {
                 ClassNode classNode = methodNode.declaringClass
+                defineComponentDefinitionClass(concreteClass)
                 boolean isParent = classNode != concreteClass
-                if(!isParent) {
-                    defineComponentDefinitionClass(classNode)
-                }
 
                 if (!isConstructor && currentConstructorBody != null) {
                     if(!methodNode.isStatic()) {
                         if(isParent) {
-                            boolean overridden = concreteClass.getDeclaredMethod(methodNode.name, methodNode.parameters) != null
+                            MethodNode overridenMethod = concreteClass.getMethod(methodNode.name, methodNode.parameters)
+
+                            boolean overridden = overridenMethod != null && overridenMethod.declaringClass != methodNode.declaringClass
                             if(overridden) {
                                 // bail out if the method has been overridden, since it will have already been handled
                                 return
                             }
                         }
                         Expression methodName = constX(methodNode.name)
-                        ClassExpression declaringClass = classX(classNode.plainNodeReference)
-                        addMethodInjectionPoint(declaringClass, methodName, !methodNode.isPrivate(),null, methodNode.parameters)
+                        boolean notPrivate = !methodNode.isPrivate()
+                        if(isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
+                            notPrivate = false
+                        }
+                        addMethodInjectionPoint(classNode, methodName, methodNode.modifiers, notPrivate ,null, methodNode.parameters)
                     }
                 }
             }
@@ -192,27 +197,34 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitField(FieldNode fieldNode) {
             if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && fieldNode.declaringClass.getProperty(fieldNode.getName()) == null) {
-                defineComponentDefinitionClass(fieldNode.declaringClass)
+                defineComponentDefinitionClass(concreteClass)
                 if (currentConstructorBody != null) {
                     if(!fieldNode.isStatic()) {
 
-                        if (currentInjectInstance != null && !Modifier.isPrivate(fieldNode.getModifiers())) {
-                            boolean isProvider = AstClassUtils.implementsInterface(fieldNode.type, Provider) && fieldNode.type.genericsTypes
-                            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
-
-                            if(isProvider) {
-                                lookupArgs.addExpression(classX(fieldNode.type.genericsTypes[0].type.plainNodeReference))
+                        def modifiers = fieldNode.getModifiers()
+                        boolean requiresReflection = Modifier.isPrivate(modifiers)
+                        if (currentInjectInstance != null && !requiresReflection) {
+                            if(isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)) {
+                                requiresReflection = true
                             }
-                            lookupArgs.addExpression( constX(fieldIndex) )
+                            else {
+                                boolean isProvider = AstClassUtils.implementsInterface(fieldNode.type, Provider) && fieldNode.type.genericsTypes
+                                ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
 
-                            String methodName = "getBeanForField"
-                            if(isProvider) {
-                                methodName = "getBeanProviderForField"
+                                if(isProvider) {
+                                    lookupArgs.addExpression(classX(fieldNode.type.genericsTypes[0].type.plainNodeReference))
+                                }
+                                lookupArgs.addExpression( constX(fieldIndex) )
+
+                                String methodName = "getBeanForField"
+                                if(isProvider) {
+                                    methodName = "getBeanProviderForField"
+                                }
+                                Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX(methodName, lookupArgs))
+                                currentInjectBody.addStatement(
+                                        stmt(injectCall)
+                                )
                             }
-                            Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX(methodName, lookupArgs))
-                            currentInjectBody.addStatement(
-                                    stmt(injectCall)
-                            )
                         }
 
                         VariableExpression fieldVar = declareFieldVar('$field' + fieldIndex++, fieldNode)
@@ -222,6 +234,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if(qualifierAnn != null) {
                             methodArgs.addExpression(callX(fieldVar, "getAnnotation", classX(qualifierAnn.classNode)))
                         }
+                        methodArgs.addExpression(constX(requiresReflection))
                         MethodCallExpression addInjectionPointMethod = callX(varX("this"),"addInjectionPoint", methodArgs)
                         currentConstructorBody.addStatement(
                                 stmt(addInjectionPointMethod)
@@ -249,37 +262,38 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             FieldNode fieldNode = propertyNode.field
             if(fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
                 if(!propertyNode.isStatic()) {
-                    defineComponentDefinitionClass(propertyNode.declaringClass)
+                    defineComponentDefinitionClass(concreteClass)
                     if (currentConstructorBody != null) {
                         VariableExpression fieldVar = declareFieldVar('$method_field' + methodIndex,fieldNode)
                         ConstantExpression setterName = constX(getSetterName(propertyNode.name))
-                        ClassExpression declaringClass = classX(propertyNode.declaringClass.plainNodeReference)
                         Expression propertyType = classX(propertyNode.type)
 
                         Parameter setterArg = param(propertyType.type, propertyNode.name)
                         AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
-                        addMethodInjectionPoint(declaringClass, setterName, !propertyNode.isPrivate(), fieldVar, setterArg)
+                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, propertyNode.modifiers, !propertyNode.isPrivate(), fieldVar, setterArg)
                     }
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassExpression declaringClass, Expression methodName, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
+        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, int modifiers, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
+
+            boolean requiresReflection = !notPrivate
 
             if (currentInjectInstance != null && notPrivate) {
-                Expression methodArgs = buildBeanLookupArguments(declaringClass, methodName, parameterTypes)
-                def injectCall = callX(currentInjectInstance, methodName, methodArgs)
-                def methodTarget = declaringClass.type.getMethod(methodName.text, parameterTypes)
+                Expression methodArgs = buildBeanLookupArguments(classX(declaringClass), methodName, parameterTypes)
+                MethodCallExpression injectCall = callX(currentInjectInstance, methodName, methodArgs)
+                MethodNode methodTarget = declaringClass.getMethod(methodName.text, parameterTypes)
                 injectCall.setMethodTarget(methodTarget)
                 currentInjectBody.addStatement(
-                    stmt(injectCall)
+                        stmt(injectCall)
                 )
             }
 
 
             ArgumentListExpression argExpr = args(methodName)
             argExpr = paramTypesToArguments(parameterTypes, argExpr)
-            MethodCallExpression getMethodCall = callX(declaringClass, "getDeclaredMethod", argExpr)
+            Expression getMethodCall = callX(declaringClass, "getDeclaredMethod", argExpr)
             def methodVar = varX('$method' + methodIndex, makeCached(Method))
             currentConstructorBody.addStatement(
                     declS(methodVar, getMethodCall)
@@ -287,7 +301,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             MapExpression paramsMap = paramsToMap(parameterTypes)
             Expression qualifiers = paramsToQualifiers(parameterTypes)
 
-            ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers)
+            ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers, constX(requiresReflection))
             if(field != null) {
                 addInjectionPointArgs.expressions.add(0, field)
             }
@@ -296,6 +310,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     stmt(addInjectionPointMethod)
             )
             methodIndex++
+        }
+
+        protected boolean isInheritedAndNotPublic(AnnotatedNode annotatedNode, ClassNode declaringClass, int modifiers) {
+            return declaringClass != concreteClass &&
+                    declaringClass.packageName != concreteClass.packageName &&
+                    ((Modifier.isProtected(modifiers) || !Modifier.isPublic(modifiers)) ||
+                    !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override

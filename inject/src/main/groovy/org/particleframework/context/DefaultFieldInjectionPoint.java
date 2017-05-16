@@ -20,18 +20,25 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     private final Field field;
     private final Annotation qualifier;
     private final ComponentDefinition declaringComponent;
+    private final boolean requiresReflection;
 
-    DefaultFieldInjectionPoint(ComponentDefinition declaringComponent, Field field, Annotation qualifier) {
+    DefaultFieldInjectionPoint(ComponentDefinition declaringComponent, Field field, Annotation qualifier, boolean requiresReflection) {
         this.field = field;
         this.field.setAccessible(true);
         this.name = field.getName();
         this.declaringComponent = declaringComponent;
         this.qualifier = qualifier;
+        this.requiresReflection = requiresReflection;
     }
 
     @Override
     public Annotation getQualifier() {
         return this.qualifier;
+    }
+
+    @Override
+    public boolean requiresReflection() {
+        return requiresReflection;
     }
 
     @Override

@@ -39,6 +39,38 @@ class FooService {}
 
     }
 
+    void "test inheritance with differing packages"() {
+        given:
+        def gcl = new GroovyClassLoader()
+
+        when:
+        gcl.parseClass('''
+
+package foo
+@javax.inject.Singleton
+class FooService {
+    @javax.inject.Inject
+    @groovy.transform.PackageScope
+    void injectPackageScopeMethod() {}
+}
+
+''')
+
+        gcl.parseClass('''
+
+package bar
+@javax.inject.Singleton
+class BarService extends foo.FooService {
+
+}
+''')
+
+        then:
+        gcl.loadedClasses.size() == 6
+
+
+    }
+
     void "test parse with abstract inheritance"() {
         given:
         def gcl = new GroovyClassLoader()
@@ -254,10 +286,10 @@ class BarService {
 
         then:
         cdef.constructor.arguments.size() == 0
-        cdef.requiredFields.size() == 1
-        cdef.requiredFields.first().name == 'anotherFooService'
-        cdef.requiredProperties.size() == 1
-        cdef.requiredProperties.first().method.name == "setFooService"
+        cdef.injectedFields.size() == 1
+        cdef.injectedFields.first().name == 'anotherFooService'
+        cdef.injectedMethods.size() == 1
+        cdef.injectedMethods.first().method.name == "setFooService"
 
     }
 }

@@ -22,16 +22,24 @@ import java.util.Map;
 class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Method method;
     private final Argument[] arguments;
+    private final boolean requiresReflection;
     private final ComponentDefinition declaringComponent;
 
     DefaultMethodInjectionPoint(ComponentDefinition declaringComponent,
                                 Method method,
+                                boolean requiresReflection,
                                 LinkedHashMap<String, Class> arguments,
                                 LinkedHashMap<String, Annotation> qualifiers) {
         this.method = method;
+        this.requiresReflection = requiresReflection;
         this.method.setAccessible(true);
         this.arguments = DefaultArgument.from(arguments, qualifiers);
         this.declaringComponent = declaringComponent;
+    }
+
+    @Override
+    public boolean requiresReflection() {
+        return requiresReflection;
     }
 
     @Override

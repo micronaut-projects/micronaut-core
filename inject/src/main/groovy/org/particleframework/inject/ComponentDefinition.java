@@ -39,12 +39,12 @@ public interface ComponentDefinition<T> {
     /**
      * @return The required properties
      */
-    Iterable<MethodInjectionPoint> getRequiredProperties();
+    Iterable<MethodInjectionPoint> getInjectedMethods();
 
     /**
      * @return The required fields
      */
-    Iterable<FieldInjectionPoint> getRequiredFields();
+    Iterable<FieldInjectionPoint> getInjectedFields();
 
     /**
      * @return Methods to call post construct

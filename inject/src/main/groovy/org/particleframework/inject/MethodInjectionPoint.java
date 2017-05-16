@@ -30,6 +30,10 @@ public interface MethodInjectionPoint {
     Argument[] getArguments();
 
     /**
+     * @return Whether reflection is required to satisfy the injection point
+     */
+    boolean requiresReflection();
+    /**
      * Invokes the method
      *
      * @param args The arguments. Should match the types of getArguments()

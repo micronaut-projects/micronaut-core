@@ -82,12 +82,12 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     }
 
     @Override
-    public Iterable<MethodInjectionPoint> getRequiredProperties() {
+    public Iterable<MethodInjectionPoint> getInjectedMethods() {
         return Collections.unmodifiableCollection(methodInjectionPoints);
     }
 
     @Override
-    public Iterable<FieldInjectionPoint> getRequiredFields() {
+    public Iterable<FieldInjectionPoint> getInjectedFields() {
         return Collections.unmodifiableCollection(fieldInjectionPoints);
     }
 
@@ -121,9 +121,9 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param qualifier The qualifier, can be null
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(Field field, Annotation qualifier) {
+    protected DefaultComponentDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
         requiredComponents.add(field.getType());
-        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, qualifier));
+        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, qualifier, requiresReflection));
         return this;
     }
 
@@ -134,9 +134,9 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param field The field
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(Field field) {
+    protected DefaultComponentDefinition addInjectionPoint(Field field, boolean requiresReflection) {
         requiredComponents.add(field.getType());
-        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, null));
+        fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, null, requiresReflection));
         return this;
     }
 
@@ -150,9 +150,10 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     protected DefaultComponentDefinition addInjectionPoint(
                                                 Method method,
                                                 LinkedHashMap<String, Class> arguments,
-                                                LinkedHashMap<String, Class> qualifiers) {
+                                                LinkedHashMap<String, Class> qualifiers,
+                                                boolean requiresReflection) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, methodInjectionPoints);
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, methodInjectionPoints);
     }
 
     /**
@@ -166,30 +167,34 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             Field field,
             Method setter,
             LinkedHashMap<String, Class> arguments,
-            LinkedHashMap<String, Class> qualifiers) {
+            LinkedHashMap<String, Class> qualifiers,
+            boolean requiresReflection) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, methodInjectionPoints);
+        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, requiresReflection, methodInjectionPoints);
     }
 
 
     protected DefaultComponentDefinition addPostConstruct(Method method,
                                                           LinkedHashMap<String, Class> arguments,
-                                                          LinkedHashMap<String, Class> qualifiers) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, postConstructMethods);
+                                                          LinkedHashMap<String, Class> qualifiers,
+                                                          boolean requiresReflection) {
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, postConstructMethods);
     }
 
     protected DefaultComponentDefinition addPreDestroy(Method method,
                                                        LinkedHashMap<String, Class> arguments,
-                                                       LinkedHashMap<String, Class> qualifiers) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, preDestroyMethods);
+                                                       LinkedHashMap<String, Class> qualifiers,
+                                                       boolean requiresReflection) {
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, preDestroyMethods);
     }
 
     protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean, boolean onlyNonPublic) {
         DefaultContext defaultContext = (DefaultContext) context;
+
         ComponentResolutionContext.Path path = resolutionContext.getPath();
-        for (FieldInjectionPoint fieldInjectionPoint : getRequiredFields()) {
-            Field field = fieldInjectionPoint.getField();
-            if(Modifier.isPrivate(field.getModifiers())) {
+        for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
+            if(fieldInjectionPoint.requiresReflection()) {
+                Field field = fieldInjectionPoint.getField();
                 Class componentType = fieldInjectionPoint.getType();
 
                 Class genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
@@ -246,8 +251,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
 
 
-        for (MethodInjectionPoint methodInjectionPoint : getRequiredProperties()) {
-            if (onlyNonPublic && java.lang.reflect.Modifier.isPrivate(methodInjectionPoint.getMethod().getModifiers())) {
+        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+            if (methodInjectionPoint.requiresReflection()) {
                 Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
                 Object[] methodArgs = new Object[methodArgumentTypes.length];
                 for (int i = 0; i < methodArgumentTypes.length; i++) {
@@ -465,7 +470,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
 
-    private DefaultComponentDefinition addMethodInjectionPointInternal(Field field, Method method, LinkedHashMap<String, Class> arguments, LinkedHashMap<String, Class> qualifierTypes, Collection<MethodInjectionPoint> methodInjectionPoints) {
+    private DefaultComponentDefinition addMethodInjectionPointInternal(Field field, Method method, LinkedHashMap<String, Class> arguments, LinkedHashMap<String, Class> qualifierTypes, boolean requiresReflection, Collection<MethodInjectionPoint> methodInjectionPoints) {
         LinkedHashMap<String, Annotation> qualifiers = null;
         if(qualifierTypes != null && !qualifierTypes.isEmpty()) {
             qualifiers = new LinkedHashMap<>();
@@ -485,7 +490,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             }
 
         }
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, arguments, qualifiers);
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method,requiresReflection, arguments, qualifiers);
         for (Argument argument : methodInjectionPoint.getArguments()) {
             requiredComponents.add(argument.getType());
         }

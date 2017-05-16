@@ -51,11 +51,6 @@ public class DefaultContext implements Context {
     }
 
     @Override
-    public <T> T getBean(Class<T> beanType) {
-        return getBean(null, beanType);
-    }
-
-    @Override
     public <T> T getBean(Class<T> beanType, Qualifier<T> qualifier) {
         return getBean(null, beanType, qualifier);
     }
@@ -313,6 +308,10 @@ public class DefaultContext implements Context {
         } else {
             return Collections.emptyList();
         }
+    }
+
+    <T> DefaultComponentDefinition<T> getComponentDefinition(Class<T> beanType) {
+        return (DefaultComponentDefinition<T>)findConcreteCandidate(beanType, null);
     }
 
     private static final class SingletonKey {

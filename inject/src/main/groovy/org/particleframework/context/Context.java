@@ -15,7 +15,9 @@ public interface Context extends LifeCycle {
      * @param <T> The bean type parameter
      * @return An instanceof said bean
      */
-    <T> T getBean(Class<T> beanType);
+    default <T> T getBean(Class<T> beanType) {
+        return getBean(beanType, null);
+    }
 
     /**
      * Obtains a Bean for the given type and qualifier

@@ -1,5 +1,6 @@
 package org.particleframework.tck.accessories
 
+import groovy.transform.PackageScope
 import org.particleframework.tck.FuelTank
 import org.particleframework.tck.Tire
 
@@ -40,7 +41,7 @@ class SpareTire extends Tire {
         subPrivateMethodInjected = true
     }
 
-    @Inject void injectPackagePrivateMethod() {
+    @Inject @PackageScope void injectPackagePrivateMethod() {
         if (subPackagePrivateMethodInjected) {
             similarPackagePrivateMethodInjectedTwice = true
         }

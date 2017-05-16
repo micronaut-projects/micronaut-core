@@ -38,6 +38,11 @@ public interface FieldInjectionPoint<T> {
     Annotation getQualifier();
 
     /**
+     * @return Whether reflection is required to satisfy the injection point
+     */
+    boolean requiresReflection();
+
+    /**
      * @param object The the field on the target object
      */
     void set(Object object, T instance);
