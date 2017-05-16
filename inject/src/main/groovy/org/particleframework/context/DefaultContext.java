@@ -2,6 +2,8 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.context.exceptions.BeanInstantiationException;
+import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.*;
@@ -78,7 +80,7 @@ public class DefaultContext implements Context {
         if (size > 0) {
             if (size == 1) {
                 ComponentDefinition<T> definition = candidates.iterator().next();
-                return doCreateBean(null, definition, beanType);
+                return doCreateBean(null, definition);
             } else {
                 throw new NonUniqueBeanException(beanType, candidates.iterator());
             }
@@ -126,13 +128,13 @@ public class DefaultContext implements Context {
             if(definition.isSingleton()) {
 
                 synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(resolutionContext, definition, beanType);
+                    T createdBean = doCreateBean(resolutionContext, definition);
                     registerSingletonBean(definition, beanType, createdBean, qualifier);
                     return createdBean;
                 }
             }
             else {
-                return doCreateBean(resolutionContext, definition, beanType);
+                return doCreateBean(resolutionContext, definition);
             }
         }
         else {
@@ -144,7 +146,7 @@ public class DefaultContext implements Context {
     }
 
 
-    private <T> T doCreateBean(ComponentResolutionContext resolutionContext, ComponentDefinition<T> componentDefinition, Class<T> beanType) {
+    private <T> T doCreateBean(ComponentResolutionContext resolutionContext, ComponentDefinition<T> componentDefinition) {
         T bean;
         if(resolutionContext == null) {
             resolutionContext = new DefaultComponentResolutionContext(this, componentDefinition);
@@ -152,7 +154,16 @@ public class DefaultContext implements Context {
 
         if (componentDefinition instanceof ComponentFactory) {
             ComponentFactory<T> componentFactory = (ComponentFactory<T>) componentDefinition;
-            bean = componentFactory.build(resolutionContext,this, componentDefinition);
+            try {
+                bean = componentFactory.build(resolutionContext,this, componentDefinition);
+            } catch (Throwable e) {
+                if(e instanceof DependencyInjectionException) {
+                    throw e;
+                }
+                else {
+                    throw new BeanInstantiationException("Error instantiating bean of type [" + componentDefinition.getName() + "]: " + e.getMessage(), e);
+                }
+            }
         } else {
             ConstructorInjectionPoint<T> constructor = componentDefinition.getConstructor();
             Argument[] requiredConstructorArguments = constructor.getArguments();
@@ -294,13 +305,13 @@ public class DefaultContext implements Context {
             for (ComponentDefinition<T> candidate : candidates) {
                 if(candidate.isSingleton()) {
                     synchronized (singletonObjects) {
-                        T createdBean = doCreateBean(resolutionContext, candidate, beanType);
+                        T createdBean = doCreateBean(resolutionContext, candidate);
                         registerSingletonBean(candidate, beanType, createdBean, null);
                         beansOfTypeList.add(createdBean);
                     }
                 }
                 else {
-                    T createdBean = doCreateBean(resolutionContext, candidate, beanType);
+                    T createdBean = doCreateBean(resolutionContext, candidate);
                     beansOfTypeList.add(createdBean);
                 }
             }
