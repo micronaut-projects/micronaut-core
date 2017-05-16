@@ -6,21 +6,33 @@ import javax.inject.Inject
 
 class RoundThing {
 
-    public boolean packagePrivateMethod2Injected
+    private boolean roundThingPackagePrivateMethod2Injected
+
+    boolean getRoundThingPackagePrivateMethod2Injected() {
+        return roundThingPackagePrivateMethod2Injected
+    }
 
     @Inject @PackageScope void injectPackagePrivateMethod2() {
-        packagePrivateMethod2Injected = true
+        roundThingPackagePrivateMethod2Injected = true
     }
 
-    public boolean packagePrivateMethod3Injected
+    private  boolean roundThingPackagePrivateMethod3Injected
+
+    boolean getRoundThingPackagePrivateMethod3Injected() {
+        return roundThingPackagePrivateMethod3Injected
+    }
 
     @Inject @PackageScope  void injectPackagePrivateMethod3() {
-        packagePrivateMethod3Injected = true
+        roundThingPackagePrivateMethod3Injected = true
     }
 
-    public boolean packagePrivateMethod4Injected
+    private  boolean roundThingPackagePrivateMethod4Injected
+
+    boolean getRoundThingPackagePrivateMethod4Injected() {
+        return roundThingPackagePrivateMethod4Injected
+    }
 
     @Inject @PackageScope void injectPackagePrivateMethod4() {
-        packagePrivateMethod4Injected = true
+        roundThingPackagePrivateMethod4Injected = true
     }
 }

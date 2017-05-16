@@ -5,8 +5,6 @@ import org.particleframework.tck.accessories.RoundThing
 import org.particleframework.tck.accessories.SpareTire
 
 import javax.inject.Inject
-import java.util.LinkedHashSet
-import java.util.Set
 
 class Tire extends RoundThing {
 
@@ -15,7 +13,7 @@ class Tire extends RoundThing {
     protected static final Set<String> moreProblems = new LinkedHashSet<String>()
 
     FuelTank constructorInjection = NEVER_INJECTED
-    @Inject FuelTank fieldInjection = NEVER_INJECTED
+    @Inject protected FuelTank fieldInjection = NEVER_INJECTED
     FuelTank methodInjection = NEVER_INJECTED
     @Inject static FuelTank staticFieldInjection = NEVER_INJECTED
     static FuelTank staticMethodInjection = NEVER_INJECTED
@@ -150,22 +148,34 @@ class Tire extends RoundThing {
         return false
     }
 
-    boolean packagePrivateMethod2Injected
+    boolean tirePackagePrivateMethod2Injected
+
+    boolean getTirePackagePrivateMethod2Injected() {
+        return tirePackagePrivateMethod2Injected
+    }
 
     @Inject @PackageScope void injectPackagePrivateMethod2() {
-        packagePrivateMethod2Injected = true
+        tirePackagePrivateMethod2Injected = true
     }
 
-    public boolean packagePrivateMethod3Injected
+    public boolean tirePackagePrivateMethod3Injected
+
+    boolean getTirePackagePrivateMethod3Injected() {
+        return tirePackagePrivateMethod3Injected
+    }
 
     @Inject @PackageScope void injectPackagePrivateMethod3() {
-        packagePrivateMethod3Injected = true
+        tirePackagePrivateMethod3Injected = true
     }
 
-    public boolean packagePrivateMethod4Injected
+    public boolean tirePackagePrivateMethod4Injected
+
+    boolean getTirePackagePrivateMethod4Injected() {
+        return tirePackagePrivateMethod4Injected
+    }
 
     @PackageScope
     void injectPackagePrivateMethod4() {
-        packagePrivateMethod4Injected = true
+        tirePackagePrivateMethod4Injected = true
     }
 }

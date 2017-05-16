@@ -416,44 +416,44 @@ class Convertible implements Car {
         }
 
         void testOverriddingMixedWithPackagePrivate2() {
-            assertTrue(spareTire.packagePrivateMethod2Injected)
-            assertTrue(((Tire) spareTire).packagePrivateMethod2Injected)
-            assertFalse(((RoundThing) spareTire).packagePrivateMethod2Injected)
+            assertTrue(spareTire.spareTirePackagePrivateMethod2Injected)
+            assertTrue(((Tire) spareTire).tirePackagePrivateMethod2Injected)
+            assertFalse(((RoundThing) spareTire).roundThingPackagePrivateMethod2Injected)
 
-            assertTrue(plainTire.packagePrivateMethod2Injected)
-            assertTrue(((RoundThing) plainTire).packagePrivateMethod2Injected)
+            assertTrue(plainTire.tirePackagePrivateMethod2Injected)
+            assertTrue(((RoundThing) plainTire).roundThingPackagePrivateMethod2Injected)
         }
 
         void testOverriddingMixedWithPackagePrivate3() {
-            assertFalse(spareTire.packagePrivateMethod3Injected)
-            assertTrue(((Tire) spareTire).packagePrivateMethod3Injected)
-            assertFalse(((RoundThing) spareTire).packagePrivateMethod3Injected)
+            assertFalse(spareTire.spareTirePackagePrivateMethod3Injected)
+            assertTrue(((Tire) spareTire).tirePackagePrivateMethod3Injected)
+            assertFalse(((RoundThing) spareTire).roundThingPackagePrivateMethod3Injected)
 
-            assertTrue(plainTire.packagePrivateMethod3Injected)
-            assertTrue(((RoundThing) plainTire).packagePrivateMethod3Injected)
+            assertTrue(plainTire.tirePackagePrivateMethod3Injected)
+            assertTrue(((RoundThing) plainTire).roundThingPackagePrivateMethod3Injected)
         }
 
         void testOverriddingMixedWithPackagePrivate4() {
-            assertFalse(plainTire.packagePrivateMethod4Injected)
-            assertTrue(((RoundThing) plainTire).packagePrivateMethod4Injected)
+            assertFalse(plainTire.tirePackagePrivateMethod4Injected)
+            assertTrue(((RoundThing) plainTire).roundThingPackagePrivateMethod4Injected)
         }
 
         // inject only once
 
         void testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
-            assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice)
+            assertFalse(engine.@overriddenPackagePrivateMethodInjectedTwice)
         }
 
         void testSimilarPackagePrivateMethodInjectedOnlyOnce() {
-            assertFalse(spareTire.similarPackagePrivateMethodInjectedTwice)
+            assertFalse(spareTire.@similarPackagePrivateMethodInjectedTwice)
         }
 
         void testOverriddenProtectedMethodInjectedOnlyOnce() {
-            assertFalse(spareTire.overriddenProtectedMethodInjectedTwice)
+            assertFalse(spareTire.@overriddenProtectedMethodInjectedTwice)
         }
 
         void testOverriddenPublicMethodInjectedOnlyOnce() {
-            assertFalse(spareTire.overriddenPublicMethodInjectedTwice)
+            assertFalse(spareTire.@overriddenPublicMethodInjectedTwice)
         }
 
     }

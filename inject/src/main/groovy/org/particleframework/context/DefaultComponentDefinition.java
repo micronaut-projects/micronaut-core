@@ -107,11 +107,11 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     }
 
     public T inject(Context context, T bean) {
-        return (T) injectBean(new DefaultComponentResolutionContext(context, this), context, bean, false);
+        return (T) injectBean(new DefaultComponentResolutionContext(context, this), context, bean);
     }
 
     protected Object injectBean(Context context, Object bean) {
-        return injectBean(new DefaultComponentResolutionContext(context, this), context, bean, true);
+        return injectBean(new DefaultComponentResolutionContext(context, this), context, bean);
     }
 
     /**
@@ -188,9 +188,43 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, preDestroyMethods);
     }
 
-    protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean, boolean onlyNonPublic) {
+    protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean) {
         DefaultContext defaultContext = (DefaultContext) context;
 
+
+        // Inject fields that require reflection
+        injectBeanFields(resolutionContext, defaultContext, bean);
+
+        // Inject methods that require reflection
+        injectBeanMethods(resolutionContext, defaultContext, bean);
+
+        return bean;
+    }
+
+    protected void injectBeanMethods(ComponentResolutionContext resolutionContext, DefaultContext context, Object bean) {
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+            if (methodInjectionPoint.requiresReflection()) {
+                Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
+                Object[] methodArgs = new Object[methodArgumentTypes.length];
+                for (int i = 0; i < methodArgumentTypes.length; i++) {
+                    Argument argument = methodArgumentTypes[i];
+                    path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
+                    Class argumentType = argument.getType();
+                    if (argumentType.isArray()) {
+                        methodArgs[i] = context.getBeansOfType(resolutionContext, argumentType.getComponentType());
+                    } else {
+                        Qualifier qualifier = resolveQualifier(argument);
+                        methodArgs[i] = context.getBean(resolutionContext, argumentType, qualifier);
+                    }
+                    path.pop();
+                }
+                methodInjectionPoint.invoke(bean, methodArgs);
+            }
+        }
+    }
+
+    protected void injectBeanFields(ComponentResolutionContext resolutionContext , DefaultContext defaultContext, Object bean) {
         ComponentResolutionContext.Path path = resolutionContext.getPath();
         for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
             if(fieldInjectionPoint.requiresReflection()) {
@@ -249,29 +283,6 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                 fieldInjectionPoint.set(bean, value);
             }
         }
-
-
-        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
-            if (methodInjectionPoint.requiresReflection()) {
-                Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
-                Object[] methodArgs = new Object[methodArgumentTypes.length];
-                for (int i = 0; i < methodArgumentTypes.length; i++) {
-                    Argument argument = methodArgumentTypes[i];
-                    path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
-                    Class argumentType = argument.getType();
-                    if (argumentType.isArray()) {
-                        methodArgs[i] = defaultContext.getBeansOfType(resolutionContext, argumentType.getComponentType());
-                    } else {
-                        Qualifier qualifier = resolveQualifier(argument);
-                        methodArgs[i] = defaultContext.getBean(resolutionContext, argumentType, qualifier);
-                    }
-                    path.pop();
-                }
-                methodInjectionPoint.invoke(bean, methodArgs);
-            }
-        }
-
-        return bean;
     }
 
     /**

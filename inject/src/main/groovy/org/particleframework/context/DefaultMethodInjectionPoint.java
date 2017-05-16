@@ -81,4 +81,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
             throw new BeanInstantiationException("Cannot inject arguments for method ["+method+"] using arguments ["+ Arrays.asList(args)+"]:" + e.getMessage(), e);
         }
     }
+
+    @Override
+    public String toString() {
+        return "Injection Point: " + method.toGenericString();
+    }
 }

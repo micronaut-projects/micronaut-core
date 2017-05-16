@@ -9,7 +9,7 @@ import javax.inject.Inject
 class SpareTire extends Tire {
 
     FuelTank constructorInjection = NEVER_INJECTED
-    @Inject FuelTank fieldInjection = NEVER_INJECTED
+    @Inject protected FuelTank fieldInjection = NEVER_INJECTED
     FuelTank methodInjection = NEVER_INJECTED
     @Inject static FuelTank staticFieldInjection = NEVER_INJECTED
     static FuelTank staticMethodInjection = NEVER_INJECTED
@@ -67,7 +67,7 @@ class SpareTire extends Tire {
         superPrivateMethodForOverrideInjected = true
     }
 
-    void injectPackagePrivateMethodForOverride() {
+    @PackageScope void injectPackagePrivateMethodForOverride() {
         superPackagePrivateMethodForOverrideInjected = true
     }
 
@@ -95,15 +95,23 @@ class SpareTire extends Tire {
         return staticMethodInjection != NEVER_INJECTED
     }
 
-    public boolean packagePrivateMethod2Injected
+    private boolean spareTirePackagePrivateMethod2Injected
 
-    @Inject void injectPackagePrivateMethod2() {
-        packagePrivateMethod2Injected = true
+    boolean getSpareTirePackagePrivateMethod2Injected() {
+        return spareTirePackagePrivateMethod2Injected
     }
 
-    public boolean packagePrivateMethod3Injected
+    @Override @Inject @PackageScope void injectPackagePrivateMethod2() {
+        spareTirePackagePrivateMethod2Injected = true
+    }
 
-    void injectPackagePrivateMethod3() {
-        packagePrivateMethod3Injected = true
+    private boolean spareTirePackagePrivateMethod3Injected
+
+    boolean getSpareTirePackagePrivateMethod3Injected() {
+        return spareTirePackagePrivateMethod3Injected
+    }
+
+    @PackageScope void injectPackagePrivateMethod3() {
+        spareTirePackagePrivateMethod3Injected = true
     }
 }

@@ -29,6 +29,7 @@ import org.particleframework.context.Context
 import org.particleframework.context.DefaultComponentDefinitionClass
 import org.particleframework.context.DefaultComponentDefinition
 import org.particleframework.context.DefaultComponentResolutionContext
+import org.particleframework.context.DefaultContext
 import org.particleframework.inject.ComponentDefinition
 import org.particleframework.inject.ComponentDefinitionClass
 import org.particleframework.inject.ComponentFactory
@@ -148,7 +149,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             stmt(callX(thisX, "setMetaClass", ConstantExpression.NULL))
                     )
                 }
-                def injectBeanArgs = args( varX(currentResolutionContextParam), varX(currentContextParam), currentInjectInstance, ConstantExpression.TRUE )
+                def injectBeanArgs = args( varX(currentResolutionContextParam), varX(currentContextParam), currentInjectInstance)
                 currentBuildBody.addStatement(
                     stmt(callX(thisX, "injectBean", injectBeanArgs))
                 )
@@ -173,7 +174,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (!isConstructor && currentConstructorBody != null) {
                     if(!methodNode.isStatic()) {
-                        if(isParent) {
+                        if(isParent && !methodNode.isPrivate()) {
                             MethodNode overridenMethod = concreteClass.getMethod(methodNode.name, methodNode.parameters)
 
                             boolean overridden = overridenMethod != null && overridenMethod.declaringClass != methodNode.declaringClass
@@ -187,7 +188,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if(isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
                             notPrivate = false
                         }
-                        addMethodInjectionPoint(classNode, methodName, methodNode.modifiers, notPrivate ,null, methodNode.parameters)
+                        addMethodInjectionPoint(classNode, methodName, notPrivate ,null, methodNode.parameters)
                     }
                 }
             }
@@ -270,24 +271,33 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Parameter setterArg = param(propertyType.type, propertyNode.name)
                         AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
-                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, propertyNode.modifiers, !propertyNode.isPrivate(), fieldVar, setterArg)
+                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, !propertyNode.isPrivate(), fieldVar, setterArg)
                     }
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, int modifiers, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
+        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, boolean notPrivate, VariableExpression field, Parameter... parameterTypes) {
 
             boolean requiresReflection = !notPrivate
 
             if (currentInjectInstance != null && notPrivate) {
+                boolean isParentMethod = declaringClass != concreteClass
                 Expression methodArgs = buildBeanLookupArguments(classX(declaringClass), methodName, parameterTypes)
                 MethodCallExpression injectCall = callX(currentInjectInstance, methodName, methodArgs)
                 MethodNode methodTarget = declaringClass.getMethod(methodName.text, parameterTypes)
                 injectCall.setMethodTarget(methodTarget)
-                currentInjectBody.addStatement(
-                        stmt(injectCall)
-                )
+
+                // methods for super classes need to be injected before anything else
+
+                if(isParentMethod) {
+                    currentInjectBody.statements.add(2, stmt(injectCall))
+                }
+                else {
+                    currentInjectBody.addStatement(
+                            stmt(injectCall)
+                    )
+                }
             }
 
 
@@ -417,24 +427,38 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 // add the inject method
                 def injectObjectParam = param(ClassHelper.OBJECT_TYPE, '$object')
-                Parameter[] injectParams = params(
+                Parameter[] injectMethodParams = params(
                         currentResolutionContextParam,
                         currentContextParam,
-                        injectObjectParam,
-                        param(ClassHelper.boolean_TYPE, "onlyPublic")
+                        injectObjectParam
                 )
-                currentComponentDef.addMethod("injectBean", Modifier.PUBLIC, classNode.plainNodeReference, injectParams, null, currentInjectBody)
-                def superCall = callSuperX("injectBean", paramsToArguments(injectParams))
-                MethodNode injectMethodTarget = DEFAULT_COMPONENT_DEFINITION.getMethod("injectBean", injectParams)
-                superCall.setMethodTarget(injectMethodTarget)
-                currentInjectBody.addStatement(
-                    stmt(superCall)
-                )
-                currentInjectInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                currentComponentDef.addMethod("injectBean", Modifier.PUBLIC, classNode.plainNodeReference, injectMethodParams, null, currentInjectBody)
 
+                def injectBeanFields = callSuperX("injectBeanFields", args(
+                        varX(currentResolutionContextParam),
+                        castX(makeCached(DefaultContext), varX(currentContextParam)),
+                        varX(injectObjectParam)
+                ))
+
+                def injectBeanMethods = callSuperX("injectBeanMethods", args(
+                        varX(currentResolutionContextParam),
+                        castX(makeCached(DefaultContext), varX(currentContextParam)),
+                        varX(injectObjectParam)
+                ))
+                MethodNode injectMethodTarget = DEFAULT_COMPONENT_DEFINITION.getMethod("injectBean", injectMethodParams)
+                injectBeanFields.setMethodTarget(injectMethodTarget)
+                currentInjectInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
                 currentInjectBody.addStatement(
                     declS(currentInjectInstance, castX(classNode, varX(injectObjectParam)))
                 )
+                currentInjectBody.addStatement(
+                    stmt(injectBeanFields)
+                )
+                currentInjectBody.addStatement(
+                    stmt(injectBeanMethods)
+                )
+                currentInjectInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+
 
                 if (constructorBody != null) {
                     currentConstructorBody = constructorBody
