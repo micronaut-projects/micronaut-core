@@ -12,7 +12,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-class DefaultComponentResolutionContext implements ComponentResolutionContext{
+public class DefaultComponentResolutionContext implements ComponentResolutionContext{
 
     private final Context context;
     private final ComponentDefinition rootDefinition;

@@ -176,8 +176,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(!methodNode.isStatic()) {
                         boolean isPackagePrivate = isPackagePrivate(methodNode)
                         boolean isPrivate = methodNode.isPrivate()
-                        MethodNode overriddenMethod = concreteClass.getMethod(methodNode.name, methodNode.parameters)
-                        boolean overridden = overriddenMethod.declaringClass != methodNode.declaringClass
+                        MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodNode.name, methodNode.parameters) : methodNode
+                        boolean overridden = isParent && overriddenMethod.declaringClass != methodNode.declaringClass
+
                         if(isParent && !isPrivate && !isPackagePrivate) {
 
                             if(overridden) {
@@ -186,8 +187,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         }
                         Expression methodName = constX(methodNode.name)
-                        boolean isPackagePrivateAndPackagesDiffer = (overriddenMethod.declaringClass.packageName != concreteClass.packageName) && isPackagePrivate
+
+                        boolean isPackagePrivateAndPackagesDiffer = overridden && (overriddenMethod.declaringClass.packageName != methodNode.declaringClass.packageName) && isPackagePrivate
                         boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
+                        boolean overriddenInjected = overridden && stereoTypeFinder.hasStereoType(overriddenMethod, Inject)
+
+                        if(isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+                            // bail out if the overridden method is package private and in the same package
+                            // and is not annotated with @Inject
+                            return
+                        }
                         if(!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
                             requiresReflection = true
                         }
@@ -200,7 +209,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         boolean isPackagePrivate(MethodNode methodNode) {
             int modifiers = methodNode.getModifiers()
-            return  ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !methodNode.getAnnotations(makeCached(PackageScope)).isEmpty())
+            return  ((!methodNode.isProtected() && !methodNode.isPublic() && !methodNode.isPrivate()) || !methodNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override
