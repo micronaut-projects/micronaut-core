@@ -1,6 +1,8 @@
 package org.particleframework.tck
 
 import junit.framework.TestCase
+import org.particleframework.context.Context
+import org.particleframework.context.DefaultContext
 import org.particleframework.tck.accessories.Cupholder
 import org.particleframework.tck.accessories.RoundThing
 import org.particleframework.tck.accessories.SpareTire
@@ -162,7 +164,10 @@ class Convertible implements Car {
 
     static class Tests extends TestCase {
 
-        private final Convertible car = localConvertible.get()
+        private final Context context = new DefaultContext(){{
+            start()
+        }}
+        private final Convertible car = context.getBean(Convertible)
         private final Cupholder cupholder = car.cupholder
         private final SpareTire spareTire = car.spareTire
         private final Tire plainTire = car.fieldPlainTire
@@ -458,80 +463,7 @@ class Convertible implements Car {
 
     }
 
-    static class StaticTests extends TestCase {
 
-        void testSubtypeStaticFieldsInjected() {
-            assertTrue(SpareTire.hasBeenStaticFieldInjected())
-        }
-
-        void testSubtypeStaticMethodsInjected() {
-            assertTrue(SpareTire.hasBeenStaticMethodInjected())
-        }
-
-        void testSupertypeStaticFieldsInjected() {
-            assertTrue(Tire.hasBeenStaticFieldInjected())
-        }
-
-        void testSupertypeStaticMethodsInjected() {
-            assertTrue(Tire.hasBeenStaticMethodInjected())
-        }
-
-        void testStaticFieldInjectionWithValues() {
-            assertFalse("Expected unqualified value",
-                    staticFieldPlainSeat instanceof DriversSeat)
-            assertFalse("Expected unqualified value",
-                    staticFieldPlainTire instanceof SpareTire)
-            assertTrue("Expected qualified value",
-                    staticFieldDriversSeat instanceof DriversSeat)
-            assertTrue("Expected qualified value",
-                    staticFieldSpareTire instanceof SpareTire)
-        }
-
-        void testStaticMethodInjectionWithValues() {
-            assertFalse("Expected unqualified value",
-                    staticMethodPlainSeat instanceof DriversSeat)
-            assertFalse("Expected unqualified value",
-                    staticMethodPlainTire instanceof SpareTire)
-            assertTrue("Expected qualified value",
-                    staticMethodDriversSeat instanceof DriversSeat)
-            assertTrue("Expected qualified value",
-                    staticMethodSpareTire instanceof SpareTire)
-        }
-
-        void testStaticFieldsInjectedBeforeMethods() {
-            assertFalse(SpareTire.staticMethodInjectedBeforeStaticFields)
-        }
-
-        void testSupertypeStaticMethodsInjectedBeforeSubtypeStaticFields() {
-            assertFalse(SpareTire.subtypeStaticFieldInjectedBeforeSupertypeStaticMethods)
-        }
-
-        void testSupertypeStaticMethodsInjectedBeforeSubtypeStaticMethods() {
-            assertFalse(SpareTire.subtypeStaticMethodInjectedBeforeSupertypeStaticMethods)
-        }
-
-        void testStaticFieldInjectionWithProviders() {
-            assertFalse("Expected unqualified value",
-                    staticFieldPlainSeatProvider.get() instanceof DriversSeat)
-            assertFalse("Expected unqualified value",
-                    staticFieldPlainTireProvider.get() instanceof SpareTire)
-            assertTrue("Expected qualified value",
-                    staticFieldDriversSeatProvider.get() instanceof DriversSeat)
-            assertTrue("Expected qualified value",
-                    staticFieldSpareTireProvider.get() instanceof SpareTire)
-        }
-
-        void testStaticMethodInjectionWithProviders() {
-            assertFalse("Expected unqualified value",
-                    staticMethodPlainSeatProvider.get() instanceof DriversSeat)
-            assertFalse("Expected unqualified value",
-                    staticMethodPlainTireProvider.get() instanceof SpareTire)
-            assertTrue("Expected qualified value",
-                    staticMethodDriversSeatProvider.get() instanceof DriversSeat)
-            assertTrue("Expected qualified value",
-                    staticMethodSpareTireProvider.get() instanceof SpareTire)
-        }
-    }
 
     static class PrivateTests extends TestCase {
 

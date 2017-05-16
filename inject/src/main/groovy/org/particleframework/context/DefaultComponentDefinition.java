@@ -399,9 +399,10 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      */
     @Internal
     protected Object getBeanForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, int argIndex) {
-        Argument argument = getConstructor().getArguments()[argIndex];
+        ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
+        Argument argument = constructorInjectionPoint.getArguments()[argIndex];
         ComponentResolutionContext.Path path = resolutionContext.getPath();
-        path.pushContructorResolve(this,  argument);
+        path.pushConstructorResolve(this,  argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
             Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType(), qualifier);
@@ -456,7 +457,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     protected Provider getBeanProviderForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, Class providedType, int argIndex) {
         Argument argument = getConstructor().getArguments()[argIndex];
         ComponentResolutionContext.Path path = resolutionContext.getPath();
-        path.pushContructorResolve(this,  argument);
+        path.pushConstructorResolve(this,  argument);
         try {
             Class type = argument.getType();
             Qualifier qualifier = resolveQualifier(argument);

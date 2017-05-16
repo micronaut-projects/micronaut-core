@@ -28,10 +28,6 @@ public interface ComponentResolutionContext {
      */
     Path getPath();
 
-    /**
-     * @return The objects that are currently still being created
-     */
-    Deque<Object> getObjectsInCreation();
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies
@@ -44,7 +40,7 @@ public interface ComponentResolutionContext {
          * @param argument The unresolved argument
          * @return This path
          */
-        Path pushContructorResolve(ComponentDefinition declaringType, Argument argument);
+        Path pushConstructorResolve(ComponentDefinition declaringType, Argument argument);
 
 
         /**
@@ -64,6 +60,13 @@ public interface ComponentResolutionContext {
          * @return This path
          */
         Path pushFieldResolve(ComponentDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
+
+        /**
+         * Converts the path to a circular string
+         *
+         * @return The circular string
+         */
+        String toCircularString();
     }
 
 
@@ -83,7 +86,7 @@ public interface ComponentResolutionContext {
         String getName();
 
         /**
-         * @return The arguments to create the type. For a field this will be empty
+         * @return The argument to create the type. For a field this will be empty
          */
         Argument getArgument();
     }

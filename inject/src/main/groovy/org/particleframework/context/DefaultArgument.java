@@ -64,14 +64,16 @@ class DefaultArgument implements Argument {
 
         DefaultArgument that = (DefaultArgument) o;
 
-        if (type != null ? !type.equals(that.type) : that.type != null) return false;
-        return name != null ? name.equals(that.name) : that.name == null;
+        if (!type.equals(that.type)) return false;
+        if (!name.equals(that.name)) return false;
+        return qualifier != null ? qualifier.equals(that.qualifier) : that.qualifier == null;
     }
 
     @Override
     public int hashCode() {
-        int result = type != null ? type.hashCode() : 0;
-        result = 31 * result + (name != null ? name.hashCode() : 0);
+        int result = type.hashCode();
+        result = 31 * result + name.hashCode();
+        result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
         return result;
     }
 }

@@ -181,11 +181,6 @@ public class DefaultContext implements Context {
             injectionDefinitionIfPossible(componentDefinition, bean);
         }
 
-        Deque<Object> objectsInCreation = resolutionContext.getObjectsInCreation();
-        Object head = objectsInCreation.peek();
-        if(head != null && head == bean) {
-            objectsInCreation.pop();
-        }
         return bean;
     }
 

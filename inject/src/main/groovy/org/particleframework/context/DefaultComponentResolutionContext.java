@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.*;
 
@@ -12,17 +13,16 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultComponentResolutionContext implements ComponentResolutionContext{
+public class DefaultComponentResolutionContext implements ComponentResolutionContext {
 
     private final Context context;
     private final ComponentDefinition rootDefinition;
-    private final Deque<Object> objectsInCreation;
     private final Path path;
 
-    DefaultComponentResolutionContext(Context context, ComponentDefinition rootDefinition) {
+    @Internal
+    public DefaultComponentResolutionContext(Context context, ComponentDefinition rootDefinition) {
         this.context = context;
         this.rootDefinition = rootDefinition;
-        this.objectsInCreation = new LinkedList<>();
         this.path = new DefaultPath();
     }
 
@@ -41,14 +41,12 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         return path;
     }
 
-    @Override
-    public Deque<Object> getObjectsInCreation() {
-        return objectsInCreation;
-    }
 
     class DefaultPath extends LinkedList<Segment> implements Path {
 
-        public DefaultPath() {
+        public static final String RIGHT_ARROW = " --> ";
+
+        DefaultPath() {
         }
 
         @Override
@@ -65,20 +63,70 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         }
 
         @Override
-        public Path pushContructorResolve(ComponentDefinition declaringType, Argument argument) {
-            push(new ConstructorSegment(declaringType, argument));
+        public String toCircularString() {
+            Iterator<Segment> i = descendingIterator();
+            StringBuilder path = new StringBuilder();
+            String ls = System.getProperty("line.separator");
+            while(i.hasNext()) {
+                String segmentString = i.next().toString();
+                path.append(segmentString);
+                if(i.hasNext()) {
+                    path.append(RIGHT_ARROW);
+                }
+                else {
+                    int totalLength = path.length() - 3;
+                    String spaces = String.join("", Collections.nCopies(totalLength, " "));
+                    path.append(ls)
+                        .append("^")
+                        .append(spaces)
+                        .append("|")
+                        .append(ls)
+                        .append("|")
+                        .append(spaces)
+                        .append("|").append(ls)
+                        .append("|")
+                        .append(spaces)
+                        .append("|").append(ls).append('+');
+                    path.append(String.join("", Collections.nCopies(totalLength, "-"))).append('+');
+                }
+            }
+            return path.toString();
+        }
+
+        @Override
+        public Path pushConstructorResolve(ComponentDefinition declaringType, Argument argument) {
+            ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
+            if(contains(constructorSegment)) {
+                throw new CircularDependencyException(DefaultComponentResolutionContext.this, argument, "Circular dependency detected");
+            }
+            else {
+                push(constructorSegment);
+            }
             return this;
         }
 
         @Override
         public Path pushMethodArgumentResolve(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
-            push(new MethodSegment(declaringType, methodInjectionPoint, argument));
+            MethodSegment methodSegment = new MethodSegment(declaringType, methodInjectionPoint, argument);
+            if(contains(methodSegment)) {
+                throw new CircularDependencyException(DefaultComponentResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
+            }
+            else {
+                push(methodSegment);
+            }
+
             return this;
         }
 
         @Override
         public Path pushFieldResolve(ComponentDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
-            push(new FieldSegment(declaringType, fieldInjectionPoint ));
+            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint);
+            if(contains(fieldSegment)) {
+                throw new CircularDependencyException(DefaultComponentResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
+            }
+            else {
+                push(fieldSegment);
+            }
             return this;
         }
     }
@@ -87,7 +135,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
      * A segment that represents a constructor
      */
     class ConstructorSegment extends AbstractSegment {
-        public ConstructorSegment(ComponentDefinition declaringClass, Argument argument) {
+        ConstructorSegment(ComponentDefinition declaringClass, Argument argument) {
             super(declaringClass, declaringClass.getType().getName(), argument);
         }
 
@@ -108,7 +156,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
 
         private final MethodInjectionPoint methodInjectionPoint;
 
-        public MethodSegment(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
+        MethodSegment(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             super(declaringType, methodInjectionPoint.getName(), argument);
             this.methodInjectionPoint = methodInjectionPoint;
         }
@@ -126,7 +174,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
      * A segment that represents a field
      */
     class FieldSegment extends AbstractSegment {
-        public FieldSegment(ComponentDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
+        FieldSegment(ComponentDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
                     new DefaultArgument(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
@@ -142,7 +190,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         private final String name;
         private final Argument argument;
 
-        public AbstractSegment(ComponentDefinition declaringClass, String name, Argument argument) {
+        AbstractSegment(ComponentDefinition declaringClass, String name, Argument argument) {
             this.declaringComponent = declaringClass;
             this.name = name;
             this.argument = argument;
@@ -170,9 +218,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
 
             AbstractSegment that = (AbstractSegment) o;
 
-            if (!declaringComponent.equals(that.declaringComponent)) return false;
-            if (!name.equals(that.name)) return false;
-            return argument.equals(that.argument);
+            return declaringComponent.equals(that.declaringComponent) && name.equals(that.name) && argument.equals(that.argument);
         }
 
         @Override
@@ -183,12 +229,12 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
             return result;
         }
 
-        protected void outputArguments(ComponentDefinition declaringType, StringBuilder baseString) {
+        void outputArguments(ComponentDefinition declaringType, StringBuilder baseString) {
             Argument[] arguments = declaringType.getConstructor().getArguments();
             outputArguments(baseString, arguments);
         }
 
-        protected void outputArguments(StringBuilder baseString, Argument[] arguments) {
+        void outputArguments(StringBuilder baseString, Argument[] arguments) {
             baseString.append('(');
             for (int i = 0; i < arguments.length; i++) {
                 Argument argument = arguments[i];

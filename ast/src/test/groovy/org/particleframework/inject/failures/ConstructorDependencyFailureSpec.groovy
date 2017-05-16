@@ -10,7 +10,7 @@ import javax.inject.Inject
 /**
  * Created by graemerocher on 12/05/2017.
  */
-class ConsructorDependencyFailureSpec extends Specification {
+class ConstructorDependencyFailureSpec extends Specification {
 
 
     void "test a useful exception is thrown when a dependency injection failure occurs"() {
@@ -24,7 +24,7 @@ class ConsructorDependencyFailureSpec extends Specification {
         then:"The correct error is thrown"
         def e = thrown(DependencyInjectionException)
         e.message == '''\
-Failed to inject value for parameter [a] of class: org.particleframework.inject.failures.ConsructorDependencyFailureSpec$B
+Failed to inject value for parameter [a] of class: org.particleframework.inject.failures.ConstructorDependencyFailureSpec$B
 
 Path Taken: new B([A a])'''
     }
