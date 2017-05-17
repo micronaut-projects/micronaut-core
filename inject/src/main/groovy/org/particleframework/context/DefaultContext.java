@@ -27,10 +27,10 @@ public class DefaultContext implements Context {
     private final Iterator<ComponentDefinitionClass> componentDefinitionClassIterator;
     private final Map<Class, ComponentDefinitionClass> componentDefinitionsClasses = new ConcurrentHashMap<>(50);
     private final Map<Class, ComponentDefinition> componentDefinitions = new ConcurrentHashMap<>(50);
-    private final Cache<Class, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
+    private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(50)
             .build();
-    private final Map<SingletonKey, Object> singletonObjects = new ConcurrentHashMap<>(50);
+    private final Map<BeanKey, Object> singletonObjects = new ConcurrentHashMap<>(50);
     private final ClassLoader classLoader;
 
     public DefaultContext() {
@@ -89,15 +89,20 @@ public class DefaultContext implements Context {
     }
 
     <T> Iterable<T> getBeansOfType(ComponentResolutionContext resolutionContext, Class<T> beanType) {
-        return getBeansOfTypeInternal(resolutionContext, beanType);
+        return getBeansOfTypeInternal(resolutionContext, beanType, null);
     }
+
+    <T> Iterable<T> getBeansOfType(ComponentResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier);
+    }
+
 
     <T> Provider<T> getBeanProvider(ComponentResolutionContext resolutionContext, Class<T> beanType) {
         return getBeanProvider(resolutionContext, beanType, null);
     }
 
     <T> Provider<T> getBeanProvider(ComponentResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        T bean = (T) singletonObjects.get(new SingletonKey(beanType,qualifier));
+        T bean = (T) singletonObjects.get(new BeanKey(beanType,qualifier));
         if (bean != null) {
             return new ResolvedProvider<>(bean);
         }
@@ -116,7 +121,7 @@ public class DefaultContext implements Context {
     }
 
     <T> T getBean(ComponentResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        T bean = (T) singletonObjects.get(new SingletonKey(beanType, qualifier));
+        T bean = (T) singletonObjects.get(new BeanKey(beanType, qualifier));
         if (bean != null) {
             return bean;
         }
@@ -213,15 +218,6 @@ public class DefaultContext implements Context {
         return definition;
     }
 
-    private <T> Collection<Object> getOrInitializeObjectsForType(Class<T> beanType) {
-        Collection<Object> initializedObjects = initializedObjectsByType.getIfPresent(beanType);
-        if (initializedObjects == null) {
-            initializedObjects = new ConcurrentLinkedQueue<>();
-            initializedObjectsByType.put(beanType, initializedObjects);
-        }
-        return initializedObjects;
-    }
-
     private <T> Collection<ComponentDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<ComponentDefinition<T>> candidates) {
         Stream<ComponentDefinition<T>> filteredResults = candidates
                                                             .stream()
@@ -233,16 +229,8 @@ public class DefaultContext implements Context {
 
     private <T> void registerSingletonBean(ComponentDefinition componentDefinition, Class<T> beanType, T createdBean, Qualifier<T> qualifier) {
         // for only one candidate create link to bean type as singleton
-        singletonObjects.put(new SingletonKey(beanType, qualifier), createdBean);
-        singletonObjects.put(new SingletonKey(createdBean.getClass(),qualifier), createdBean);
-        if (createdBean != null) {
-            Collection<Object> initializedObjects = getOrInitializeObjectsForType(beanType);
-            if (componentDefinition.getType().equals(beanType)) {
-                getOrInitializeObjectsForType(beanType).add(createdBean);
-            }
-
-            initializedObjects.add(createdBean);
-        }
+        singletonObjects.put(new BeanKey(beanType, qualifier), createdBean);
+        singletonObjects.put(new BeanKey(createdBean.getClass(),qualifier), createdBean);
     }
 
     private void consumeAllComponentDefinitionClasses() {
@@ -285,34 +273,58 @@ public class DefaultContext implements Context {
         }
     }
 
-    private <T> Collection<T> getBeansOfTypeInternal(ComponentResolutionContext resolutionContext, Class<T> beanType) {
-        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(beanType);
+    private <T> Collection<T> getBeansOfTypeInternal(ComponentResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        BeanKey key = new BeanKey(beanType, qualifier);
+        Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(key);
         if (existing != null) {
             return Collections.unmodifiableCollection(existing);
         }
 
-        List<T> beansOfTypeList = new ArrayList<>();
+        Collection<T> beansOfTypeList = new ConcurrentLinkedQueue<>();
 
-        consumeAllComponentDefinitionClasses();
-        Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
-
-        if (!candidates.isEmpty()) {
-            for (ComponentDefinition<T> candidate : candidates) {
-                if(candidate.isSingleton()) {
-                    synchronized (singletonObjects) {
-                        T createdBean = doCreateBean(resolutionContext, candidate);
-                        registerSingletonBean(candidate, beanType, createdBean, null);
-                        beansOfTypeList.add(createdBean);
-                    }
+        Object intializedBean = singletonObjects.get(key);
+        Collection<T> beans;
+        if(intializedBean != null) {
+            // unique bean found
+            beansOfTypeList.add((T) intializedBean);
+            beans = Collections.unmodifiableCollection(beansOfTypeList);
+        }
+        else {
+            Collection<ComponentDefinition<T>> candidates = findBeanCandidates(beanType);
+            if(qualifier != null) {
+                ComponentDefinition<T> qualified = qualifier.qualify(beanType, candidates.stream());
+                if(qualified != null) {
+                    addCandidateToList(resolutionContext, beanType, qualified, beansOfTypeList);
+                    beans = Collections.unmodifiableCollection(beansOfTypeList);
                 }
                 else {
-                    T createdBean = doCreateBean(resolutionContext, candidate);
-                    beansOfTypeList.add(createdBean);
+                    beans = Collections.emptyList();
                 }
             }
-            return Collections.unmodifiableList(beansOfTypeList);
-        } else {
-            return Collections.emptyList();
+            else if (!candidates.isEmpty()) {
+                for (ComponentDefinition<T> candidate : candidates) {
+                    addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList);
+                }
+                beans = Collections.unmodifiableCollection(beansOfTypeList);
+            } else {
+                beans = Collections.emptyList();
+            }
+        }
+        initializedObjectsByType.put(key, (Collection<Object>) beans);
+        return beans;
+    }
+
+    private <T> void addCandidateToList(ComponentResolutionContext resolutionContext, Class<T> beanType, ComponentDefinition<T> candidate, Collection<T> beansOfTypeList) {
+        if(candidate.isSingleton()) {
+            synchronized (singletonObjects) {
+                T createdBean = doCreateBean(resolutionContext, candidate);
+                registerSingletonBean(candidate, beanType, createdBean, null);
+                beansOfTypeList.add(createdBean);
+            }
+        }
+        else {
+            T createdBean = doCreateBean(resolutionContext, candidate);
+            beansOfTypeList.add(createdBean);
         }
     }
 
@@ -320,11 +332,11 @@ public class DefaultContext implements Context {
         return (DefaultComponentDefinition<T>)findConcreteCandidate(beanType, null);
     }
 
-    private static final class SingletonKey {
+    private static final class BeanKey {
         private final Class beanType;
         private final Qualifier qualifier;
 
-        public SingletonKey(Class beanType, Qualifier qualifier) {
+        public BeanKey(Class beanType, Qualifier qualifier) {
             this.beanType = beanType;
             this.qualifier = qualifier;
         }
@@ -334,7 +346,7 @@ public class DefaultContext implements Context {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
 
-            SingletonKey that = (SingletonKey) o;
+            BeanKey that = (BeanKey) o;
 
             if (!beanType.equals(that.beanType)) return false;
             return qualifier != null ? qualifier.equals(that.qualifier) : that.qualifier == null;

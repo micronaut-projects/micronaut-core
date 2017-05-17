@@ -1,6 +1,5 @@
 package org.particleframework.context
 
-import org.particleframework.context.exceptions.NonUniqueBeanException
 import org.particleframework.inject.ComponentDefinition
 
 import java.util.stream.Stream

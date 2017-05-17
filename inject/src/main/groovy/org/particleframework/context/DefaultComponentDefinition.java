@@ -37,7 +37,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
                                            Class<T> type,
                                            Constructor<T> constructor,
                                            LinkedHashMap<String, Class> arguments,
-                                           LinkedHashMap<String, Class> qualifiers) {
+                                           Map<String, Class> qualifiers,
+                                           Map<String, List<Class>> genericTypes) {
         this.scope = scope;
         this.singleton = singleton;
         this.type = type;
@@ -46,14 +47,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             qualifierMap = new LinkedHashMap<>();
             populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, constructor.getParameterAnnotations());
         }
-        this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments, qualifierMap);
+        this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments, qualifierMap, genericTypes);
     }
 
     protected DefaultComponentDefinition(  Annotation scope,
                                            boolean singleton,
                                            Class<T> type,
                                            Constructor<T> constructor) {
-        this(scope, singleton, type, constructor, EMPTY_MAP, null);
+        this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
     }
 
     @Override
@@ -150,10 +151,11 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     protected DefaultComponentDefinition addInjectionPoint(
                                                 Method method,
                                                 LinkedHashMap<String, Class> arguments,
-                                                LinkedHashMap<String, Class> qualifiers,
+                                                Map<String, Class> qualifiers,
+                                                Map<String, List<Class>> genericTypes,
                                                 boolean requiresReflection) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, methodInjectionPoints);
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes,requiresReflection, methodInjectionPoints);
     }
 
     /**
@@ -167,25 +169,28 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             Field field,
             Method setter,
             LinkedHashMap<String, Class> arguments,
-            LinkedHashMap<String, Class> qualifiers,
+            Map<String, Class> qualifiers,
+            Map<String, List<Class>> genericTypes,
             boolean requiresReflection) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, requiresReflection, methodInjectionPoints);
+        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, genericTypes, requiresReflection, methodInjectionPoints);
     }
 
 
     protected DefaultComponentDefinition addPostConstruct(Method method,
                                                           LinkedHashMap<String, Class> arguments,
-                                                          LinkedHashMap<String, Class> qualifiers,
+                                                          Map<String, Class> qualifiers,
+                                                          Map<String, List<Class>> genericTypes,
                                                           boolean requiresReflection) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, postConstructMethods);
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, postConstructMethods);
     }
 
     protected DefaultComponentDefinition addPreDestroy(Method method,
                                                        LinkedHashMap<String, Class> arguments,
-                                                       LinkedHashMap<String, Class> qualifiers,
+                                                       Map<String, Class> qualifiers,
+                                                       Map<String, List<Class>> genericTypes,
                                                        boolean requiresReflection) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, requiresReflection, preDestroyMethods);
+        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, preDestroyMethods);
     }
 
     protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean) {
@@ -310,9 +315,77 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
         }
-
     }
 
+
+    /**
+     * Obtains all bean definitions for the method at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param methodIndex The method index
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Iterable getBeansOfTypeForMethodArgument(ComponentResolutionContext resolutionContext, Context context, int methodIndex, int argIndex) {
+        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
+        Argument argument = injectionPoint.getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushMethodArgumentResolve(this, injectionPoint, argument);
+        try {
+            Qualifier qualifier = resolveQualifier(argument);
+            Class[] genericTypes = argument.getGenericTypes();
+            Class genericType;
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, "Expected exactly 1 generic type argument");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
+            Iterable beansOfType = ((DefaultContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
+            path.pop();
+            return beansOfType;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+        }
+    }
+
+    /**
+     * Obtains all bean definitions for a constructor argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @param argIndex The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Iterable getBeansOfTypeForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, int argIndex) {
+        ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
+        Argument argument = constructorInjectionPoint.getArguments()[argIndex];
+        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        path.pushConstructorResolve(this,  argument);
+        try {
+            Qualifier qualifier = resolveQualifier(argument);
+            Class[] genericTypes = argument.getGenericTypes();
+            Class genericType;
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
+            Iterable beansOfType = ((DefaultContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
+            path.pop();
+            return beansOfType;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, argument , e);
+        }
+    }
 
     /**
      * Obtains a bean definition for the field at the given index and the argument at the given index
@@ -415,6 +488,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
 
 
 
+
     /**
      * Obtains a bean provider for the method at the given index and the argument at the given index
      *
@@ -474,6 +548,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             return new HashSet<>(beans);
         } else if (componentType == Queue.class) {
             return new LinkedList<>(beans);
+        } else if (componentType == List.class) {
+            return new ArrayList<>(beans);
         } else if (!componentType.isInterface()) {
             Constructor<? extends Iterable> constructor = componentType.getConstructor(Collection.class);
             return constructor.newInstance(beans);
@@ -482,7 +558,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
 
-    private DefaultComponentDefinition addMethodInjectionPointInternal(Field field, Method method, LinkedHashMap<String, Class> arguments, LinkedHashMap<String, Class> qualifierTypes, boolean requiresReflection, Collection<MethodInjectionPoint> methodInjectionPoints) {
+    private DefaultComponentDefinition addMethodInjectionPointInternal(
+            Field field,
+            Method method,
+            LinkedHashMap<String, Class> arguments,
+            Map<String, Class> qualifierTypes,
+            Map<String, List<Class>> genericTypes,
+            boolean requiresReflection,
+            Collection<MethodInjectionPoint> methodInjectionPoints) {
         LinkedHashMap<String, Annotation> qualifiers = null;
         if(qualifierTypes != null && !qualifierTypes.isEmpty()) {
             qualifiers = new LinkedHashMap<>();
@@ -502,7 +585,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             }
 
         }
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method,requiresReflection, arguments, qualifiers);
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method,requiresReflection, arguments, qualifiers, genericTypes);
         for (Argument argument : methodInjectionPoint.getArguments()) {
             requiredComponents.add(argument.getType());
         }
@@ -510,7 +593,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return this;
     }
 
-    private void populateQualifiersFromParameterAnnotations(LinkedHashMap<String, Class> argumentTypes, LinkedHashMap<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
+    private void populateQualifiersFromParameterAnnotations(LinkedHashMap<String, Class> argumentTypes, Map<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
         int i = 0;
         for (Map.Entry<String, Class> entry : argumentTypes.entrySet()) {
             Annotation[] annotations = parameterAnnotations[i++];

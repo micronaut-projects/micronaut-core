@@ -8,6 +8,7 @@ import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
@@ -325,8 +326,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             )
             MapExpression paramsMap = paramsToMap(parameterTypes)
             Expression qualifiers = paramsToQualifiers(parameterTypes)
+            Expression generics = paramsToGenericTypes(parameterTypes)
 
-            ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers, constX(requiresReflection))
+            ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers, generics, constX(requiresReflection))
             if(field != null) {
                 addInjectionPointArgs.expressions.add(0, field)
             }
@@ -420,6 +422,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         ArgumentListExpression ctorTypeArgs = paramTypesToArguments(constructorNode.parameters)
                         MapExpression ctorParamsMap = paramsToMap(constructorNode.parameters)
                         Expression qualifiers = paramsToQualifiers(constructorNode.parameters)
+                        Expression generics = paramsToGenericTypes(constructorNode.parameters)
                         ArgumentListExpression ctorArgs =  buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
                         currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode.plainNodeReference)
                         currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
@@ -429,7 +432,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 classNodeExpr,
                                 callX(classNodeExpr, "getConstructor", ctorTypeArgs),
                                 ctorParamsMap,
-                                qualifiers)
+                                qualifiers,
+                                generics)
                         constructorBody = block(
                             ctorSuperS(constructorArgs)
                         )
@@ -501,38 +505,33 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         private Expression buildBeanLookupExpression(ClassExpression declaringClass, Expression methodExpression, Parameter parameter, int parameterIndex) {
             ClassNode type = parameter.type
             Expression expressionToAdd
-            if (AstClassUtils.implementsInterface(type, Iterable) && type.genericsTypes) {
-                Expression getBeansOfTypeCall = callX(varX(currentContextParam), "getBeansOfType", classX(type.genericsTypes[0].type))
-                expressionToAdd = castX(type, getBeansOfTypeCall)
-            } else if (type?.isArray()) {
-                Expression getBeansOfTypeCall = callX(varX(currentContextParam), "getBeansOfType", classX(type.componentType))
-                expressionToAdd = castX(type, getBeansOfTypeCall)
-
-            } else {
-                boolean isConstructor = methodExpression instanceof ClassExpression
-                boolean isProvider = AstClassUtils.implementsInterface(type, Provider) && type.genericsTypes
-                String lookMethodName
-                if(isProvider) {
-                    lookMethodName = isConstructor ? "getBeanProviderForConstructorArgument" : "getBeanProviderForMethodArgument"
-                }
-                else {
-                    lookMethodName = isConstructor ? "getBeanForConstructorArgument" : "getBeanForMethodArgument"
-                }
-
-
-                ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
-                if(isProvider) {
-                    lookupArgs.addExpression(classX(type.genericsTypes[0].type.plainNodeReference))
-                }
-                if(isConstructor) {
-                    lookupArgs.addExpression(constX(parameterIndex))
-                }
-                else {
-                    lookupArgs.addExpression(constX(methodIndex))
-                    lookupArgs.addExpression(constX(parameterIndex))
-                }
-                expressionToAdd = callX(varX("this"), lookMethodName, lookupArgs)
+            boolean isConstructor = methodExpression instanceof ClassExpression
+            boolean isProvider = AstClassUtils.implementsInterface(type, Provider) && type.genericsTypes
+            boolean isIterable = (AstClassUtils.implementsInterface(type, Iterable) && type.genericsTypes) || type.isArray()
+            String lookMethodName
+            if(isIterable) {
+                lookMethodName = isConstructor ? "getBeansOfTypeForConstructorArgument" : "getBeansOfTypeForMethodArgument"
             }
+            else if(isProvider) {
+                lookMethodName = isConstructor ? "getBeanProviderForConstructorArgument" : "getBeanProviderForMethodArgument"
+            }
+            else {
+                lookMethodName = isConstructor ? "getBeanForConstructorArgument" : "getBeanForMethodArgument"
+            }
+
+
+            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
+            if(isProvider) {
+                lookupArgs.addExpression(classX(type.genericsTypes[0].type.plainNodeReference))
+            }
+            if(isConstructor) {
+                lookupArgs.addExpression(constX(parameterIndex))
+            }
+            else {
+                lookupArgs.addExpression(constX(methodIndex))
+                lookupArgs.addExpression(constX(parameterIndex))
+            }
+            expressionToAdd = callX(varX("this"), lookMethodName, lookupArgs)
             return expressionToAdd
         }
 
@@ -576,6 +575,32 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(ann != null) {
                     if(map == null) map = new MapExpression()
                     map.addMapEntryExpression( constX(p.name), classX(ann.classNode) )
+                }
+            }
+            if(map != null) {
+                return map
+            }
+            else {
+                return ConstantExpression.NULL
+            }
+        }
+
+        private Expression paramsToGenericTypes(Parameter[] parameters) {
+            MapExpression map = null
+            for(p in parameters) {
+                GenericsType[] genericsTypes = p.type.genericsTypes
+                if(genericsTypes != null && genericsTypes.length > 0) {
+                    if(map == null) map = new MapExpression()
+                    ListExpression listExpression = new ListExpression()
+                    for(genericType in genericsTypes) {
+                        listExpression.addExpression(classX(genericType.type.plainNodeReference))
+                    }
+                    map.addMapEntryExpression( constX(p.name), listExpression )
+                }
+                else if(p.type.isArray()) {
+                    if(map == null) map = new MapExpression()
+                    ListExpression listExpression = new ListExpression([classX(p.type.componentType.plainNodeReference)] as List<Expression>)
+                    map.addMapEntryExpression( constX(p.name), listExpression )
                 }
             }
             if(map != null) {

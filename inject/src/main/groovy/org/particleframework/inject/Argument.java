@@ -20,6 +20,11 @@ public interface Argument<T> {
     Class<T> getType();
 
     /**
+     * @return The generic types for the type. For example for Iterable<Foo> this would return an array containing Foo
+     */
+    Class[] getGenericTypes();
+
+    /**
      * @return The qualifier
      */
     Annotation getQualifier();

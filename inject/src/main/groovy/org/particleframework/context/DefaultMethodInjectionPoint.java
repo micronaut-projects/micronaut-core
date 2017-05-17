@@ -10,6 +10,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,11 +30,12 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Method method,
                                 boolean requiresReflection,
                                 LinkedHashMap<String, Class> arguments,
-                                LinkedHashMap<String, Annotation> qualifiers) {
+                                Map<String, Annotation> qualifiers, Map<String,
+                                List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
         this.method.setAccessible(true);
-        this.arguments = DefaultArgument.from(arguments, qualifiers);
+        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes);
         this.declaringComponent = declaringComponent;
     }
 

@@ -20,19 +20,35 @@ class DefaultArgument implements Argument {
     private final Class type;
     private final String name;
     private final Annotation qualifier;
+    private final Class[] genericTypes;
 
-    DefaultArgument(Class type, String name, Annotation qualifier) {
+    DefaultArgument(Class type, String name, Annotation qualifier, Class...genericTypes) {
         this.type = type;
         this.name = name;
         this.qualifier = qualifier;
+        this.genericTypes = genericTypes;
     }
 
-    static Argument[] from(Map<String, Class> arguments, LinkedHashMap<String, Annotation> qualifiers) {
+    @Override
+    public Class[] getGenericTypes() {
+        return this.genericTypes;
+    }
+
+    /**
+     * Builds the arguments from the given maps. A LinkedHashMap is used to maintain the order of the arguments
+     *
+     * @param arguments The arguments
+     * @param qualifiers The qualifiers
+     * @return
+     */
+    static Argument[] from(LinkedHashMap<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
         List<Argument> args = new ArrayList<>(arguments.size());
         for (Map.Entry<String, Class> entry : arguments.entrySet()) {
             String name = entry.getKey();
             Annotation qualifier = qualifiers != null ? qualifiers.get(name) : null;
-            args.add( new DefaultArgument(entry.getValue(), name, qualifier));
+            List<Class> genericTypeList = genericTypes != null ? genericTypes.get(name) : null;
+            Class[] genericsArray = genericTypeList != null ? genericTypeList.toArray(new Class[genericTypeList.size()]) : new Class[0];
+            args.add( new DefaultArgument(entry.getValue(), name, qualifier, genericsArray));
         }
         return args.toArray(new Argument[arguments.size()]);
     }
