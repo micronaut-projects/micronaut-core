@@ -25,12 +25,12 @@ import java.util.stream.Stream;
 public class DefaultBeanContext implements BeanContext {
 
     private final Iterator<BeanDefinitionClass> componentDefinitionClassIterator;
-    private final Map<Class, BeanDefinitionClass> componentDefinitionsClasses = new ConcurrentHashMap<>(50);
-    private final Map<Class, BeanDefinition> componentDefinitions = new ConcurrentHashMap<>(50);
+    private final Map<Class, BeanDefinitionClass> componentDefinitionsClasses = new ConcurrentHashMap<>(30);
+    private final Map<Class, BeanDefinition> componentDefinitions = new ConcurrentHashMap<>(30);
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(50)
             .build();
-    private final Map<BeanKey, Object> singletonObjects = new ConcurrentHashMap<>(50);
+    private final Map<BeanKey, Object> singletonObjects = new ConcurrentHashMap<>(30);
     private final ClassLoader classLoader;
 
     public DefaultBeanContext() {
@@ -80,7 +80,7 @@ public class DefaultBeanContext implements BeanContext {
         if (size > 0) {
             if (size == 1) {
                 BeanDefinition<T> definition = candidates.iterator().next();
-                return doCreateBean(null, definition);
+                return doCreateBean(null, definition, null);
             } else {
                 throw new NonUniqueBeanException(beanType, candidates.iterator());
             }
@@ -133,13 +133,13 @@ public class DefaultBeanContext implements BeanContext {
             if(definition.isSingleton()) {
 
                 synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(resolutionContext, definition);
+                    T createdBean = doCreateBean(resolutionContext, definition, qualifier);
                     registerSingletonBean(definition, beanType, createdBean, qualifier);
                     return createdBean;
                 }
             }
             else {
-                return doCreateBean(resolutionContext, definition);
+                return doCreateBean(resolutionContext, definition, qualifier);
             }
         }
         else {
@@ -151,8 +151,12 @@ public class DefaultBeanContext implements BeanContext {
     }
 
 
-    private <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition) {
-        T bean;
+    private <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Qualifier<T> qualifier) {
+        T bean = (T) singletonObjects.get(new BeanKey(beanDefinition.getType(), qualifier));
+        if(bean != null) {
+            return bean;
+        }
+
         if(resolutionContext == null) {
             resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
         }
@@ -302,7 +306,7 @@ public class DefaultBeanContext implements BeanContext {
                     if(qualified.isSingleton()) {
                         allCandidatesAreSingleton = true;
                     }
-                    addCandidateToList(resolutionContext, beanType, qualified, beansOfTypeList);
+                    addCandidateToList(resolutionContext, beanType, qualified, beansOfTypeList, qualifier);
                     beans = Collections.unmodifiableCollection(beansOfTypeList);
                 }
                 else {
@@ -315,7 +319,7 @@ public class DefaultBeanContext implements BeanContext {
                     if(!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
                     }
-                    addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList);
+                    addCandidateToList(resolutionContext, beanType, candidate, beansOfTypeList, qualifier);
                 }
                 if(!hasNonSingletonCandidate) {
                     allCandidatesAreSingleton = true;
@@ -332,16 +336,16 @@ public class DefaultBeanContext implements BeanContext {
         return beans;
     }
 
-    private <T> void addCandidateToList(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<T> candidate, Collection<T> beansOfTypeList) {
+    private <T> void addCandidateToList(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<T> candidate, Collection<T> beansOfTypeList, Qualifier<T> qualifier) {
         if(candidate.isSingleton()) {
             synchronized (singletonObjects) {
-                T createdBean = doCreateBean(resolutionContext, candidate);
+                T createdBean = doCreateBean(resolutionContext, candidate, qualifier);
                 registerSingletonBean(candidate, beanType, createdBean, null);
                 beansOfTypeList.add(createdBean);
             }
         }
         else {
-            T createdBean = doCreateBean(resolutionContext, candidate);
+            T createdBean = doCreateBean(resolutionContext, candidate, qualifier);
             beansOfTypeList.add(createdBean);
         }
     }

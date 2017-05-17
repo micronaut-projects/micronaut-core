@@ -11,7 +11,7 @@ import javax.inject.Provider;
 class ResolvedProvider<T> implements Provider<T> {
     private final T bean;
 
-    public ResolvedProvider(T bean) {
+    ResolvedProvider(T bean) {
         this.bean = bean;
     }
 
