@@ -5,6 +5,7 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinitionClass;
+import org.particleframework.scope.Context;
 
 /**
  * An uninitialized component definition with basic information available regarding its requirements
@@ -43,5 +44,10 @@ public class DefaultBeanDefinitionClass<T> implements BeanDefinitionClass<T> {
         } catch (Throwable e) {
             throw new BeanContextException("Error loading component definition ["+componentDefinitionClass.getName()+"]: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public boolean isContextScope() {
+        return getClass().getAnnotation(Context.class) != null;
     }
 }

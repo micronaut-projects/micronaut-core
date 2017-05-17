@@ -231,16 +231,20 @@ public class DefaultBeanContext implements BeanContext {
                 throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
             } else if (definition.isSingleton()) {
 
-                synchronized (singletonObjects) {
-                    T createdBean = doCreateBean(resolutionContext, definition, qualifier);
-                    registerSingletonBean(definition, beanType, createdBean, qualifier, true);
-                    return createdBean;
-                }
+                return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
             } else {
                 return doCreateBean(resolutionContext, definition, qualifier);
             }
         } else {
             throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+        }
+    }
+
+    private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
+        synchronized (singletonObjects) {
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier);
+            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+            return createdBean;
         }
     }
 
@@ -358,9 +362,20 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void readAllBeanDefinitionClasses() {
+        List<BeanDefinitionClass> contextScopeBeans = new ArrayList<>();
         while (beanDefinitionClassIterator.hasNext()) {
             BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
-            beanDefinitionsClasses.put(beanDefinitionClass.getComponentType(), beanDefinitionClass);
+            if(beanDefinitionClass.isContextScope()) {
+                contextScopeBeans.add(beanDefinitionClass);
+            }
+            else {
+                beanDefinitionsClasses.put(beanDefinitionClass.getComponentType(), beanDefinitionClass);
+            }
+        }
+        for (BeanDefinitionClass contextScopeBean : contextScopeBeans) {
+            BeanDefinition beanDefinition = contextScopeBean.load();
+            beanDefinitions.put(beanDefinition.getType(), beanDefinition);
+            createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getType(), null);
         }
     }
 

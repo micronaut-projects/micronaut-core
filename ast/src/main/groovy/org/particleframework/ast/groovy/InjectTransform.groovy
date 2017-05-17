@@ -36,6 +36,7 @@ import org.particleframework.inject.BeanFactory
 import org.particleframework.inject.DisposableBeanDefinition
 import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
+import org.particleframework.scope.Context
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -65,6 +66,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(AbstractBeanDefinition)
 
     CompilationUnit unit
+    AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -97,6 +99,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             stmt(callX(varX("this"), "setMetaClass", ConstantExpression.NULL))
                     ))
             )
+            // override the load method to make more efficient loading
+            componentDefinitionClass.addMethod('load', Modifier.PUBLIC, GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClass), [] as Parameter[], null, block(
+                returnS(ctorX(newClass))
+            ))
+            if(stereoTypeFinder.hasStereoType(targetClass, Context.name)) {
+                componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(Context)))
+            }
             componentDefinitionClass.setModule(moduleNode)
             generator.generate(componentDefinitionClass, BeanDefinitionClass)
             moduleNode.addClass(componentDefinitionClass)

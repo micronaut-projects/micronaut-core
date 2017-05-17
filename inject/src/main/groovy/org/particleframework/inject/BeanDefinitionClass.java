@@ -24,4 +24,9 @@ public interface BeanDefinitionClass<T> {
      * @return The loaded component definition or null if it shouldn't be loaded
      */
     BeanDefinition<T> load();
+
+    /**
+     * @return Is this class context scope
+     */
+    boolean isContextScope();
 }
