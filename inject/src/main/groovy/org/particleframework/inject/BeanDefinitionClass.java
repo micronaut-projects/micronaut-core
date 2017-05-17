@@ -3,7 +3,7 @@ package org.particleframework.inject;
 import org.particleframework.core.annotation.Internal;
 
 /**
- * <p>A component definition class provides a reference to a {@link ComponentDefinition} thus
+ * <p>A component definition class provides a reference to a {@link BeanDefinition} thus
  * allowing for soft loading of component definitions for purposes of type inspection.</p>
  *
  * <p>The class can also decided whether to abort loading the definition by returning null</p>
@@ -12,7 +12,7 @@ import org.particleframework.core.annotation.Internal;
  * @since 1.0
  */
 @Internal
-public interface ComponentDefinitionClass<T> {
+public interface BeanDefinitionClass<T> {
     /**
      * @return The underlying component type
      */
@@ -23,5 +23,5 @@ public interface ComponentDefinitionClass<T> {
      *
      * @return The loaded component definition or null if it shouldn't be loaded
      */
-    ComponentDefinition<T> load();
+    BeanDefinition<T> load();
 }

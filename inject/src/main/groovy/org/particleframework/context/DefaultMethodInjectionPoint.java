@@ -1,7 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
@@ -24,9 +24,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Method method;
     private final Argument[] arguments;
     private final boolean requiresReflection;
-    private final ComponentDefinition declaringComponent;
+    private final BeanDefinition declaringComponent;
 
-    DefaultMethodInjectionPoint(ComponentDefinition declaringComponent,
+    DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
                                 Method method,
                                 boolean requiresReflection,
                                 LinkedHashMap<String, Class> arguments,
@@ -45,7 +45,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public ComponentDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringComponent() {
         return this.declaringComponent;
     }
 

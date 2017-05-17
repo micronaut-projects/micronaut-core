@@ -12,13 +12,13 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * Default implementation of the {@link ComponentDefinition} interface
+ * Default implementation of the {@link BeanDefinition} interface
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
+public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
 
     private static final LinkedHashMap<String, Class> EMPTY_MAP = new LinkedHashMap<>(0);
     private final Annotation scope;
@@ -32,13 +32,13 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
 
 
-    protected DefaultComponentDefinition(  Annotation scope,
-                                           boolean singleton,
-                                           Class<T> type,
-                                           Constructor<T> constructor,
-                                           LinkedHashMap<String, Class> arguments,
-                                           Map<String, Class> qualifiers,
-                                           Map<String, List<Class>> genericTypes) {
+    protected DefaultBeanDefinition(Annotation scope,
+                                    boolean singleton,
+                                    Class<T> type,
+                                    Constructor<T> constructor,
+                                    LinkedHashMap<String, Class> arguments,
+                                    Map<String, Class> qualifiers,
+                                    Map<String, List<Class>> genericTypes) {
         this.scope = scope;
         this.singleton = singleton;
         this.type = type;
@@ -50,10 +50,10 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments, qualifierMap, genericTypes);
     }
 
-    protected DefaultComponentDefinition(  Annotation scope,
-                                           boolean singleton,
-                                           Class<T> type,
-                                           Constructor<T> constructor) {
+    protected DefaultBeanDefinition(Annotation scope,
+                                    boolean singleton,
+                                    Class<T> type,
+                                    Constructor<T> constructor) {
         this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
     }
 
@@ -107,12 +107,12 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return getType().getName();
     }
 
-    public T inject(Context context, T bean) {
-        return (T) injectBean(new DefaultComponentResolutionContext(context, this), context, bean);
+    public T inject(BeanContext context, T bean) {
+        return (T) injectBean(new DefaultBeanResolutionContext(context, this), context, bean);
     }
 
-    protected Object injectBean(Context context, Object bean) {
-        return injectBean(new DefaultComponentResolutionContext(context, this), context, bean);
+    protected Object injectBean(BeanContext context, Object bean) {
+        return injectBean(new DefaultBeanResolutionContext(context, this), context, bean);
     }
 
     /**
@@ -122,7 +122,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param qualifier The qualifier, can be null
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
+    protected DefaultBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, qualifier, requiresReflection));
         return this;
@@ -135,7 +135,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param field The field
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(Field field, boolean requiresReflection) {
+    protected DefaultBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, null, requiresReflection));
         return this;
@@ -148,7 +148,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param  arguments The arguments to the method
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(
+    protected DefaultBeanDefinition addInjectionPoint(
                                                 Method method,
                                                 LinkedHashMap<String, Class> arguments,
                                                 Map<String, Class> qualifiers,
@@ -165,7 +165,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @param  arguments The arguments to the method
      * @return this component definition
      */
-    protected DefaultComponentDefinition addInjectionPoint(
+    protected DefaultBeanDefinition addInjectionPoint(
             Field field,
             Method setter,
             LinkedHashMap<String, Class> arguments,
@@ -177,24 +177,24 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
     }
 
 
-    protected DefaultComponentDefinition addPostConstruct(Method method,
-                                                          LinkedHashMap<String, Class> arguments,
-                                                          Map<String, Class> qualifiers,
-                                                          Map<String, List<Class>> genericTypes,
-                                                          boolean requiresReflection) {
+    protected DefaultBeanDefinition addPostConstruct(Method method,
+                                                     LinkedHashMap<String, Class> arguments,
+                                                     Map<String, Class> qualifiers,
+                                                     Map<String, List<Class>> genericTypes,
+                                                     boolean requiresReflection) {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, postConstructMethods);
     }
 
-    protected DefaultComponentDefinition addPreDestroy(Method method,
-                                                       LinkedHashMap<String, Class> arguments,
-                                                       Map<String, Class> qualifiers,
-                                                       Map<String, List<Class>> genericTypes,
-                                                       boolean requiresReflection) {
+    protected DefaultBeanDefinition addPreDestroy(Method method,
+                                                  LinkedHashMap<String, Class> arguments,
+                                                  Map<String, Class> qualifiers,
+                                                  Map<String, List<Class>> genericTypes,
+                                                  boolean requiresReflection) {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, preDestroyMethods);
     }
 
-    protected Object injectBean(ComponentResolutionContext resolutionContext, Context context, Object bean) {
-        DefaultContext defaultContext = (DefaultContext) context;
+    protected Object injectBean(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
 
 
         // Inject fields that require reflection
@@ -206,8 +206,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         return bean;
     }
 
-    protected void injectBeanMethods(ComponentResolutionContext resolutionContext, DefaultContext context, Object bean) {
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+    protected void injectBeanMethods(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
             if (methodInjectionPoint.requiresReflection()) {
                 Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
@@ -229,8 +229,8 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
 
-    protected void injectBeanFields(ComponentResolutionContext resolutionContext , DefaultContext defaultContext, Object bean) {
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+    protected void injectBeanFields(BeanResolutionContext resolutionContext , DefaultBeanContext defaultContext, Object bean) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
             if(fieldInjectionPoint.requiresReflection()) {
                 Field field = fieldInjectionPoint.getField();
@@ -302,14 +302,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanForMethodArgument(ComponentResolutionContext resolutionContext, Context context, int methodIndex, int argIndex) {
+    protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType(), qualifier);
+            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argument.getType(), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -330,10 +330,10 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Iterable getBeansOfTypeForMethodArgument(ComponentResolutionContext resolutionContext, Context context, int methodIndex, int argIndex) {
+    protected Iterable getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
@@ -345,7 +345,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             else {
                 genericType = genericTypes[0];
             }
-            Iterable beansOfType = ((DefaultContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
+            Iterable beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
             path.pop();
             return beansOfType;
         } catch (NoSuchBeanException e) {
@@ -364,10 +364,10 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Iterable getBeansOfTypeForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, int argIndex) {
+    protected Iterable getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument argument = constructorInjectionPoint.getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
@@ -379,7 +379,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
             else {
                 genericType = genericTypes[0];
             }
-            Iterable beansOfType = ((DefaultContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
+            Iterable beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
             path.pop();
             return beansOfType;
         } catch (NoSuchBeanException e) {
@@ -397,15 +397,15 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanForField(ComponentResolutionContext resolutionContext, Context context, int fieldIndex) {
+    protected Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
         Class beanType = injectionPoint.getType();
 
         try {
             Qualifier qualifier = resolveQualifier(injectionPoint);
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, beanType, qualifier);
+            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, beanType, qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -424,14 +424,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanProviderForField(ComponentResolutionContext resolutionContext, Context context, Class providedType, int fieldIndex) {
+    protected Object getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
 
         try {
             Qualifier qualifier = resolveQualifier(injectionPoint);
-            Object bean = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
+            Object bean = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -471,14 +471,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, int argIndex) {
+    protected Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument argument = constructorInjectionPoint.getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
-            Object bean = ((DefaultContext)context).getBean(resolutionContext, argument.getType(), qualifier);
+            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argument.getType(), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
@@ -501,14 +501,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForMethodArgument(ComponentResolutionContext resolutionContext, Context context, Class providedType, int methodIndex, int argIndex) {
+    protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
-            Provider beanProvider = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType,qualifier);
+            Provider beanProvider = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType,qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -528,14 +528,14 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForConstructorArgument(ComponentResolutionContext resolutionContext, Context context, Class providedType, int argIndex) {
+    protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int argIndex) {
         Argument argument = getConstructor().getArguments()[argIndex];
-        ComponentResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
             Class type = argument.getType();
             Qualifier qualifier = resolveQualifier(argument);
-            Provider beanProvider  = ((DefaultContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
+            Provider beanProvider  = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -558,7 +558,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         }
     }
 
-    private DefaultComponentDefinition addMethodInjectionPointInternal(
+    private DefaultBeanDefinition addMethodInjectionPointInternal(
             Field field,
             Method method,
             LinkedHashMap<String, Class> arguments,
@@ -628,7 +628,7 @@ public class DefaultComponentDefinition<T> implements ComponentDefinition<T> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        DefaultComponentDefinition<?> that = (DefaultComponentDefinition<?>) o;
+        DefaultBeanDefinition<?> that = (DefaultBeanDefinition<?>) o;
 
         return type != null ? type.equals(that.type) : that.type == null;
     }

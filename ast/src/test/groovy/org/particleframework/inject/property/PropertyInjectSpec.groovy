@@ -1,7 +1,7 @@
 package org.particleframework.inject.property
 
-import org.particleframework.context.DefaultContext
-import org.particleframework.context.Context
+import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.BeanContext
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -11,7 +11,7 @@ class SimplePropertyInjectSpec extends Specification {
 
     void "test that property injection works via the new operator"() {
         when:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
         BookController controller = context.getBean(BookController)
         BookController2 controller2 = context.getBean(BookController2)

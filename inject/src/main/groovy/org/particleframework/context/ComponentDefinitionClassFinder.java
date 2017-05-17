@@ -1,6 +1,6 @@
 package org.particleframework.context;
 
-import org.particleframework.inject.ComponentDefinitionClass;
+import org.particleframework.inject.BeanDefinitionClass;
 
 import java.net.URL;
 import java.util.Enumeration;
@@ -12,7 +12,7 @@ import java.util.Iterator;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ComponentDefinitionClassFinder implements Iterable<ComponentDefinitionClass> {
+public class ComponentDefinitionClassFinder implements Iterable<BeanDefinitionClass> {
 
     private final ClassLoader classLoader;
 
@@ -25,11 +25,11 @@ public class ComponentDefinitionClassFinder implements Iterable<ComponentDefinit
     }
 
     @Override
-    public Iterator<ComponentDefinitionClass> iterator() {
+    public Iterator<BeanDefinitionClass> iterator() {
         return new LazyIterator(classLoader);
     }
 
-    private class LazyIterator implements Iterator<ComponentDefinitionClass> {
+    private class LazyIterator implements Iterator<BeanDefinitionClass> {
         private final ClassLoader classLoader;
         Enumeration<URL> descriptors = null;
 
@@ -46,7 +46,7 @@ public class ComponentDefinitionClassFinder implements Iterable<ComponentDefinit
         }
 
         @Override
-        public ComponentDefinitionClass next() {
+        public BeanDefinitionClass next() {
             return null;
         }
 

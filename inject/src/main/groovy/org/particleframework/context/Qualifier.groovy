@@ -1,6 +1,6 @@
 package org.particleframework.context
 
-import org.particleframework.inject.ComponentDefinition
+import org.particleframework.inject.BeanDefinition
 
 import java.util.stream.Stream
 
@@ -18,5 +18,5 @@ interface Qualifier<T> {
      * @param candidates The candidates
      * @return The qualified candidate or null it it cannot be qualified
      */
-    ComponentDefinition<T> qualify(Class<T> beanType, Stream<ComponentDefinition<T>> candidates)
+    BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates)
 }

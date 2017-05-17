@@ -6,7 +6,7 @@ package org.particleframework.context;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Context extends LifeCycle {
+public interface BeanContext extends LifeCycle {
 
     /**
      * Obtains a Bean for the given type

@@ -1,8 +1,8 @@
 package org.particleframework.tck
 
 import junit.framework.TestCase
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import org.particleframework.tck.accessories.Cupholder
 import org.particleframework.tck.accessories.RoundThing
 import org.particleframework.tck.accessories.SpareTire
@@ -164,7 +164,7 @@ class Convertible implements Car {
 
     static class Tests extends TestCase {
 
-        private final Context context = new DefaultContext(){{
+        private final BeanContext context = new DefaultBeanContext(){{
             start()
         }}
         private final Convertible car = context.getBean(Convertible)
@@ -466,7 +466,7 @@ class Convertible implements Car {
 
 
     static class PrivateTests extends TestCase {
-        private final Context context = new DefaultContext(){{
+        private final BeanContext context = new DefaultBeanContext(){{
             start()
         }}
         private final Convertible car = context.getBean(Convertible)

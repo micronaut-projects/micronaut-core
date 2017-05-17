@@ -1,6 +1,5 @@
 package org.particleframework.inject;
 
-import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 
 /**
@@ -9,7 +8,7 @@ import java.lang.annotation.Annotation;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ComponentDefinition<T> {
+public interface BeanDefinition<T> {
 
     /**
      * @return The scope of the component

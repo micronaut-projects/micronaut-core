@@ -1,7 +1,7 @@
 package org.particleframework.inject.failures
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
@@ -15,7 +15,7 @@ class NestedDependencyFailureSpec extends Specification {
 
     void "test injection via setter with interface"() {
         given:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:"A bean is obtained that has a setter with @Inject"

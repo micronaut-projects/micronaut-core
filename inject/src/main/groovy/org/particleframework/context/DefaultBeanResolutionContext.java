@@ -7,32 +7,32 @@ import org.particleframework.inject.*;
 import java.util.*;
 
 /**
- * Default implementation of the {@link ComponentResolutionContext} interface
+ * Default implementation of the {@link BeanResolutionContext} interface
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class DefaultComponentResolutionContext implements ComponentResolutionContext {
+public class DefaultBeanResolutionContext implements BeanResolutionContext {
 
-    private final Context context;
-    private final ComponentDefinition rootDefinition;
+    private final BeanContext context;
+    private final BeanDefinition rootDefinition;
     private final Path path;
 
     @Internal
-    public DefaultComponentResolutionContext(Context context, ComponentDefinition rootDefinition) {
+    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
     }
 
     @Override
-    public Context getContext() {
+    public BeanContext getContext() {
         return context;
     }
 
     @Override
-    public ComponentDefinition getRootDefinition() {
+    public BeanDefinition getRootDefinition() {
         return rootDefinition;
     }
 
@@ -94,10 +94,10 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         }
 
         @Override
-        public Path pushConstructorResolve(ComponentDefinition declaringType, Argument argument) {
+        public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
             if(contains(constructorSegment)) {
-                throw new CircularDependencyException(DefaultComponentResolutionContext.this, argument, "Circular dependency detected");
+                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
             }
             else {
                 push(constructorSegment);
@@ -106,10 +106,10 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         }
 
         @Override
-        public Path pushMethodArgumentResolve(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
+        public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             MethodSegment methodSegment = new MethodSegment(declaringType, methodInjectionPoint, argument);
             if(contains(methodSegment)) {
-                throw new CircularDependencyException(DefaultComponentResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
+                throw new CircularDependencyException(DefaultBeanResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
             }
             else {
                 push(methodSegment);
@@ -119,10 +119,10 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         }
 
         @Override
-        public Path pushFieldResolve(ComponentDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
+        public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint);
             if(contains(fieldSegment)) {
-                throw new CircularDependencyException(DefaultComponentResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
+                throw new CircularDependencyException(DefaultBeanResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
             }
             else {
                 push(fieldSegment);
@@ -135,14 +135,14 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
      * A segment that represents a constructor
      */
     class ConstructorSegment extends AbstractSegment {
-        ConstructorSegment(ComponentDefinition declaringClass, Argument argument) {
+        ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
             super(declaringClass, declaringClass.getType().getName(), argument);
         }
 
         @Override
         public String toString() {
             StringBuilder baseString = new StringBuilder("new ");
-            ComponentDefinition declaringType = getDeclaringType();
+            BeanDefinition declaringType = getDeclaringType();
             baseString.append(declaringType.getType().getSimpleName());
             outputArguments(declaringType, baseString);
             return baseString.toString();
@@ -156,7 +156,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
 
         private final MethodInjectionPoint methodInjectionPoint;
 
-        MethodSegment(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
+        MethodSegment(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             super(declaringType, methodInjectionPoint.getName(), argument);
             this.methodInjectionPoint = methodInjectionPoint;
         }
@@ -174,7 +174,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
      * A segment that represents a field
      */
     class FieldSegment extends AbstractSegment {
-        FieldSegment(ComponentDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
+        FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
                     new DefaultArgument(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
@@ -186,11 +186,11 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
     }
 
     abstract class AbstractSegment implements Segment {
-        private final ComponentDefinition declaringComponent;
+        private final BeanDefinition declaringComponent;
         private final String name;
         private final Argument argument;
 
-        AbstractSegment(ComponentDefinition declaringClass, String name, Argument argument) {
+        AbstractSegment(BeanDefinition declaringClass, String name, Argument argument) {
             this.declaringComponent = declaringClass;
             this.name = name;
             this.argument = argument;
@@ -202,7 +202,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
         }
 
         @Override
-        public ComponentDefinition getDeclaringType() {
+        public BeanDefinition getDeclaringType() {
             return  declaringComponent;
         }
 
@@ -229,7 +229,7 @@ public class DefaultComponentResolutionContext implements ComponentResolutionCon
             return result;
         }
 
-        void outputArguments(ComponentDefinition declaringType, StringBuilder baseString) {
+        void outputArguments(BeanDefinition declaringType, StringBuilder baseString) {
             Argument[] arguments = declaringType.getConstructor().getArguments();
             outputArguments(baseString, arguments);
         }

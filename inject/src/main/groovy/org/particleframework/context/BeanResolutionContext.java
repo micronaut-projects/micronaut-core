@@ -3,7 +3,6 @@ package org.particleframework.context;
 import org.particleframework.inject.*;
 
 import java.util.Deque;
-import java.util.Map;
 
 /**
  * Represents the resolution context for a current resolve of a given bean
@@ -11,17 +10,17 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ComponentResolutionContext {
+public interface BeanResolutionContext {
 
     /**
      * @return The context
      */
-    Context getContext();
+    BeanContext getContext();
     /**
      *
      * @return The class requested at the root of this resolution context
      */
-    ComponentDefinition getRootDefinition();
+    BeanDefinition getRootDefinition();
 
     /**
      * @return The path that this resolution has taken so far
@@ -40,7 +39,7 @@ public interface ComponentResolutionContext {
          * @param argument The unresolved argument
          * @return This path
          */
-        Path pushConstructorResolve(ComponentDefinition declaringType, Argument argument);
+        Path pushConstructorResolve(BeanDefinition declaringType, Argument argument);
 
 
         /**
@@ -51,7 +50,7 @@ public interface ComponentResolutionContext {
          * @param argument The unresolved argument
          * @return This path
          */
-        Path pushMethodArgumentResolve(ComponentDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument);
+        Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument);
         /**
          * Push an unresolved field onto the queue
          *
@@ -59,7 +58,7 @@ public interface ComponentResolutionContext {
          * @param fieldInjectionPoint The field injection point
          * @return This path
          */
-        Path pushFieldResolve(ComponentDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
+        Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
 
         /**
          * Converts the path to a circular string
@@ -77,7 +76,7 @@ public interface ComponentResolutionContext {
         /**
          * @return The type requested
          */
-        ComponentDefinition getDeclaringType();
+        BeanDefinition getDeclaringType();
 
         /**
          *

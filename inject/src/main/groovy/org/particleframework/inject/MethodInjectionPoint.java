@@ -12,7 +12,7 @@ public interface MethodInjectionPoint {
     /**
      * @return The component that declares this injection point
      */
-    ComponentDefinition getDeclaringComponent();
+    BeanDefinition getDeclaringComponent();
 
     /**
      * @return The setter to invoke to set said property

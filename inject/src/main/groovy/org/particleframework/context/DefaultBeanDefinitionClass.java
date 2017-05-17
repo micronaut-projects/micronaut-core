@@ -1,9 +1,10 @@
 package org.particleframework.context;
 
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.context.exceptions.ContextException;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.inject.BeanDefinitionClass;
 
 /**
  * An uninitialized component definition with basic information available regarding its requirements
@@ -12,11 +13,11 @@ import org.particleframework.core.annotation.Internal;
  * @since 1.0
  */
 @Internal
-public class DefaultComponentDefinitionClass<T> implements org.particleframework.inject.ComponentDefinitionClass<T> {
+public class DefaultBeanDefinitionClass<T> implements BeanDefinitionClass<T> {
 
-    private final Class<? extends ComponentDefinition<T>> componentDefinitionClass;
+    private final Class<? extends BeanDefinition<T>> componentDefinitionClass;
 
-    protected DefaultComponentDefinitionClass(Class<? extends ComponentDefinition<T>> componentDefinitionClass) {
+    protected DefaultBeanDefinitionClass(Class<? extends BeanDefinition<T>> componentDefinitionClass) {
         this.componentDefinitionClass = componentDefinitionClass;
     }
 
@@ -36,7 +37,7 @@ public class DefaultComponentDefinitionClass<T> implements org.particleframework
      * @return The loaded component definition
      */
     @Override
-    public ComponentDefinition<T> load() {
+    public BeanDefinition<T> load() {
         try {
             return componentDefinitionClass.newInstance();
         } catch (Throwable e) {

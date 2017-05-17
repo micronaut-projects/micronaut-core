@@ -1,7 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.exceptions.NonUniqueBeanException;
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
@@ -23,9 +23,9 @@ class AnnotationQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public ComponentDefinition<T> qualify(Class<T> beanType, Stream<ComponentDefinition<T>> candidates) throws NonUniqueBeanException {
+    public BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates) throws NonUniqueBeanException {
 
-        Stream<ComponentDefinition<T>> filtered;
+        Stream<BeanDefinition<T>> filtered;
         String name;
         if (qualifier instanceof Named) {
             Named named = (Named) qualifier;
@@ -53,7 +53,7 @@ class AnnotationQualifier<T> implements Qualifier<T> {
                 }
         );
 
-        Optional<ComponentDefinition<T>> first = filtered.findFirst();
+        Optional<BeanDefinition<T>> first = filtered.findFirst();
         return first.orElse(null);
     }
 

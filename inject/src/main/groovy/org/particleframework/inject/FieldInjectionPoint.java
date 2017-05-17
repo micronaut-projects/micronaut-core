@@ -15,7 +15,7 @@ public interface FieldInjectionPoint<T> {
     /**
      * @return The component that declares this injection point
      */
-    ComponentDefinition getDeclaringComponent();
+    BeanDefinition getDeclaringComponent();
 
     /**
      * @return The name of the field

@@ -1,7 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.exceptions.NonUniqueBeanException;
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -21,14 +21,14 @@ class NameQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public ComponentDefinition<T> qualify(Class<T> beanType, Stream<ComponentDefinition<T>> candidates) throws NonUniqueBeanException {
-        Stream<ComponentDefinition<T>> filtered = candidates.filter(candidate -> {
+    public BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates) throws NonUniqueBeanException {
+        Stream<BeanDefinition<T>> filtered = candidates.filter(candidate -> {
                 String typeName = candidate.getType().getSimpleName();
                 return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
             }
         );
 
-        Optional<ComponentDefinition<T>> first = filtered.findFirst();
+        Optional<BeanDefinition<T>> first = filtered.findFirst();
         return first.orElse(null);
     }
 

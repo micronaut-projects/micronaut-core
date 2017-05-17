@@ -1,6 +1,6 @@
 package org.particleframework.inject;
 
-import org.particleframework.context.Context;
+import org.particleframework.context.BeanContext;
 
 /**
  * A bean definition that is injectable
@@ -8,7 +8,7 @@ import org.particleframework.context.Context;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InjectableComponentDefinition<T> extends ComponentDefinition<T> {
+public interface InjectableBeanDefinition<T> extends BeanDefinition<T> {
     /**
      * Inject the given bean with the context
      *
@@ -16,5 +16,5 @@ public interface InjectableComponentDefinition<T> extends ComponentDefinition<T>
      * @param bean The bean
      * @return The injected bean
      */
-    T inject(Context context, T bean);
+    T inject(BeanContext context, T bean);
 }

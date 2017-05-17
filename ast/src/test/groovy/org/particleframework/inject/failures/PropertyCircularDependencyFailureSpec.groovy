@@ -1,9 +1,8 @@
 package org.particleframework.inject.failures
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.exceptions.CircularDependencyException
-import org.particleframework.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -16,7 +15,7 @@ class PropertyCircularDependencyFailureSpec extends Specification {
 
     void "test simple property circular dependency failure"() {
         given:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:"A bean is obtained that has a setter with @Inject"

@@ -1,7 +1,7 @@
 package org.particleframework.inject.method
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -13,7 +13,7 @@ import javax.inject.Singleton
 class SetterSetInjectionSpec extends Specification {
     void "test injection via setter that takes an array"() {
         given:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:

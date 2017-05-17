@@ -13,7 +13,6 @@ import org.codehaus.groovy.ast.expr.MapExpression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
-import org.codehaus.groovy.ast.tools.GeneralUtils
 import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -25,16 +24,16 @@ import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstClassUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
-import org.particleframework.context.ComponentResolutionContext
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultComponentDefinitionClass
-import org.particleframework.context.DefaultComponentDefinition
-import org.particleframework.context.DefaultComponentResolutionContext
-import org.particleframework.context.DefaultContext
-import org.particleframework.inject.ComponentDefinition
-import org.particleframework.inject.ComponentDefinitionClass
-import org.particleframework.inject.ComponentFactory
-import org.particleframework.inject.InjectableComponentDefinition
+import org.particleframework.context.BeanResolutionContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanDefinitionClass
+import org.particleframework.context.DefaultBeanDefinition
+import org.particleframework.context.DefaultBeanResolutionContext
+import org.particleframework.context.DefaultBeanContext
+import org.particleframework.inject.BeanDefinition
+import org.particleframework.inject.BeanDefinitionClass
+import org.particleframework.inject.BeanFactory
+import org.particleframework.inject.InjectableBeanDefinition
 
 import javax.inject.Inject
 import javax.inject.Provider
@@ -59,7 +58,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     private static final String FACTORY_INSTANCE_VAR_NAME = '$instance'
-    private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(DefaultComponentDefinition)
+    private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(DefaultBeanDefinition)
 
     CompilationUnit unit
 
@@ -83,7 +82,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode newClass = entry.value
             ClassNode targetClass =entry.key
             moduleNode.addClass(newClass)
-            ClassNode componentDefinitionClassSuperClass = GenericsUtils.makeClassSafeWithGenerics(DefaultComponentDefinitionClass, targetClass)
+            ClassNode componentDefinitionClassSuperClass = GenericsUtils.makeClassSafeWithGenerics(DefaultBeanDefinitionClass, targetClass)
             ClassNode componentDefinitionClass = new ClassNode(newClass.name + "Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
 
             componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
@@ -95,7 +94,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ))
             )
             componentDefinitionClass.setModule(moduleNode)
-            generator.generate(componentDefinitionClass, ComponentDefinitionClass)
+            generator.generate(componentDefinitionClass, BeanDefinitionClass)
             moduleNode.addClass(componentDefinitionClass)
         }
     }
@@ -355,32 +354,32 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 isProvider = providerGenericType != null
                 ClassNode targetClassNode = isProvider ? providerGenericType : classNode
-                String componentDefinitionName = classNode.name + "ComponentDefinition"
+                String componentDefinitionName = classNode.name + "BeanDefinition"
                 currentBuildBody = block()
                 currentInjectBody = block()
-                ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(ComponentFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableComponentDefinition, classNode)] as ClassNode[]
-                ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(DefaultComponentDefinition, targetClassNode)
+                ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]
+                ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(DefaultBeanDefinition, targetClassNode)
                 currentComponentDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
                         interfaceNodes, null)
 
-                currentContextParam = param(makeCached(Context).plainNodeReference, '$context')
-                currentResolutionContextParam = param(makeCached(ComponentResolutionContext).plainNodeReference, '$resolutionContext')
+                currentContextParam = param(makeCached(BeanContext).plainNodeReference, '$context')
+                currentResolutionContextParam = param(makeCached(BeanResolutionContext).plainNodeReference, '$resolutionContext')
 
                 // add the build method
                 Parameter[] buildMethodParams = params(
                     currentResolutionContextParam,
                     currentContextParam,
-                    param(GenericsUtils.makeClassSafeWithGenerics(ComponentDefinition, targetClassNode), '$definition')
+                    param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
                 )
 
                 Parameter[] buildDelegateMethodParams = params(
-                    param(makeCached(Context), '$context'),
-                    param(GenericsUtils.makeClassSafeWithGenerics(ComponentDefinition, targetClassNode), '$definition')
+                    param(makeCached(BeanContext), '$context'),
+                    param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
                 )
                 currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildMethodParams, null, currentBuildBody)
 
 
-                def newResolutionContext = ctorX(makeCached(DefaultComponentResolutionContext), args(varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])))
+                def newResolutionContext = ctorX(makeCached(DefaultBeanResolutionContext), args(varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])))
                 currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildDelegateMethodParams, null, block(
                     stmt( callX(varX("this"),"build", args(newResolutionContext, varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])) ) )
                 ))
@@ -454,13 +453,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 def injectBeanFields = callSuperX("injectBeanFields", args(
                         varX(currentResolutionContextParam),
-                        castX(makeCached(DefaultContext), varX(currentContextParam)),
+                        castX(makeCached(DefaultBeanContext), varX(currentContextParam)),
                         varX(injectObjectParam)
                 ))
 
                 def injectBeanMethods = callSuperX("injectBeanMethods", args(
                         varX(currentResolutionContextParam),
-                        castX(makeCached(DefaultContext), varX(currentContextParam)),
+                        castX(makeCached(DefaultBeanContext), varX(currentContextParam)),
                         varX(injectObjectParam)
                 ))
                 MethodNode injectMethodTarget = DEFAULT_COMPONENT_DEFINITION.getMethod("injectBean", injectMethodParams)

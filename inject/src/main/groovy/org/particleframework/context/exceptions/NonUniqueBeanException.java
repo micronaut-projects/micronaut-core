@@ -1,8 +1,7 @@
 package org.particleframework.context.exceptions;
 
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 
-import java.util.Collection;
 import java.util.Iterator;
 
 /**
@@ -16,7 +15,7 @@ public class NonUniqueBeanException extends NoSuchBeanException {
     private final Iterator possibleCandidates;
 
 
-    public <T> NonUniqueBeanException(Class targetType, Iterator<ComponentDefinition<T>> candidates) {
+    public <T> NonUniqueBeanException(Class targetType, Iterator<BeanDefinition<T>> candidates) {
         super(buildMessage(candidates));
         this.targetType = targetType;
         this.possibleCandidates = candidates;
@@ -25,7 +24,7 @@ public class NonUniqueBeanException extends NoSuchBeanException {
     /**
      * @return The possible bean candidates
      */
-    public <T> Iterator<ComponentDefinition<T>> getPossibleCandidates() {
+    public <T> Iterator<BeanDefinition<T>> getPossibleCandidates() {
         return possibleCandidates;
     }
 
@@ -37,7 +36,7 @@ public class NonUniqueBeanException extends NoSuchBeanException {
         return (Class<T>)targetType;
     }
 
-    private static <T> String buildMessage(Iterator<ComponentDefinition<T>> possibleCandidates) {
+    private static <T> String buildMessage(Iterator<BeanDefinition<T>> possibleCandidates) {
         final StringBuilder message = new StringBuilder("Multiple possible bean candidates found: [");
         while (possibleCandidates.hasNext()) {
             Class next = possibleCandidates.next().getType();

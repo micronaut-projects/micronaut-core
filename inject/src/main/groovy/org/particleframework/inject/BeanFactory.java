@@ -1,7 +1,7 @@
 package org.particleframework.inject;
 
-import org.particleframework.context.ComponentResolutionContext;
-import org.particleframework.context.Context;
+import org.particleframework.context.BeanResolutionContext;
+import org.particleframework.context.BeanContext;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 /**
@@ -10,7 +10,7 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ComponentFactory<T> {
+public interface BeanFactory<T> {
 
     /**
      * builds a component instance
@@ -20,7 +20,7 @@ public interface ComponentFactory<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    T build(Context context, ComponentDefinition<T> definition) throws BeanInstantiationException;
+    T build(BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException;
 
     /**
      * builds a component instance
@@ -30,5 +30,5 @@ public interface ComponentFactory<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    T build(ComponentResolutionContext resolutionContext, Context context, ComponentDefinition<T> definition) throws BeanInstantiationException;
+    T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException;
 }

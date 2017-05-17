@@ -1,7 +1,6 @@
 package org.particleframework.inject;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 
 /**
  * A constructor injection point
@@ -14,7 +13,7 @@ public interface ConstructorInjectionPoint<T> {
     /**
      * @return The component that declares this injection point
      */
-    ComponentDefinition getDeclaringComponent();
+    BeanDefinition getDeclaringComponent();
 
     /**
      * The required argument types

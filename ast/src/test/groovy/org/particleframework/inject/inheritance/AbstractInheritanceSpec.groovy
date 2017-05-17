@@ -1,7 +1,7 @@
 package org.particleframework.inject.inheritance
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -14,7 +14,7 @@ class AbstractInheritanceSpec extends Specification {
 
     void "test values are injected for abstract parent class"() {
         given:
-        Context context  = new DefaultContext()
+        BeanContext context  = new DefaultBeanContext()
         context.start()
 
         when:"A bean is retrieved that has abstract inherited values"

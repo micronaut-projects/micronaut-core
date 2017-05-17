@@ -1,8 +1,8 @@
 package org.particleframework.inject.ast
 
-import org.particleframework.context.DefaultComponentDefinition
-import org.particleframework.context.DefaultComponentDefinitionClass
-import org.particleframework.inject.ComponentDefinition
+import org.particleframework.context.DefaultBeanDefinition
+import org.particleframework.context.DefaultBeanDefinitionClass
+import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
 
 /**
@@ -24,15 +24,15 @@ class FooService {}
         gcl.loadedClasses.size() == 3
 
         when:
-        def cls = gcl.loadClass('FooServiceComponentDefinitionClass')
+        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultComponentDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinitionClass<FooService>'
+        DefaultBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
 
         when:
-        DefaultComponentDefinitionClass cdefc = cls.newInstance()
-        ComponentDefinition cdef = cdefc.load()
+        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        BeanDefinition cdef = cdefc.load()
 
         then:
         cdef.constructor.arguments.size() == 0
@@ -135,15 +135,15 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceComponentDefinitionClass')
+        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultComponentDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinitionClass<FooService>'
+        DefaultBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
 
         when:
-        DefaultComponentDefinitionClass cdefc = cls.newInstance()
-        ComponentDefinition cdef = cdefc.load()
+        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        BeanDefinition cdef = cdefc.load()
 
         then:
         cdef.constructor.arguments.size() == 0
@@ -172,15 +172,15 @@ class FooService {}
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceComponentDefinitionClass')
+        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultComponentDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinitionClass<FooService>'
+        DefaultBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
 
         when:
-        DefaultComponentDefinitionClass cdefc = cls.newInstance()
-        ComponentDefinition cdef = cdefc.load()
+        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        BeanDefinition cdef = cdefc.load()
 
         then:
         cdef.constructor.arguments.size() == 0
@@ -209,15 +209,15 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceComponentDefinitionClass')
+        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultComponentDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinitionClass<FooService>'
+        DefaultBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
 
         when:
-        DefaultComponentDefinitionClass cdefc = cls.newInstance()
-        ComponentDefinition cdef = cdefc.load()
+        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        BeanDefinition cdef = cdefc.load()
 
         then:
         cdef.constructor.arguments.size() == 0
@@ -240,14 +240,14 @@ class FooService {
         gcl.loadedClasses.size() == 3
 
         when:
-        def cls = gcl.loadClass('FooServiceComponentDefinition')
+        def cls = gcl.loadClass('FooServiceBeanDefinition')
 
         then:
-        DefaultComponentDefinition.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinition<FooService>'
+        DefaultBeanDefinition.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinition<FooService>'
 
         when:
-        ComponentDefinition cdef = cls.newInstance()
+        BeanDefinition cdef = cls.newInstance()
 
         then:
         cdef.constructor.arguments.size() == 1
@@ -275,14 +275,14 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('BarServiceComponentDefinition')
+        def cls = gcl.loadClass('BarServiceBeanDefinition')
 
         then:
-        DefaultComponentDefinition.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultComponentDefinition<BarService>'
+        DefaultBeanDefinition.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinition<BarService>'
 
         when:
-        ComponentDefinition cdef = cls.newInstance()
+        BeanDefinition cdef = cls.newInstance()
 
         then:
         cdef.constructor.arguments.size() == 0

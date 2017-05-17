@@ -1,6 +1,6 @@
 package org.particleframework.context.exceptions;
 
-import org.particleframework.context.ComponentResolutionContext;
+import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.FieldInjectionPoint;
 import org.particleframework.inject.MethodInjectionPoint;
@@ -13,42 +13,42 @@ import org.particleframework.inject.MethodInjectionPoint;
  */
 public class DependencyInjectionException extends BeanInstantiationException {
 
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, Argument argument, Throwable cause) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, Throwable cause) {
         super(buildMessage(resolutionContext, argument, null, false), cause);
     }
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, Argument argument, String message) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, String message) {
         super(buildMessage(resolutionContext, argument, message, false));
     }
 
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, Throwable cause) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, Throwable cause) {
         super(buildMessage(resolutionContext, fieldInjectionPoint, null, false), cause);
     }
 
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message) {
         super(buildMessage(resolutionContext, fieldInjectionPoint, message, false));
     }
 
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint,Argument argument, Throwable cause) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, Throwable cause) {
         super(buildMessage(resolutionContext, methodInjectionPoint, argument, null, false), cause);
     }
 
-    public DependencyInjectionException(ComponentResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message) {
         super(buildMessage(resolutionContext, methodInjectionPoint, argument, message, false));
     }
 
-    protected DependencyInjectionException(ComponentResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message, boolean circular) {
+    protected DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message, boolean circular) {
         super(buildMessage(resolutionContext, methodInjectionPoint, argument, message, circular));
     }
 
-    protected DependencyInjectionException(ComponentResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, boolean circular) {
+    protected DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, boolean circular) {
         super(buildMessage(resolutionContext, fieldInjectionPoint, message, circular));
     }
 
-    protected DependencyInjectionException(ComponentResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
+    protected DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
         super(buildMessage(resolutionContext, argument, message, circular));
     }
 
-    private static String buildMessage(ComponentResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message, boolean circular) {
+    private static String buildMessage(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = System.getProperty("line.separator");
         builder.append(argument.getName()).append("] of method [")
@@ -69,7 +69,7 @@ public class DependencyInjectionException extends BeanInstantiationException {
     }
 
 
-    private static String buildMessage(ComponentResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, boolean circular) {
+    private static String buildMessage(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
         String ls = System.getProperty("line.separator");
         builder.append(fieldInjectionPoint.getName()).append("] of class: ")
@@ -90,7 +90,7 @@ public class DependencyInjectionException extends BeanInstantiationException {
 
 
 
-    private static String buildMessage(ComponentResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
+    private static String buildMessage(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = System.getProperty("line.separator");
         builder.append(argument.getName()).append("] of class: ")

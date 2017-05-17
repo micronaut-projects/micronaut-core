@@ -1,7 +1,7 @@
 package org.particleframework.inject.field
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.qualifiers.One
 import spock.lang.Specification
 
@@ -16,7 +16,7 @@ class FieldProtectedWithQualifierSpec extends Specification {
 
     void "test that a field with a qualifier is injected correctly"() {
         given:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:

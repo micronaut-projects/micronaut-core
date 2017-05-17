@@ -1,7 +1,7 @@
 package org.particleframework.inject.constructor
 
-import org.particleframework.context.Context
-import org.particleframework.context.DefaultContext
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -15,7 +15,7 @@ class ConstructorFactorySpec extends Specification {
 
     void "test injection with constructor supplied by a provider"() {
         given:
-        Context context = new DefaultContext()
+        BeanContext context = new DefaultBeanContext()
         context.start()
 
         when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"

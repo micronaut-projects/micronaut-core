@@ -1,6 +1,6 @@
 package org.particleframework.context;
 
-import org.particleframework.inject.ComponentDefinition;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.FieldInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
@@ -19,10 +19,10 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     private final String name;
     private final Field field;
     private final Annotation qualifier;
-    private final ComponentDefinition declaringComponent;
+    private final BeanDefinition declaringComponent;
     private final boolean requiresReflection;
 
-    DefaultFieldInjectionPoint(ComponentDefinition declaringComponent, Field field, Annotation qualifier, boolean requiresReflection) {
+    DefaultFieldInjectionPoint(BeanDefinition declaringComponent, Field field, Annotation qualifier, boolean requiresReflection) {
         this.field = field;
         this.field.setAccessible(true);
         this.name = field.getName();
@@ -42,7 +42,7 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public ComponentDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringComponent() {
         return this.declaringComponent;
     }
 
