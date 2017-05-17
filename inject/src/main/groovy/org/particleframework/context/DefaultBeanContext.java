@@ -96,6 +96,26 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public boolean containsBean(Class beanType, Qualifier qualifier) {
+        BeanKey beanKey = new BeanKey(beanType, qualifier);
+        if(singletonObjects.containsKey(beanKey)) {
+            return true;
+        }
+        else {
+            try {
+                BeanDefinition candidate = findConcreteCandidate(beanType, qualifier);
+                if(candidate != null) {
+                    return true;
+                }
+            } catch (NonUniqueBeanException e) {
+                // FIXME: probably inefficient
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public <T> T getBean(Class<T> beanType, Qualifier<T> qualifier) {
         return getBean(null, beanType, qualifier);
     }

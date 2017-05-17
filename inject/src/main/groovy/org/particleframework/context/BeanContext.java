@@ -22,6 +22,24 @@ public interface BeanContext extends LifeCycle {
     }
 
     /**
+     * Return whether the bean of the given type is contained within this context
+     *
+     * @param beanType The bean type
+     * @return True if it is
+     */
+    default boolean containsBean(Class beanType) {
+        return containsBean(beanType, null);
+    }
+
+    /**
+     * Return whether the bean of the given type is contained within this context
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier for the bean
+     * @return True if it is
+     */
+    boolean containsBean(Class beanType, Qualifier qualifier);
+    /**
      * Obtains a Bean for the given type and qualifier
      *
      * @param beanType The bean type

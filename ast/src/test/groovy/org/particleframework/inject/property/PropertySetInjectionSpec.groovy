@@ -20,6 +20,7 @@ class PropertySetInjectionSpec extends Specification {
         B b =  context.getBean(B)
 
         then:
+        context.containsBean(B)
         b.all != null
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
