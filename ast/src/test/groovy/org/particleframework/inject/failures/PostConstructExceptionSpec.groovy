@@ -1,7 +1,9 @@
-package org.particleframework.inject.lifecyle
+package org.particleframework.inject.failures
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.exceptions.BeanInstantiationException
+import org.particleframework.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
@@ -11,21 +13,21 @@ import javax.inject.Singleton
 /**
  * Created by graemerocher on 17/05/2017.
  */
-class BeanWithPostConstructSpec extends Specification{
+class PostConstructExceptionSpec extends Specification {
 
-    void "test that a bean with a protected post construct hook that the hook is invoked"() {
+    void "test error message when a bean has an error in the post construct method"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
 
-        when:
-        B b = context.getBean(B)
+        when:"A bean is obtained that has a setter with @Inject"
+        B b =  context.getBean(B)
 
-        then:
-        b.a != null
-        b.injectedFirst
-        b.setupComplete
+        then:"The implementation is injected"
+        def e = thrown(BeanInstantiationException)
+        e.message == 'Error instantiating bean of type [org.particleframework.inject.failures.PostConstructExceptionSpec$B]: bad'
     }
+
 
     @Singleton
     static class A {
@@ -51,10 +53,7 @@ class BeanWithPostConstructSpec extends Specification{
 
         @PostConstruct
         void setup() {
-            if(a != null && another != null) {
-                injectedFirst = true
-            }
-            setupComplete = true
+            throw new RuntimeException("bad")
         }
     }
 }

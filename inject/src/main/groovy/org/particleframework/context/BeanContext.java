@@ -59,4 +59,14 @@ public interface BeanContext extends LifeCycle {
      * @return The instance
      */
     <T> T createBean(Class<T> beanType);
+
+    /**
+     * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
+     * destroyed and removed from the context, otherwise null will be returned.
+     *
+     * @param beanType The bean type
+     * @param <T> The concrete class
+     * @return The destroy instance or null if no such bean exists
+     */
+    <T> T destroyBean(Class<T> beanType);
 }

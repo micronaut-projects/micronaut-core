@@ -89,27 +89,27 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     @Override
-    public Iterable<Class> getRequiredComponents() {
+    public Collection<Class> getRequiredComponents() {
         return Collections.unmodifiableCollection(requiredComponents);
     }
 
     @Override
-    public Iterable<MethodInjectionPoint> getInjectedMethods() {
+    public Collection<MethodInjectionPoint> getInjectedMethods() {
         return Collections.unmodifiableCollection(methodInjectionPoints);
     }
 
     @Override
-    public Iterable<FieldInjectionPoint> getInjectedFields() {
+    public Collection<FieldInjectionPoint> getInjectedFields() {
         return Collections.unmodifiableCollection(fieldInjectionPoints);
     }
 
     @Override
-    public Iterable<MethodInjectionPoint> getPostConstructMethods() {
+    public Collection<MethodInjectionPoint> getPostConstructMethods() {
         return Collections.unmodifiableCollection(postConstructMethods);
     }
 
     @Override
-    public Iterable<MethodInjectionPoint> getPreDestroyMethods() {
+    public Collection<MethodInjectionPoint> getPreDestroyMethods() {
         return Collections.unmodifiableCollection(preDestroyMethods);
     }
 
@@ -308,7 +308,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             }
             path.pop();
         }
-        methodInjectionPoint.invoke(bean, methodArgs);
+        try {
+            methodInjectionPoint.invoke(bean, methodArgs);
+        } catch (Throwable e) {
+            throw new BeanInstantiationException(this, e);
+        }
     }
 
     protected void injectBeanFields(BeanResolutionContext resolutionContext , DefaultBeanContext defaultContext, Object bean) {

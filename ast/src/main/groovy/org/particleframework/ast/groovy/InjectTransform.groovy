@@ -33,6 +33,7 @@ import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.BeanFactory
+import org.particleframework.inject.DisposableBeanDefinition
 import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
 
@@ -164,6 +165,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         stmt(callX(thisX, "postConstruct", injectBeanArgs))
                     )
                 }
+                if(currentShutdownBody != null) {
+                    makeBeanDefinitionDisposable()
+                }
                 if (isProvider) {
                     currentBuildBody.addStatement(
                             returnS(callX(currentBuildInstance, "get"))
@@ -177,54 +181,62 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        private void makeBeanDefinitionDisposable() {
+            makeLifeCycleHook(DisposableBeanDefinition, 'dispose', "preDestroy", currentShutdownBody)
+        }
+
         private void makeBeanDefinitionInitializable() {
-            // implement the InitializingBeanDefinition interface
-            ClassNode targetClass = concreteClass.plainNodeReference
+            makeLifeCycleHook(InitializingBeanDefinition, 'initialize', "postConstruct", currentStartupBody)
+        }
+
+        private void makeLifeCycleHook(Class interfaceType, String interfaceMethod, String protectedDelegateMethod, BlockStatement body) {
+                ClassNode targetClass = concreteClass.plainNodeReference
             currentComponentDef.addInterface(
-                    GenericsUtils.makeClassSafeWithGenerics(InitializingBeanDefinition, targetClass)
+                    GenericsUtils.makeClassSafeWithGenerics(interfaceType, concreteClass)
             )
 
             // implement the initialize method such that
             // T initialize(BeanContext $context, T $instance) {
             //    return postConstruct(new DefaultBeanResolutionContext($context, this), $context, $instance)
             // }
-            Parameter[] initializeParams = params(
+            Parameter[] interfaceMethodParams = params(
                     param(makeCached(BeanContext), '$context'),
                     param(targetClass, INSTANCE_VAR_NAME)
             )
             ClassNode resolutionContext = makeCached(DefaultBeanResolutionContext)
             def newResolutionContext = ctorX(resolutionContext, args(
-                    varX(initializeParams[0]),
+                    varX(interfaceMethodParams[0]),
                     varX("this")
             ))
-            ArgumentListExpression postConstructArgs = paramsToArguments(initializeParams)
-            postConstructArgs.expressions.add(0, newResolutionContext)
+            ArgumentListExpression interfaceMethodArgs = paramsToArguments(interfaceMethodParams)
+            interfaceMethodArgs.expressions.add(0, newResolutionContext)
             currentComponentDef.addMethod(
-                    'initialize',
+                    interfaceMethod,
                     Modifier.PUBLIC,
                     targetClass,
-                    initializeParams,
+                    interfaceMethodParams,
                     null,
                     returnS(
-                            callThisX("postConstruct", postConstructArgs)
+                            callThisX(protectedDelegateMethod, interfaceMethodArgs)
                     )
             )
 
             // override the postConstruct method to call post construct hooks
-            Parameter[] postConstructParams = params(
+            Parameter[] protectedDelegateMethodParams = params(
                     param(makeCached(BeanResolutionContext), '$resolutionContext'),
                     param(makeCached(BeanContext), '$context'),
                     param(targetClass, INSTANCE_VAR_NAME)
             )
+
             currentComponentDef.addMethod(
-                    'postConstruct',
+                    protectedDelegateMethod,
                     Modifier.PROTECTED,
                     ClassHelper.OBJECT_TYPE,
-                    postConstructParams,
+                    protectedDelegateMethodParams,
                     null,
                     block(
-                        currentStartupBody,
-                        stmt(callSuperX('postConstruct', paramsToArguments(postConstructParams)))
+                            body,
+                            stmt(callSuperX(protectedDelegateMethod, paramsToArguments(protectedDelegateMethodParams)))
                     )
             )
         }

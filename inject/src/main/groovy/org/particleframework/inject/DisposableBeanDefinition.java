@@ -16,5 +16,5 @@ public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
      * @param context The bean context
      * @param bean The bean
      */
-    void dispose(BeanContext context, T bean);
+    T dispose(BeanContext context, T bean);
 }
