@@ -1,11 +1,11 @@
-package org.particleframework.tck
+package org.particleframework.javax.inject.tck
 
 import junit.framework.TestCase
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.tck.accessories.Cupholder
-import org.particleframework.tck.accessories.RoundThing
-import org.particleframework.tck.accessories.SpareTire
+import org.particleframework.javax.inject.tck.accessories.Cupholder
+import org.particleframework.javax.inject.tck.accessories.RoundThing
+import org.particleframework.javax.inject.tck.accessories.SpareTire
 
 import javax.inject.Inject
 import javax.inject.Named

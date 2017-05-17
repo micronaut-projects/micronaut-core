@@ -1,6 +1,6 @@
-package org.particleframework.tck.accessories
+package org.particleframework.javax.inject.tck.accessories
 
-import org.particleframework.tck.Seat
+import org.particleframework.javax.inject.tck.Seat
 
 import javax.inject.Inject
 import javax.inject.Provider

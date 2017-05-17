@@ -1,4 +1,4 @@
-package org.particleframework.tck
+package org.particleframework.javax.inject.tck
 
 /**
  * Created by graemerocher on 12/05/2017.

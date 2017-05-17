@@ -1,6 +1,6 @@
-package org.particleframework.tck
+package org.particleframework.javax.inject.tck
 
-import org.particleframework.tck.accessories.SpareTire
+import org.particleframework.javax.inject.tck.accessories.SpareTire
 
 import javax.inject.Inject
 import javax.inject.Named

@@ -1,4 +1,4 @@
-package org.particleframework.tck.accessories
+package org.particleframework.javax.inject.tck.accessories
 
 import groovy.transform.PackageScope
 

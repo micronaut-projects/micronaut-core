@@ -1,6 +1,6 @@
-package org.particleframework.tck
+package org.particleframework.javax.inject.tck
 
-import org.particleframework.tck.accessories.Cupholder
+import org.particleframework.javax.inject.tck.accessories.Cupholder
 
 import javax.inject.Inject
 

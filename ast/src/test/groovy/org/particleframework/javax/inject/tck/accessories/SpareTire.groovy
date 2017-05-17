@@ -1,8 +1,8 @@
-package org.particleframework.tck.accessories
+package org.particleframework.javax.inject.tck.accessories
 
 import groovy.transform.PackageScope
-import org.particleframework.tck.FuelTank
-import org.particleframework.tck.Tire
+import org.particleframework.javax.inject.tck.FuelTank
+import org.particleframework.javax.inject.tck.Tire
 
 import javax.inject.Inject
 
