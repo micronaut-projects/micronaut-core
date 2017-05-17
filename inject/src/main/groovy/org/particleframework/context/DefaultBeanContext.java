@@ -58,7 +58,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public <T> Iterable<T> getBeansOfType(Class<T> beanType) {
+    public <T> Collection<T> getBeansOfType(Class<T> beanType) {
         return getBeansOfType(null, beanType);
     }
 
@@ -88,11 +88,11 @@ public class DefaultBeanContext implements BeanContext {
         throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
     }
 
-    <T> Iterable<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
+    <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeansOfTypeInternal(resolutionContext, beanType, null);
     }
 
-    <T> Iterable<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return getBeansOfTypeInternal(resolutionContext, beanType, qualifier);
     }
 

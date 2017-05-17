@@ -1,5 +1,7 @@
 package org.particleframework.context;
 
+import java.util.Collection;
+
 /**
  * Represents the context that resolves component definitions
  *
@@ -37,7 +39,7 @@ public interface BeanContext extends LifeCycle {
      * @param <T> The bean type parameter
      * @return The found beans
      */
-    <T> Iterable<T> getBeansOfType(Class<T> beanType);
+    <T> Collection<T> getBeansOfType(Class<T> beanType);
 
     /**
      * Inject an existing instance
