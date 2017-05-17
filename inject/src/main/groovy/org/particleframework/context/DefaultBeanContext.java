@@ -346,8 +346,8 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    <T> DefaultBeanDefinition<T> getComponentDefinition(Class<T> beanType) {
-        return (DefaultBeanDefinition<T>)findConcreteCandidate(beanType, null);
+    <T> AbstractBeanDefinition<T> getComponentDefinition(Class<T> beanType) {
+        return (AbstractBeanDefinition<T>)findConcreteCandidate(beanType, null);
     }
 
     private static final class BeanKey {

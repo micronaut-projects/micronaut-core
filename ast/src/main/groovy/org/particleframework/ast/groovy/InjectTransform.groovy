@@ -27,7 +27,7 @@ import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.context.BeanResolutionContext
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanDefinitionClass
-import org.particleframework.context.DefaultBeanDefinition
+import org.particleframework.context.AbstractBeanDefinition
 import org.particleframework.context.DefaultBeanResolutionContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
@@ -58,7 +58,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     private static final String FACTORY_INSTANCE_VAR_NAME = '$instance'
-    private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(DefaultBeanDefinition)
+    private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(AbstractBeanDefinition)
 
     CompilationUnit unit
 
@@ -358,7 +358,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 currentBuildBody = block()
                 currentInjectBody = block()
                 ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]
-                ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(DefaultBeanDefinition, targetClassNode)
+                ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(AbstractBeanDefinition, targetClassNode)
                 currentComponentDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
                         interfaceNodes, null)
 

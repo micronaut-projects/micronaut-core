@@ -5,7 +5,9 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 /**
- * Responsible for instantiating components
+ * An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete instance.
+ * This interface is generally implemented by a build time tool such as an AST transformation framework that will build the
+ * code necessary to construct a valid bean instance.
  *
  * @author Graeme Rocher
  * @since 1.0

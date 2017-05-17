@@ -13,13 +13,18 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * Default implementation of the {@link BeanDefinition} interface
+ * <p></p>Default implementation of the {@link BeanDefinition} interface. This class is generally not used directly in user code.
+ * Instead a build time tool does analysis of source code and dynamically produces subclasses of this class containing
+ * information about the available injection points for a given class.</p>
+ *
+ * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by compiler tools and plugins (such as AST transformation frameworks)</p>
+ *
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
+public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
 
     private static final LinkedHashMap<String, Class> EMPTY_MAP = new LinkedHashMap<>(0);
     private final Annotation scope;
@@ -33,13 +38,13 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
 
 
-    protected DefaultBeanDefinition(Annotation scope,
-                                    boolean singleton,
-                                    Class<T> type,
-                                    Constructor<T> constructor,
-                                    LinkedHashMap<String, Class> arguments,
-                                    Map<String, Class> qualifiers,
-                                    Map<String, List<Class>> genericTypes) {
+    protected AbstractBeanDefinition(Annotation scope,
+                                     boolean singleton,
+                                     Class<T> type,
+                                     Constructor<T> constructor,
+                                     LinkedHashMap<String, Class> arguments,
+                                     Map<String, Class> qualifiers,
+                                     Map<String, List<Class>> genericTypes) {
         this.scope = scope;
         this.singleton = singleton;
         this.type = type;
@@ -51,10 +56,10 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
         this.constructor = new DefaultConstructorInjectionPoint<>(this,constructor, arguments, qualifierMap, genericTypes);
     }
 
-    protected DefaultBeanDefinition(Annotation scope,
-                                    boolean singleton,
-                                    Class<T> type,
-                                    Constructor<T> constructor) {
+    protected AbstractBeanDefinition(Annotation scope,
+                                     boolean singleton,
+                                     Class<T> type,
+                                     Constructor<T> constructor) {
         this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
     }
 
@@ -123,7 +128,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
      * @param qualifier The qualifier, can be null
      * @return this component definition
      */
-    protected DefaultBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
+    protected AbstractBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, qualifier, requiresReflection));
         return this;
@@ -136,7 +141,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
      * @param field The field
      * @return this component definition
      */
-    protected DefaultBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
+    protected AbstractBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this,field, null, requiresReflection));
         return this;
@@ -149,7 +154,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
      * @param  arguments The arguments to the method
      * @return this component definition
      */
-    protected DefaultBeanDefinition addInjectionPoint(
+    protected AbstractBeanDefinition addInjectionPoint(
                                                 Method method,
                                                 LinkedHashMap<String, Class> arguments,
                                                 Map<String, Class> qualifiers,
@@ -166,7 +171,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
      * @param  arguments The arguments to the method
      * @return this component definition
      */
-    protected DefaultBeanDefinition addInjectionPoint(
+    protected AbstractBeanDefinition addInjectionPoint(
             Field field,
             Method setter,
             LinkedHashMap<String, Class> arguments,
@@ -178,19 +183,19 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
     }
 
 
-    protected DefaultBeanDefinition addPostConstruct(Method method,
-                                                     LinkedHashMap<String, Class> arguments,
-                                                     Map<String, Class> qualifiers,
-                                                     Map<String, List<Class>> genericTypes,
-                                                     boolean requiresReflection) {
+    protected AbstractBeanDefinition addPostConstruct(Method method,
+                                                      LinkedHashMap<String, Class> arguments,
+                                                      Map<String, Class> qualifiers,
+                                                      Map<String, List<Class>> genericTypes,
+                                                      boolean requiresReflection) {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, postConstructMethods);
     }
 
-    protected DefaultBeanDefinition addPreDestroy(Method method,
-                                                  LinkedHashMap<String, Class> arguments,
-                                                  Map<String, Class> qualifiers,
-                                                  Map<String, List<Class>> genericTypes,
-                                                  boolean requiresReflection) {
+    protected AbstractBeanDefinition addPreDestroy(Method method,
+                                                   LinkedHashMap<String, Class> arguments,
+                                                   Map<String, Class> qualifiers,
+                                                   Map<String, List<Class>> genericTypes,
+                                                   boolean requiresReflection) {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, preDestroyMethods);
     }
 
@@ -591,7 +596,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
         }
     }
 
-    private DefaultBeanDefinition addMethodInjectionPointInternal(
+    private AbstractBeanDefinition addMethodInjectionPointInternal(
             Field field,
             Method method,
             LinkedHashMap<String, Class> arguments,
@@ -661,7 +666,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        DefaultBeanDefinition<?> that = (DefaultBeanDefinition<?>) o;
+        AbstractBeanDefinition<?> that = (AbstractBeanDefinition<?>) o;
 
         return type != null ? type.equals(that.type) : that.type == null;
     }
