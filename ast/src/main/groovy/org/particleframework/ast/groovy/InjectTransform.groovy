@@ -170,7 +170,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 if (isProvider) {
                     currentBuildBody.addStatement(
-                            returnS(callX(currentBuildInstance, "get"))
+                        returnS(
+                            callThisX("injectAnother", args(
+                                varX(currentResolutionContextParam),
+                                varX(currentContextParam),
+                                callX(currentBuildInstance, "get")
+                            ))
+
+                        )
                     )
                 }
                 currentInjectBody.addStatement(

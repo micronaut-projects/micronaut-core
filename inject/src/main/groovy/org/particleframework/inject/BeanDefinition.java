@@ -22,6 +22,10 @@ public interface BeanDefinition<T> {
     boolean isSingleton();
 
     /**
+     * @return Is this definition provided by another bean
+     */
+    boolean isProvided();
+    /**
      * @return The component type
      */
     Class<T> getType();

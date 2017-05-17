@@ -7,6 +7,7 @@ import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.scope.Provided;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -33,6 +34,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private final Annotation scope;
     private final boolean singleton;
     private final Class<T> type;
+    private final boolean provided;
     private boolean hasPreDestroyMethods = false;
     private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
@@ -53,6 +55,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.scope = scope;
         this.singleton = singleton;
         this.type = type;
+        this.provided = type.getAnnotation(Provided.class) != null;
         LinkedHashMap<String, Annotation> qualifierMap = null;
         if(qualifiers != null) {
             qualifierMap = new LinkedHashMap<>();
@@ -66,6 +69,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                                      Class<T> type,
                                      Constructor<T> constructor) {
         this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
+    }
+
+    @Override
+    public boolean isProvided() {
+        return provided;
     }
 
     @Override
@@ -118,12 +126,14 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return getType().getName();
     }
 
+    @Override
     public T inject(BeanContext context, T bean) {
         return (T) injectBean(new DefaultBeanResolutionContext(context, this), context, bean);
     }
 
-    protected Object injectBean(BeanContext context, Object bean) {
-        return injectBean(new DefaultBeanResolutionContext(context, this), context, bean);
+    @Override
+    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        return (T) injectBean(resolutionContext, context, bean);
     }
 
     /**
@@ -217,6 +227,18 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return bean;
     }
 
+    /**
+     * Inject another bean, for example one created via factory
+     *
+     * @param resolutionContext The reslution context
+     * @param context The context
+     * @param bean The bean
+     * @return The bean
+     */
+    protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        return defaultContext.inject(resolutionContext, bean);
+    }
     /**
      * Default postConstruct hook that only invokes methods that require reflection. Generated subclasses should override to call methods that don't require reflection
      *

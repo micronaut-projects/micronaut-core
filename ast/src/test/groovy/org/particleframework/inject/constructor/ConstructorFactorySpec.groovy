@@ -2,6 +2,7 @@ package org.particleframework.inject.constructor
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.scope.Provided
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -26,6 +27,7 @@ class ConstructorFactorySpec extends Specification {
         b.a instanceof AImpl
         b.a.c != null
         b.a.c2 != null
+        b.a.d != null
         b.a.is(context.getBean(AImpl))
     }
 
@@ -38,12 +40,18 @@ class ConstructorFactorySpec extends Specification {
     }
 
     @Singleton
+    static class D {}
+
+    @Singleton
     static class CImpl implements C {
 
     }
+
+    @Provided
     static class AImpl implements A {
         final C c
         final C c2
+        @Inject protected D d
 
         AImpl(C c, C c2) {
             this.c = c
