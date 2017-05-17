@@ -37,13 +37,12 @@ class BeanWithPostConstructSpec extends Specification{
         boolean setupComplete = false
         boolean injectedFirst = false
 
+        @Inject protected A another
         private A a
+        
         @Inject
         void setA(A a ) {
             this.a = a
-            if(!setupComplete) {
-                injectedFirst = true
-            }
         }
 
         A getA() {
@@ -52,6 +51,9 @@ class BeanWithPostConstructSpec extends Specification{
 
         @PostConstruct
         void setup() {
+            if(a != null && another != null) {
+                injectedFirst = true
+            }
             setupComplete = true
         }
     }
