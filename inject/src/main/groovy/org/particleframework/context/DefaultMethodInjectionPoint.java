@@ -6,6 +6,8 @@ import org.particleframework.inject.MethodInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -42,6 +44,16 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     @Override
     public boolean requiresReflection() {
         return requiresReflection;
+    }
+
+    @Override
+    public boolean isPreDestroyMethod() {
+        return method.getAnnotation(PreDestroy.class) != null;
+    }
+
+    @Override
+    public boolean isPostConstructMethod() {
+        return method.getAnnotation(PostConstruct.class) != null;
     }
 
     @Override

@@ -33,6 +33,16 @@ public interface MethodInjectionPoint {
      * @return Whether reflection is required to satisfy the injection point
      */
     boolean requiresReflection();
+
+    /**
+     * @return Is this method a pre-destroy method
+     */
+    boolean isPreDestroyMethod();
+
+    /**
+     * @return Is this method a post construct method
+     */
+    boolean isPostConstructMethod();
     /**
      * Invokes the method
      *

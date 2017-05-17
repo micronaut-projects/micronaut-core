@@ -20,18 +20,27 @@ import java.lang.annotation.Target
 class AnnotationStereoTypeFinder {
 
     boolean hasStereoType(AnnotatedNode classNode, Class<? extends Annotation> stereotype) {
+        return hasStereoType(classNode, stereotype.name)
+    }
+
+    boolean hasStereoType(AnnotatedNode classNode, String... stereotypes) {
+        return hasStereoType(classNode, Arrays.asList(stereotypes))
+    }
+
+    boolean hasStereoType(AnnotatedNode classNode, List<String> stereotypes) {
         List<AnnotationNode> annotations = classNode.getAnnotations()
         for(ann in annotations) {
             ClassNode annotationClassNode = ann.classNode
-            if(annotationClassNode.name == stereotype.name) {
+            if(stereotypes.contains(annotationClassNode.name)) {
                 return true
             }
-            else if(!(annotationClassNode.name in [Retention.name, Documented.name, Target.name]) && hasStereoType(annotationClassNode, stereotype)) {
+            else if(!(annotationClassNode.name in [Retention.name, Documented.name, Target.name]) && hasStereoType(annotationClassNode, stereotypes)) {
                 return true
             }
         }
         return false
     }
+
 
     AnnotationNode findAnnotationWithStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
         List<AnnotationNode> annotations = annotatedNode.getAnnotations()

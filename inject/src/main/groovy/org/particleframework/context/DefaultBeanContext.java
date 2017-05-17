@@ -121,6 +121,11 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        // allow injection the bean context
+        if(beanType == BeanContext.class) {
+            return (T) this;
+        }
+
         T bean = (T) singletonObjects.get(new BeanKey(beanType, qualifier));
         if (bean != null) {
             return bean;

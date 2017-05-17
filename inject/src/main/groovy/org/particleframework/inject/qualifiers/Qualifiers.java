@@ -1,4 +1,6 @@
-package org.particleframework.context;
+package org.particleframework.inject.qualifiers;
+
+import org.particleframework.context.Qualifier;
 
 import java.lang.annotation.Annotation;
 

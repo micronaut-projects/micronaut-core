@@ -6,7 +6,10 @@ import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.inject.qualifiers.Qualifiers;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -30,6 +33,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private final Annotation scope;
     private final boolean singleton;
     private final Class<T> type;
+    private boolean hasPreDestroyMethods = false;
+    private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
     protected final List<MethodInjectionPoint> methodInjectionPoints = new ArrayList<>(3);
@@ -212,58 +217,98 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return bean;
     }
 
+    /**
+     * Default postConstruct hook that only invokes methods that require reflection. Generated subclasses should override to call methods that don't require reflection
+     *
+     * @param resolutionContext The resolution hook
+     * @param context The context
+     * @param bean The bean
+     * @return The bean
+     */
+    protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+            if(methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
+                injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
+            }
+        }
+        return bean;
+    }
+
+    /**
+     * Default preDestroy hook that only invokes methods that require reflection. Generated subclasses should override to call methods that don't require reflection
+     *
+     * @param resolutionContext The resolution hook
+     * @param context The context
+     * @param bean The bean
+     * @return The bean
+     */
+    protected Object preDestroy(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
+        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+            if(methodInjectionPoint.isPreDestroyMethod() && methodInjectionPoint.requiresReflection()) {
+                injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
+            }
+        }
+        return bean;
+    }
+
     protected void injectBeanMethods(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
-            if (methodInjectionPoint.requiresReflection()) {
-                Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
-                Object[] methodArgs = new Object[methodArgumentTypes.length];
-                for (int i = 0; i < methodArgumentTypes.length; i++) {
-                    Argument argument = methodArgumentTypes[i];
-                    path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
-                    Class argumentType = argument.getType();
-                    Qualifier qualifier = resolveQualifier(argument);
-
-                    if(argumentType.isArray()) {
-                        Class arrayType = argumentType.getComponentType();
-                        methodArgs[i] = collectionToArray(arrayType, context.getBeansOfType(resolutionContext, arrayType));
-                    }
-                    else if (Iterable.class.isAssignableFrom(argumentType)) {
-                        Class[] genericTypes = argument.getGenericTypes();
-                        if(genericTypes != null && genericTypes.length == 1) {
-                            Class genericType = genericTypes[0];
-                            Collection beansOfType = context.getBeansOfType(resolutionContext, genericType);
-                            try {
-                                methodArgs[i] = coerceToType(beansOfType, argumentType);
-                            } catch (Exception e) {
-                                throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot convert collection to target iterable type: " + argumentType.getName());
-                            }
-                        }
-                        else {
-                            throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Iterable missing generic argument types");
-                        }
-                    } else if(Provider.class.isAssignableFrom(argumentType)) {
-                        Class[] genericTypes = argument.getGenericTypes();
-                        if(genericTypes != null && genericTypes.length == 1) {
-                            Class genericType = genericTypes[0];
-                            if (genericType != null) {
-                                methodArgs[i] = context.getBeanProvider(resolutionContext, genericType);
-                                path.pop();
-                            } else {
-                                throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot inject Iterable with missing generic type arguments for field");
-                            }
-                        }
-                        else {
-                            throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Provider missing generic argument types");
-                        }
-                    } else {
-                        methodArgs[i] = context.getBean(resolutionContext, argumentType, qualifier);
-                    }
-                    path.pop();
-                }
-                methodInjectionPoint.invoke(bean, methodArgs);
+            if (methodInjectionPoint.requiresReflection() && !methodInjectionPoint.isPostConstructMethod() && !methodInjectionPoint.isPreDestroyMethod()) {
+                injectBeanMethod(resolutionContext, context, bean, path, methodInjectionPoint);
             }
         }
+    }
+
+    private void injectBeanMethod(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean, BeanResolutionContext.Path path, MethodInjectionPoint methodInjectionPoint) {
+        Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
+        Object[] methodArgs = new Object[methodArgumentTypes.length];
+        for (int i = 0; i < methodArgumentTypes.length; i++) {
+            Argument argument = methodArgumentTypes[i];
+            path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
+            Class argumentType = argument.getType();
+            Qualifier qualifier = resolveQualifier(argument);
+
+            if(argumentType.isArray()) {
+                Class arrayType = argumentType.getComponentType();
+                methodArgs[i] = collectionToArray(arrayType, context.getBeansOfType(resolutionContext, arrayType));
+            }
+            else if (Iterable.class.isAssignableFrom(argumentType)) {
+                Class[] genericTypes = argument.getGenericTypes();
+                if(genericTypes != null && genericTypes.length == 1) {
+                    Class genericType = genericTypes[0];
+                    Collection beansOfType = context.getBeansOfType(resolutionContext, genericType);
+                    try {
+                        methodArgs[i] = coerceToType(beansOfType, argumentType);
+                    } catch (Exception e) {
+                        throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot convert collection to target iterable type: " + argumentType.getName());
+                    }
+                }
+                else {
+                    throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Iterable missing generic argument types");
+                }
+            } else if(Provider.class.isAssignableFrom(argumentType)) {
+                Class[] genericTypes = argument.getGenericTypes();
+                if(genericTypes != null && genericTypes.length == 1) {
+                    Class genericType = genericTypes[0];
+                    if (genericType != null) {
+                        methodArgs[i] = context.getBeanProvider(resolutionContext, genericType);
+                        path.pop();
+                    } else {
+                        throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot inject Iterable with missing generic type arguments for field");
+                    }
+                }
+                else {
+                    throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Provider missing generic argument types");
+                }
+            } else {
+                methodArgs[i] = context.getBean(resolutionContext, argumentType, qualifier);
+            }
+            path.pop();
+        }
+        methodInjectionPoint.invoke(bean, methodArgs);
     }
 
     protected void injectBeanFields(BeanResolutionContext resolutionContext , DefaultBeanContext defaultContext, Object bean) {
@@ -604,6 +649,13 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Map<String, List<Class>> genericTypes,
             boolean requiresReflection,
             Collection<MethodInjectionPoint> methodInjectionPoints) {
+        if(!hasPreDestroyMethods && method.getAnnotation(PreDestroy.class) != null) {
+            hasPreDestroyMethods = true;
+        }
+        if(!hasPostConstructMethods && method.getAnnotation(PostConstruct.class) != null) {
+            hasPostConstructMethods = true;
+        }
+
         LinkedHashMap<String, Annotation> qualifiers = null;
         if(qualifierTypes != null && !qualifierTypes.isEmpty()) {
             qualifiers = new LinkedHashMap<>();

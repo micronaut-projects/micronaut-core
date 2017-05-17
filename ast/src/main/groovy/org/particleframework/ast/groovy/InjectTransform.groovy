@@ -33,8 +33,11 @@ import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.BeanFactory
+import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
 
+import javax.annotation.PostConstruct
+import javax.annotation.PreDestroy
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Qualifier
@@ -57,7 +60,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
-    private static final String FACTORY_INSTANCE_VAR_NAME = '$instance'
+    private static final String INSTANCE_VAR_NAME = '$instance'
     private static final ClassNode DEFAULT_COMPONENT_DEFINITION = makeCached(AbstractBeanDefinition)
 
     CompilationUnit unit
@@ -66,10 +69,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
 
-        Map<ClassNode, ClassNode> componentDefinitionClassNodes =[:]
+        Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
 
         for (ClassNode classNode in moduleNode.getClasses()) {
-            if(classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
+            if (classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             }
             InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
@@ -80,7 +83,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in componentDefinitionClassNodes) {
             ClassNode newClass = entry.value
-            ClassNode targetClass =entry.key
+            ClassNode targetClass = entry.key
             moduleNode.addClass(newClass)
             ClassNode componentDefinitionClassSuperClass = GenericsUtils.makeClassSafeWithGenerics(DefaultBeanDefinitionClass, targetClass)
             ClassNode componentDefinitionClass = new ClassNode(newClass.name + "Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
@@ -114,6 +117,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         BlockStatement currentConstructorBody = null
         BlockStatement currentBuildBody = null
         BlockStatement currentInjectBody = null
+        BlockStatement currentStartupBody = null
+        BlockStatement currentShutdownBody = null
         Parameter currentContextParam = null
         int methodIndex = 0
         int fieldIndex = 0
@@ -135,53 +140,112 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             super.visitClass(node)
             ClassNode superClass = node.getSuperClass()
-            while(superClass != null) {
+            while (superClass != null) {
                 superClass.visitContents(this)
                 superClass = superClass.getSuperClass()
             }
-            if(node.isAbstract()) return
+            if (node.isAbstract()) return
 
-            if(currentBuildBody != null && !currentComponentDef.getNodeMetaData("injected")) {
+            if (currentBuildBody != null && !currentComponentDef.getNodeMetaData("injected")) {
                 def thisX = varX("this")
                 // set the meta class to null to save memory
-                if(currentConstructorBody != null) {
+                if (currentConstructorBody != null) {
                     currentConstructorBody.addStatement(
                             stmt(callX(thisX, "setMetaClass", ConstantExpression.NULL))
                     )
                 }
-                def injectBeanArgs = args( varX(currentResolutionContextParam), varX(currentContextParam), currentInjectInstance)
+                def injectBeanArgs = args(varX(currentResolutionContextParam), varX(currentContextParam), currentInjectInstance)
                 currentBuildBody.addStatement(
-                    stmt(callX(thisX, "injectBean", injectBeanArgs))
+                        stmt(callX(thisX, "injectBean", injectBeanArgs))
                 )
-                if(isProvider) {
+                if (currentStartupBody != null) {
+                    makeBeanDefinitionInitializable()
                     currentBuildBody.addStatement(
-                        returnS(callX(currentBuildInstance, "get"))
+                        stmt(callX(thisX, "postConstruct", injectBeanArgs))
+                    )
+                }
+                if (isProvider) {
+                    currentBuildBody.addStatement(
+                            returnS(callX(currentBuildInstance, "get"))
                     )
                 }
                 currentInjectBody.addStatement(
-                    returnS(currentInjectInstance)
+                        returnS(currentInjectInstance)
                 )
+
                 currentComponentDef.putNodeMetaData("injected", Boolean.TRUE)
             }
         }
 
+        private void makeBeanDefinitionInitializable() {
+            // implement the InitializingBeanDefinition interface
+            ClassNode targetClass = concreteClass.plainNodeReference
+            currentComponentDef.addInterface(
+                    GenericsUtils.makeClassSafeWithGenerics(InitializingBeanDefinition, targetClass)
+            )
+
+            // implement the initialize method such that
+            // T initialize(BeanContext $context, T $instance) {
+            //    return postConstruct(new DefaultBeanResolutionContext($context, this), $context, $instance)
+            // }
+            Parameter[] initializeParams = params(
+                    param(makeCached(BeanContext), '$context'),
+                    param(targetClass, INSTANCE_VAR_NAME)
+            )
+            ClassNode resolutionContext = makeCached(DefaultBeanResolutionContext)
+            def newResolutionContext = ctorX(resolutionContext, args(
+                    varX(initializeParams[0]),
+                    varX("this")
+            ))
+            ArgumentListExpression postConstructArgs = paramsToArguments(initializeParams)
+            postConstructArgs.expressions.add(0, newResolutionContext)
+            currentComponentDef.addMethod(
+                    'initialize',
+                    Modifier.PUBLIC,
+                    targetClass,
+                    initializeParams,
+                    null,
+                    returnS(
+                            callThisX("postConstruct", postConstructArgs)
+                    )
+            )
+
+            // override the postConstruct method to call post construct hooks
+            Parameter[] postConstructParams = params(
+                    param(makeCached(BeanResolutionContext), '$resolutionContext'),
+                    param(makeCached(BeanContext), '$context'),
+                    param(targetClass, INSTANCE_VAR_NAME)
+            )
+            currentComponentDef.addMethod(
+                    'postConstruct',
+                    Modifier.PROTECTED,
+                    ClassHelper.OBJECT_TYPE,
+                    postConstructParams,
+                    null,
+                    block(
+                        currentStartupBody,
+                        stmt(callSuperX('postConstruct', paramsToArguments(postConstructParams)))
+                    )
+            )
+        }
+
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (stereoTypeFinder.hasStereoType(methodNode, Inject)) {
+            if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
                 ClassNode classNode = methodNode.declaringClass
                 defineComponentDefinitionClass(concreteClass)
                 boolean isParent = classNode != concreteClass
 
                 if (!isConstructor && currentConstructorBody != null) {
-                    if(!methodNode.isStatic()) {
+                    if (!methodNode.isStatic()) {
                         boolean isPackagePrivate = isPackagePrivate(methodNode)
                         boolean isPrivate = methodNode.isPrivate()
                         MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodNode.name, methodNode.parameters) : methodNode
                         boolean overridden = isParent && overriddenMethod.declaringClass != methodNode.declaringClass
 
-                        if(isParent && !isPrivate && !isPackagePrivate) {
+                        if (isParent && !isPrivate && !isPackagePrivate) {
 
-                            if(overridden) {
+                            if (overridden) {
                                 // bail out if the method has been overridden, since it will have already been handled
                                 return
                             }
@@ -192,15 +256,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
                         boolean overriddenInjected = overridden && stereoTypeFinder.hasStereoType(overriddenMethod, Inject)
 
-                        if(isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+                        if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
                             // bail out if the overridden method is package private and in the same package
                             // and is not annotated with @Inject
                             return
                         }
-                        if(!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
+                        if (!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
                             requiresReflection = true
                         }
-                        addMethodInjectionPoint(classNode, methodName, requiresReflection ,null, methodNode.parameters)
+                        addMethodInjectionPoint(classNode, methodName, requiresReflection, null, methodNode.parameters)
                     }
                 }
             }
@@ -208,8 +272,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         boolean isPackagePrivate(MethodNode methodNode) {
-            int modifiers = methodNode.getModifiers()
-            return  ((!methodNode.isProtected() && !methodNode.isPublic() && !methodNode.isPrivate()) || !methodNode.getAnnotations(makeCached(PackageScope)).isEmpty())
+            return ((!methodNode.isProtected() && !methodNode.isPublic() && !methodNode.isPrivate()) || !methodNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override
@@ -217,25 +280,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && fieldNode.declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineComponentDefinitionClass(concreteClass)
                 if (currentConstructorBody != null) {
-                    if(!fieldNode.isStatic()) {
+                    if (!fieldNode.isStatic()) {
 
                         def modifiers = fieldNode.getModifiers()
                         boolean requiresReflection = Modifier.isPrivate(modifiers)
                         if (currentInjectInstance != null && !requiresReflection) {
-                            if(isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)) {
+                            if (isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)) {
                                 requiresReflection = true
-                            }
-                            else {
+                            } else {
                                 boolean isProvider = AstClassUtils.implementsInterface(fieldNode.type, Provider) && fieldNode.type.genericsTypes
-                                ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
+                                ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam))
 
-                                if(isProvider) {
+                                if (isProvider) {
                                     lookupArgs.addExpression(classX(fieldNode.type.genericsTypes[0].type.plainNodeReference))
                                 }
-                                lookupArgs.addExpression( constX(fieldIndex) )
+                                lookupArgs.addExpression(constX(fieldIndex))
 
                                 String methodName = "getBeanForField"
-                                if(isProvider) {
+                                if (isProvider) {
                                     methodName = "getBeanProviderForField"
                                 }
                                 Expression injectCall = assignX(propX(currentInjectInstance, fieldNode.name), callThisX(methodName, lookupArgs))
@@ -249,11 +311,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         ArgumentListExpression methodArgs = args(fieldVar)
                         AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
                         AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
-                        if(qualifierAnn != null) {
+                        if (qualifierAnn != null) {
                             methodArgs.addExpression(callX(fieldVar, "getAnnotation", classX(qualifierAnn.classNode)))
                         }
                         methodArgs.addExpression(constX(requiresReflection))
-                        MethodCallExpression addInjectionPointMethod = callX(varX("this"),"addInjectionPoint", methodArgs)
+                        MethodCallExpression addInjectionPointMethod = callX(varX("this"), "addInjectionPoint", methodArgs)
                         currentConstructorBody.addStatement(
                                 stmt(addInjectionPointMethod)
                         )
@@ -278,23 +340,27 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
-            if(fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
-                if(!propertyNode.isStatic()) {
+            if (fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
+                if (!propertyNode.isStatic()) {
                     defineComponentDefinitionClass(concreteClass)
                     if (currentConstructorBody != null) {
-                        VariableExpression fieldVar = declareFieldVar('$method_field' + methodIndex,fieldNode)
+                        VariableExpression fieldVar = declareFieldVar('$method_field' + methodIndex, fieldNode)
                         ConstantExpression setterName = constX(getSetterName(propertyNode.name))
                         Expression propertyType = classX(propertyNode.type)
 
                         Parameter setterArg = param(propertyType.type, propertyNode.name)
                         AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
-                        addMethodInjectionPoint(propertyNode.declaringClass,  setterName, propertyNode.isPrivate(), fieldVar, setterArg)
+                        addMethodInjectionPoint(propertyNode.declaringClass, setterName, propertyNode.isPrivate(), fieldVar, setterArg)
                     }
                 }
             }
         }
 
-        private void addMethodInjectionPoint(ClassNode declaringClass, Expression methodName, boolean requiresReflection, VariableExpression field, Parameter... parameterTypes) {
+        private void addMethodInjectionPoint(ClassNode declaringClass,
+                                             Expression methodName,
+                                             boolean requiresReflection,
+                                             VariableExpression field,
+                                             Parameter... parameterTypes) {
 
             if (currentInjectInstance != null && !requiresReflection) {
                 boolean isParentMethod = declaringClass != concreteClass
@@ -302,14 +368,29 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 MethodCallExpression injectCall = callX(currentInjectInstance, methodName, methodArgs)
                 MethodNode methodTarget = declaringClass.getMethod(methodName.text, parameterTypes)
                 injectCall.setMethodTarget(methodTarget)
+                BlockStatement targetBody = currentInjectBody
+                int parentIndex = 2
+                if (methodTarget != null && stereoTypeFinder.hasStereoType(methodTarget, PostConstruct)) {
+                    if (currentStartupBody == null) {
+                        currentStartupBody = block()
+                    }
+                    targetBody = currentStartupBody
+                    parentIndex = 0
+                }
+                if (methodTarget != null && stereoTypeFinder.hasStereoType(methodTarget, PreDestroy)) {
+                    if (currentShutdownBody == null) {
+                        currentShutdownBody = block()
+                    }
+                    targetBody = currentShutdownBody
+                    parentIndex = 0
+                }
 
                 // methods for super classes need to be injected before anything else
 
-                if(isParentMethod) {
-                    currentInjectBody.statements.add(2, stmt(injectCall))
-                }
-                else {
-                    currentInjectBody.addStatement(
+                if (isParentMethod) {
+                    targetBody.statements.add(parentIndex, stmt(injectCall))
+                } else {
+                    targetBody.addStatement(
                             stmt(injectCall)
                     )
                 }
@@ -328,7 +409,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             Expression generics = paramsToGenericTypes(parameterTypes)
 
             ArgumentListExpression addInjectionPointArgs = args(methodVar, paramsMap, qualifiers, generics, constX(requiresReflection))
-            if(field != null) {
+            if (field != null) {
                 addInjectionPointArgs.expressions.add(0, field)
             }
             MethodCallExpression addInjectionPointMethod = callThisX("addInjectionPoint", addInjectionPointArgs)
@@ -367,21 +448,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 // add the build method
                 Parameter[] buildMethodParams = params(
-                    currentResolutionContextParam,
-                    currentContextParam,
-                    param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
+                        currentResolutionContextParam,
+                        currentContextParam,
+                        param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
                 )
 
                 Parameter[] buildDelegateMethodParams = params(
-                    param(makeCached(BeanContext), '$context'),
-                    param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
+                        param(makeCached(BeanContext), '$context'),
+                        param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
                 )
                 currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildMethodParams, null, currentBuildBody)
 
 
                 def newResolutionContext = ctorX(makeCached(DefaultBeanResolutionContext), args(varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])))
                 currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildDelegateMethodParams, null, block(
-                    stmt( callX(varX("this"),"build", args(newResolutionContext, varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])) ) )
+                        stmt(callX(varX("this"), "build", args(newResolutionContext, varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1]))))
                 ))
 
                 currentComponentDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
@@ -392,38 +473,36 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Expression singleton
                 def annotationStereoTypeFinder = new AnnotationStereoTypeFinder()
                 AnnotationNode scopeAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Scope.class)
-                if(scopeAnn != null) {
+                if (scopeAnn != null) {
                     scope = callX(classNodeExpr, "getAnnotation", classX(scopeAnn.classNode))
-                }
-                else {
+                } else {
                     scope = ConstantExpression.NULL
                 }
                 AnnotationNode singletonAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Singleton.class)
                 singleton = singletonAnn != null ? ConstantExpression.TRUE : ConstantExpression.FALSE
                 if (constructors.isEmpty()) {
-                    currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                    currentBuildInstance = varX(INSTANCE_VAR_NAME, classNode)
                     currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode)))
                     constructorBody = block(
-                        ctorSuperS(args(scope,singleton, classNodeExpr, callX(classNodeExpr, "getConstructor")) )
+                            ctorSuperS(args(scope, singleton, classNodeExpr, callX(classNodeExpr, "getConstructor")))
                     )
 
                 } else {
                     List<ConstructorNode> publicConstructors = findPublicConstructors(constructors)
 
                     ConstructorNode constructorNode
-                    if(publicConstructors.size() == 1) {
+                    if (publicConstructors.size() == 1) {
                         constructorNode = publicConstructors[0]
+                    } else {
+                        constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
                     }
-                    else {
-                        constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject))}
-                    }
-                    if(constructorNode != null) {
+                    if (constructorNode != null) {
                         ArgumentListExpression ctorTypeArgs = paramTypesToArguments(constructorNode.parameters)
                         MapExpression ctorParamsMap = paramsToMap(constructorNode.parameters)
                         Expression qualifiers = paramsToQualifiers(constructorNode.parameters)
                         Expression generics = paramsToGenericTypes(constructorNode.parameters)
-                        ArgumentListExpression ctorArgs =  buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
-                        currentBuildInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode.plainNodeReference)
+                        ArgumentListExpression ctorArgs = buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
+                        currentBuildInstance = varX(INSTANCE_VAR_NAME, classNode.plainNodeReference)
                         currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
                         ArgumentListExpression constructorArgs = args(
                                 scope,
@@ -434,10 +513,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 qualifiers,
                                 generics)
                         constructorBody = block(
-                            ctorSuperS(constructorArgs)
+                                ctorSuperS(constructorArgs)
                         )
-                    }
-                    else {
+                    } else {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
@@ -449,7 +527,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         currentContextParam,
                         injectObjectParam
                 )
-                currentComponentDef.addMethod("injectBean", Modifier.PUBLIC, classNode.plainNodeReference, injectMethodParams, null, currentInjectBody)
+                currentComponentDef.addMethod("injectBean", Modifier.PROTECTED, classNode.plainNodeReference, injectMethodParams, null, currentInjectBody)
 
                 def injectBeanFields = callSuperX("injectBeanFields", args(
                         varX(currentResolutionContextParam),
@@ -464,28 +542,28 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ))
                 MethodNode injectMethodTarget = DEFAULT_COMPONENT_DEFINITION.getMethod("injectBean", injectMethodParams)
                 injectBeanFields.setMethodTarget(injectMethodTarget)
-                currentInjectInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                currentInjectInstance = varX(INSTANCE_VAR_NAME, classNode)
                 currentInjectBody.addStatement(
-                    declS(currentInjectInstance, castX(classNode, varX(injectObjectParam)))
+                        declS(currentInjectInstance, castX(classNode, varX(injectObjectParam)))
                 )
                 currentInjectBody.addStatement(
-                    stmt(injectBeanFields)
+                        stmt(injectBeanFields)
                 )
                 currentInjectBody.addStatement(
-                    stmt(injectBeanMethods)
+                        stmt(injectBeanMethods)
                 )
-                currentInjectInstance = varX(FACTORY_INSTANCE_VAR_NAME, classNode)
+                currentInjectInstance = varX(INSTANCE_VAR_NAME, classNode)
 
 
                 if (constructorBody != null) {
                     currentConstructorBody = constructorBody
                     currentComponentDef.addConstructor(
-                        new ConstructorNode(Modifier.PUBLIC, constructorBody)
+                            new ConstructorNode(Modifier.PUBLIC, constructorBody)
                     )
 
                     componentDefinitionClassNodes.put(classNode, currentComponentDef)
                 }
-            } else if(!classNode.isAbstract()) {
+            } else if (!classNode.isAbstract()) {
                 currentComponentDef = componentDefinitionClassNodes.get(classNode)
             }
         }
@@ -508,25 +586,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             boolean isProvider = AstClassUtils.implementsInterface(type, Provider) && type.genericsTypes
             boolean isIterable = (AstClassUtils.implementsInterface(type, Iterable) && type.genericsTypes) || type.isArray()
             String lookMethodName
-            if(isIterable) {
+            if (isIterable) {
                 lookMethodName = isConstructor ? "getBeansOfTypeForConstructorArgument" : "getBeansOfTypeForMethodArgument"
-            }
-            else if(isProvider) {
+            } else if (isProvider) {
                 lookMethodName = isConstructor ? "getBeanProviderForConstructorArgument" : "getBeanProviderForMethodArgument"
-            }
-            else {
+            } else {
                 lookMethodName = isConstructor ? "getBeanForConstructorArgument" : "getBeanForMethodArgument"
             }
 
 
-            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam) )
-            if(isProvider) {
+            ArgumentListExpression lookupArgs = args(varX(currentResolutionContextParam), varX(currentContextParam))
+            if (isProvider) {
                 lookupArgs.addExpression(classX(type.genericsTypes[0].type.plainNodeReference))
             }
-            if(isConstructor) {
+            if (isConstructor) {
                 lookupArgs.addExpression(constX(parameterIndex))
-            }
-            else {
+            } else {
                 lookupArgs.addExpression(constX(methodIndex))
                 lookupArgs.addExpression(constX(parameterIndex))
             }
@@ -536,8 +611,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private List<ConstructorNode> findPublicConstructors(List<ConstructorNode> constructorNodes) {
             List<ConstructorNode> publicConstructors = []
-            for(node in constructorNodes ) {
-                if(Modifier.isPublic(node.modifiers)) {
+            for (node in constructorNodes) {
+                if (Modifier.isPublic(node.modifiers)) {
                     publicConstructors.add(node)
                 }
             }
@@ -560,8 +635,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private MapExpression paramsToMap(Parameter[] parameters) {
             MapExpression map = new MapExpression()
-            for(p in parameters) {
-                map.addMapEntryExpression( constX(p.name), classX(p.type.plainNodeReference) )
+            for (p in parameters) {
+                map.addMapEntryExpression(constX(p.name), classX(p.type.plainNodeReference))
             }
             return map
         }
@@ -569,43 +644,40 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         private Expression paramsToQualifiers(Parameter[] parameters) {
             MapExpression map = null
             AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
-            for(p in parameters) {
+            for (p in parameters) {
                 AnnotationNode ann = stereoTypeFinder.findAnnotationWithStereoType(p, Qualifier)
-                if(ann != null) {
-                    if(map == null) map = new MapExpression()
-                    map.addMapEntryExpression( constX(p.name), classX(ann.classNode) )
+                if (ann != null) {
+                    if (map == null) map = new MapExpression()
+                    map.addMapEntryExpression(constX(p.name), classX(ann.classNode))
                 }
             }
-            if(map != null) {
+            if (map != null) {
                 return map
-            }
-            else {
+            } else {
                 return ConstantExpression.NULL
             }
         }
 
         private Expression paramsToGenericTypes(Parameter[] parameters) {
             MapExpression map = null
-            for(p in parameters) {
+            for (p in parameters) {
                 GenericsType[] genericsTypes = p.type.genericsTypes
-                if(genericsTypes != null && genericsTypes.length > 0) {
-                    if(map == null) map = new MapExpression()
+                if (genericsTypes != null && genericsTypes.length > 0) {
+                    if (map == null) map = new MapExpression()
                     ListExpression listExpression = new ListExpression()
-                    for(genericType in genericsTypes) {
+                    for (genericType in genericsTypes) {
                         listExpression.addExpression(classX(genericType.type.plainNodeReference))
                     }
-                    map.addMapEntryExpression( constX(p.name), listExpression )
-                }
-                else if(p.type.isArray()) {
-                    if(map == null) map = new MapExpression()
+                    map.addMapEntryExpression(constX(p.name), listExpression)
+                } else if (p.type.isArray()) {
+                    if (map == null) map = new MapExpression()
                     ListExpression listExpression = new ListExpression([classX(p.type.componentType.plainNodeReference)] as List<Expression>)
-                    map.addMapEntryExpression( constX(p.name), listExpression )
+                    map.addMapEntryExpression(constX(p.name), listExpression)
                 }
             }
-            if(map != null) {
+            if (map != null) {
                 return map
-            }
-            else {
+            } else {
                 return ConstantExpression.NULL
             }
         }
