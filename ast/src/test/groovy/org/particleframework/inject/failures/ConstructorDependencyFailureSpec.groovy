@@ -26,6 +26,7 @@ class ConstructorDependencyFailureSpec extends Specification {
         e.message == '''\
 Failed to inject value for parameter [a] of class: org.particleframework.inject.failures.ConstructorDependencyFailureSpec$B
 
+Message: No bean of type [org.particleframework.inject.failures.ConstructorDependencyFailureSpec$A] exists
 Path Taken: new B([A a])'''
     }
 

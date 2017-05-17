@@ -9,11 +9,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Created by graemerocher on 16/05/2017.
+ * Created by graemerocher on 17/05/2017.
  */
-class NestedDependencyFailureSpec extends Specification {
+class ConstructorExceptionSpec extends Specification {
 
-    void "test injection via setter with interface"() {
+    void "test error message when exception occurs in constructor"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
@@ -23,20 +23,17 @@ class NestedDependencyFailureSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(DependencyInjectionException)
-
+        //e.cause.message == 'bad'
         e.message == '''\
-Failed to inject value for parameter [d] of class: org.particleframework.inject.failures.NestedDependencyFailureSpec$C
+Failed to inject value for parameter [c] of class: org.particleframework.inject.failures.ConstructorExceptionSpec$A
 
-Message: No bean of type [org.particleframework.inject.failures.NestedDependencyFailureSpec$D] exists
-Path Taken: B.a --> new A([C c]) --> new C([D d])'''
+Path Taken: B.a --> new A([C c])'''
     }
-
-    static class D {}
 
     @Singleton
     static class C {
-        C(D d) {
-
+        C() {
+            throw new RuntimeException("bad")
         }
     }
     @Singleton

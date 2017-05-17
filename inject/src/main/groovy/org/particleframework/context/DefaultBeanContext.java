@@ -165,8 +165,11 @@ public class DefaultBeanContext implements BeanContext {
                 if(e instanceof DependencyInjectionException) {
                     throw e;
                 }
+                if(e instanceof BeanInstantiationException) {
+                    throw e;
+                }
                 else {
-                    throw new BeanInstantiationException("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + e.getMessage(), e);
+                    throw new BeanInstantiationException(resolutionContext, e);
                 }
             }
         } else {

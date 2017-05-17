@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -481,7 +482,7 @@ public class DefaultBeanDefinition<T> implements BeanDefinition<T> {
             Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argument.getType(), qualifier);
             path.pop();
             return bean;
-        } catch (NoSuchBeanException e) {
+        } catch (NoSuchBeanException | BeanInstantiationException e) {
             throw new DependencyInjectionException(resolutionContext, argument , e);
         }
     }

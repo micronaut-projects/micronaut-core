@@ -2,6 +2,7 @@ package org.particleframework.inject.failures
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.exceptions.BeanInstantiationException
 import org.particleframework.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
@@ -9,11 +10,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Created by graemerocher on 16/05/2017.
+ * Created by graemerocher on 17/05/2017.
  */
-class NestedDependencyFailureSpec extends Specification {
+class PropertyExceptionSpec extends Specification {
 
-    void "test injection via setter with interface"() {
+
+    void "test error message when exception occurs setting a property"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
@@ -22,27 +24,23 @@ class NestedDependencyFailureSpec extends Specification {
         B b =  context.getBean(B)
 
         then:"The implementation is injected"
-        def e = thrown(DependencyInjectionException)
-
+        def e = thrown(BeanInstantiationException)
+        e.cause.message == 'bad'
         e.message == '''\
-Failed to inject value for parameter [d] of class: org.particleframework.inject.failures.NestedDependencyFailureSpec$C
+Error instantiating bean of type  [org.particleframework.inject.failures.PropertyExceptionSpec$B]
 
-Message: No bean of type [org.particleframework.inject.failures.NestedDependencyFailureSpec$D] exists
-Path Taken: B.a --> new A([C c]) --> new C([D d])'''
+Message: bad
+Path Taken: B.a'''
     }
-
-    static class D {}
 
     @Singleton
     static class C {
-        C(D d) {
-
-        }
     }
     @Singleton
     static class A {
-        A(C c) {
-
+        @Inject
+        void setC(C c) {
+            throw new RuntimeException("bad")
         }
     }
 

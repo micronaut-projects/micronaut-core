@@ -6,7 +6,7 @@ package org.particleframework.context.exceptions;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NoSuchBeanException extends ContextException {
+public class NoSuchBeanException extends BeanContextException {
     public NoSuchBeanException(String message, Throwable cause) {
         super(message, cause);
     }

@@ -2,7 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.context.exceptions.ContextException;
+import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinitionClass;
 
@@ -41,7 +41,7 @@ public class DefaultBeanDefinitionClass<T> implements BeanDefinitionClass<T> {
         try {
             return componentDefinitionClass.newInstance();
         } catch (Throwable e) {
-            throw new ContextException("Error loading component definition ["+componentDefinitionClass.getName()+"]: " + e.getMessage(), e);
+            throw new BeanContextException("Error loading component definition ["+componentDefinitionClass.getName()+"]: " + e.getMessage(), e);
         }
     }
 }
