@@ -26,7 +26,7 @@ import org.particleframework.ast.groovy.utils.AstClassUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.context.BeanResolutionContext
 import org.particleframework.context.BeanContext
-import org.particleframework.context.DefaultBeanDefinitionClass
+import org.particleframework.context.AbstractBeanDefinitionClass
 import org.particleframework.context.AbstractBeanDefinition
 import org.particleframework.context.DefaultBeanResolutionContext
 import org.particleframework.context.DefaultBeanContext
@@ -71,10 +71,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
-
         Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
 
-        for (ClassNode classNode in moduleNode.getClasses()) {
+        List<ClassNode> classes = moduleNode.getClasses()
+
+        for (ClassNode classNode in classes) {
             if (classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             }
@@ -88,19 +89,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode newClass = entry.value
             ClassNode targetClass = entry.key
             moduleNode.addClass(newClass)
-            ClassNode componentDefinitionClassSuperClass = GenericsUtils.makeClassSafeWithGenerics(DefaultBeanDefinitionClass, targetClass)
+            ClassNode componentDefinitionClassSuperClass = makeCached(AbstractBeanDefinitionClass).plainNodeReference
             ClassNode componentDefinitionClass = new ClassNode(newClass.name + "Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
 
             componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
             componentDefinitionClass.addConstructor(
                     new ConstructorNode(Modifier.PUBLIC, block(
-                            ctorSuperS(args(classX(newClass))),
+                            ctorSuperS(args(constX(newClass.name))),
                             // set the meta class to null to save memory
                             stmt(callX(varX("this"), "setMetaClass", ConstantExpression.NULL))
                     ))
             )
             // override the load method to make more efficient loading
-            componentDefinitionClass.addMethod('load', Modifier.PUBLIC, GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClass), [] as Parameter[], null, block(
+            componentDefinitionClass.addMethod('load', Modifier.PUBLIC, makeCached(BeanDefinition).plainNodeReference, [] as Parameter[], null, block(
                 returnS(ctorX(newClass))
             ))
             if(stereoTypeFinder.hasStereoType(targetClass, Context.name)) {

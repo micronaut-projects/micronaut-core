@@ -1,7 +1,7 @@
 package org.particleframework.inject.ast
 
 import org.particleframework.context.AbstractBeanDefinition
-import org.particleframework.context.DefaultBeanDefinitionClass
+import org.particleframework.context.AbstractBeanDefinitionClass
 import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
 
@@ -9,6 +9,7 @@ import spock.lang.Specification
  * Created by graemerocher on 11/05/2017.
  */
 class ParseSpec extends Specification {
+
 
     void "test parse simple singleton"() {
         given:
@@ -27,11 +28,11 @@ class FooService {}
         def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultBeanDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
+        AbstractBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.AbstractBeanDefinitionClass'
 
         when:
-        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        AbstractBeanDefinitionClass cdefc = cls.newInstance()
         BeanDefinition cdef = cdefc.load()
 
         then:
@@ -138,11 +139,11 @@ class BarService {
         def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultBeanDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
+        AbstractBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.AbstractBeanDefinitionClass'
 
         when:
-        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        AbstractBeanDefinitionClass cdefc = cls.newInstance()
         BeanDefinition cdef = cdefc.load()
 
         then:
@@ -175,11 +176,11 @@ class FooService {}
         def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultBeanDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
+        AbstractBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.AbstractBeanDefinitionClass'
 
         when:
-        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        AbstractBeanDefinitionClass cdefc = cls.newInstance()
         BeanDefinition cdef = cdefc.load()
 
         then:
@@ -212,11 +213,11 @@ class BarService {
         def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
 
         then:
-        DefaultBeanDefinitionClass.isAssignableFrom(cls)
-        cls.genericSuperclass.typeName == 'org.particleframework.context.DefaultBeanDefinitionClass<FooService>'
+        AbstractBeanDefinitionClass.isAssignableFrom(cls)
+        cls.genericSuperclass.typeName == 'org.particleframework.context.AbstractBeanDefinitionClass'
 
         when:
-        DefaultBeanDefinitionClass cdefc = cls.newInstance()
+        AbstractBeanDefinitionClass cdefc = cls.newInstance()
         BeanDefinition cdef = cdefc.load()
 
         then:

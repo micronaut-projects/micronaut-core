@@ -16,7 +16,12 @@ public interface BeanDefinitionClass<T> {
     /**
      * @return The underlying component type
      */
-    Class<T> getComponentType();
+    Class<T> getBeanType();
+
+    /**
+     * @return The name of the bean type
+     */
+    String getBeanTypeName();
 
     /**
      * Loads the component definition
@@ -29,4 +34,9 @@ public interface BeanDefinitionClass<T> {
      * @return Is this class context scope
      */
     boolean isContextScope();
+
+    /**
+     * @return Is the underlying bean type present on the classpath
+     */
+    boolean isPresent();
 }

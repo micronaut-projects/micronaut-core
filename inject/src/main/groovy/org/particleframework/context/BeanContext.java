@@ -22,6 +22,17 @@ public interface BeanContext extends LifeCycle {
     }
 
     /**
+     * Obtains a Bean for the given type and qualifier
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     *
+     * @param <T> The bean type parameter
+     * @return An instanceof said bean
+     */
+    <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
+
+    /**
      * Return whether the bean of the given type is contained within this context
      *
      * @param beanType The bean type
@@ -39,16 +50,6 @@ public interface BeanContext extends LifeCycle {
      * @return True if it is
      */
     boolean containsBean(Class beanType, Qualifier qualifier);
-    /**
-     * Obtains a Bean for the given type and qualifier
-     *
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     *
-     * @param <T> The bean type parameter
-     * @return An instanceof said bean
-     */
-    <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
      * Get all beans of the given type
@@ -76,7 +77,20 @@ public interface BeanContext extends LifeCycle {
      * @param <T> The bean generic type
      * @return The instance
      */
-    <T> T createBean(Class<T> beanType);
+    default <T> T createBean(Class<T> beanType) {
+        return createBean(beanType, null);
+    }
+
+    /**
+     * Creates a new instance of the given bean performing dependency injection and returning a new instance.
+     *
+     * Note that the instance returned is not saved as a singleton in the context.
+     *
+     * @param beanType The bean type
+     * @param <T> The bean generic type
+     * @return The instance
+     */
+    <T> T createBean(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
      * Destroys the bean for the given type causing it to be re-created. If a singleton has been loaded it will be
@@ -87,4 +101,9 @@ public interface BeanContext extends LifeCycle {
      * @return The destroy instance or null if no such bean exists
      */
     <T> T destroyBean(Class<T> beanType);
+
+    /**
+     * @return The class loader used by this context
+     */
+    ClassLoader getClassLoader();
 }

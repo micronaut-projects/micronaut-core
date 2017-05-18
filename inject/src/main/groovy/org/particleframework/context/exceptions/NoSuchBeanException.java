@@ -14,4 +14,8 @@ public class NoSuchBeanException extends BeanContextException {
     public NoSuchBeanException(String message) {
         super(message);
     }
+
+    public NoSuchBeanException(Class beanType) {
+        super("No bean of type [" + beanType.getName() + "] exists");
+    }
 }
