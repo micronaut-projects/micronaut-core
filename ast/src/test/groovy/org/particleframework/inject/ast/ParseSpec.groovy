@@ -23,9 +23,9 @@ class FooService {}
 
         then:
         gcl.loadedClasses.size() == 3
-
+        println gcl.loadedClasses
         when:
-        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
+        def cls = gcl.loadClass('$FooServiceBeanDefinitionClass')
 
         then:
         AbstractBeanDefinitionClass.isAssignableFrom(cls)
@@ -136,7 +136,7 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
+        def cls = gcl.loadClass('$FooServiceBeanDefinitionClass')
 
         then:
         AbstractBeanDefinitionClass.isAssignableFrom(cls)
@@ -173,7 +173,7 @@ class FooService {}
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
+        def cls = gcl.loadClass('$FooServiceBeanDefinitionClass')
 
         then:
         AbstractBeanDefinitionClass.isAssignableFrom(cls)
@@ -210,7 +210,7 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('FooServiceBeanDefinitionClass')
+        def cls = gcl.loadClass('$FooServiceBeanDefinitionClass')
 
         then:
         AbstractBeanDefinitionClass.isAssignableFrom(cls)
@@ -241,7 +241,7 @@ class FooService {
         gcl.loadedClasses.size() == 3
 
         when:
-        def cls = gcl.loadClass('FooServiceBeanDefinition')
+        def cls = gcl.loadClass('$FooServiceBeanDefinition')
 
         then:
         AbstractBeanDefinition.isAssignableFrom(cls)
@@ -276,7 +276,7 @@ class BarService {
         gcl.loadedClasses.size() == 6
 
         when:
-        def cls = gcl.loadClass('BarServiceBeanDefinition')
+        def cls = gcl.loadClass('$BarServiceBeanDefinition')
 
         then:
         AbstractBeanDefinition.isAssignableFrom(cls)

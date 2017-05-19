@@ -1,6 +1,9 @@
 package org.particleframework.context;
 
+import org.particleframework.inject.BeanConfiguration;
+
 import java.util.Collection;
+import java.util.Optional;
 
 /**
  * Represents the context that resolves component definitions
@@ -106,4 +109,12 @@ public interface BeanContext extends LifeCycle {
      * @return The class loader used by this context
      */
     ClassLoader getClassLoader();
+
+    /**
+     * Obtain a bean configuration by name
+     *
+     * @param configurationName The configuration name
+     * @return An optional with the configuration either present or not
+     */
+    Optional<BeanConfiguration> getBeanConfiguration(String configurationName);
 }

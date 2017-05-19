@@ -1,5 +1,8 @@
 package org.particleframework.context;
 
+import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.condition.Condition;
+import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinitionClass;
@@ -20,10 +23,13 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     private final Package thePackage;
     private final String packageName;
     private final Collection<BeanDefinitionClass> beanDefinitionClasses = new ArrayList<>();
+    private final Condition condition;
 
     protected AbstractBeanConfiguration(Package thePackage) {
         this.thePackage = thePackage;
         this.packageName = thePackage.getName();
+        Requires[] annotations = thePackage.getAnnotationsByType(Requires.class);
+        this.condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
     }
 
     @Override
@@ -32,8 +38,20 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     }
 
     @Override
+    public String getName() {
+        return this.packageName;
+    }
+
+    @Override
+    public String getVersion() {
+        return getPackage().getImplementationVersion();
+    }
+
+    @Override
     public boolean isEnabled(BeanContext context) {
-        // TODO: Implement support for requirements
+        if(condition != null) {
+            return condition.matches(new DefaultConditionContext(context, this));
+        }
         return true;
     }
 

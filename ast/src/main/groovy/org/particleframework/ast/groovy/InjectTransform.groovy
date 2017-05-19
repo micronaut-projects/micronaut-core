@@ -24,12 +24,15 @@ import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstClassUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
+import org.particleframework.context.AbstractBeanConfiguration
 import org.particleframework.context.BeanResolutionContext
 import org.particleframework.context.BeanContext
 import org.particleframework.context.AbstractBeanDefinitionClass
 import org.particleframework.context.AbstractBeanDefinition
 import org.particleframework.context.DefaultBeanResolutionContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.annotation.Configuration
+import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.BeanFactory
@@ -45,6 +48,7 @@ import javax.inject.Provider
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.lang.annotation.Target
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -74,6 +78,53 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
 
         List<ClassNode> classes = moduleNode.getClasses()
+        if(classes.size() == 1) {
+            ClassNode classNode = classes[0]
+            if(classNode.nameWithoutPackage == 'package-info') {
+                PackageNode packageNode = classNode.getPackage()
+                AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
+                if(annotationNode != null) {
+                    ClassNode beanConfigurationClass = makeCached(AbstractBeanConfiguration).plainNodeReference
+                    String packageName = classNode.packageName
+                    ClassNode newBeanConfiguration = new ClassNode("${ packageName}.\$BeanConfiguration", Modifier.PUBLIC, beanConfigurationClass)
+                    newBeanConfiguration.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
+                    for(ann in packageNode.annotations) {
+                        def annotationClassNode = ann.classNode
+                        AnnotationNode target = AstAnnotationUtils.findAnnotation(annotationClassNode, Target.name)
+                        if(target == null) {
+                            newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
+                        }
+                        else {
+                            def value = target.getMember("value")
+                            if(value instanceof ListExpression) {
+                                for(v in ((ListExpression)value).expressions) {
+                                    if(v.text == 'java.lang.annotation.ElementType.TYPE') {
+                                        newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
+                                        break
+                                    }
+                                }
+                            }
+                            else if(value != null) {
+                                if(value.text == 'java.lang.annotation.ElementType.TYPE') {
+                                    newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
+                                }
+                            }
+                        }
+                    }
+                    
+                    newBeanConfiguration.addConstructor(
+                        new ConstructorNode(Modifier.PUBLIC, block(
+                            ctorSuperS(args(callX(makeCached(Package), "getPackage", constX(packageName))))
+                        ))
+                    )
+                    ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
+                    moduleNode.addClass(newBeanConfiguration)
+                    generator.generate(newBeanConfiguration, BeanConfiguration.class)
+                }
+
+                return
+            }
+        }
 
         for (ClassNode classNode in classes) {
             if (classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
@@ -90,7 +141,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode targetClass = entry.key
             moduleNode.addClass(newClass)
             ClassNode componentDefinitionClassSuperClass = makeCached(AbstractBeanDefinitionClass).plainNodeReference
-            ClassNode componentDefinitionClass = new ClassNode(newClass.name + "Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
+            String packageName = newClass.packageName ? "${newClass.packageName}." : ""
+            ClassNode componentDefinitionClass = new ClassNode("${packageName}${newClass.nameWithoutPackage}Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
 
             componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
             componentDefinitionClass.addConstructor(
@@ -464,7 +516,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 isProvider = providerGenericType != null
                 ClassNode targetClassNode = isProvider ? providerGenericType : classNode
-                String componentDefinitionName = classNode.name + "BeanDefinition"
+                String packageName = classNode.packageName ? "${classNode.packageName}." : ""
+                String componentDefinitionName = "${packageName}\$${classNode.nameWithoutPackage}BeanDefinition"
                 currentBuildBody = block()
                 currentInjectBody = block()
                 ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]

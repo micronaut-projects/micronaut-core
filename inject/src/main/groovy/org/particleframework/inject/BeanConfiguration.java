@@ -16,6 +16,17 @@ public interface BeanConfiguration {
     Package getPackage();
 
     /**
+     * @return The package name this configuration
+     */
+    String getName();
+
+    /**
+     * The version of this configuration. Note: returns null when called on a configuration not provided by a JAR
+     *
+     * @return The version or null
+     */
+    String getVersion();
+    /**
      * Return whether this bean configuration is enabled
      *
      * @param context The context

@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.BinaryOperator;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,8 +30,10 @@ public class DefaultBeanContext implements BeanContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     private final Iterator<BeanDefinitionClass> beanDefinitionClassIterator;
-    private final Map<Class, BeanDefinitionClass> beanDefinitionsClasses = new ConcurrentHashMap<>(30);
+    private final Iterator<BeanConfiguration> beanConfigurationIterator;
+    private final Map<String, BeanDefinitionClass> beanDefinitionsClasses = new ConcurrentHashMap<>(30);
     private final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
+    private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(50)
             .build();
@@ -50,7 +54,8 @@ public class DefaultBeanContext implements BeanContext {
      */
     public DefaultBeanContext(ClassLoader classLoader) {
         this.classLoader = classLoader;
-        this.beanDefinitionClassIterator = resolveComponentDefinitionClasses().iterator();
+        this.beanDefinitionClassIterator = resolveBeanDefinitionClasses().iterator();
+        this.beanConfigurationIterator = resolveBeanConfigurarions().iterator();
     }
 
     /**
@@ -61,7 +66,19 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting BeanContext");
         }
+        readAllBeanConfigurations();
         readAllBeanDefinitionClasses();
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("BeanContext Started.");
+        }
+    }
+
+    private void readAllBeanConfigurations() {
+        while (beanConfigurationIterator.hasNext()) {
+            BeanConfiguration configuration = beanConfigurationIterator.next();
+            beanConfigurations.put(configuration.getName(), configuration);
+        }
     }
 
     /**
@@ -101,6 +118,11 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
+        return null;
+    }
+
+    @Override
     public boolean containsBean(Class beanType, Qualifier qualifier) {
         BeanKey beanKey = new BeanKey(beanType, qualifier);
         if (singletonObjects.containsKey(beanKey)) {
@@ -137,7 +159,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> T createBean(Class<T> beanType, Qualifier<T> qualifier) {
         BeanDefinition<T> candidate = findConcreteCandidate(beanType, qualifier, true, false);
-        if(candidate != null) {
+        if (candidate != null) {
             return doCreateBean(new DefaultBeanResolutionContext(this, candidate), candidate, qualifier, false);
         }
         throw new NoSuchBeanException(beanType);
@@ -246,10 +268,23 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    protected Iterable<BeanDefinitionClass> resolveComponentDefinitionClasses() {
+    /**
+     * Resolves the {@link BeanDefinitionClass} class instances. Default implementation uses ServiceLoader pattern
+     *
+     * @return The bean definition classes
+     */
+    protected Iterable<BeanDefinitionClass> resolveBeanDefinitionClasses() {
         return ServiceLoader.load(BeanDefinitionClass.class, classLoader);
     }
 
+    /**
+     * Resolves the {@link BeanConfiguration} class instances. Default implementation uses ServiceLoader pattern
+     *
+     * @return The bean definition classes
+     */
+    protected Iterable<BeanConfiguration> resolveBeanConfigurarions() {
+        return ServiceLoader.load(BeanConfiguration.class, classLoader);
+    }
 
     private <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Qualifier<T> qualifier, boolean isSingleton) {
         BeanRegistration<T> beanRegistration = isSingleton ? singletonObjects.get(new BeanKey(beanDefinition.getType(), qualifier)) : null;
@@ -362,15 +397,27 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionClass> contextScopeBeans = new ArrayList<>();
         while (beanDefinitionClassIterator.hasNext()) {
             BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
-            if(beanDefinitionClass.isPresent()) {
-                if(beanDefinitionClass.isContextScope()) {
+            if (beanDefinitionClass.isPresent()) {
+                if (beanDefinitionClass.isContextScope()) {
                     contextScopeBeans.add(beanDefinitionClass);
-                }
-                else {
-                    beanDefinitionsClasses.put(beanDefinitionClass.getBeanType(), beanDefinitionClass);
+                } else {
+                    beanDefinitionsClasses.put(beanDefinitionClass.getBeanTypeName(), beanDefinitionClass);
                 }
             }
         }
+
+        Collection<BeanDefinitionClass> values = new HashSet<>(beanDefinitionsClasses.values());
+        values.forEach(beanDefinitionClass -> {
+                for (BeanConfiguration configuration : beanConfigurations.values()) {
+                    boolean enabled = configuration.isEnabled(this);
+                    if(!enabled && configuration.isWithin(beanDefinitionClass)) {
+                        beanDefinitionsClasses.remove(beanDefinitionClass.getBeanTypeName());
+                        contextScopeBeans.remove(beanDefinitionClass);
+                    }
+                }
+            }
+        );
+
         for (BeanDefinitionClass contextScopeBean : contextScopeBeans) {
             BeanDefinition beanDefinition = contextScopeBean.load();
             beanDefinitions.put(beanDefinition.getType(), beanDefinition);
@@ -378,11 +425,24 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    private BeanConfiguration findBeanConfiguration(BeanDefinitionClass definitionClass) {
+        if (beanConfigurations.isEmpty()) {
+            return null;
+        } else {
+            Optional<BeanConfiguration> result = beanConfigurations.values()
+                    .stream()
+                    .filter(beanConfiguration -> beanConfiguration.isWithin(definitionClass))
+                    .findFirst();
+
+            return result.orElse(null);
+        }
+    }
+
     private <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
         Collection<BeanDefinition<T>> candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
-        for (Map.Entry<Class, BeanDefinitionClass> componentDefinitionClassEntry : beanDefinitionsClasses.entrySet()) {
-            Class componentType = componentDefinitionClassEntry.getKey();
+        for (Map.Entry<String, BeanDefinitionClass> componentDefinitionClassEntry : beanDefinitionsClasses.entrySet()) {
+            Class componentType = componentDefinitionClassEntry.getValue().getBeanType();
             if (beanType.isAssignableFrom(componentType)) {
                 // load it
                 BeanDefinitionClass beanDefinitionClass = componentDefinitionClassEntry.getValue();

@@ -1,6 +1,10 @@
 package org.particleframework.context.annotation;
 
+import org.particleframework.context.condition.Condition;
+
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
@@ -9,6 +13,7 @@ import java.lang.annotation.Target;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 public @interface Requires {
 
@@ -20,6 +25,13 @@ public @interface Requires {
      * @return The property that should be set.
      */
     String property() default "";
+
+    /**
+     * One ore more custom condition classes
+     *
+     * @return The condition classes
+     */
+    Class<? extends Condition>[] condition() default {};
 
     /**
      * Used to express an SDK requirement. Typically used in combination with {@link #version()} to specify a minimum version requirement

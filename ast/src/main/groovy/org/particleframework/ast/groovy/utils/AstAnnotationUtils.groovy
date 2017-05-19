@@ -3,7 +3,12 @@ package org.particleframework.ast.groovy.utils
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
+import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
+
+import java.lang.annotation.Annotation
 
 /**
  * Utility methods for dealing with annotations within the context of AST
@@ -14,6 +19,49 @@ import org.codehaus.groovy.ast.expr.Expression
 @CompileStatic
 class AstAnnotationUtils {
 
+    /**
+     * Finds an annotation for the given annotated node and type
+     *
+     * @param annotatedNode The annotated node
+     * @param annotationName The annotation type
+     * @return The annotation or null
+     */
+    static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, Class<?> type) {
+        String annotationName = type.name
+        return findAnnotation(annotatedNode, annotationName)
+    }
+
+    /**
+     * Finds an annotation for the given annotated node and name
+     *
+     * @param annotatedNode The annotated node
+     * @param annotationName The annotation name
+     * @return The annotation or null
+     */
+    static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, String annotationName) {
+        List<AnnotationNode> annotations = annotatedNode.getAnnotations()
+        for(ann in annotations) {
+            if(ann.classNode.name == annotationName) {
+                return ann
+            }
+        }
+        return null
+    }
+
+    /**
+     * Returns true if MethodNode is marked with annotationClass
+     * @param methodNode A MethodNode to inspect
+     * @param annotationClass an annotation to look for
+     * @return true if classNode is marked with annotationClass, otherwise false
+     */
+    static boolean hasAnnotation(final MethodNode methodNode, final Class<? extends Annotation> annotationClass) {
+        def classNode = new ClassNode(annotationClass)
+        return hasAnnotation(methodNode, classNode)
+    }
+
+    static boolean hasAnnotation(MethodNode methodNode, ClassNode annotationClassNode) {
+        return !methodNode.getAnnotations(annotationClassNode).isEmpty()
+    }
     /**
      * Copy the annotations from one annotated node to another
      *
