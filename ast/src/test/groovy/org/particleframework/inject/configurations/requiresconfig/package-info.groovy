@@ -1,6 +1,6 @@
 @Configuration
-@Requires(beans = NotABean)
-package org.particleframework.inject.configurations.test1
+@Requires(configuration = "test")
+package org.particleframework.inject.configurations.requiresconfig
 
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Requires

@@ -1,5 +1,6 @@
 package org.particleframework.context.condition;
 
+import groovy.lang.GroovySystem;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.version.SemanticVersion;
@@ -35,6 +36,28 @@ public class RequiresCondition implements Condition {
             }
             if(!matchesConfiguration(context, annotation)) {
                 return false;
+            }
+            if(!matchesSdk(annotation)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesSdk(Requires annotation) {
+        Requires.Sdk sdk = annotation.sdk();
+        String version = annotation.version();
+        if(version.length() > 0) {
+
+            switch (sdk) {
+                case GROOVY:
+                    String groovyVersion = GroovySystem.getVersion();
+                    return SemanticVersion.isAtLeast(groovyVersion, version);
+                case JAVA:
+                    String javaVersion = System.getProperty("java.version");
+                    return SemanticVersion.isAtLeast(javaVersion, version);
+                default:
+                    return SemanticVersion.isAtLeast(getClass().getPackage().getImplementationVersion(), version);
             }
         }
         return true;
@@ -90,4 +113,6 @@ public class RequiresCondition implements Condition {
             }
         }
     }
+
+
 }

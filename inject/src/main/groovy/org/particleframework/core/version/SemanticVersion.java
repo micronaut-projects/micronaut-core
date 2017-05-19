@@ -28,14 +28,14 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
 
     public SemanticVersion(String version) {
         this.version = version;
-        String[] parts = version.split("\\.");
+        String[] parts = version.replace('_', '.').split("\\.");
         if (parts.length >= 3) {
             try {
                 this.major = Integer.valueOf(parts[0]);
                 this.minor = Integer.valueOf(parts[1]);
                 this.patch = Integer.valueOf(parts[2]);
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See http://semver.org");
+                throw new IllegalArgumentException("Version number is not semantic ["+version+"]! Should be in the format d.d.d. See http://semver.org");
             }
         } else {
             throw new IllegalArgumentException("Version number is not semantic. Should be in the format d.d.d. See http://semver.org");
@@ -93,7 +93,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
         if (version != null) {
             SemanticVersion thisVersion = new SemanticVersion(version);
             SemanticVersion otherVersion = new SemanticVersion(requiredVersion);
-            if (otherVersion.compareTo(otherVersion) == 1) {
+            if (thisVersion.compareTo(otherVersion) != -1) {
                 return true;
             }
         }

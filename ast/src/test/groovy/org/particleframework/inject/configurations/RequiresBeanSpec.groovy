@@ -2,8 +2,9 @@ package org.particleframework.inject.configurations
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.inject.configurations.test1.RequiresNotABean
-import org.particleframework.scope.Context
+import org.particleframework.inject.configurations.requiresbean.RequiresBean
+import org.particleframework.inject.configurations.requiresconfig.RequiresConfig
+import org.particleframework.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.Specification
 
 /**
@@ -18,7 +19,8 @@ class RequiresBeanSpec extends Specification {
 
         expect:
         context.containsBean(ABean)
-        !context.containsBean(RequiresNotABean)
-
+        !context.containsBean(RequiresBean)
+        !context.containsBean(RequiresConfig)
+        !context.containsBean(RequiresJava9)
     }
 }

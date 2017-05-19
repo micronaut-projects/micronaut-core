@@ -119,7 +119,13 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
-        return null;
+        BeanConfiguration configuration = this.beanConfigurations.get(configurationName);
+        if(configuration != null) {
+            return Optional.of(configuration);
+        }
+        else {
+            return Optional.empty();
+        }
     }
 
     @Override
