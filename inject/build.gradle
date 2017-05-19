@@ -1,4 +1,5 @@
 dependencies {
+    compile project(":core")
     compile 'com.github.ben-manes.caffeine:caffeine:2.5.0'
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
 }
