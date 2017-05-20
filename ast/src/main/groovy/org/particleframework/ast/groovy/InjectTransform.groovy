@@ -39,7 +39,7 @@ import org.particleframework.inject.BeanFactory
 import org.particleframework.inject.DisposableBeanDefinition
 import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
-import org.particleframework.scope.Context
+import org.particleframework.context.annotation.Context
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy

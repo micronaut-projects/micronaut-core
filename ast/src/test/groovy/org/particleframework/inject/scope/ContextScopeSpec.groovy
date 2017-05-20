@@ -1,7 +1,7 @@
 package org.particleframework.inject.scope
 
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.scope.Context
+import org.particleframework.context.annotation.Context
 import spock.lang.Specification
 
 /**

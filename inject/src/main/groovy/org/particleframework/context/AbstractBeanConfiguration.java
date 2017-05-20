@@ -24,7 +24,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     private final String packageName;
     private final Collection<BeanDefinitionClass> beanDefinitionClasses = new ArrayList<>();
     private final Condition condition;
-
+    private Boolean enabled = null;
     protected AbstractBeanConfiguration(Package thePackage) {
         this.thePackage = thePackage;
         this.packageName = thePackage.getName();
@@ -49,10 +49,10 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
 
     @Override
     public boolean isEnabled(BeanContext context) {
-        if(condition != null) {
-            return condition.matches(new DefaultConditionContext(context, this));
+        if(enabled == null) {
+            enabled = condition.matches(new DefaultConditionContext(context, this));
         }
-        return true;
+        return enabled;
     }
 
     @Override

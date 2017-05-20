@@ -1,11 +1,9 @@
 package org.particleframework.context.annotation;
 
 import org.particleframework.context.condition.Condition;
+import org.particleframework.context.condition.TrueCondition;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * Expresses a requirement for a bean or {@link Configuration}
@@ -13,6 +11,7 @@ import java.lang.annotation.Target;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 public @interface Requires {
@@ -31,7 +30,7 @@ public @interface Requires {
      *
      * @return The condition classes
      */
-    Class<? extends Condition>[] condition() default {};
+    Class<? extends Condition> condition() default TrueCondition.class;
 
     /**
      * Used to express an SDK requirement. Typically used in combination with {@link #version()} to specify a minimum version requirement

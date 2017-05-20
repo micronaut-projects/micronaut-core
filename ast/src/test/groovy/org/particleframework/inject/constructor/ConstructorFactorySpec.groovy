@@ -2,7 +2,7 @@ package org.particleframework.inject.constructor
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.scope.Provided
+import org.particleframework.context.annotation.Provided
 import spock.lang.Specification
 
 import javax.inject.Inject

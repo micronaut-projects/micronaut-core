@@ -7,7 +7,7 @@ import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.qualifiers.Qualifiers;
-import org.particleframework.scope.Provided;
+import org.particleframework.context.annotation.Provided;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;

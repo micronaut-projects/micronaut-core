@@ -5,6 +5,8 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -15,6 +17,7 @@ import java.util.Optional;
  */
 public class RequiresCondition implements Condition {
 
+    private static final Logger LOG = LoggerFactory.getLogger(RequiresCondition.class);
     private final Requires[] requiresAnnotations;
 
     public RequiresCondition(Requires[] annotations) {
@@ -40,8 +43,28 @@ public class RequiresCondition implements Condition {
             if(!matchesSdk(annotation)) {
                 return false;
             }
+            if(!matchesConditions(context, annotation)) {
+                return false;
+            }
         }
         return true;
+    }
+
+    private boolean matchesConditions(ConditionContext context, Requires annotation) {
+        Class<? extends Condition> condition = annotation.condition();
+        if(condition == TrueCondition.class) {
+            return true;
+        }
+        else {
+            try {
+                return !condition.newInstance().matches(context);
+            } catch (Throwable e) {
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error instantiating condition ["+condition.getName()+"]: " + e.getMessage(), e);
+                }
+                return false;
+            }
+        }
     }
 
     private boolean matchesSdk(Requires annotation) {

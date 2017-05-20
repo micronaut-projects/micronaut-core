@@ -1,4 +1,4 @@
-package org.particleframework.scope;
+package org.particleframework.context.annotation;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

@@ -3,6 +3,7 @@ package org.particleframework.inject.configurations
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.configurations.requiresbean.RequiresBean
+import org.particleframework.inject.configurations.requirescondition.TravisBean
 import org.particleframework.inject.configurations.requiresconfig.RequiresConfig
 import org.particleframework.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.Specification
@@ -22,5 +23,6 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
         !context.containsBean(RequiresJava9)
+        !context.containsBean(TravisBean)
     }
 }

@@ -5,7 +5,7 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinitionClass;
-import org.particleframework.scope.Context;
+import org.particleframework.context.annotation.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
