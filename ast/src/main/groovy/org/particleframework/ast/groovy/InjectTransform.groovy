@@ -24,14 +24,14 @@ import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstClassUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
-import org.particleframework.context.AbstractBeanConfiguration
+import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.context.BeanResolutionContext
 import org.particleframework.context.BeanContext
-import org.particleframework.context.AbstractBeanDefinitionClass
 import org.particleframework.context.AbstractBeanDefinition
 import org.particleframework.context.DefaultBeanResolutionContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.annotation.Configuration
+import org.particleframework.context.annotation.Context
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.BeanDefinitionClass
@@ -39,7 +39,8 @@ import org.particleframework.inject.BeanFactory
 import org.particleframework.inject.DisposableBeanDefinition
 import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
-import org.particleframework.context.annotation.Context
+import org.particleframework.inject.asm.BeanDefinitionClassWriter
+import org.particleframework.inject.asm.ConfigurationClassWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -48,7 +49,6 @@ import javax.inject.Provider
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
-import java.lang.annotation.Target
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -84,42 +84,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
                 if(annotationNode != null) {
-                    ClassNode beanConfigurationClass = makeCached(AbstractBeanConfiguration).plainNodeReference
-                    String packageName = classNode.packageName
-                    ClassNode newBeanConfiguration = new ClassNode("${ packageName}.\$BeanConfiguration", Modifier.PUBLIC, beanConfigurationClass)
-                    newBeanConfiguration.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
-                    for(ann in packageNode.annotations) {
-                        def annotationClassNode = ann.classNode
-                        AnnotationNode target = AstAnnotationUtils.findAnnotation(annotationClassNode, Target.name)
-                        if(target == null) {
-                            newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
+                    try {
+                        ConfigurationClassWriter writer = new ConfigurationClassWriter()
+                        String configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
+                        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
+                        File targetDirectory = source.configuration.targetDirectory
+                        if(targetDirectory != null) {
+                            generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
                         }
-                        else {
-                            def value = target.getMember("value")
-                            if(value instanceof ListExpression) {
-                                for(v in ((ListExpression)value).expressions) {
-                                    if(v.text == 'java.lang.annotation.ElementType.TYPE') {
-                                        newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
-                                        break
-                                    }
-                                }
-                            }
-                            else if(value != null) {
-                                if(value.text == 'java.lang.annotation.ElementType.TYPE') {
-                                    newBeanConfiguration.addAnnotation(AstAnnotationUtils.cloneAnnotation(ann))
-                                }
-                            }
-                        }
+                    } catch (Throwable e) {
+                        AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }
-                    
-                    newBeanConfiguration.addConstructor(
-                        new ConstructorNode(Modifier.PUBLIC, block(
-                            ctorSuperS(args(callX(makeCached(Package), "getPackage", constX(packageName))))
-                        ))
-                    )
-                    ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-                    moduleNode.addClass(newBeanConfiguration)
-                    generator.generate(newBeanConfiguration, BeanConfiguration.class)
                 }
 
                 return
@@ -132,36 +107,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
             injectVisitor.visitClass(classNode)
-            componentDefinitionClassNodes.putAll(injectVisitor.componentDefinitionClassNodes)
+            componentDefinitionClassNodes.putAll(injectVisitor.beanDefinitionClassNodes)
         }
 
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in componentDefinitionClassNodes) {
-            ClassNode newClass = entry.value
-            ClassNode targetClass = entry.key
-            moduleNode.addClass(newClass)
-            ClassNode componentDefinitionClassSuperClass = makeCached(AbstractBeanDefinitionClass).plainNodeReference
-            String packageName = newClass.packageName ? "${newClass.packageName}." : ""
-            ClassNode componentDefinitionClass = new ClassNode("${packageName}${newClass.nameWithoutPackage}Class", Modifier.PUBLIC, componentDefinitionClassSuperClass)
-
-            componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
-            componentDefinitionClass.addConstructor(
-                    new ConstructorNode(Modifier.PUBLIC, block(
-                            ctorSuperS(args(constX(newClass.name))),
-                            // set the meta class to null to save memory
-                            stmt(callX(varX("this"), "setMetaClass", ConstantExpression.NULL))
-                    ))
-            )
-            // override the load method to make more efficient loading
-            componentDefinitionClass.addMethod('load', Modifier.PUBLIC, makeCached(BeanDefinition).plainNodeReference, [] as Parameter[], null, block(
-                returnS(ctorX(newClass))
-            ))
-            if(stereoTypeFinder.hasStereoType(targetClass, Context.name)) {
-                componentDefinitionClass.addAnnotation(new AnnotationNode(makeCached(Context)))
+            ClassNode beanDefinition = entry.value
+            moduleNode.addClass(beanDefinition)
+            def writer = new BeanDefinitionClassWriter()
+            File classesDir = source.configuration.targetDirectory
+            try {
+                String beanDefinitionClassName = writer.writeBeanDefinitionClass(classesDir, beanDefinition.name, stereoTypeFinder.hasStereoType(entry.key, Context.name))
+                generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionClass)
+            } catch (Throwable e) {
+                AstMessageUtils.error(source, entry.key, "Error generating bean definition for dependency injection of class [${entry.key.name}]: $e.message")
             }
-            componentDefinitionClass.setModule(moduleNode)
-            generator.generate(componentDefinitionClass, BeanDefinitionClass)
-            moduleNode.addClass(componentDefinitionClass)
         }
     }
 
@@ -172,11 +132,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         final SourceUnit sourceUnit
-        final Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
+        final Map<ClassNode, ClassNode> beanDefinitionClassNodes = [:]
         final ClassNode concreteClass
 
         boolean isProvider = false
-        ClassNode currentComponentDef = null
+        ClassNode currentBeanDef = null
         BlockStatement currentConstructorBody = null
         BlockStatement currentBuildBody = null
         BlockStatement currentInjectBody = null
@@ -209,14 +169,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             if (node.isAbstract()) return
 
-            if (currentBuildBody != null && !currentComponentDef.getNodeMetaData("injected")) {
+            if (currentBuildBody != null && !currentBeanDef.getNodeMetaData("injected")) {
                 def thisX = varX("this")
                 // set the meta class to null to save memory
-                if (currentConstructorBody != null) {
-                    currentConstructorBody.addStatement(
-                            stmt(callX(thisX, "setMetaClass", ConstantExpression.NULL))
-                    )
-                }
                 def injectBeanArgs = args(varX(currentResolutionContextParam), varX(currentContextParam), currentInjectInstance)
                 currentBuildBody.addStatement(
                         stmt(callX(thisX, "injectBean", injectBeanArgs))
@@ -246,7 +201,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         returnS(currentInjectInstance)
                 )
 
-                currentComponentDef.putNodeMetaData("injected", Boolean.TRUE)
+                currentBeanDef.putNodeMetaData("injected", Boolean.TRUE)
             }
         }
 
@@ -260,7 +215,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private void makeLifeCycleHook(Class interfaceType, String interfaceMethod, String protectedDelegateMethod, BlockStatement body) {
                 ClassNode targetClass = concreteClass.plainNodeReference
-            currentComponentDef.addInterface(
+            currentBeanDef.addInterface(
                     GenericsUtils.makeClassSafeWithGenerics(interfaceType, concreteClass)
             )
 
@@ -279,7 +234,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ))
             ArgumentListExpression interfaceMethodArgs = paramsToArguments(interfaceMethodParams)
             interfaceMethodArgs.expressions.add(0, newResolutionContext)
-            currentComponentDef.addMethod(
+            currentBeanDef.addMethod(
                     interfaceMethod,
                     Modifier.PUBLIC,
                     targetClass,
@@ -297,7 +252,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     param(targetClass, INSTANCE_VAR_NAME)
             )
 
-            currentComponentDef.addMethod(
+            currentBeanDef.addMethod(
                     protectedDelegateMethod,
                     Modifier.PROTECTED,
                     ClassHelper.OBJECT_TYPE,
@@ -512,7 +467,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void defineComponentDefinitionClass(ClassNode classNode) {
-            if (!componentDefinitionClassNodes.containsKey(classNode) && !classNode.isAbstract()) {
+            if (!beanDefinitionClassNodes.containsKey(classNode) && !classNode.isAbstract()) {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 isProvider = providerGenericType != null
                 ClassNode targetClassNode = isProvider ? providerGenericType : classNode
@@ -522,7 +477,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 currentInjectBody = block()
                 ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]
                 ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(AbstractBeanDefinition, targetClassNode)
-                currentComponentDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
+                currentBeanDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
                         interfaceNodes, null)
 
                 currentContextParam = param(makeCached(BeanContext).plainNodeReference, '$context')
@@ -539,15 +494,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         param(makeCached(BeanContext), '$context'),
                         param(GenericsUtils.makeClassSafeWithGenerics(BeanDefinition, targetClassNode), '$definition')
                 )
-                currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildMethodParams, null, currentBuildBody)
+                currentBeanDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildMethodParams, null, currentBuildBody)
 
 
                 def newResolutionContext = ctorX(makeCached(DefaultBeanResolutionContext), args(varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1])))
-                currentComponentDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildDelegateMethodParams, null, block(
+                currentBeanDef.addMethod("build", Modifier.PUBLIC, targetClassNode.plainNodeReference, buildDelegateMethodParams, null, block(
                         stmt(callX(varX("this"), "build", args(newResolutionContext, varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1]))))
                 ))
 
-                currentComponentDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
+                currentBeanDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
                 List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
                 ClassExpression classNodeExpr = classX(classNode.plainNodeReference)
                 BlockStatement constructorBody
@@ -609,7 +564,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         currentContextParam,
                         injectObjectParam
                 )
-                currentComponentDef.addMethod("injectBean", Modifier.PROTECTED, classNode.plainNodeReference, injectMethodParams, null, currentInjectBody)
+                currentBeanDef.addMethod("injectBean", Modifier.PROTECTED, classNode.plainNodeReference, injectMethodParams, null, currentInjectBody)
 
                 def injectBeanFields = callSuperX("injectBeanFields", args(
                         varX(currentResolutionContextParam),
@@ -639,14 +594,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (constructorBody != null) {
                     currentConstructorBody = constructorBody
-                    currentComponentDef.addConstructor(
+                    currentBeanDef.addConstructor(
                             new ConstructorNode(Modifier.PUBLIC, constructorBody)
                     )
 
-                    componentDefinitionClassNodes.put(classNode, currentComponentDef)
+                    beanDefinitionClassNodes.put(classNode, currentBeanDef)
                 }
             } else if (!classNode.isAbstract()) {
-                currentComponentDef = componentDefinitionClassNodes.get(classNode)
+                currentBeanDef = beanDefinitionClassNodes.get(classNode)
             }
         }
 

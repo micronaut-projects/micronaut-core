@@ -35,26 +35,31 @@ class ServiceDescriptorGenerator {
                     targetDirectory = new File("build/resources/main")
                 }
 
-                File servicesDir = new File(targetDirectory, "META-INF/services")
-                servicesDir.mkdirs()
 
                 String className = classNode.name
                 try {
-                    def descriptor = new File(servicesDir, serviceType.name)
-                    if (descriptor.exists()) {
-                        String ls = System.getProperty('line.separator')
-                        String contents = descriptor.text
-                        def entries = contents.split('\\n')
-                        if (!entries.contains(className)) {
-                            descriptor.append("${ls}${className}")
-                        }
-                    } else {
-                        descriptor.text = className
-                    }
+                    generate(targetDirectory, className, serviceType)
                 } catch (Throwable e) {
                     AstMessageUtils.warning(sourceUnit, classNode, "Error generating service loader descriptor for class [${className}]: $e.message")
                 }
             }
+        }
+    }
+
+    void generate(File targetDirectory, String className, Class serviceType) {
+        File servicesDir = new File(targetDirectory, "META-INF/services")
+        servicesDir.mkdirs()
+
+        def descriptor = new File(servicesDir, serviceType.name)
+        if (descriptor.exists()) {
+            String ls = System.getProperty('line.separator')
+            String contents = descriptor.text
+            def entries = contents.split('\\n')
+            if (!entries.contains(className)) {
+                descriptor.append("${ls}${className}")
+            }
+        } else {
+            descriptor.text = className
         }
     }
 }
