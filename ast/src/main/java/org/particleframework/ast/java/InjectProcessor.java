@@ -1,4 +1,4 @@
-package org.particleframework.ast.groovy;
+package org.particleframework.ast.java;
 
 import com.google.auto.service.AutoService;
 import org.particleframework.context.annotation.Configuration;
