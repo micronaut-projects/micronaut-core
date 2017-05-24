@@ -1,0 +1,58 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url "https://repo.grails.org/grails/core" }
+    }
+    dependencies {
+        classpath "org.grails:grails-gradle-plugin:$grailsVersion"
+        classpath "org.grails:grails-docs:$grailsVersion"
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
+        classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
+        classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
+    }
+}
+
+repositories {
+    mavenLocal()
+    maven { url "https://repo.grails.org/grails/core" }
+}
+
+version project.projectVersion
+
+ext {
+    // commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/master"
+    commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/1a6b9e24fd2ec49e321ab983994f850663adcc6d/"
+}
+
+subprojects {
+
+    version project.projectVersion
+
+    ext {
+        userOrg = "grails"
+        isGrailsPlugin = false
+        isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
+    }
+
+    group "org.particleframework"
+
+    repositories {
+        mavenLocal()
+        maven { url "https://repo.grails.org/grails/core" }
+    }
+    
+    if(it.name.startsWith("examples")) {
+        // apply plugin:"org.grails.grails-web"
+    }
+    else {
+        apply from:"${commonBuild}/common-project.gradle"
+        sourceCompatibility = '1.8'
+        targetCompatibility = '1.8'
+        if(!it.name.contains('test-suite')) {
+            apply from:"${commonBuild}/common-publishing.gradle"
+        }
+    }
+
+}
+
+// apply from:"${commonBuild}/common-docs.gradle"

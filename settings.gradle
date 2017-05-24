@@ -1,0 +1,10 @@
+rootProject.name = 'particle'
+
+include "ast"
+include "core"
+include "inject"
+include "aop"
+include "runtime"
+include "runtime-netty"
+include "test-suite"
+
