@@ -16,8 +16,7 @@ import java.util.Set;
 /**
  * Created by maqsoodi on 5/24/2017.
  */
-@SupportedAnnotationTypes({"org.particleframework.context.annotation.Configuration",
-        "org.particleframework.context.annotation.Requires"})
+@SupportedAnnotationTypes({"org.particleframework.context.annotation.Configuration"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class InjectProcessor extends AbstractProcessor {
