@@ -16,11 +16,11 @@ import org.particleframework.inject.InitializingBeanDefinition;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 
 /**
@@ -43,9 +43,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             new IllegalStateException("AbstractBeanDefinition.preDestroy(..) method not found. Incompatible version of Particle on the classpath?")
     );
     private static final Method INJECT_BEAN_METHODS_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBeanMethods", BeanResolutionContext.class, DefaultBeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.injectBeanMethods(..) method not found. Incompatible version of Particle on the classpath?")
-    );
-    private static final Method INJECT_ANOTHER_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectAnother", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.injectBeanMethods(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
@@ -88,7 +85,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private final Type scope;
     private final boolean isSingleton;
     private final Set<Class> interfaceTypes;
-    private final String packageName;
     private final String providedBeanClassName;
     private MethodVisitor constructorVisitor;
     private MethodVisitor buildMethodVisitor;
@@ -117,6 +113,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private int injectInstanceIndex;
     private int postConstructInstanceIndex;
     private int preDestroyInstanceIndex;
+    private boolean beanFinalized = false;
 
     /**
      * Creates a bean definition writer
@@ -147,7 +144,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                 String providedClassName,
                                 String scope,
                                 boolean isSingleton) {
-        this.packageName = packageName;
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = packageName + '.' + className;
         this.providedBeanClassName = providedClassName;
@@ -198,7 +194,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     /**
      * Finalize the bean definition to the given output stream
      */
-    public void visitBeanDefinitionEnd(File targetDir) throws IOException {
+    public void visitBeanDefinitionEnd() throws IOException {
         if (classWriter instanceof ClassWriter) {
             String[] interfaceInternalNames = new String[interfaceTypes.size()];
             Iterator<Class> j = interfaceTypes.iterator();
@@ -233,20 +229,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             }
 
             classWriter.visitEnd();
-            File targetFile = new File(targetDir, getBeanDefinitionClassFile()).getCanonicalFile();
-            File parentDir = targetDir.getParentFile();
-            if (!parentDir.exists() && !parentDir.mkdirs()) {
-                throw new IOException("Cannot create parent directory: " + targetDir.getParentFile());
-            }
-            try (FileOutputStream out = new FileOutputStream(targetFile)) {
-                byte[] classBytes = ((ClassWriter) classWriter).toByteArray();
+        }
+        this.beanFinalized = true;
+    }
 
-//                ClassReader reader = new ClassReader(classBytes);
-//                TraceClassVisitor classVisitor = new TraceClassVisitor(new PrintWriter(System.out));
-//                reader.accept(classVisitor, 0);
+    /**
+     * Write the class to the given output stream
+     *
+     * @param outputStream The output stream
+     * @throws IOException If an error occurs
+     */
+    public void writeTo(OutputStream outputStream) throws IOException {
+        if(!beanFinalized) {
+            throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
+        }
+        byte[] classBytes = ((ClassWriter) classWriter).toByteArray();
+        outputStream.write(classBytes);
+    }
 
-                out.write(classBytes);
-            }
+    /**
+     * Write the class to the given output stream
+     *
+     * @param compilationDir The compilation dir
+     * @throws IOException If an error occurs
+     */
+    public void writeTo(File compilationDir) throws IOException {
+        if(!beanFinalized) {
+            throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
+        }
+
+        File targetFile = new File(compilationDir, getBeanDefinitionClassFile()).getCanonicalFile();
+        File parentDir = targetFile.getParentFile();
+        if (!parentDir.exists() && !parentDir.mkdirs()) {
+            throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
+        }
+        try (FileOutputStream out = new FileOutputStream(targetFile)) {
+            writeTo(out);
         }
     }
 
@@ -850,10 +868,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
             }
         }
-    }
-
-    private void pushNull(MethodVisitor methodVisitor) {
-        methodVisitor.visitInsn(ACONST_NULL);
     }
 
     private void pushCreateMapCall(MethodVisitor methodVisitor, Map<String, Object> argumentTypes) {

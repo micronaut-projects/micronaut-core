@@ -59,16 +59,26 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
                 if (annotationNode != null) {
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter()
+                    String configurationName = null
+
                     try {
-                        BeanConfigurationWriter writer = new BeanConfigurationWriter()
-                        String configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
-                        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-                        File targetDirectory = source.configuration.targetDirectory
-                        if (targetDirectory != null) {
-                            generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
-                        }
+                        configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
+                    }
+
+                    if(configurationName != null) {
+
+                        try {
+                            ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
+                            File targetDirectory = source.configuration.targetDirectory
+                            if (targetDirectory != null) {
+                                generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
+                            }
+                        } catch (Throwable e) {
+                            AstMessageUtils.error(source, classNode, "Error generating bean configuration descriptor for package-info class [${classNode.name}]: $e.message")
+                        }
                     }
                 }
 
@@ -89,16 +99,33 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         for (entry in beanDefinitionWriters) {
             BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
-
+            String beanDefinitionClassName = null
             try {
                 BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter()
-                String beanDefinitionClassName = beanClassWriter.writeBeanDefinitionClass(classesDir, beanDefWriter.beanDefinitionName, stereoTypeFinder.hasStereoType(entry.key, Context.name))
-                beanDefWriter.visitBeanDefinitionEnd(classesDir)
-                generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionClass)
+                beanDefinitionClassName = beanClassWriter.writeBeanDefinitionClass(classesDir, beanDefWriter.beanDefinitionName, stereoTypeFinder.hasStereoType(entry.key, Context.name))
             } catch (Throwable e) {
-                e.printStackTrace()
-                AstMessageUtils.error(source, entry.key, "Error generating bean definition for dependency injection of class [${entry.key.name}]: $e.message")
+                AstMessageUtils.error(source, entry.key, "Error generating bean definition class for dependency injection of class [${entry.key.name}]: $e.message")
             }
+
+            if (beanDefinitionClassName != null) {
+                boolean abort = false
+                try {
+                    generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionClass)
+                }
+                catch (Throwable e) {
+                    abort = true
+                    AstMessageUtils.error(source, entry.key, "Error generating bean definition class descriptor for dependency injection of class [${entry.key.name}]: $e.message")
+                }
+                if(!abort) {
+                    try {
+                        beanDefWriter.visitBeanDefinitionEnd()
+                        beanDefWriter.writeTo(classesDir)
+                    } catch (Throwable e) {
+                        AstMessageUtils.error(source, entry.key, "Error generating bean definition for dependency injection of class [${entry.key.name}]: $e.message")
+                    }
+                }
+            }
+
         }
     }
 
@@ -132,7 +159,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 superClass = superClass.getSuperClass()
             }
             superClasses = superClasses.reverse()
-            for(classNode in superClasses) {
+            for (classNode in superClasses) {
                 classNode.visitContents(this)
             }
             super.visitClass(node)
@@ -179,9 +206,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
                         ClassNode declaringClass = methodNode.declaringClass
 
-                        int modifiers = resolveModifiers(methodNode, methodNode.modifiers)
-
-                        if(stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
+                        if (stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
                             beanWriter.visitPostConstructMethod(
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
@@ -190,8 +215,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
-                        }
-                        else if(stereoTypeFinder.hasStereoType(methodNode, PreDestroy.name)) {
+                        } else if (stereoTypeFinder.hasStereoType(methodNode, PreDestroy.name)) {
                             beanWriter.visitPreDestroyMethod(
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
@@ -200,8 +224,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
-                        }
-                        else {
+                        } else {
                             beanWriter.visitMethodInjectionPoint(
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
@@ -217,11 +240,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
 
-        }
-
-        protected int resolveModifiers(AnnotatedNode annotatedNode, int modifiers) {
-            // when @PackageScope transform is used force modifiers to be package scope (ie no modifiers)
-            return isPackagePrivate(annotatedNode, modifiers) ? 0 : modifiers
         }
 
         protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
@@ -270,8 +288,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             genericTypeList.add(resolveTypeReference(genericType.type))
                         }
                     }
-                }
-                else if(fieldType.isArray()){
+                } else if (fieldType.isArray()) {
                     genericTypeList = []
                     genericTypeList.add(resolveTypeReference(fieldType.componentType))
                 }
@@ -289,10 +306,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private Object resolveTypeReference(ClassNode classNode) {
-            if(classNode == null) {
+            if (classNode == null) {
                 return null
-            }
-            else {
+            } else {
                 return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
             }
         }
@@ -316,15 +332,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 AnnotationNode scopeAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Scope.class)
                 AnnotationNode singletonAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Singleton.class)
 
-                if(isProvider) {
+                if (isProvider) {
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             scopeAnn?.classNode?.name,
                             singletonAnn != null)
-                }
-                else {
+                } else {
 
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
