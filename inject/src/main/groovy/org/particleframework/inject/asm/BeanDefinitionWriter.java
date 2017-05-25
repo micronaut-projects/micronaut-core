@@ -24,7 +24,22 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 /**
- * Responsible for building bean definitions at compile time. Uses ASM build the class definition
+ * <p>Responsible for building bean definitions at compile time. Uses ASM build the class definition.</p>
+ * <p>
+ * <p>Should be used from AST frameworks to build bean definitions from source code data.</p>
+ * <p>
+ * <p>For example:</p>
+ * <p>
+ * <pre>
+ *     {@code
+ *
+ *          BeanDefinitionWriter writer = new BeanDefinitionWriter("my.package", "MyClass", "javax.inject.Singleton", true)
+ *          writer.visitBeanDefinitionConstructor()
+ *          writer.visitFieldInjectionPoint("my.Qualifier", false, "my.package.MyDependency", "myfield" )
+ *          writer.visitBeanDefinitionEnd()
+ *          writer.writeTo(new File(..))
+ *     }
+ * </pre>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -192,6 +207,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     /**
+     * Visits a no-args constructor used to create the bean definition.
+     */
+    public void visitBeanDefinitionConstructor() {
+        if (constructorVisitor == null) {
+            // first build the constructor
+            visitBeanDefinitionConstructorInternal(Collections.emptyMap(), null, null);
+
+            // now prepare the implementation of the build method. See BeanFactory interface
+            visitBuildMethodDefinition(Collections.emptyMap());
+
+            // now override the injectBean method
+            visitInjectMethodDefinition();
+        }
+    }
+
+    /**
      * Finalize the bean definition to the given output stream
      */
     public void visitBeanDefinitionEnd() throws IOException {
@@ -240,7 +271,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(OutputStream outputStream) throws IOException {
-        if(!beanFinalized) {
+        if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
         byte[] classBytes = ((ClassWriter) classWriter).toByteArray();
@@ -254,7 +285,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(File compilationDir) throws IOException {
-        if(!beanFinalized) {
+        if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
 
@@ -387,6 +418,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         visitPreDestroyMethodDefinition();
         visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
     }
+
+
+    /**
+     * Visits a method injection point
+     *
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     */
+    public void visitMethodInjectionPoint(boolean requiresReflection,
+                                          Object returnType,
+                                          String methodName,
+                                          Map<String, Object> argumentTypes) {
+        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, null, null);
+    }
+
+    /**
+     * Visits a method injection point
+     *
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     */
+    public void visitMethodInjectionPoint(boolean requiresReflection,
+                                          Object returnType,
+                                          String methodName,
+                                          Map<String, Object> argumentTypes,
+                                          Map<String, Object> qualifierTypes,
+                                          Map<String, List<Object>> genericTypes) {
+        visitMethodInjectionPoint(beanFullClassName, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes);
+    }
+
 
     /**
      * Visits a method injection point
@@ -521,9 +588,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     /**
      * Visits a field injection point
      *
+     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    public void visitFieldInjectionPoint(Object qualifierType,
+                                         boolean requiresReflection,
+                                         Object fieldType,
+                                         String fieldName) {
+        visitFieldInjectionPoint(beanFullClassName, qualifierType, requiresReflection, fieldType, fieldName);
+    }
+
+    /**
+     * Visits a field injection point
+     *
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    public void visitFieldInjectionPoint(boolean requiresReflection,
+                                         Object fieldType,
+                                         String fieldName) {
+        visitFieldInjectionPoint(beanFullClassName, null, requiresReflection, fieldType, fieldName);
+    }
+
+    /**
+     * Visits a field injection point
+     *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
      * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
      * @param fieldName          The name of the field
      */
     public void visitFieldInjectionPoint(Object declaringType,
