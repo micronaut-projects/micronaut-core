@@ -21,7 +21,7 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
 
     public String writeBeanDefinitionClass(File targetDir, String beanDefinitionName, boolean isContextScope) {
 
-        String newBeanDefinitionClassName = beanDefinitionName.replace('.', '/') + "Class";
+        String newBeanDefinitionClassName = getInternalName(beanDefinitionName) + "Class";
         try {
             ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
@@ -74,10 +74,6 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
             throw new ClassGenerationException("Error generating bean definition class for bean definition ["+beanDefinitionName+"]: " + e.getMessage(), e);
         }
         return  beanDefinitionName + "Class";
-    }
-
-    private String getInternalName(String className) {
-        return className.replace('.', '/');
     }
 
 }

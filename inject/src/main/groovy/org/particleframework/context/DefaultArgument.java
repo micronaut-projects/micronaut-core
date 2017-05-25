@@ -5,7 +5,6 @@ import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +40,11 @@ class DefaultArgument implements Argument {
      * @param qualifiers The qualifiers
      * @return
      */
-    static Argument[] from(LinkedHashMap<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
+    static Argument[] from(Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
+        if(arguments == null) {
+            return new Argument[0];
+        }
+
         List<Argument> args = new ArrayList<>(arguments.size());
         for (Map.Entry<String, Class> entry : arguments.entrySet()) {
             String name = entry.getKey();

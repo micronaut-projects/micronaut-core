@@ -24,7 +24,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     private final Argument[] arguments;
     private final BeanDefinition declaringComponent;
 
-    DefaultConstructorInjectionPoint(BeanDefinition declaringComponent, Constructor<T> constructor, LinkedHashMap<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
+    DefaultConstructorInjectionPoint(BeanDefinition declaringComponent, Constructor<T> constructor, Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
         this.declaringComponent = declaringComponent;
         this.constructor = constructor;
         this.constructor.setAccessible(true);

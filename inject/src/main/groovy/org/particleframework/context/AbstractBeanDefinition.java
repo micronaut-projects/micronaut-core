@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import groovy.lang.SpreadMap;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
@@ -49,7 +50,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                                      boolean singleton,
                                      Class<T> type,
                                      Constructor<T> constructor,
-                                     LinkedHashMap<String, Class> arguments,
+                                     Map<String, Class> arguments,
                                      Map<String, Class> qualifiers,
                                      Map<String, List<Class>> genericTypes) {
         this.scope = scope;
@@ -69,6 +70,14 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                                      Class<T> type,
                                      Constructor<T> constructor) {
         this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
+    }
+
+    protected AbstractBeanDefinition(Annotation scope,
+                                     boolean singleton,
+                                     Class<T> type,
+                                     Constructor<T> constructor,
+                                     Map<String, Class> arguments) {
+        this(scope, singleton, type, constructor, arguments, null, null);
     }
 
     @Override
@@ -171,7 +180,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      */
     protected AbstractBeanDefinition addInjectionPoint(
                                                 Method method,
-                                                LinkedHashMap<String, Class> arguments,
+                                                Map<String, Class> arguments,
                                                 Map<String, Class> qualifiers,
                                                 Map<String, List<Class>> genericTypes,
                                                 boolean requiresReflection) {
@@ -180,21 +189,37 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     /**
-     * Adds an injection point for a method. Typically called by a dynamically generated subclass.
+     * Adds an injection point for a setter and field to be set. Typically called by a dynamically generated subclass.
      *
      * @param setter The method
-     * @param  arguments The arguments to the method
      * @return this component definition
      */
     protected AbstractBeanDefinition addInjectionPoint(
             Field field,
             Method setter,
-            LinkedHashMap<String, Class> arguments,
-            Map<String, Class> qualifiers,
-            Map<String, List<Class>> genericTypes,
+            Annotation qualifier,
+            List<Class> genericTypes,
             boolean requiresReflection) {
-        Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(field, setter, arguments, qualifiers, genericTypes, requiresReflection, methodInjectionPoints);
+
+        Map<String, Annotation> qualifiers = null;
+        Map<String, List<Class>> genericTypeMap = null;
+        String fieldName = field.getName();
+        if(qualifier != null) {
+            qualifiers = Collections.singletonMap(fieldName, qualifier);
+        }
+        if(genericTypes != null) {
+            genericTypeMap = Collections.singletonMap(fieldName, genericTypes);
+        }
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(
+                this,
+                                setter,
+                                requiresReflection,
+                                Collections.singletonMap(fieldName, field.getType()),
+                                qualifiers,
+                                genericTypeMap );
+        requiredComponents.add(field.getType());
+        methodInjectionPoints.add(methodInjectionPoint);
+        return this;
     }
 
 
@@ -414,15 +439,42 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        BeanResolutionContext.Path path = resolutionContext.getPath();
-        path.pushMethodArgumentResolve(this, injectionPoint, argument);
-        try {
-            Qualifier qualifier = resolveQualifier(argument);
-            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argument.getType(), qualifier);
-            path.pop();
-            return bean;
-        } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+        Class argumentType = argument.getType();
+        if(argumentType.isArray()) {
+            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+            return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
+        }
+        else if (Iterable.class.isAssignableFrom(argumentType)) {
+            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+            return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
+        }
+        else if(Provider.class.isAssignableFrom(argumentType)) {
+            return getBeanProviderForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+        }
+        else {
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            path.pushMethodArgumentResolve(this, injectionPoint, argument);
+            try {
+                Qualifier qualifier = resolveQualifier(argument);
+                Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argumentType, qualifier);
+                path.pop();
+                return bean;
+            } catch (NoSuchBeanException e) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+            }
+        }
+    }
+
+    private Object coerceCollectionToCorrectType(BeanResolutionContext resolutionContext, Argument argument, Class collectionType, Collection beansOfType) {
+        if(collectionType.isInstance(beansOfType)) {
+            return beansOfType;
+        }
+        else {
+            try {
+                return coerceToType(beansOfType, collectionType);
+            } catch (Exception e) {
+                throw new DependencyInjectionException(resolutionContext, argument, "Cannot convert collection to target iterable type: " + collectionType.getName());
+            }
         }
     }
 
@@ -439,7 +491,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Iterable getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
+    protected Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
         BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -454,7 +506,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             else {
                 genericType = genericTypes[0];
             }
-            Iterable beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
+            Collection beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
             path.pop();
             return beansOfType;
         } catch (NoSuchBeanException e) {
@@ -473,23 +525,29 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Iterable getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
+    protected Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument argument = constructorInjectionPoint.getArguments()[argIndex];
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
-            Class[] genericTypes = argument.getGenericTypes();
             Class genericType;
-            if(genericTypes.length != 1) {
-                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+            Class argumentType = argument.getType();
+            boolean isArray = argumentType.isArray();
+            if(isArray) {
+                genericType = argumentType.getComponentType();
             }
             else {
-                genericType = genericTypes[0];
+                Class[] genericTypes = argument.getGenericTypes();
+                if(genericTypes.length != 1) {
+                    throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+                }
+                else {
+                    genericType = genericTypes[0];
+                }
             }
-            Iterable beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
-            path.pop();
+            Collection beansOfType = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, genericType, qualifier);
             return beansOfType;
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, argument , e);
@@ -508,17 +566,39 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     @Internal
     protected Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-        BeanResolutionContext.Path path = resolutionContext.getPath();
-        path.pushFieldResolve(this, injectionPoint);
         Class beanType = injectionPoint.getType();
+        if(beanType.isArray()) {
+            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, fieldIndex);
+            return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
+        }
+        else if (Collection.class.isAssignableFrom(beanType)) {
+            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, fieldIndex);
+            if(beanType.isInstance(beansOfType)) {
+                return beansOfType;
+            }
+            else {
+                try {
+                    return coerceToType(beansOfType, beanType);
+                } catch (Exception e) {
+                    throw new DependencyInjectionException(resolutionContext, injectionPoint, "Cannot convert collection to target iterable type: " + beanType.getName());
+                }
+            }
+        }
+        else if(Provider.class.isAssignableFrom(beanType)) {
+            return getBeanProviderForField(resolutionContext, context, fieldIndex);
+        }
+        else {
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            path.pushFieldResolve(this, injectionPoint);
 
-        try {
-            Qualifier qualifier = resolveQualifier(injectionPoint);
-            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, beanType, qualifier);
-            path.pop();
-            return bean;
-        } catch (NoSuchBeanException e) {
-            throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+            try {
+                Qualifier qualifier = resolveQualifier(injectionPoint);
+                Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, beanType, qualifier);
+                path.pop();
+                return bean;
+            } catch (NoSuchBeanException e) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+            }
         }
 
     }
@@ -533,20 +613,54 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int fieldIndex) {
+    protected Object getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
 
         try {
+            Class genericType = GenericTypeUtils.resolveGenericTypeArgument(injectionPoint.getField());
+            if(genericType == null) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
+            }
             Qualifier qualifier = resolveQualifier(injectionPoint);
-            Object bean = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
+            Object bean = ((DefaultBeanContext)context).getBeanProvider(resolutionContext,genericType, qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
         }
+    }
 
+    /**
+     * Obtains a bean definition for the field at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
+        FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushFieldResolve(this, injectionPoint);
+
+        try {
+            Class genericType = GenericTypeUtils.resolveGenericTypeArgument(injectionPoint.getField());
+            if(genericType == null) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
+            }
+            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Collection beans = ((DefaultBeanContext)context).getBeansOfType(resolutionContext,genericType, qualifier);
+            path.pop();
+            return beans;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+        }
     }
 
     private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {
@@ -583,15 +697,29 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument argument = constructorInjectionPoint.getArguments()[argIndex];
-        BeanResolutionContext.Path path = resolutionContext.getPath();
-        path.pushConstructorResolve(this,  argument);
-        try {
-            Qualifier qualifier = resolveQualifier(argument);
-            Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argument.getType(), qualifier);
-            path.pop();
-            return bean;
-        } catch (NoSuchBeanException | BeanInstantiationException e) {
-            throw new DependencyInjectionException(resolutionContext, argument , e);
+        Class argumentType = argument.getType();
+        if(argumentType.isArray()) {
+            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argIndex);
+            return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
+        }
+        else if (Iterable.class.isAssignableFrom(argumentType)) {
+            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argIndex);
+            return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
+        }
+        else if(Provider.class.isAssignableFrom(argumentType)) {
+            return getBeanProviderForConstructorArgument(resolutionContext, context, argIndex);
+        }
+        else {
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            path.pushConstructorResolve(this,  argument);
+            try {
+                Qualifier qualifier = resolveQualifier(argument);
+                Object bean = ((DefaultBeanContext)context).getBean(resolutionContext, argumentType, qualifier);
+                path.pop();
+                return bean;
+            } catch (NoSuchBeanException | BeanInstantiationException e) {
+                throw new DependencyInjectionException(resolutionContext, argument , e);
+            }
         }
     }
 
@@ -610,14 +738,22 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int methodIndex, int argIndex) {
+    protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
             Qualifier qualifier = resolveQualifier(argument);
-            Provider beanProvider = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType,qualifier);
+            Class[] genericTypes = argument.getGenericTypes();
+            Class genericType;
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type for argument ["+argument+"] of method ["+injectionPoint.getName()+"]");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
+            Provider beanProvider = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, genericType,qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -637,14 +773,21 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, Class providedType, int argIndex) {
+    protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         Argument argument = getConstructor().getArguments()[argIndex];
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
-            Class type = argument.getType();
+            Class[] genericTypes = argument.getGenericTypes();
+            Class genericType;
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
             Qualifier qualifier = resolveQualifier(argument);
-            Provider beanProvider  = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, providedType, qualifier);
+            Provider beanProvider  = ((DefaultBeanContext)context).getBeanProvider(resolutionContext, genericType, qualifier);
             path.pop();
             return beanProvider;
         } catch (NoSuchBeanException e) {
@@ -653,6 +796,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     private Object coerceToType(Collection beans, Class<? extends Iterable> componentType) throws Exception {
+        if(componentType.isInstance(beans)) {
+            return beans;
+        }
         if (componentType == Set.class) {
             return new HashSet<>(beans);
         } else if (componentType == Queue.class) {
@@ -670,7 +816,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private AbstractBeanDefinition addMethodInjectionPointInternal(
             Field field,
             Method method,
-            LinkedHashMap<String, Class> arguments,
+            Map<String, Class> arguments,
             Map<String, Class> qualifierTypes,
             Map<String, List<Class>> genericTypes,
             boolean requiresReflection,
@@ -709,7 +855,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return this;
     }
 
-    private void populateQualifiersFromParameterAnnotations(LinkedHashMap<String, Class> argumentTypes, Map<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
+    private void populateQualifiersFromParameterAnnotations(Map<String, Class> argumentTypes, Map<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
         int i = 0;
         for (Map.Entry<String, Class> entry : argumentTypes.entrySet()) {
             Annotation[] annotations = parameterAnnotations[i++];
@@ -752,5 +898,14 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     @Override
     public int hashCode() {
         return type != null ? type.hashCode() : 0;
+    }
+
+    protected static Map createMap(Object[] values) {
+        Map answer = new LinkedHashMap(values.length / 2);
+        int i = 0;
+        while (i < values.length - 1) {
+            answer.put(values[i++], values[i++]);
+        }
+        return answer;
     }
 }
