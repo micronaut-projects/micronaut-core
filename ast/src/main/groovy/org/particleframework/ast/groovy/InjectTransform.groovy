@@ -125,12 +125,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitClass(ClassNode node) {
 
-            super.visitClass(node)
             ClassNode superClass = node.getSuperClass()
+            List<ClassNode> superClasses = []
             while (superClass != null) {
-                superClass.visitContents(this)
+                superClasses.add(superClass)
                 superClass = superClass.getSuperClass()
             }
+            superClasses = superClasses.reverse()
+            for(classNode in superClasses) {
+                classNode.visitContents(this)
+            }
+            super.visitClass(node)
 
         }
 
