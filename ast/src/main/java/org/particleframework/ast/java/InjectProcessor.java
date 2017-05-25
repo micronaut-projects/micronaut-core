@@ -4,7 +4,7 @@ import com.google.auto.service.AutoService;
 import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.asm.ConfigurationClassWriter;
+import org.particleframework.inject.asm.BeanConfigurationWriter;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -27,7 +27,7 @@ public class InjectProcessor extends AbstractProcessor {
         for (final Element element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
             if (element.getSimpleName().contentEquals("package-info")) {
                     try {
-                        ConfigurationClassWriter writer = new ConfigurationClassWriter();
+                        BeanConfigurationWriter writer = new BeanConfigurationWriter();
                         String configurationName = writer.writeConfiguration(element.getEnclosingElement().toString(), new File(element.getEnclosingElement().toString()));
                         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
                         File targetDirectory = new File(element.getEnclosingElement().toString());
