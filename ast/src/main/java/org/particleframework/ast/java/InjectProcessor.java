@@ -1,15 +1,16 @@
 package org.particleframework.ast.java;
 
 import com.google.auto.service.AutoService;
+import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.context.annotation.Configuration;
+import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.asm.ConfigurationClassWriter;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.tools.Diagnostic;
+import java.io.File;
 import java.util.Set;
 
 /**
@@ -24,27 +25,23 @@ public class InjectProcessor extends AbstractProcessor {
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
         for (final Element element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
-
-            if (element instanceof TypeElement) {
-                final TypeElement typeElement = (TypeElement) element;
-
-                for (final Element enclosedElement : typeElement.getEnclosedElements()) {
-                    if (enclosedElement instanceof VariableElement) {
-                        final VariableElement variableElement = (VariableElement) enclosedElement;
-                        if (!variableElement.getModifiers().contains(Modifier.FINAL)) {
-                            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                                    String.format(
-                                            "Class '%s' is annotated as @Immutable, but field '%s' is not declared as final",
-                                            typeElement.getSimpleName(), variableElement.getSimpleName()
-                                    )
-                            );
+            if (element.getSimpleName().contentEquals("package-info")) {
+                    try {
+                        ConfigurationClassWriter writer = new ConfigurationClassWriter();
+                        String configurationName = writer.writeConfiguration(element.getEnclosingElement().toString(), new File(element.getEnclosingElement().toString()));
+                        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
+                        File targetDirectory = new File(element.getEnclosingElement().toString());
+                        if (targetDirectory != null) {
+                            generator.generate(targetDirectory, configurationName, BeanConfiguration.class);
                         }
+                    } catch (Throwable e) {
+                        new Exception("Error generating bean configuration for package-info class [${element.simplename}]: $e.message");
                     }
-                }
             }
         }
 
-        // Claiming that annotations have been processed by this processor
+        // return true once annotations have been processed by this processor
         return true;
     }
+
 }
