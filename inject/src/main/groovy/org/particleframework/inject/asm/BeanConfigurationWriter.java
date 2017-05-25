@@ -15,7 +15,7 @@ import java.io.File;
  * @since 1.0
  */
 @Internal
-public class ConfigurationClassWriter extends AbstractClassFileWriter {
+public class BeanConfigurationWriter extends AbstractClassFileWriter {
 
 
     /**
@@ -29,7 +29,7 @@ public class ConfigurationClassWriter extends AbstractClassFileWriter {
                                      File targetDir) {
 
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        String packagePath = packageName.replace('.', '/');
+        String packagePath = getInternalName(packageName);
         String classShortName = "$BeanConfiguration";
         String className = packagePath + '/' + classShortName;
 

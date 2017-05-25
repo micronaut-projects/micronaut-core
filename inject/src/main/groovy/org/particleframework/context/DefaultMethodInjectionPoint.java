@@ -31,7 +31,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
                                 Method method,
                                 boolean requiresReflection,
-                                LinkedHashMap<String, Class> arguments,
+                                Map<String, Class> arguments,
                                 Map<String, Annotation> qualifiers, Map<String,
                                 List<Class>> genericTypes) {
         this.method = method;

@@ -40,7 +40,8 @@ import org.particleframework.inject.DisposableBeanDefinition
 import org.particleframework.inject.InitializingBeanDefinition
 import org.particleframework.inject.InjectableBeanDefinition
 import org.particleframework.inject.asm.BeanDefinitionClassWriter
-import org.particleframework.inject.asm.ConfigurationClassWriter
+import org.particleframework.inject.asm.BeanDefinitionWriter
+import org.particleframework.inject.asm.BeanConfigurationWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -76,23 +77,25 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         Map<ClassNode, ClassNode> componentDefinitionClassNodes = [:]
+        Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
 
         List<ClassNode> classes = moduleNode.getClasses()
-        if(classes.size() == 1) {
+        if (classes.size() == 1) {
             ClassNode classNode = classes[0]
-            if(classNode.nameWithoutPackage == 'package-info') {
+            if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
                 AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
-                if(annotationNode != null) {
+                if (annotationNode != null) {
                     try {
-                        ConfigurationClassWriter writer = new ConfigurationClassWriter()
+                        BeanConfigurationWriter writer = new BeanConfigurationWriter()
                         String configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
                         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
                         File targetDirectory = source.configuration.targetDirectory
-                        if(targetDirectory != null) {
+                        if (targetDirectory != null) {
                             generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
                         }
                     } catch (Throwable e) {
+                        e.printStackTrace()
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }
                 }
@@ -108,18 +111,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
             injectVisitor.visitClass(classNode)
             componentDefinitionClassNodes.putAll(injectVisitor.beanDefinitionClassNodes)
+            beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
         }
 
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-        for (entry in componentDefinitionClassNodes) {
-            ClassNode beanDefinition = entry.value
-            moduleNode.addClass(beanDefinition)
-            def writer = new BeanDefinitionClassWriter()
+        for (entry in beanDefinitionWriters) {
+            BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
+
             try {
-                String beanDefinitionClassName = writer.writeBeanDefinitionClass(classesDir, beanDefinition.name, stereoTypeFinder.hasStereoType(entry.key, Context.name))
+                BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter()
+                String beanDefinitionClassName = beanClassWriter.writeBeanDefinitionClass(classesDir, beanDefWriter.beanDefinitionName, stereoTypeFinder.hasStereoType(entry.key, Context.name))
+                beanDefWriter.visitBeanDefinitionEnd(classesDir)
                 generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionClass)
             } catch (Throwable e) {
+                e.printStackTrace()
                 AstMessageUtils.error(source, entry.key, "Error generating bean definition for dependency injection of class [${entry.key.name}]: $e.message")
             }
         }
@@ -134,6 +140,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final SourceUnit sourceUnit
         final Map<ClassNode, ClassNode> beanDefinitionClassNodes = [:]
         final ClassNode concreteClass
+        final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
+        BeanDefinitionWriter beanWriter
 
         boolean isProvider = false
         ClassNode currentBeanDef = null
@@ -154,7 +162,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
-                defineComponentDefinitionClass(concreteClass)
+                defineBeanDefinition(concreteClass)
             }
         }
 
@@ -179,22 +187,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (currentStartupBody != null) {
                     makeBeanDefinitionInitializable()
                     currentBuildBody.addStatement(
-                        stmt(callX(thisX, "postConstruct", injectBeanArgs))
+                            stmt(callX(thisX, "postConstruct", injectBeanArgs))
                     )
                 }
-                if(currentShutdownBody != null) {
+                if (currentShutdownBody != null) {
                     makeBeanDefinitionDisposable()
                 }
                 if (isProvider) {
                     currentBuildBody.addStatement(
-                        returnS(
-                            callThisX("injectAnother", args(
-                                varX(currentResolutionContextParam),
-                                varX(currentContextParam),
-                                callX(currentBuildInstance, "get")
-                            ))
+                            returnS(
+                                    callThisX("injectAnother", args(
+                                            varX(currentResolutionContextParam),
+                                            varX(currentContextParam),
+                                            callX(currentBuildInstance, "get")
+                                    ))
 
-                        )
+                            )
                     )
                 }
                 currentInjectBody.addStatement(
@@ -214,7 +222,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void makeLifeCycleHook(Class interfaceType, String interfaceMethod, String protectedDelegateMethod, BlockStatement body) {
-                ClassNode targetClass = concreteClass.plainNodeReference
+            ClassNode targetClass = concreteClass.plainNodeReference
             currentBeanDef.addInterface(
                     GenericsUtils.makeClassSafeWithGenerics(interfaceType, concreteClass)
             )
@@ -269,7 +277,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
             if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
                 ClassNode classNode = methodNode.declaringClass
-                defineComponentDefinitionClass(concreteClass)
+                defineBeanDefinition(concreteClass)
                 boolean isParent = classNode != concreteClass
 
                 if (!isConstructor && currentConstructorBody != null) {
@@ -300,7 +308,45 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if (!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
                             requiresReflection = true
                         }
-                        addMethodInjectionPoint(classNode, methodName, requiresReflection, null, methodNode.parameters)
+
+                        Map<String, Object> paramsToType = [:]
+                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, List<Object>> genericTypeMap = [:]
+                        populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+                        ClassNode declaringClass = methodNode.declaringClass
+
+                        if(stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
+                            beanWriter.visitPostConstructMethod(
+                                    resolveTypeReference(declaringClass),
+                                    methodNode.modifiers,
+                                    resolveTypeReference(methodNode.returnType),
+                                    methodNode.name,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap)
+                        }
+                        else if(stereoTypeFinder.hasStereoType(methodNode, PreDestroy.name)) {
+                            beanWriter.visitPreDestroyMethod(
+                                    resolveTypeReference(declaringClass),
+                                    methodNode.modifiers,
+                                    resolveTypeReference(methodNode.returnType),
+                                    methodNode.name,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap)
+                        }
+                        else {
+                            beanWriter.visitMethodInjectionPoint(
+                                    resolveTypeReference(declaringClass),
+                                    methodNode.modifiers,
+                                    resolveTypeReference(methodNode.returnType),
+                                    methodNode.name,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap)
+                        }
+
+
                     }
                 }
             }
@@ -313,15 +359,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitField(FieldNode fieldNode) {
-            if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && fieldNode.declaringClass.getProperty(fieldNode.getName()) == null) {
-                defineComponentDefinitionClass(concreteClass)
+            ClassNode declaringClass = fieldNode.declaringClass
+            if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && declaringClass.getProperty(fieldNode.getName()) == null) {
+                defineBeanDefinition(concreteClass)
                 if (currentConstructorBody != null) {
                     if (!fieldNode.isStatic()) {
 
-                        def modifiers = fieldNode.getModifiers()
+                        int modifiers = fieldNode.getModifiers()
                         boolean requiresReflection = Modifier.isPrivate(modifiers)
                         if (currentInjectInstance != null && !requiresReflection) {
-                            if (isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)) {
+                            if (isInheritedAndNotPublic(fieldNode, declaringClass, modifiers)) {
                                 requiresReflection = true
                             } else {
                                 boolean isProvider = AstClassUtils.implementsInterface(fieldNode.type, Provider) && fieldNode.type.genericsTypes
@@ -343,10 +390,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         }
 
+                        AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
+                        ClassNode qualifierClassNode = qualifierAnn?.classNode
+                        Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
+                        beanWriter.visitFieldInjectionPoint(
+                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                fieldNode.modifiers,
+                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
+                                fieldNode.name
+                        )
+
                         VariableExpression fieldVar = declareFieldVar('$field' + fieldIndex++, fieldNode)
                         ArgumentListExpression methodArgs = args(fieldVar)
                         AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
-                        AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
+
                         if (qualifierAnn != null) {
                             methodArgs.addExpression(callX(fieldVar, "getAnnotation", classX(qualifierAnn.classNode)))
                         }
@@ -376,19 +433,44 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
-            if (fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
-                if (!propertyNode.isStatic()) {
-                    defineComponentDefinitionClass(concreteClass)
-                    if (currentConstructorBody != null) {
-                        VariableExpression fieldVar = declareFieldVar('$method_field' + methodIndex, fieldNode)
-                        ConstantExpression setterName = constX(getSetterName(propertyNode.name))
-                        Expression propertyType = classX(propertyNode.type)
+            if (fieldNode != null && !propertyNode.isStatic() && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
+                defineBeanDefinition(concreteClass)
+                ClassNode qualfierType = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier.class)?.classNode
 
-                        Parameter setterArg = param(propertyType.type, propertyNode.name)
-                        AstAnnotationUtils.copyAnnotations(fieldNode, setterArg)
-                        addMethodInjectionPoint(propertyNode.declaringClass, setterName, propertyNode.isPrivate(), fieldVar, setterArg)
+                ClassNode fieldType = fieldNode.type
+                GenericsType[] genericsTypes = fieldType.genericsTypes
+                List<Object> genericTypeList = null
+                if (genericsTypes != null && genericsTypes.length > 0) {
+                    genericTypeList = []
+                    for (genericType in genericsTypes) {
+                        if (!genericType.isPlaceholder()) {
+                            genericTypeList.add(resolveTypeReference(genericType.type))
+                        }
                     }
                 }
+                else if(fieldType.isArray()){
+                    genericTypeList = []
+                    genericTypeList.add(resolveTypeReference(fieldType.componentType))
+                }
+                ClassNode declaringClass = fieldNode.declaringClass
+                beanWriter.visitSetterInjectionPoint(
+                        resolveTypeReference(declaringClass),
+                        resolveTypeReference(qualfierType),
+                        propertyNode.modifiers,
+                        resolveTypeReference(fieldType),
+                        fieldNode.name,
+                        getSetterName(propertyNode.name),
+                        genericTypeList
+                )
+            }
+        }
+
+        private Object resolveTypeReference(ClassNode classNode) {
+            if(classNode == null) {
+                return null
+            }
+            else {
+                return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
             }
         }
 
@@ -466,19 +548,48 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             return sourceUnit
         }
 
-        private void defineComponentDefinitionClass(ClassNode classNode) {
+        private void defineBeanDefinition(ClassNode classNode) {
             if (!beanDefinitionClassNodes.containsKey(classNode) && !classNode.isAbstract()) {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 isProvider = providerGenericType != null
                 ClassNode targetClassNode = isProvider ? providerGenericType : classNode
                 String packageName = classNode.packageName ? "${classNode.packageName}." : ""
-                String componentDefinitionName = "${packageName}\$${classNode.nameWithoutPackage}BeanDefinition"
+                String beanDefinitionName = "${packageName}\$${classNode.nameWithoutPackage}BeanDefinition"
+                AnnotationStereoTypeFinder annotationStereoTypeFinder = new AnnotationStereoTypeFinder()
+                AnnotationNode scopeAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Scope.class)
+                AnnotationNode singletonAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Singleton.class)
+                Expression singleton = singletonAnn != null ? ConstantExpression.TRUE : ConstantExpression.FALSE
+
+                if(isProvider) {
+                    beanWriter = new BeanDefinitionWriter(
+                            classNode.packageName ?: "",
+                            classNode.nameWithoutPackage,
+                            providerGenericType.name,
+                            scopeAnn?.classNode?.name,
+                            singletonAnn != null)
+                }
+                else {
+
+                    beanWriter = new BeanDefinitionWriter(
+                            classNode.packageName ?: "",
+                            classNode.nameWithoutPackage,
+                            scopeAnn?.classNode?.name,
+                            singletonAnn != null)
+                }
+                beanDefinitionWriters.put(classNode, beanWriter)
+
+
                 currentBuildBody = block()
                 currentInjectBody = block()
-                ClassNode[] interfaceNodes = [GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode), GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]
+
+                ClassNode[] interfaceNodes = [
+                        GenericsUtils.makeClassSafeWithGenerics(BeanFactory, targetClassNode),
+                        GenericsUtils.makeClassSafeWithGenerics(InjectableBeanDefinition, classNode)] as ClassNode[]
+
                 ClassNode superClass = GenericsUtils.makeClassSafeWithGenerics(AbstractBeanDefinition, targetClassNode)
-                currentBeanDef = new ClassNode(componentDefinitionName, Modifier.PUBLIC, superClass,
+                currentBeanDef = new ClassNode(beanDefinitionName, Modifier.PUBLIC, superClass,
                         interfaceNodes, null)
+                currentBeanDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
 
                 currentContextParam = param(makeCached(BeanContext).plainNodeReference, '$context')
                 currentResolutionContextParam = param(makeCached(BeanResolutionContext).plainNodeReference, '$resolutionContext')
@@ -502,27 +613,28 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         stmt(callX(varX("this"), "build", args(newResolutionContext, varX(buildDelegateMethodParams[0]), varX(buildDelegateMethodParams[1]))))
                 ))
 
-                currentBeanDef.addAnnotation(new AnnotationNode(makeCached(CompileStatic)))
+
                 List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
                 ClassExpression classNodeExpr = classX(classNode.plainNodeReference)
                 BlockStatement constructorBody
                 Expression scope
-                Expression singleton
-                def annotationStereoTypeFinder = new AnnotationStereoTypeFinder()
-                AnnotationNode scopeAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Scope.class)
+
+
                 if (scopeAnn != null) {
                     scope = callX(classNodeExpr, "getAnnotation", classX(scopeAnn.classNode))
                 } else {
                     scope = ConstantExpression.NULL
                 }
-                AnnotationNode singletonAnn = annotationStereoTypeFinder.findAnnotationWithStereoType(classNode, Singleton.class)
-                singleton = singletonAnn != null ? ConstantExpression.TRUE : ConstantExpression.FALSE
+
+
                 if (constructors.isEmpty()) {
                     currentBuildInstance = varX(INSTANCE_VAR_NAME, classNode)
                     currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode)))
                     constructorBody = block(
                             ctorSuperS(args(scope, singleton, classNodeExpr, callX(classNodeExpr, "getConstructor")))
                     )
+
+                    beanWriter.visitBeanDefinitionConstructor(Collections.emptyMap(), null, null)
 
                 } else {
                     List<ConstructorNode> publicConstructors = findPublicConstructors(constructors)
@@ -534,24 +646,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
                     }
                     if (constructorNode != null) {
-                        ArgumentListExpression ctorTypeArgs = paramTypesToArguments(constructorNode.parameters)
-                        MapExpression ctorParamsMap = paramsToMap(constructorNode.parameters)
-                        Expression qualifiers = paramsToQualifiers(constructorNode.parameters)
-                        Expression generics = paramsToGenericTypes(constructorNode.parameters)
-                        ArgumentListExpression ctorArgs = buildBeanLookupArguments(classNodeExpr, classNodeExpr, constructorNode.parameters)
-                        currentBuildInstance = varX(INSTANCE_VAR_NAME, classNode.plainNodeReference)
-                        currentBuildBody.addStatement(declS(currentBuildInstance, ctorX(classNode.plainNodeReference, ctorArgs)))
-                        ArgumentListExpression constructorArgs = args(
-                                scope,
-                                singleton,
-                                classNodeExpr,
-                                callX(classNodeExpr, "getConstructor", ctorTypeArgs),
-                                ctorParamsMap,
-                                qualifiers,
-                                generics)
-                        constructorBody = block(
-                                ctorSuperS(constructorArgs)
-                        )
+                        Map<String, Object> paramsToType = [:]
+                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, List<Object>> genericTypeMap = [:]
+                        Parameter[] parameters = constructorNode.parameters
+                        populateParameterData(parameters, paramsToType, qualifierTypes, genericTypeMap)
+                        beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
                     } else {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
                     }
@@ -602,6 +702,41 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             } else if (!classNode.isAbstract()) {
                 currentBeanDef = beanDefinitionClassNodes.get(classNode)
+            }
+        }
+
+        private void populateParameterData(Parameter[] parameters, Map<String, Object> paramsToType, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypeMap) {
+            for (param in parameters) {
+                ClassNode parameterType = param.type
+                String parameterName = param.name
+                if (parameterType.isResolved()) {
+                    paramsToType.put(parameterName, parameterType.typeClass)
+                } else {
+                    paramsToType.put(parameterName, parameterType.name)
+                }
+                AnnotationNode ann = stereoTypeFinder.findAnnotationWithStereoType(param, Qualifier)
+                if (ann != null) {
+                    if (ann.classNode.isResolved()) {
+                        qualifierTypes.put(parameterName, ann.classNode.typeClass)
+                    } else {
+                        qualifierTypes.put(parameterName, ann.classNode.name)
+                    }
+                }
+
+                GenericsType[] genericsTypes = parameterType.genericsTypes
+                if (genericsTypes != null && genericsTypes.length > 0) {
+                    List<Object> genericTypeList = []
+                    genericTypeMap.put(parameterName, genericTypeList)
+                    for (genericType in genericsTypes) {
+                        if (!genericType.isPlaceholder()) {
+                            genericTypeList.add(resolveTypeReference(genericType.type))
+                        }
+                    }
+                } else if (parameterType.isArray()) {
+                    List<Object> genericTypeList = []
+                    genericTypeList.add(resolveTypeReference(parameterType.componentType))
+                    genericTypeMap.put(parameterName, genericTypeList)
+                }
             }
         }
 

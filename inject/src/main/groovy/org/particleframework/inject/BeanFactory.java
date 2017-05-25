@@ -2,6 +2,7 @@ package org.particleframework.inject;
 
 import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.DefaultBeanResolutionContext;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 /**
@@ -22,7 +23,9 @@ public interface BeanFactory<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    T build(BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException;
+    default T build(BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
+        return build(new DefaultBeanResolutionContext(context, definition), context, definition);
+    }
 
     /**
      * builds a component instance
