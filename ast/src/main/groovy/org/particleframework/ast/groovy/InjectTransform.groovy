@@ -61,11 +61,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
                 if (annotationNode != null) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter()
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName)
                     String configurationName = null
 
                     try {
-                        configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
+                        writer.writeTo(source.configuration.targetDirectory)
+                        configurationName = writer.getConfigurationClassName()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }

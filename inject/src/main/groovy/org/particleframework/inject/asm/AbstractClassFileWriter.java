@@ -155,7 +155,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         if(targetDir != null) {
 
             byte[] bytes = classWriter.toByteArray();
-            String fileName = className + ".class";
+            String fileName = className.replace('.','/') + ".class";
             File targetFile = new File(targetDir, fileName);
             targetFile.getParentFile().mkdirs();
 
