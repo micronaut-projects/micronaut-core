@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -115,14 +116,12 @@ public class DefaultBeanContext implements BeanContext {
     }
 
 
-
     @Override
     public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
         BeanConfiguration configuration = this.beanConfigurations.get(configurationName);
-        if(configuration != null) {
+        if (configuration != null) {
             return Optional.of(configuration);
-        }
-        else {
+        } else {
             return Optional.empty();
         }
     }
@@ -149,6 +148,44 @@ public class DefaultBeanContext implements BeanContext {
         return getBeansOfType(null, beanType);
     }
 
+    @Override
+    public <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier) {
+        return streamOfType(null, beanType, qualifier);
+    }
+
+    <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType);
+        if (candidates.isEmpty()) {
+            return Stream.empty();
+        } else {
+            BeanKey beanKey = new BeanKey(beanType, qualifier);
+            BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
+            if (beanRegistration != null) {
+                return Stream.of(beanRegistration.bean);
+            } else {
+                Iterator<BeanDefinition<T>> candidateIterator = candidates.iterator();
+
+                return Stream.generate(() -> {
+                    BeanDefinition<T> definition = candidateIterator.next();
+
+                    if (definition.isSingleton()) {
+                        BeanRegistration<T> candidateRegistration = singletonObjects.get(beanKey);
+                        if (candidateRegistration != null) {
+                            return candidateRegistration.bean;
+                        } else {
+                            synchronized (singletonObjects) {
+                                T createdBean = doCreateBean(resolutionContext, definition, qualifier, true);
+                                registerSingletonBean(definition, beanType, createdBean, qualifier, candidates.size() == 1);
+                                return createdBean;
+                            }
+                        }
+                    } else {
+                        return doCreateBean(resolutionContext, definition, qualifier, false);
+                    }
+                }).limit(candidates.size());
+            }
+        }
+    }
     @Override
     public <T> T inject(T instance) {
         Class<?> beanType = instance.getClass();
@@ -367,10 +404,9 @@ public class DefaultBeanContext implements BeanContext {
                     Optional<BeanDefinition<T>> primary = candidates.stream()
                             .filter((candidate) -> candidate.getType().getAnnotation(Primary.class) != null)
                             .findFirst();
-                    if(primary.isPresent()) {
+                    if (primary.isPresent()) {
                         return primary.get();
-                    }
-                    else {
+                    } else {
                         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
                         if (exactMatches.size() == 1) {
                             definition = exactMatches.iterator().next();
@@ -420,7 +456,7 @@ public class DefaultBeanContext implements BeanContext {
             BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
             if (beanDefinitionClass.isPresent()) {
                 String replacesBeanTypeName = beanDefinitionClass.getReplacesBeanTypeName();
-                if(replacesBeanTypeName != null) {
+                if (replacesBeanTypeName != null) {
                     replacements.put(replacesBeanTypeName, beanDefinitionClass);
                 }
                 if (beanDefinitionClass.isContextScope()) {
@@ -433,14 +469,14 @@ public class DefaultBeanContext implements BeanContext {
 
         Collection<BeanDefinitionClass> values = new HashSet<>(beanDefinitionsClasses.values());
         values.forEach(beanDefinitionClass -> {
-                for (BeanConfiguration configuration : beanConfigurations.values()) {
-                    boolean enabled = configuration.isEnabled(this);
-                    if(!enabled && configuration.isWithin(beanDefinitionClass)) {
-                        beanDefinitionsClasses.remove(beanDefinitionClass.getBeanTypeName());
-                        contextScopeBeans.remove(beanDefinitionClass);
+                    for (BeanConfiguration configuration : beanConfigurations.values()) {
+                        boolean enabled = configuration.isEnabled(this);
+                        if (!enabled && configuration.isWithin(beanDefinitionClass)) {
+                            beanDefinitionsClasses.remove(beanDefinitionClass.getBeanTypeName());
+                            contextScopeBeans.remove(beanDefinitionClass);
+                        }
                     }
                 }
-            }
         );
 
         // This logic handles the @Replaces annotation
@@ -449,7 +485,7 @@ public class DefaultBeanContext implements BeanContext {
         for (Map.Entry<String, BeanDefinitionClass> replacement : replacements.entrySet()) {
             BeanDefinitionClass replacementBeanClass = replacement.getValue();
             String beanNameToBeReplaced = replacement.getKey();
-            if( beanDefinitionsClasses.containsValue(replacementBeanClass) &&  beanDefinitionsClasses.containsKey(beanNameToBeReplaced)) {
+            if (beanDefinitionsClasses.containsValue(replacementBeanClass) && beanDefinitionsClasses.containsKey(beanNameToBeReplaced)) {
                 BeanDefinitionClass removedClass = beanDefinitionsClasses.remove(beanNameToBeReplaced);
                 contextScopeBeans.remove(removedClass);
             }

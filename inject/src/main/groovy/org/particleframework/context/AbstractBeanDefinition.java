@@ -16,6 +16,7 @@ import javax.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * <p></p>Default implementation of the {@link BeanDefinition} interface. This class is generally not used directly in user code.
@@ -320,46 +321,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         Object[] methodArgs = new Object[methodArgumentTypes.length];
         for (int i = 0; i < methodArgumentTypes.length; i++) {
             Argument argument = methodArgumentTypes[i];
-            path.pushMethodArgumentResolve(this, methodInjectionPoint, argument);
-            Class argumentType = argument.getType();
-            Qualifier qualifier = resolveQualifier(argument);
 
-            if(argumentType.isArray()) {
-                Class arrayType = argumentType.getComponentType();
-                methodArgs[i] = collectionToArray(arrayType, context.getBeansOfType(resolutionContext, arrayType));
-            }
-            else if (Iterable.class.isAssignableFrom(argumentType)) {
-                Class[] genericTypes = argument.getGenericTypes();
-                if(genericTypes != null && genericTypes.length == 1) {
-                    Class genericType = genericTypes[0];
-                    Collection beansOfType = context.getBeansOfType(resolutionContext, genericType);
-                    try {
-                        methodArgs[i] = coerceToType(beansOfType, argumentType);
-                    } catch (Exception e) {
-                        throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot convert collection to target iterable type: " + argumentType.getName());
-                    }
-                }
-                else {
-                    throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Iterable missing generic argument types");
-                }
-            } else if(Provider.class.isAssignableFrom(argumentType)) {
-                Class[] genericTypes = argument.getGenericTypes();
-                if(genericTypes != null && genericTypes.length == 1) {
-                    Class genericType = genericTypes[0];
-                    if (genericType != null) {
-                        methodArgs[i] = context.getBeanProvider(resolutionContext, genericType);
-                        path.pop();
-                    } else {
-                        throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Cannot inject Iterable with missing generic type arguments for field");
-                    }
-                }
-                else {
-                    throw new DependencyInjectionException(resolutionContext, methodInjectionPoint, argument, "Provider missing generic argument types");
-                }
-            } else {
-                methodArgs[i] = context.getBean(resolutionContext, argumentType, qualifier);
-            }
-            path.pop();
+            methodArgs[i] = getBeanForMethodArgument(resolutionContext, context, methodInjectionPoint, argument);
         }
         try {
             methodInjectionPoint.invoke(bean, methodArgs);
@@ -369,54 +332,14 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     protected void injectBeanFields(BeanResolutionContext resolutionContext , DefaultBeanContext defaultContext, Object bean) {
-        BeanResolutionContext.Path path = resolutionContext.getPath();
         for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
             if(fieldInjectionPoint.requiresReflection()) {
-                Field field = fieldInjectionPoint.getField();
-                Class beanType = fieldInjectionPoint.getType();
-
-                Class genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
-                path.pushFieldResolve(this, fieldInjectionPoint);
-
-                Object value;
-                if (beanType.isArray()) {
-                    Class arrayType = beanType.getComponentType();
-                    Collection beans = defaultContext.getBeansOfType(resolutionContext,arrayType);
-                    value = collectionToArray(arrayType, beans);
-                } else if (Iterable.class.isAssignableFrom(beanType)) {
-                    if (genericType != null) {
-                        Collection beans = defaultContext.getBeansOfType(resolutionContext, genericType);
-                        if (beanType.isInstance(beans)) {
-                            value = beans;
-                        } else {
-                            try {
-                                value = coerceToType(beans, beanType);
-                            } catch (Throwable e) {
-                                throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
-                            }
-                        }
-                    } else {
-                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
-                    }
-                } else if(Provider.class.isAssignableFrom(beanType)) {
-                    if (genericType != null) {
-                        value = defaultContext.getBeanProvider(resolutionContext, genericType);
-                        path.pop();
-                    } else {
-                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Cannot inject Iterable with missing generic type arguments for field");
-                    }
-                } else {
-                    Object beanValue;
-                    try {
-                        Qualifier qualifier = resolveQualifier(fieldInjectionPoint);
-                        beanValue = defaultContext.getBean(resolutionContext, beanType, qualifier);
-                    } catch (NoSuchBeanException e) {
-                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, e);
-                    }
-                    value = beanValue;
+                Object value = getBeanForField(resolutionContext, defaultContext, fieldInjectionPoint);
+                try {
+                    fieldInjectionPoint.set(bean, value);
+                } catch (Exception e) {
+                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
                 }
-                path.pop();
-                fieldInjectionPoint.set(bean, value);
             }
         }
     }
@@ -445,17 +368,24 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
+        return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
+    }
+
+    protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         Class argumentType = argument.getType();
         if(argumentType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint,argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
         }
-        else if (Iterable.class.isAssignableFrom(argumentType)) {
-            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+        else if (Collection.class.isAssignableFrom(argumentType)) {
+            Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint,argument);
             return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
         }
+        else if (Stream.class.isAssignableFrom(argumentType)) {
+            return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
+        }
         else if(Provider.class.isAssignableFrom(argumentType)) {
-            return getBeanProviderForMethodArgument(resolutionContext, context, methodIndex, argIndex);
+            return getBeanProviderForMethodArgument(resolutionContext, context, injectionPoint, argument);
         }
         else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -492,14 +422,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      *
      * @param resolutionContext The resolution context
      * @param context The context
-     * @param methodIndex The method index
-     * @param argIndex The argument index
      * @return The resolved bean
      */
     @Internal
-    protected Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
-        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
-        Argument argument = injectionPoint.getArguments()[argIndex];
+    protected Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
@@ -520,6 +446,38 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         }
     }
 
+
+    /**
+     * Obtains all bean definitions for the method at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Stream streamOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushMethodArgumentResolve(this, injectionPoint, argument);
+        try {
+            Qualifier qualifier = resolveQualifier(argument);
+            Class[] genericTypes = argument.getGenericTypes();
+            Class genericType;
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, "Expected exactly 1 generic type argument");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
+            Stream beansOfType = ((DefaultBeanContext) context).streamOfType(resolutionContext, genericType, qualifier);
+            path.pop();
+            return beansOfType;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
+        }
+    }
+
     /**
      * Obtains all bean definitions for a constructor argument at the given index
      *
@@ -527,13 +485,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      *
      * @param resolutionContext The resolution context
      * @param context The context
-     * @param argIndex The argument index
      * @return The resolved bean
      */
     @Internal
-    protected Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
-        ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
-        Argument argument = constructorInjectionPoint.getArguments()[argIndex];
+    protected Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {
@@ -561,6 +516,35 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     /**
+     * Obtains all bean definitions for a constructor argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Stream streamOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushConstructorResolve(this,  argument);
+        try {
+            Class genericType;
+            Qualifier qualifier = resolveQualifier(argument);
+            Class[] genericTypes = argument.getGenericTypes();
+            if(genericTypes.length != 1) {
+                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+            }
+            else {
+                genericType = genericTypes[0];
+            }
+            Stream beansOfType = ((DefaultBeanContext) context).streamOfType(resolutionContext, genericType, qualifier);
+            return beansOfType;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, argument , e);
+        }
+    }
+    /**
      * Obtains a bean definition for the field at the given index and the argument at the given index
      *
      * Warning: this method is used by internal generated code and should not be called by user code.
@@ -572,13 +556,18 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     @Internal
     protected Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        return getBeanForField(resolutionContext, context, injectionPoint);
+
+    }
+
+    protected Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         Class beanType = injectionPoint.getType();
         if(beanType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, fieldIndex);
+            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
         }
         else if (Collection.class.isAssignableFrom(beanType)) {
-            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, fieldIndex);
+            Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             if(beanType.isInstance(beansOfType)) {
                 return beansOfType;
             }
@@ -590,8 +579,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 }
             }
         }
+        else if(Stream.class.isAssignableFrom(beanType)) {
+            return getStreamOfTypeForField(resolutionContext, context, injectionPoint);
+        }
         else if(Provider.class.isAssignableFrom(beanType)) {
-            return getBeanProviderForField(resolutionContext, context, fieldIndex);
+            return getBeanProviderForField(resolutionContext, context, injectionPoint);
         }
         else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -606,7 +598,6 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
             }
         }
-
     }
 
     /**
@@ -619,9 +610,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Object getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
-        FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-
+    protected Object getBeanProviderForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
 
@@ -649,9 +638,43 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      * @return The resolved bean
      */
     @Internal
-    protected Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
-        FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+    protected Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushFieldResolve(this, injectionPoint);
 
+        try {
+            Field field = injectionPoint.getField();
+            Class genericType;
+            Class<?> fieldType = field.getType();
+            if(fieldType.isArray()) {
+                genericType = fieldType.getComponentType();
+            } else {
+                genericType = GenericTypeUtils.resolveGenericTypeArgument(field);
+            }
+
+            if(genericType == null) {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
+            }
+            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Collection beans = ((DefaultBeanContext)context).getBeansOfType(resolutionContext,genericType, qualifier);
+            path.pop();
+            return beans;
+        } catch (NoSuchBeanException e) {
+            throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
+        }
+    }
+
+    /**
+     * Obtains a bean definition for the field at the given index and the argument at the given index
+     *
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context The context
+     * @return The resolved bean
+     */
+    @Internal
+    protected Stream getStreamOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
 
@@ -661,7 +684,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
             }
             Qualifier qualifier = resolveQualifier(injectionPoint);
-            Collection beans = ((DefaultBeanContext)context).getBeansOfType(resolutionContext,genericType, qualifier);
+            Stream beans = ((DefaultBeanContext)context).streamOfType(resolutionContext,genericType, qualifier);
             path.pop();
             return beans;
         } catch (NoSuchBeanException e) {
@@ -705,15 +728,18 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         Argument argument = constructorInjectionPoint.getArguments()[argIndex];
         Class argumentType = argument.getType();
         if(argumentType.isArray()) {
-            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argIndex);
+            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
         }
-        else if (Iterable.class.isAssignableFrom(argumentType)) {
-            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, argIndex);
+        else if (Collection.class.isAssignableFrom(argumentType)) {
+            Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
         }
+        else if (Stream.class.isAssignableFrom(argumentType)) {
+            return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
+        }
         else if(Provider.class.isAssignableFrom(argumentType)) {
-            return getBeanProviderForConstructorArgument(resolutionContext, context, argIndex);
+            return getBeanProviderForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
         }
         else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -739,14 +765,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      *
      * @param resolutionContext The resolution context
      * @param context The context
-     * @param methodIndex The method index
-     * @param argIndex The argument index
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
-        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
-        Argument argument = injectionPoint.getArguments()[argIndex];
+    protected Provider getBeanProviderForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
@@ -775,12 +797,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      *
      * @param resolutionContext The resolution context
      * @param context The context
-     * @param argIndex The argument index
      * @return The resolved bean
      */
     @Internal
-    protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
-        Argument argument = getConstructor().getArguments()[argIndex];
+    protected Provider getBeanProviderForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, ConstructorInjectionPoint constructorInjectionPoint, Argument argument) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this,  argument);
         try {

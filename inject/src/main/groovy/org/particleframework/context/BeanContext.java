@@ -4,6 +4,7 @@ import org.particleframework.inject.BeanConfiguration;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Represents the context that resolves component definitions
@@ -63,6 +64,26 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      */
     <T> Collection<T> getBeansOfType(Class<T> beanType);
 
+    /**
+     * Obtain a stream of beans of the given type
+     *
+     * @param beanType The bean type
+     * @param <T> The bean concrete type
+     *
+     * @return A stream
+     */
+    <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier);
+    /**
+     * Obtain a stream of beans of the given type
+     *
+     * @param beanType The bean type
+     * @param <T> The bean concrete type
+     *
+     * @return A stream
+     */
+    default <T> Stream<T> streamOfType(Class<T> beanType) {
+        return streamOfType(beanType, null);
+    }
     /**
      * Inject an existing instance
      *
