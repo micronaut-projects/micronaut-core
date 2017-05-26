@@ -415,9 +415,14 @@ public class DefaultBeanContext implements BeanContext {
 
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionClass> contextScopeBeans = new ArrayList<>();
+        Map<String, BeanDefinitionClass> replacements = new LinkedHashMap<>();
         while (beanDefinitionClassIterator.hasNext()) {
             BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
             if (beanDefinitionClass.isPresent()) {
+                String replacesBeanTypeName = beanDefinitionClass.getReplacesBeanTypeName();
+                if(replacesBeanTypeName != null) {
+                    replacements.put(replacesBeanTypeName, beanDefinitionClass);
+                }
                 if (beanDefinitionClass.isContextScope()) {
                     contextScopeBeans.add(beanDefinitionClass);
                 } else {
@@ -437,6 +442,18 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
         );
+
+        // This logic handles the @Replaces annotation
+        // we go through all of the replacements and if the replacement hasn't been discarded
+        // we lookup the bean to be replaced and remove it from the bean definitions and context scope beans
+        for (Map.Entry<String, BeanDefinitionClass> replacement : replacements.entrySet()) {
+            BeanDefinitionClass replacementBeanClass = replacement.getValue();
+            String beanNameToBeReplaced = replacement.getKey();
+            if( beanDefinitionsClasses.containsValue(replacementBeanClass) &&  beanDefinitionsClasses.containsKey(beanNameToBeReplaced)) {
+                BeanDefinitionClass removedClass = beanDefinitionsClasses.remove(beanNameToBeReplaced);
+                contextScopeBeans.remove(removedClass);
+            }
+        }
 
         for (BeanDefinitionClass contextScopeBean : contextScopeBeans) {
             BeanDefinition beanDefinition = contextScopeBean.load();
@@ -461,27 +478,30 @@ public class DefaultBeanContext implements BeanContext {
     private <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
         Collection<BeanDefinition<T>> candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
-        for (Map.Entry<String, BeanDefinitionClass> componentDefinitionClassEntry : beanDefinitionsClasses.entrySet()) {
-            Class componentType = componentDefinitionClassEntry.getValue().getBeanType();
-            if (beanType.isAssignableFrom(componentType)) {
+        for (Map.Entry<String, BeanDefinitionClass> beanDefinitionClassEntry : beanDefinitionsClasses.entrySet()) {
+            Class candidateType = beanDefinitionClassEntry.getValue().getBeanType();
+            if (beanType.isAssignableFrom(candidateType)) {
                 // load it
-                BeanDefinitionClass beanDefinitionClass = componentDefinitionClassEntry.getValue();
+                BeanDefinitionClass beanDefinitionClass = beanDefinitionClassEntry.getValue();
                 BeanDefinition<T> beanDefinition = beanDefinitionClass.load();
                 if (beanDefinition != null) {
-                    beanDefinitions.put(componentType, beanDefinition);
+
                     candidates.add(beanDefinition);
                 }
             }
         }
+        for (BeanDefinition<T> candidate : candidates) {
+            beanDefinitions.put(candidate.getType(), candidate);
+            beanDefinitionsClasses.remove(candidate.getType());
+        }
+
         for (Map.Entry<Class, BeanDefinition> componentDefinitionEntry : beanDefinitions.entrySet()) {
             BeanDefinition beanDefinition = componentDefinitionEntry.getValue();
             if (!candidates.contains(beanDefinition) && beanType.isAssignableFrom(beanDefinition.getType())) {
                 candidates.add(beanDefinition);
             }
         }
-        for (BeanDefinition<T> candidate : candidates) {
-            beanDefinitionsClasses.remove(candidate.getType());
-        }
+
         return candidates;
     }
 
