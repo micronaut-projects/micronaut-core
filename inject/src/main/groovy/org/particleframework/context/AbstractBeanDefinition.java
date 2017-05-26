@@ -279,6 +279,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
             }
         }
+        if(bean instanceof LifeCycle) {
+            bean = ((LifeCycle) bean).start();
+        }
         return bean;
     }
 
@@ -296,6 +299,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             if(methodInjectionPoint.isPreDestroyMethod() && methodInjectionPoint.requiresReflection()) {
                 injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
             }
+        }
+        if(bean instanceof LifeCycle) {
+            bean = ((LifeCycle) bean).stop();
         }
         return bean;
     }
