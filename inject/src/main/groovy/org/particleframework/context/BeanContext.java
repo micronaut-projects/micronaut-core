@@ -1,6 +1,5 @@
 package org.particleframework.context;
 
-import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.inject.BeanConfiguration;
 
 import java.util.Collection;
@@ -134,6 +133,34 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      * @return The class loader used by this context
      */
     ClassLoader getClassLoader();
+
+    /**
+     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
+     *
+     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     *
+     * <p>If no bean definition data is found the bean is registered as is.</p>
+     *
+     * @param singleton The singleton bean
+     *
+     * @see #registerRuntimeSingleton(Object)
+     * @return This bean context
+     */
+    BeanContext registerSingleton(Object singleton);
+
+    /**
+     * <p>Registers a new singleton bean at runtime. Unlike {@link #registerSingleton(Object)}, if a {@link org.particleframework.inject.BeanDefinition} is not found this method
+     * will parse the class file's bytes and produce a {@link org.particleframework.inject.BeanDefinition} method at runtime in order to dependency inject the bean.</p>
+     *
+     * <p>Due this behaviour this method is significantly more expensive both in terms of performance and memory consumption in comparison to {@link #registerSingleton(Object)} and
+     * should be used sparely and rare cases where it is no possible to compile dependency injection data ahead of time.</p>
+     *
+     * @param singleton The singleton bean
+     *
+     * @see #registerSingleton(Object)
+     * @return This bean context
+     */
+    BeanContext registerRuntimeSingleton(Object singleton);
 
     /**
      * Obtain a bean configuration by name

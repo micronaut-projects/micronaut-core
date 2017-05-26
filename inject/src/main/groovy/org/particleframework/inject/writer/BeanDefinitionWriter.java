@@ -272,11 +272,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(OutputStream outputStream) throws IOException {
+        outputStream.write(toByteArray());
+    }
+
+    /**
+     * @return The bytes of the class
+     */
+    public byte[] toByteArray() {
         if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
-        byte[] classBytes = ((ClassWriter) classWriter).toByteArray();
-        outputStream.write(classBytes);
+        return  ((ClassWriter) classWriter).toByteArray();
     }
 
     /**
@@ -286,10 +292,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(File compilationDir) throws IOException {
-        if (!beanFinalized) {
-            throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
-        }
-
         File targetFile = new File(compilationDir, getBeanDefinitionClassFile()).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {

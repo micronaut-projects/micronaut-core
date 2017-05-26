@@ -263,9 +263,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
-                    AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
-                    ClassNode qualifierClassNode = qualifierAnn?.classNode
-                    Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
+                    Object qualifierRef = resolveQualifier(fieldNode)
 
 
                     boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
@@ -281,12 +279,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        public Object resolveQualifier(AnnotatedNode annotatedNode) {
+            AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(annotatedNode, Qualifier)
+            ClassNode qualifierClassNode = qualifierAnn?.classNode
+            Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
+            return qualifierRef
+        }
+
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             if (fieldNode != null && !propertyNode.isStatic() && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
                 defineBeanDefinition(concreteClass)
-                ClassNode qualfierType = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier.class)?.classNode
+                Object qualifier = resolveQualifier(fieldNode)
 
                 ClassNode fieldType = fieldNode.type
                 GenericsType[] genericsTypes = fieldType.genericsTypes
@@ -305,7 +310,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode declaringClass = fieldNode.declaringClass
                 beanWriter.visitSetterInjectionPoint(
                         resolveTypeReference(declaringClass),
-                        resolveTypeReference(qualfierType),
+                        qualifier,
                         false,
                         resolveTypeReference(fieldType),
                         fieldNode.name,
@@ -401,13 +406,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 } else {
                     paramsToType.put(parameterName, parameterType.name)
                 }
-                AnnotationNode ann = stereoTypeFinder.findAnnotationWithStereoType(param, Qualifier)
-                if (ann != null) {
-                    if (ann.classNode.isResolved()) {
-                        qualifierTypes.put(parameterName, ann.classNode.typeClass)
-                    } else {
-                        qualifierTypes.put(parameterName, ann.classNode.name)
-                    }
+
+                Object qualifier = resolveQualifier(param)
+                if (qualifier != null) {
+                    qualifierTypes.put(parameterName, qualifier)
                 }
 
                 GenericsType[] genericsTypes = parameterType.genericsTypes

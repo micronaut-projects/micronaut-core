@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
+import javax.inject.Singleton;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -78,6 +80,35 @@ public class DefaultBeanContext implements BeanContext {
             LOG.debug("BeanContext Started.");
         }
         return this;
+    }
+
+    @Override
+    public BeanContext registerSingleton(Object singleton) {
+        if(singleton == null) {
+            throw new IllegalArgumentException("Passed singleton cannot be null");
+        }
+        Class<?> beanType = singleton.getClass();
+        BeanKey beanKey = new BeanKey(beanType, null);
+        synchronized (singletonObjects) {
+            initializedObjectsByType.invalidateAll();
+
+            BeanDefinition<?> beanDefinition = findConcreteCandidate(beanType, null, false, true);
+            if(beanDefinition != null) {
+                if(beanDefinition instanceof InjectableBeanDefinition) {
+                    doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
+                    singletonObjects.put(beanKey, new BeanRegistration(beanDefinition, singleton));
+                }
+            }
+            else {
+                singletonObjects.put(beanKey, new BeanRegistration(new NoInjectionBeanDefinition(beanType), singleton));
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public BeanContext registerRuntimeSingleton(Object singleton) {
+        throw new UnsupportedOperationException("registerRuntimeSingleton not yet implemented");
     }
 
     /**
@@ -244,14 +275,18 @@ public class DefaultBeanContext implements BeanContext {
                 // bail out, don't inject for bean definition in creation
                 return instance;
             }
-            if (definition instanceof InjectableBeanDefinition) {
-                ((InjectableBeanDefinition) definition).inject(resolutionContext, this, instance);
-            }
-            if(definition instanceof InitializingBeanDefinition) {
-                ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
-            }
+            doInject(resolutionContext, instance, definition);
         }
         return instance;
+    }
+
+    private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
+        if (definition instanceof InjectableBeanDefinition) {
+            ((InjectableBeanDefinition) definition).inject(resolutionContext, this, instance);
+        }
+        if(definition instanceof InitializingBeanDefinition) {
+            ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
+        }
     }
 
     <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
@@ -671,6 +706,84 @@ public class DefaultBeanContext implements BeanContext {
             int result = beanType.hashCode();
             result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
             return result;
+        }
+    }
+
+    private static class NoInjectionBeanDefinition implements BeanDefinition {
+        private final Class singletonClass;
+
+        public NoInjectionBeanDefinition(Class singletonClass) {
+            this.singletonClass = singletonClass;
+        }
+
+        @Override
+        public Annotation getScope() {
+            return null;
+        }
+
+        @Override
+        public boolean isSingleton() {
+            return true;
+        }
+
+        @Override
+        public boolean isProvided() {
+            return false;
+        }
+
+        @Override
+        public Class getType() {
+            return singletonClass;
+        }
+
+        @Override
+        public ConstructorInjectionPoint getConstructor() {
+            return null;
+        }
+
+        @Override
+        public Collection<Class> getRequiredComponents() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Collection<MethodInjectionPoint> getInjectedMethods() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Collection<FieldInjectionPoint> getInjectedFields() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Collection<MethodInjectionPoint> getPostConstructMethods() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Collection<MethodInjectionPoint> getPreDestroyMethods() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public String getName() {
+            return singletonClass.getName();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            NoInjectionBeanDefinition that = (NoInjectionBeanDefinition) o;
+
+            return singletonClass.equals(that.singletonClass);
+        }
+
+        @Override
+        public int hashCode() {
+            return singletonClass.hashCode();
         }
     }
 

@@ -1,8 +1,6 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.Provided;
-import org.particleframework.context.event.BeanCreatedEvent;
-import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.event.BeanInitializedEventListener;
 import org.particleframework.context.event.BeanInitializingEvent;
 import org.particleframework.context.exceptions.BeanInstantiationException;
