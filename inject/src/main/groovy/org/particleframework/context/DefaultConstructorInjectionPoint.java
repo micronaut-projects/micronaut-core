@@ -8,6 +8,7 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,17 +24,23 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     private final Constructor<T> constructor;
     private final Argument[] arguments;
     private final BeanDefinition declaringComponent;
+    private final boolean requiresReflection;
 
     DefaultConstructorInjectionPoint(BeanDefinition declaringComponent, Constructor<T> constructor, Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
         this.declaringComponent = declaringComponent;
         this.constructor = constructor;
-        this.constructor.setAccessible(true);
+        this.requiresReflection = Modifier.isPrivate(constructor.getModifiers());
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes);
     }
 
     @Override
     public BeanDefinition getDeclaringComponent() {
         return this.declaringComponent;
+    }
+
+    @Override
+    public boolean requiresReflection() {
+        return requiresReflection;
     }
 
     @Override
@@ -48,6 +55,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
 
     @Override
     public T invoke(Object... args) {
+        this.constructor.setAccessible(true);
         Argument[] componentTypes = getArguments();
         if(componentTypes.length == 0) {
             try {

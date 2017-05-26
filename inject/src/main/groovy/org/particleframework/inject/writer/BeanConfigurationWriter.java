@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.ClassWriter;
 import groovyjarjarasm.asm.MethodVisitor;

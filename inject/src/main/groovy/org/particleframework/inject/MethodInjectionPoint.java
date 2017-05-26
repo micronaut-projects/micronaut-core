@@ -8,11 +8,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint {
-    /**
-     * @return The component that declares this injection point
-     */
-    BeanDefinition getDeclaringComponent();
+public interface MethodInjectionPoint extends CallableInjectionPoint {
 
     /**
      * @return The setter to invoke to set said property
@@ -23,16 +19,6 @@ public interface MethodInjectionPoint {
      * @return The method name
      */
     String getName();
-
-    /**
-     * The required component arguments
-     */
-    Argument[] getArguments();
-
-    /**
-     * @return Whether reflection is required to satisfy the injection point
-     */
-    boolean requiresReflection();
 
     /**
      * @return Is this method a pre-destroy method

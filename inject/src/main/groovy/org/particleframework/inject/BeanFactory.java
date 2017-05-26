@@ -6,9 +6,11 @@ import org.particleframework.context.DefaultBeanResolutionContext;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 
 /**
- * An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete instance.
+ * <p>An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete instance.
  * This interface is generally implemented by a build time tool such as an AST transformation framework that will build the
- * code necessary to construct a valid bean instance.
+ * code necessary to construct a valid bean instance.</p>
+ *
+ * @see org.particleframework.inject.writer.BeanDefinitionWriter
  *
  * @author Graeme Rocher
  * @since 1.0

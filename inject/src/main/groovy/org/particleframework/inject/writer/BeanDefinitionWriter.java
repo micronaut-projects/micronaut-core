@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
 import groovyjarjarasm.asm.signature.SignatureVisitor;

@@ -7,7 +7,9 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Represents the context that resolves component definitions
+ * <p>The core BeanContext abstraction which which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
+ *
+ * <p>Apart of the standard {@link javax.inject} annotations for dependency injection, additional annotations within the {@link org.particleframework.context.annotation} package allow control over configuration of the bean context.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -68,6 +70,7 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      * Obtain a stream of beans of the given type
      *
      * @param beanType The bean type
+     * @param qualifier The qualifier
      * @param <T> The bean concrete type
      *
      * @return A stream

@@ -1,31 +1,35 @@
 package org.particleframework.context;
 
-import groovy.lang.SpreadMap;
+import org.particleframework.context.annotation.Provided;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
-import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.qualifiers.Qualifiers;
-import org.particleframework.context.annotation.Provided;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Provider;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.*;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * <p></p>Default implementation of the {@link BeanDefinition} interface. This class is generally not used directly in user code.
+ * <p>Default implementation of the {@link BeanDefinition} interface. This class is generally not used directly in user code.
  * Instead a build time tool does analysis of source code and dynamically produces subclasses of this class containing
  * information about the available injection points for a given class.</p>
  *
  * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by compiler tools and plugins (such as AST transformation frameworks)</p>
  *
+ * <p>The {@link org.particleframework.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at compile or runtime</p>
  *
+ * @see org.particleframework.inject.writer.BeanDefinitionWriter
  * @author Graeme Rocher
  * @since 1.0
  */

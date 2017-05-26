@@ -20,9 +20,9 @@ import org.particleframework.context.annotation.Context
 import org.particleframework.context.annotation.Replaces
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
-import org.particleframework.inject.asm.BeanDefinitionClassWriter
-import org.particleframework.inject.asm.BeanDefinitionWriter
-import org.particleframework.inject.asm.BeanConfigurationWriter
+import org.particleframework.inject.writer.BeanDefinitionClassWriter
+import org.particleframework.inject.writer.BeanDefinitionWriter
+import org.particleframework.inject.writer.BeanConfigurationWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy

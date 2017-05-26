@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 /**
  * Thrown when an exception occurs during compilation due to a class generation error
