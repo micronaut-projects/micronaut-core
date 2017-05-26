@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
 import groovyjarjarasm.asm.signature.SignatureVisitor;
@@ -238,7 +238,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                     Type.getInternalName(AbstractBeanDefinition.class),
                     interfaceInternalNames);
 
-            finalizeInjectMethod(injectMethodVisitor);
+            if(buildMethodVisitor == null) {
+                throw new IllegalStateException("At least one call to visitBeanDefinitionConstructor() is required");
+            }
+
+            finalizeInjectMethod();
+            finalizeBuildMethod();
             constructorVisitor.visitInsn(RETURN);
             constructorVisitor.visitMaxs(defaultMaxStack, 1);
             if (buildMethodVisitor != null) {
@@ -271,11 +276,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(OutputStream outputStream) throws IOException {
+        outputStream.write(toByteArray());
+    }
+
+    /**
+     * @return The bytes of the class
+     */
+    public byte[] toByteArray() {
         if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
-        byte[] classBytes = ((ClassWriter) classWriter).toByteArray();
-        outputStream.write(classBytes);
+        return  ((ClassWriter) classWriter).toByteArray();
     }
 
     /**
@@ -285,10 +296,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(File compilationDir) throws IOException {
-        if (!beanFinalized) {
-            throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
-        }
-
         File targetFile = new File(compilationDir, getBeanDefinitionClassFile()).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {
@@ -754,6 +761,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "initialize");
             pushCastToType(buildMethodVisitor, beanFullClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
         }
     }
 
@@ -784,7 +792,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 null);
     }
 
-    private void finalizeInjectMethod(MethodVisitor injectMethodVisitor) {
+    private void finalizeBuildMethod() {
+        // if this is a provided bean then execute "get"
+        if (!providedBeanClassName.equals(beanFullClassName)) {
+
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
+            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    beanType.getInternalName(),
+                    "get",
+                    Type.getMethodDescriptor(Type.getType(Object.class)),
+                    false);
+            pushCastToType(buildMethodVisitor, providedBeanClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
+            pushCastToType(buildMethodVisitor, providedBeanClassName);
+        }
+    }
+
+    private void finalizeInjectMethod() {
         invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHODS_METHOD);
 
         injectMethodVisitor.visitVarInsn(ALOAD, 3);
@@ -841,30 +867,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
             // store a reference to the bean being built at index 3
             this.buildInstanceIndex = pushNewBuildLocalVariable();
-
-
-            // if this is a provided bean then execute "get"
-            if (!providedBeanClassName.equals(beanFullClassName)) {
-
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
-                pushCastToType(buildMethodVisitor, beanFullClassName);
-                buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
-                buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
-                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                        beanType.getInternalName(),
-                        "get",
-                        Type.getMethodDescriptor(Type.getType(Object.class)),
-                        false);
-                pushCastToType(buildMethodVisitor, providedBeanClassName);
-                buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
-                pushCastToType(buildMethodVisitor, providedBeanClassName);
-            } else {
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
-                pushCastToType(buildMethodVisitor, beanFullClassName);
-            }
+            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
+            pushCastToType(buildMethodVisitor, beanFullClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
         }
     }
+
+
 
 
     private void pushBeanDefinitionMethodInvocation(MethodVisitor buildMethodVisitor, String methodName) {
@@ -882,9 +892,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     private void pushCastToType(MethodVisitor methodVisitor, Object type) {
-        methodVisitor.visitTypeInsn(CHECKCAST, getTypeDescriptor(type));
+        methodVisitor.visitTypeInsn(CHECKCAST, getInternalNameForCast(type));
     }
-
 
     private int pushNewBuildLocalVariable() {
         buildMethodVisitor.visitVarInsn(ASTORE, buildMethodLocalCount);
@@ -954,10 +963,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 pushCreateMapCall(this.constructorVisitor, argumentTypes);
 
                 // 6th Argument: Create a call to createMap from qualifier types
-                pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                if(qualifierTypes != null) {
+                    pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                }
+                else {
+                    constructorVisitor.visitInsn(ACONST_NULL);
+                }
 
                 // 7th Argument: Create a call to createMap from generic types
-                pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+                if(genericTypes != null) {
+                    pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+                }
+                else {
+                    constructorVisitor.visitInsn(ACONST_NULL);
+                }
 
 
                 invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Map.class, Map.class, Map.class);

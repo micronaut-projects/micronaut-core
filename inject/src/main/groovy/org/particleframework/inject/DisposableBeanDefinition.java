@@ -5,8 +5,9 @@ import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.DefaultBeanResolutionContext;
 
 /**
- * A bean definition that is disposable
+ * A bean definition that provides disposing hooks normally in the form of {@link javax.annotation.PreDestroy} annotated methods
  *
+ * @see javax.annotation.PreDestroy
  * @author Graeme Rocher
  * @since 1.0
  */

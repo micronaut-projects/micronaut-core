@@ -21,7 +21,9 @@ public class BeanInstantiationException extends BeanContextException {
     public BeanInstantiationException(BeanResolutionContext resolutionContext, Throwable cause) {
         super(MessageUtils.buildMessage(resolutionContext,cause.getMessage()), cause);
     }
-
+    public BeanInstantiationException(BeanResolutionContext resolutionContext, String message) {
+        super(MessageUtils.buildMessage(resolutionContext,message));
+    }
     public <T> BeanInstantiationException(BeanDefinition<T> beanDefinition, Throwable cause) {
         super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + cause.getMessage(), cause);
     }

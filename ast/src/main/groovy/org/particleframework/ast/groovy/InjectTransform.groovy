@@ -4,6 +4,7 @@ import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
+import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -16,11 +17,12 @@ import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Context
+import org.particleframework.context.annotation.Replaces
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
-import org.particleframework.inject.asm.BeanDefinitionClassWriter
-import org.particleframework.inject.asm.BeanDefinitionWriter
-import org.particleframework.inject.asm.BeanConfigurationWriter
+import org.particleframework.inject.writer.BeanDefinitionClassWriter
+import org.particleframework.inject.writer.BeanDefinitionWriter
+import org.particleframework.inject.writer.BeanConfigurationWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -59,11 +61,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 AnnotationNode annotationNode = AstAnnotationUtils.findAnnotation(packageNode, Configuration.name)
                 if (annotationNode != null) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter()
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName)
                     String configurationName = null
 
                     try {
-                        configurationName = writer.writeConfiguration(classNode.packageName, source.configuration.targetDirectory)
+                        writer.writeTo(source.configuration.targetDirectory)
+                        configurationName = writer.getConfigurationClassName()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
                     }
@@ -100,11 +103,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
             String beanDefinitionClassName = null
+            ClassNode beanClassNode = entry.key
             try {
-                BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter()
-                beanDefinitionClassName = beanClassWriter.writeBeanDefinitionClass(classesDir, beanDefWriter.beanDefinitionName, stereoTypeFinder.hasStereoType(entry.key, Context.name))
+                BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(beanClassNode.name, beanDefWriter.beanDefinitionName)
+                beanClassWriter.setContextScope(stereoTypeFinder.hasStereoType(beanClassNode, Context.name))
+                AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
+                if(replacesAnn != null) {
+                    beanClassWriter.setReplaceBeanName(((ClassExpression)replacesAnn.getMember("value")).type.name)
+                }
+                beanDefinitionClassName = beanClassWriter.getBeanDefinitionClassName()
+                beanClassWriter.writeTo(classesDir)
             } catch (Throwable e) {
-                AstMessageUtils.error(source, entry.key, "Error generating bean definition class for dependency injection of class [${entry.key.name}]: $e.message")
+                AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanClassNode.name}]: $e.message")
             }
 
             if (beanDefinitionClassName != null) {
@@ -114,14 +124,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 catch (Throwable e) {
                     abort = true
-                    AstMessageUtils.error(source, entry.key, "Error generating bean definition class descriptor for dependency injection of class [${entry.key.name}]: $e.message")
+                    AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanClassNode.name}]: $e.message")
                 }
                 if(!abort) {
                     try {
                         beanDefWriter.visitBeanDefinitionEnd()
                         beanDefWriter.writeTo(classesDir)
                     } catch (Throwable e) {
-                        AstMessageUtils.error(source, entry.key, "Error generating bean definition for dependency injection of class [${entry.key.name}]: $e.message")
+                        AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanClassNode.name}]: $e.message")
                     }
                 }
             }
@@ -253,9 +263,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
-                    AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier)
-                    ClassNode qualifierClassNode = qualifierAnn?.classNode
-                    Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
+                    Object qualifierRef = resolveQualifier(fieldNode)
 
 
                     boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
@@ -271,12 +279,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        public Object resolveQualifier(AnnotatedNode annotatedNode) {
+            AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(annotatedNode, Qualifier)
+            ClassNode qualifierClassNode = qualifierAnn?.classNode
+            Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
+            return qualifierRef
+        }
+
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             if (fieldNode != null && !propertyNode.isStatic() && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
                 defineBeanDefinition(concreteClass)
-                ClassNode qualfierType = stereoTypeFinder.findAnnotationWithStereoType(fieldNode, Qualifier.class)?.classNode
+                Object qualifier = resolveQualifier(fieldNode)
 
                 ClassNode fieldType = fieldNode.type
                 GenericsType[] genericsTypes = fieldType.genericsTypes
@@ -295,7 +310,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode declaringClass = fieldNode.declaringClass
                 beanWriter.visitSetterInjectionPoint(
                         resolveTypeReference(declaringClass),
-                        resolveTypeReference(qualfierType),
+                        qualifier,
                         false,
                         resolveTypeReference(fieldType),
                         fieldNode.name,
@@ -391,13 +406,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 } else {
                     paramsToType.put(parameterName, parameterType.name)
                 }
-                AnnotationNode ann = stereoTypeFinder.findAnnotationWithStereoType(param, Qualifier)
-                if (ann != null) {
-                    if (ann.classNode.isResolved()) {
-                        qualifierTypes.put(parameterName, ann.classNode.typeClass)
-                    } else {
-                        qualifierTypes.put(parameterName, ann.classNode.name)
-                    }
+
+                Object qualifier = resolveQualifier(param)
+                if (qualifier != null) {
+                    qualifierTypes.put(parameterName, qualifier)
                 }
 
                 GenericsType[] genericsTypes = parameterType.genericsTypes

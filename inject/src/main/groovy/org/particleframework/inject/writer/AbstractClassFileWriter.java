@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
 
@@ -7,7 +7,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -155,7 +154,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         if(targetDir != null) {
 
             byte[] bytes = classWriter.toByteArray();
-            String fileName = className + ".class";
+            String fileName = className.replace('.','/') + ".class";
             File targetFile = new File(targetDir, fileName);
             targetFile.getParentFile().mkdirs();
 
@@ -213,5 +212,20 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return newClassName.substring(0, newClassName.length()-2);
         }
         return newClassName;
+    }
+
+    protected String getInternalNameForCast(Object type) {
+        if(type instanceof Class) {
+            return Type.getInternalName((Class) type);
+        }
+        else {
+            String className = type.toString();
+            if(className.endsWith("[]")) {
+                return getTypeDescriptor(type);
+            }
+            else {
+                return getInternalName(className);
+            }
+        }
     }
 }

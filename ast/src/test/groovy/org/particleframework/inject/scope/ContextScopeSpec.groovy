@@ -17,7 +17,7 @@ class ContextScopeSpec extends Specification {
         beanContext.start()
 
         then:"So is the bean"
-        beanContext.@singletonObjects.values().first().bean instanceof A
+        beanContext.@singletonObjects.values().find() { it.bean instanceof A }
     }
 
     @Context

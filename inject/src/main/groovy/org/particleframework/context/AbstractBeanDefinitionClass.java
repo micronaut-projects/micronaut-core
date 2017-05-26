@@ -20,11 +20,13 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
 
     private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinitionClass.class);
     private final String beanTypeName;
+    private final String beanDefinitionTypeName;
     private Class beanDefinition;
     private boolean present;
 
-    protected AbstractBeanDefinitionClass(String beanTypeName) {
+    public AbstractBeanDefinitionClass(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;
+        this.beanDefinitionTypeName = beanDefinitionTypeName;
     }
 
     /**
@@ -43,6 +45,11 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
         return null;
     }
 
+    @Override
+    public String getReplacesBeanTypeName() {
+        return null; // no replacement semantics by default
+    }
+
     /**
      * @return The loaded component definition
      */
@@ -52,7 +59,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
             try {
                 return (BeanDefinition) beanDefinition.newInstance();
             } catch (Throwable e) {
-                throw new BeanContextException("Error loading component definition ["+beanTypeName+"]: " + e.getMessage(), e);
+                throw new BeanContextException("Error loading bean definition ["+beanTypeName+"]: " + e.getMessage(), e);
             }
         }
         else {
@@ -80,7 +87,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
         if(beanDefinition == null) {
 
             try {
-                beanDefinition = Class.forName(beanTypeName, false, getClass().getClassLoader());
+                beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
                 present = true;
             } catch (ClassNotFoundException e) {
                 if(LOG.isDebugEnabled()) {
@@ -97,11 +104,11 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
 
         AbstractBeanDefinitionClass that = (AbstractBeanDefinitionClass) o;
 
-        return beanTypeName.equals(that.beanTypeName);
+        return beanDefinitionTypeName.equals(that.beanDefinitionTypeName);
     }
 
     @Override
     public int hashCode() {
-        return beanTypeName.hashCode();
+        return beanDefinitionTypeName.hashCode();
     }
 }

@@ -3,7 +3,6 @@ package org.particleframework.core.reflect;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
 
 /**
  * Utility methods for dealing with generic types
@@ -16,8 +15,32 @@ public class GenericTypeUtils {
     public static Class resolveSuperGenericTypeArgument(Class type) {
         Type genericSuperclass = type.getGenericSuperclass();
         if(genericSuperclass instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) genericSuperclass;
-            return (Class) pt.getActualTypeArguments()[0];
+            return resolveSingleTypeArgument(genericSuperclass);
+        }
+        return null;
+    }
+
+    public static Class resolveInterfaceTypeArgument(Class type, Class interfaceType) {
+        Type[] genericInterfaces = type.getGenericInterfaces();
+        for (Type genericInterface : genericInterfaces) {
+            if(genericInterface instanceof ParameterizedType) {
+                ParameterizedType pt = (ParameterizedType) genericInterface;
+                if( pt.getRawType() == interfaceType ) {
+                    Class actualTypeArguments = resolveSingleTypeArgument(genericInterface);
+                    if (actualTypeArguments != null) return actualTypeArguments;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Class resolveSingleTypeArgument(Type genericInterface) {
+        if(genericInterface instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) genericInterface;
+            Type[] actualTypeArguments = pt.getActualTypeArguments();
+            if(actualTypeArguments.length == 1) {
+                return (Class) actualTypeArguments[0];
+            }
         }
         return null;
     }

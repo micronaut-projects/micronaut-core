@@ -1,4 +1,4 @@
-package org.particleframework.inject.asm;
+package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.ClassWriter;
 import groovyjarjarasm.asm.MethodVisitor;
@@ -17,28 +17,40 @@ import java.io.File;
 @Internal
 public class BeanConfigurationWriter extends AbstractClassFileWriter {
 
+    private final String packageName;
+    private final String configurationClassName;
+    private final String configurationClassInternalName;
+
+    public BeanConfigurationWriter(String packageName) {
+        this.packageName = packageName;
+        String classShortName = "$BeanConfiguration";
+        this.configurationClassName = packageName + '.' + classShortName;
+        this.configurationClassInternalName = getInternalName(configurationClassName);
+    }
+
+    /**
+     * @return The configuration class name
+     */
+    public String getConfigurationClassName() {
+        return configurationClassName;
+    }
 
     /**
      * Writes the configuration class for a {@link org.particleframework.context.annotation.Configuration}
      *
-     * @param packageName The package name of the configuration
      * @param targetDir   The target directory for compilation
      * @return The generated class name
      */
-    public String writeConfiguration(String packageName,
-                                     File targetDir) {
+    public void writeTo(File targetDir) {
 
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        String packagePath = getInternalName(packageName);
-        String classShortName = "$BeanConfiguration";
-        String className = packagePath + '/' + classShortName;
 
         try {
 
             Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
             Type beanConfigurationType = Type.getType(superType);
 
-            startClass(classWriter, className, beanConfigurationType);
+            startClass(classWriter, configurationClassInternalName, beanConfigurationType);
             MethodVisitor cv = startConstructor(classWriter);
 
             // ALOAD 0
@@ -58,11 +70,10 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
             // MAXLOCALS = 1
             cv.visitMaxs(2, 1);
 
-            writeClassToDisk(targetDir, classWriter, className);
+            writeClassToDisk(targetDir, classWriter, configurationClassName);
         } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+            throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Particle version?: " + e.getMessage(), e);
         }
-        return packageName + '.' + classShortName;
     }
 
 }

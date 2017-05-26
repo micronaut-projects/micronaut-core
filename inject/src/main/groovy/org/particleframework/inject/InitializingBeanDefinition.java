@@ -5,7 +5,9 @@ import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.DefaultBeanResolutionContext;
 
 /**
- * A bean definition that is initializable
+ * A bean definition that is provides initialization hooks normally in the form of methods annotated with {@link javax.annotation.PostConstruct}
+ *
+ * @see javax.annotation.PostConstruct
  *
  * @author Graeme Rocher
  * @since 1.0

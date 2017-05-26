@@ -8,17 +8,7 @@ import java.lang.reflect.Constructor;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> {
-
-    /**
-     * @return The component that declares this injection point
-     */
-    BeanDefinition getDeclaringComponent();
-
-    /**
-     * The required argument types
-     */
-    Argument[] getArguments();
+public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint {
 
     /**
      * @return The setter to invoke to set said property
@@ -31,5 +21,5 @@ public interface ConstructorInjectionPoint<T> {
      * @param args The arguments
      * @return The new value
      */
-    T invoke(Object...args);
+    T invoke(Object... args);
 }

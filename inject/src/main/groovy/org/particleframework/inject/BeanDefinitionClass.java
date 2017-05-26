@@ -24,6 +24,11 @@ public interface BeanDefinitionClass<T> {
     String getBeanTypeName();
 
     /**
+     * @return The name of the bean that this bean replaces
+     */
+    String getReplacesBeanTypeName();
+
+    /**
      * Loads the component definition
      *
      * @return The loaded component definition or null if it shouldn't be loaded
