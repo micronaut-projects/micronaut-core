@@ -62,7 +62,7 @@ public class DefaultBeanContext implements BeanContext {
      * The start method will read all bean definition classes found on the classpath and initialize any pre-required state
      */
     @Override
-    public void start() {
+    public BeanContext start() {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting BeanContext");
         }
@@ -72,20 +72,14 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isDebugEnabled()) {
             LOG.debug("BeanContext Started.");
         }
-    }
-
-    private void readAllBeanConfigurations() {
-        while (beanConfigurationIterator.hasNext()) {
-            BeanConfiguration configuration = beanConfigurationIterator.next();
-            beanConfigurations.put(configuration.getName(), configuration);
-        }
+        return this;
     }
 
     /**
      * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
      */
     @Override
-    public void close() throws IOException {
+    public BeanContext stop() {
         // need to sort registered singletons so that beans with that require other beans appear first
         ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
         objects.sort((o1, o2) -> {
@@ -110,12 +104,16 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
         });
+
+        return this;
     }
 
     @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
+
+
 
     @Override
     public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
@@ -215,10 +213,10 @@ public class DefaultBeanContext implements BeanContext {
         return getBeansOfTypeInternal(resolutionContext, beanType, qualifier);
     }
 
-
     <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeanProvider(resolutionContext, beanType, null);
     }
+
 
     <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
@@ -266,14 +264,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
-        synchronized (singletonObjects) {
-            T createdBean = doCreateBean(resolutionContext, definition, qualifier, true);
-            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
-            return createdBean;
-        }
-    }
-
     /**
      * Resolves the {@link BeanDefinitionClass} class instances. Default implementation uses ServiceLoader pattern
      *
@@ -290,6 +280,14 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected Iterable<BeanConfiguration> resolveBeanConfigurarions() {
         return ServiceLoader.load(BeanConfiguration.class, classLoader);
+    }
+
+    private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
+        synchronized (singletonObjects) {
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier, true);
+            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+            return createdBean;
+        }
     }
 
     private <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, Qualifier<T> qualifier, boolean isSingleton) {
@@ -378,6 +376,13 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         return definition;
+    }
+
+    private void readAllBeanConfigurations() {
+        while (beanConfigurationIterator.hasNext()) {
+            BeanConfiguration configuration = beanConfigurationIterator.next();
+            beanConfigurations.put(configuration.getName(), configuration);
+        }
     }
 
     private <T> Collection<BeanDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<BeanDefinition<T>> candidates) {

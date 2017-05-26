@@ -466,9 +466,7 @@ class Convertible implements Car {
 
 
     static class PrivateTests extends TestCase {
-        private final BeanContext context = new DefaultBeanContext(){{
-            start()
-        }}
+        private final BeanContext context = new DefaultBeanContext().start()
         private final Convertible car = context.getBean(Convertible)
         private final Engine engine = car.engineProvider.get()
         private final SpareTire spareTire = car.spareTire

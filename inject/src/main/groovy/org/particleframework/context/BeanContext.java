@@ -11,7 +11,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanContext extends LifeCycle {
+public interface BeanContext extends LifeCycle<BeanContext> {
 
     /**
      * Obtains a Bean for the given type
