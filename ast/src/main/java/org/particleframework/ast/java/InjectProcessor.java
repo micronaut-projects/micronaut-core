@@ -3,8 +3,7 @@ package org.particleframework.ast.java;
 import com.google.auto.service.AutoService;
 import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.context.annotation.Configuration;
-import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.asm.BeanConfigurationWriter;
+import org.particleframework.inject.writer.BeanConfigurationWriter;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -26,12 +25,13 @@ public class InjectProcessor extends AbstractProcessor {
         for (final Element element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
             if (element.getSimpleName().contentEquals("package-info")) {
                     try {
-                        BeanConfigurationWriter writer = new BeanConfigurationWriter();
-                        String configurationName = writer.writeConfiguration(element.getEnclosingElement().toString(), new File(element.getEnclosingElement().toString()));
+                        BeanConfigurationWriter writer = new BeanConfigurationWriter(element.getEnclosedElements().toString());
+                        writer.writeTo(new File(element.getEnclosingElement().toString()));
                         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
                         File targetDirectory = new File(element.getEnclosingElement().toString());
                         if (targetDirectory != null) {
-                            generator.generate(targetDirectory, configurationName, BeanConfiguration.class);
+                            // looks like this does not required after making writeTo void
+                            //generator.generate(targetDirectory, configurationName, BeanConfiguration.class);
                         }
                     } catch (Throwable e) {
                         new Exception("Error generating bean configuration for package-info class [${element.simplename}]: $e.message");
