@@ -2,6 +2,7 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
@@ -363,13 +364,21 @@ public class DefaultBeanContext implements BeanContext {
                         }
                     }
                 } else {
-                    Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
-                    if (exactMatches.size() == 1) {
-                        definition = exactMatches.iterator().next();
-                    } else {
+                    Optional<BeanDefinition<T>> primary = candidates.stream()
+                            .filter((candidate) -> candidate.getType().getAnnotation(Primary.class) != null)
+                            .findFirst();
+                    if(primary.isPresent()) {
+                        return primary.get();
+                    }
+                    else {
+                        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
+                        if (exactMatches.size() == 1) {
+                            definition = exactMatches.iterator().next();
+                        } else {
 
-                        if (throwNonUnique) {
-                            throw new NonUniqueBeanException(beanType, candidates.iterator());
+                            if (throwNonUnique) {
+                                throw new NonUniqueBeanException(beanType, candidates.iterator());
+                            }
                         }
                     }
                 }
