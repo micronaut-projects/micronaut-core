@@ -3,10 +3,13 @@ package org.particleframework.context;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.context.event.BeanCreatedEvent;
+import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +40,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
-            .maximumSize(50)
+            .maximumSize(30)
             .build();
     private final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(30);
     private final ClassLoader classLoader;
@@ -186,6 +189,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
     }
+
     @Override
     public <T> T inject(T instance) {
         Class<?> beanType = instance.getClass();
@@ -374,6 +378,19 @@ public class DefaultBeanContext implements BeanContext {
             inject(resolutionContext, bean);
         }
 
+        if(!BeanCreatedEventListener.class.isInstance(bean)) {
+
+            Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, null);
+            for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
+                Class targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanCreatedEventListener.class);
+                if (targetType == null || targetType.isInstance(bean)) {
+                    bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, bean));
+                    if(bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener ["+listener+"] returned null from onCreated event");
+                    }
+                }
+            }
+        }
         return bean;
     }
 

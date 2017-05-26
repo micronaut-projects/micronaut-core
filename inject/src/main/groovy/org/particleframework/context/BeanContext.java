@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.inject.BeanConfiguration;
 
 import java.util.Collection;
