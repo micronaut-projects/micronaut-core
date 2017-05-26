@@ -213,4 +213,19 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
         return newClassName;
     }
+
+    protected String getInternalNameForCast(Object type) {
+        if(type instanceof Class) {
+            return Type.getInternalName((Class) type);
+        }
+        else {
+            String className = type.toString();
+            if(className.endsWith("[]")) {
+                return getTypeDescriptor(type);
+            }
+            else {
+                return getInternalName(className);
+            }
+        }
+    }
 }

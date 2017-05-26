@@ -238,6 +238,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                     Type.getInternalName(AbstractBeanDefinition.class),
                     interfaceInternalNames);
 
+            if(buildMethodVisitor == null) {
+                throw new IllegalStateException("At least one call to visitBeanDefinitionConstructor() is required");
+            }
+
             finalizeInjectMethod();
             finalizeBuildMethod();
             constructorVisitor.visitInsn(RETURN);
@@ -888,9 +892,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     private void pushCastToType(MethodVisitor methodVisitor, Object type) {
-        methodVisitor.visitTypeInsn(CHECKCAST, getTypeDescriptor(type));
+        methodVisitor.visitTypeInsn(CHECKCAST, getInternalNameForCast(type));
     }
-
 
     private int pushNewBuildLocalVariable() {
         buildMethodVisitor.visitVarInsn(ASTORE, buildMethodLocalCount);
@@ -960,10 +963,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 pushCreateMapCall(this.constructorVisitor, argumentTypes);
 
                 // 6th Argument: Create a call to createMap from qualifier types
-                pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                if(qualifierTypes != null) {
+                    pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                }
+                else {
+                    constructorVisitor.visitInsn(ACONST_NULL);
+                }
 
                 // 7th Argument: Create a call to createMap from generic types
-                pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+                if(genericTypes != null) {
+                    pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+                }
+                else {
+                    constructorVisitor.visitInsn(ACONST_NULL);
+                }
 
 
                 invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Map.class, Map.class, Map.class);
