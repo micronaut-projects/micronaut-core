@@ -236,12 +236,19 @@ public class DefaultBeanContext implements BeanContext {
         return bean;
     }
 
-    <T> T inject(BeanResolutionContext resolutionContext, T instance) {
+    <T> T inject(BeanResolutionContext resolutionContext, BeanDefinition requestingBeanDefinition, T instance) {
         Class<?> beanType = instance.getClass();
         BeanDefinition definition = findConcreteCandidate(beanType, null, false, true);
         if (definition != null) {
+            if(requestingBeanDefinition != null && requestingBeanDefinition.equals(definition)) {
+                // bail out, don't inject for bean definition in creation
+                return instance;
+            }
             if (definition instanceof InjectableBeanDefinition) {
                 ((InjectableBeanDefinition) definition).inject(resolutionContext, this, instance);
+            }
+            if(definition instanceof InitializingBeanDefinition) {
+                ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
             }
         }
         return instance;
@@ -375,7 +382,7 @@ public class DefaultBeanContext implements BeanContext {
                 bean = constructor.invoke(constructorArgs);
             }
 
-            inject(resolutionContext, bean);
+            inject(resolutionContext, null, bean);
         }
 
         if(!BeanCreatedEventListener.class.isInstance(bean)) {

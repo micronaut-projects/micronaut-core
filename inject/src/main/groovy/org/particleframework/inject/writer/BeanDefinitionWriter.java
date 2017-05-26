@@ -238,7 +238,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                     Type.getInternalName(AbstractBeanDefinition.class),
                     interfaceInternalNames);
 
-            finalizeInjectMethod(injectMethodVisitor);
+            finalizeInjectMethod();
+            finalizeBuildMethod();
             constructorVisitor.visitInsn(RETURN);
             constructorVisitor.visitMaxs(defaultMaxStack, 1);
             if (buildMethodVisitor != null) {
@@ -754,6 +755,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
             pushBeanDefinitionMethodInvocation(buildMethodVisitor, "initialize");
             pushCastToType(buildMethodVisitor, beanFullClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
         }
     }
 
@@ -784,7 +786,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 null);
     }
 
-    private void finalizeInjectMethod(MethodVisitor injectMethodVisitor) {
+    private void finalizeBuildMethod() {
+        // if this is a provided bean then execute "get"
+        if (!providedBeanClassName.equals(beanFullClassName)) {
+
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
+            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    beanType.getInternalName(),
+                    "get",
+                    Type.getMethodDescriptor(Type.getType(Object.class)),
+                    false);
+            pushCastToType(buildMethodVisitor, providedBeanClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
+            pushCastToType(buildMethodVisitor, providedBeanClassName);
+        }
+    }
+
+    private void finalizeInjectMethod() {
         invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHODS_METHOD);
 
         injectMethodVisitor.visitVarInsn(ALOAD, 3);
@@ -841,30 +861,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
             // store a reference to the bean being built at index 3
             this.buildInstanceIndex = pushNewBuildLocalVariable();
-
-
-            // if this is a provided bean then execute "get"
-            if (!providedBeanClassName.equals(beanFullClassName)) {
-
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
-                pushCastToType(buildMethodVisitor, beanFullClassName);
-                buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
-                buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
-                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                        beanType.getInternalName(),
-                        "get",
-                        Type.getMethodDescriptor(Type.getType(Object.class)),
-                        false);
-                pushCastToType(buildMethodVisitor, providedBeanClassName);
-                buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectAnother");
-                pushCastToType(buildMethodVisitor, providedBeanClassName);
-            } else {
-                pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
-                pushCastToType(buildMethodVisitor, beanFullClassName);
-            }
+            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
+            pushCastToType(buildMethodVisitor, beanFullClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
         }
     }
+
+
 
 
     private void pushBeanDefinitionMethodInvocation(MethodVisitor buildMethodVisitor, String methodName) {

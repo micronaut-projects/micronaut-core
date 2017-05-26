@@ -1,6 +1,10 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.Provided;
+import org.particleframework.context.event.BeanCreatedEvent;
+import org.particleframework.context.event.BeanCreatedEventListener;
+import org.particleframework.context.event.BeanInitializedEventListener;
+import org.particleframework.context.event.BeanInitializingEvent;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
@@ -267,7 +271,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      */
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        return defaultContext.inject(resolutionContext, bean);
+        return defaultContext.inject(resolutionContext, this, bean);
     }
     /**
      * Default postConstruct hook that only invokes methods that require reflection. Generated subclasses should override to call methods that don't require reflection
@@ -279,6 +283,17 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      */
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, null);
+        for (BeanInitializedEventListener listener : initializedEventListeners) {
+            Class targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanInitializedEventListener.class);
+            if (targetType == null || targetType.isInstance(bean)) {
+                bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+                if(bean == null) {
+                    throw new BeanInstantiationException(resolutionContext, "Listener ["+listener+"] returned null from onCreated event");
+                }
+            }
+
+        }
         for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
             if(methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
                 injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
