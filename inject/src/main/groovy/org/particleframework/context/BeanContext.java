@@ -143,24 +143,24 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      *
      * @param singleton The singleton bean
      *
-     * @see #registerRuntimeSingleton(Object)
      * @return This bean context
      */
     BeanContext registerSingleton(Object singleton);
 
-    /**
-     * <p>Registers a new singleton bean at runtime. Unlike {@link #registerSingleton(Object)}, if a {@link org.particleframework.inject.BeanDefinition} is not found this method
-     * will parse the class file's bytes and produce a {@link org.particleframework.inject.BeanDefinition} method at runtime in order to dependency inject the bean.</p>
-     *
-     * <p>Due this behaviour this method is significantly more expensive both in terms of performance and memory consumption in comparison to {@link #registerSingleton(Object)} and
-     * should be used sparely and rare cases where it is no possible to compile dependency injection data ahead of time.</p>
-     *
-     * @param singleton The singleton bean
-     *
-     * @see #registerSingleton(Object)
-     * @return This bean context
-     */
-    BeanContext registerRuntimeSingleton(Object singleton);
+//    TODO: This method would be nice, but would require implementing a ClassVisitor for ASM
+//     /**
+//     * <p>Registers a new singleton bean at runtime. Unlike {@link #registerSingleton(Object)}, if a {@link org.particleframework.inject.BeanDefinition} is not found this method
+//     * will parse the class file's bytes and produce a {@link org.particleframework.inject.BeanDefinition} method at runtime in order to dependency inject the bean.</p>
+//     *
+//     * <p>Due this behaviour this method is significantly more expensive both in terms of performance and memory consumption in comparison to {@link #registerSingleton(Object)} and
+//     * should be used sparely and rare cases where it is no possible to compile dependency injection data ahead of time.</p>
+//     *
+//     * @param singleton The singleton bean
+//     *
+//     * @see #registerSingleton(Object)
+//     * @return This bean context
+//     */
+//    BeanContext registerRuntimeSingleton(Object singleton);
 
     /**
      * Obtain a bean configuration by name

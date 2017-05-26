@@ -106,11 +106,6 @@ public class DefaultBeanContext implements BeanContext {
         return this;
     }
 
-    @Override
-    public BeanContext registerRuntimeSingleton(Object singleton) {
-        throw new UnsupportedOperationException("registerRuntimeSingleton not yet implemented");
-    }
-
     /**
      * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
      */
