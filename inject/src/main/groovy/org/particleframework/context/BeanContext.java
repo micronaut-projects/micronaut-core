@@ -38,6 +38,29 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      */
     <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
 
+
+    /**
+     * Finds a Bean for the given type
+     *
+     * @param beanType The bean type
+     * @param <T> The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     */
+    default <T> Optional<T> findBean(Class<T> beanType) {
+        return findBean(beanType, null);
+    }
+
+    /**
+     * Finds a Bean for the given type and qualifier
+     *
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     *
+     * @param <T> The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     */
+    <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier);
+
     /**
      * Return whether the bean of the given type is contained within this context
      *
