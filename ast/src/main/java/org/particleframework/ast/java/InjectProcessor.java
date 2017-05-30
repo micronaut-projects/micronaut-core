@@ -1,6 +1,5 @@
 package org.particleframework.ast.java;
 
-import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.inject.writer.BeanConfigurationWriter;
 
@@ -28,7 +27,6 @@ public class InjectProcessor extends AbstractProcessor {
                     try {
                         BeanConfigurationWriter writer = new BeanConfigurationWriter(element.getEnclosedElements().toString());
                         writer.writeTo(new File(element.getEnclosingElement().toString()));
-                        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
                         File targetDirectory = new File(element.getEnclosingElement().toString());
                         if (targetDirectory != null) {
                             // looks like this does not required after making writeTo void
