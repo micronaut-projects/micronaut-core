@@ -4,7 +4,5 @@ configurations.all {
 dependencies {
     compile project(":inject")
     testCompile "junit:junit:4.7"
-    // https://mvnrepository.com/artifact/com.google.auto.service/auto-service
-    compile group: 'com.google.auto.service', name: 'auto-service', version: '1.0-rc1'
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

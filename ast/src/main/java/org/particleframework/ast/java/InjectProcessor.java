@@ -1,11 +1,13 @@
 package org.particleframework.ast.java;
 
-import com.google.auto.service.AutoService;
 import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.inject.writer.BeanConfigurationWriter;
 
-import javax.annotation.processing.*;
+import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -17,7 +19,6 @@ import java.util.Set;
  */
 @SupportedAnnotationTypes({"org.particleframework.context.annotation.Configuration"})
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-@AutoService(Processor.class)
 public class InjectProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
