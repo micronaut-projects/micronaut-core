@@ -173,6 +173,11 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier) {
+        return findBean(null, beanType, qualifier);
+    }
+
+    @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType) {
         return getBeansOfType(null, beanType);
     }
@@ -342,6 +347,36 @@ public class DefaultBeanContext implements BeanContext {
             throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
         }
     }
+
+    <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        // allow injection the bean context
+        if (beanType == BeanContext.class) {
+            return Optional.of((T) this);
+        }
+
+        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
+        if (beanRegistration != null) {
+            return Optional.of(beanRegistration.bean);
+        }
+
+        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, true, false);
+
+        if (definition != null) {
+
+            if (definition.isProvided() && beanType == definition.getType()) {
+                return Optional.empty();
+            } else if (definition.isSingleton()) {
+                T bean = createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
+                return Optional.of(bean);
+            } else {
+                T bean = doCreateBean(resolutionContext, definition, qualifier, false);
+                return Optional.of(bean);
+            }
+        } else {
+            return Optional.empty();
+        }
+    }
+
 
     /**
      * Resolves the {@link BeanDefinitionClass} class instances. Default implementation uses ServiceLoader pattern
