@@ -1,6 +1,5 @@
 package org.particleframework.ast.java;
 
-import org.particleframework.context.annotation.Configuration;
 import org.particleframework.inject.writer.BeanConfigurationWriter;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -21,23 +20,18 @@ import java.util.Set;
 public class InjectProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-
-        for (final Element element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
-            if (element.getSimpleName().contentEquals("package-info")) {
+        for (TypeElement annotation : annotations) {
+            for (final Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
+                if (element.getSimpleName().contentEquals("package-info")) {
                     try {
-                        BeanConfigurationWriter writer = new BeanConfigurationWriter(element.getEnclosedElements().toString());
-                        writer.writeTo(new File(element.getEnclosingElement().toString()));
-                        File targetDirectory = new File(element.getEnclosingElement().toString());
-                        if (targetDirectory != null) {
-                            // looks like this does not required after making writeTo void
-                            //generator.generate(targetDirectory, configurationName, BeanConfiguration.class);
-                        }
+                        BeanConfigurationWriter writer = new BeanConfigurationWriter(annotation.getQualifiedName().toString());
+                        writer.writeTo(new File("/abc/"));
                     } catch (Throwable e) {
                         new Exception("Error generating bean configuration for package-info class [${element.simplename}]: $e.message");
                     }
+                }
             }
         }
-
         // return true once annotations have been processed by this processor
         return true;
     }
