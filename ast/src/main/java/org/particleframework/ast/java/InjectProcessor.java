@@ -9,6 +9,7 @@ import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.tools.Diagnostic;
 import java.io.File;
 import java.util.Set;
 
@@ -22,7 +23,10 @@ public class InjectProcessor extends AbstractProcessor {
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         for (TypeElement annotation : annotations) {
             for (final Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
-                if (element.getSimpleName().contentEquals("package-info")) {
+
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, "found @Configuration at " + element);
+
+                if (element.toString().equals("org.particleframework.inject.configurations.requiresbean.java")) {
                     try {
                         BeanConfigurationWriter writer = new BeanConfigurationWriter(annotation.getQualifiedName().toString());
                         writer.writeTo(new File("/abc/"));
