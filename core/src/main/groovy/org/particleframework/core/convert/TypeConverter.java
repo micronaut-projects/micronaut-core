@@ -1,5 +1,7 @@
 package org.particleframework.core.convert;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -15,10 +17,20 @@ public interface TypeConverter<S, T> {
     /**
      * Converts from the given source object type to the target type
      *
-     * @param targetType The target type being converted to
      * @param object The object type
+     * @param targetType The target type being converted to
      * @return The converted type or empty if the conversion is not possible
      */
-    Optional<T> convert(Class<T> targetType, S object);
+    default Optional<T> convert(S object, Class<T> targetType) {
+        return convert(object, targetType, Collections.emptyMap());
+    };
+    /**
+     * Converts from the given source object type to the target type
+     *
+     * @param object The object type
+     * @param targetType The target type being converted to
+     * @return The converted type or empty if the conversion is not possible
+     */
+    Optional<T> convert(S object, Class<T> targetType, Map<String, Class> typeArguments);
 }
 

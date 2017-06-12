@@ -6,6 +6,7 @@ import org.particleframework.context.DefaultBeanContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -83,7 +84,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType) {
-        return getEnvironment().getProperty(name, requiredType);
+    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
+        return getEnvironment().getProperty(name, requiredType, typeArguments);
     }
 }

@@ -15,4 +15,11 @@ public interface PropertySource extends Iterable<String> {
      * @return The value
      */
     Object get(String key);
+
+    /**
+     * @return Whether the property source has upper case under score separated keys
+     */
+    default boolean hasUpperCaseKeys() {
+        return false;
+    }
 }

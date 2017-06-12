@@ -1,5 +1,7 @@
 package org.particleframework.config;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -18,7 +20,19 @@ public interface PropertyResolver {
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists
      */
-    <T> Optional<T> getProperty(String name, Class<T> requiredType);
+    <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments);
+
+    /**
+     * Resolve the given property for the given name
+     *
+     * @param name The name
+     * @param requiredType The required type
+     * @param <T> The concrete type
+     * @return An optional containing the property value if it exists
+     */
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType) {
+        return getProperty(name, requiredType, Collections.emptyMap());
+    };
 
     /**
      * Resolve the given property for the given name

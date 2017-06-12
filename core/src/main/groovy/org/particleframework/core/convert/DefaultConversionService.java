@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.MalformedURLException;
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultConversionService implements ConversionService {
+public class DefaultConversionService implements ConversionService<DefaultConversionService> {
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()
             .maximumSize(60)
@@ -36,6 +37,11 @@ public class DefaultConversionService implements ConversionService {
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType) {
+        return convert(object, targetType, Collections.emptyMap());
+    }
+
+    @Override
+    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
         if (object == null) {
             return Optional.empty();
         }
@@ -48,18 +54,18 @@ public class DefaultConversionService implements ConversionService {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
         if (typeConverter != null) {
-            return typeConverter.convert(targetType, object);
+            return typeConverter.convert(object, targetType);
         } else {
             typeConverter = findTypeConverter(sourceType, targetType);
             if (typeConverter != null) {
-                return typeConverter.convert(targetType, object);
+                return typeConverter.convert(object, targetType, typeArguments);
             }
         }
         return Optional.empty();
     }
 
     @Override
-    public <S, T> ConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+    public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
@@ -68,7 +74,7 @@ public class DefaultConversionService implements ConversionService {
 
     protected void registerDefaultConverters() {
         // String -> Integer
-        addConverter(CharSequence.class, Integer.class, (Class<Integer> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, Map<String, Class> typeArguments) -> {
             try {
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
@@ -78,7 +84,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Number
-        addConverter(CharSequence.class, Number.class, (Class<Number> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Number.class, (CharSequence object, Class<Number> targetType, Map<String, Class> typeArguments) -> {
             try {
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
@@ -88,7 +94,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Long
-        addConverter(CharSequence.class, Long.class, (Class<Long> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Long.class, (CharSequence object, Class<Long> targetType, Map<String, Class> typeArguments) -> {
             try {
                 Long converted = Long.valueOf(object.toString());
                 return Optional.of(converted);
@@ -98,7 +104,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Short
-        addConverter(CharSequence.class, Short.class, (Class<Short> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Short.class, (CharSequence object, Class<Short> targetType, Map<String, Class> typeArguments) -> {
             try {
                 Short converted = Short.valueOf(object.toString());
                 return Optional.of(converted);
@@ -108,7 +114,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> BigDecimal
-        addConverter(CharSequence.class, BigDecimal.class, (Class<BigDecimal> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, BigDecimal.class, (CharSequence object, Class<BigDecimal> targetType, Map<String, Class> typeArguments) -> {
             try {
                 BigDecimal converted = new BigDecimal(object.toString());
                 return Optional.of(converted);
@@ -118,7 +124,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Boolean
-        addConverter(CharSequence.class, Boolean.class, (Class<Boolean> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, Map<String, Class> typeArguments) -> {
             String booleanString = object.toString().toLowerCase(Locale.ENGLISH);
             switch (booleanString) {
                 case "yes":
@@ -132,7 +138,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> URL
-        addConverter(CharSequence.class, URL.class, (Class<URL> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, URL.class, (CharSequence object, Class<URL> targetType, Map<String, Class> typeArguments) -> {
             try {
                 return Optional.of(new URL(object.toString()));
             } catch (MalformedURLException e) {
@@ -141,7 +147,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> URI
-        addConverter(CharSequence.class, URI.class, (Class<URI> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, URI.class, (CharSequence object, Class<URI> targetType, Map<String, Class> typeArguments) -> {
             try {
                 return Optional.of(new URI(object.toString()));
             } catch (URISyntaxException e) {
@@ -150,7 +156,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> UUID
-        addConverter(CharSequence.class, UUID.class, (Class<UUID> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, Map<String, Class> typeArguments) -> {
             try {
                 return Optional.of(UUID.fromString(object.toString()));
             } catch (IllegalArgumentException e) {
@@ -159,7 +165,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Currency
-        addConverter(CharSequence.class, Currency.class, (Class<Currency> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Currency.class, (CharSequence object, Class<Currency> targetType, Map<String, Class> typeArguments) -> {
             try {
                 return Optional.of(Currency.getInstance(object.toString()));
             } catch (IllegalArgumentException e) {
@@ -169,10 +175,10 @@ public class DefaultConversionService implements ConversionService {
 
 
         // String -> TimeZone
-        addConverter(CharSequence.class, TimeZone.class, (Class<TimeZone> targetType, CharSequence object) -> Optional.of(TimeZone.getTimeZone(object.toString())));
+        addConverter(CharSequence.class, TimeZone.class, (CharSequence object, Class<TimeZone> targetType, Map<String, Class> typeArguments) -> Optional.of(TimeZone.getTimeZone(object.toString())));
 
         // String -> Charset
-        addConverter(CharSequence.class, Charset.class, (Class<Charset> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Charset.class, (CharSequence object, Class<Charset> targetType, Map<String, Class> typeArguments) -> {
             try {
                 return Optional.of(Charset.forName(object.toString()));
             } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
@@ -181,7 +187,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Character
-        addConverter(CharSequence.class, Character.class, (Class<Character> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Character.class, (CharSequence object, Class<Character> targetType, Map<String, Class> typeArguments) -> {
             String str = object.toString();
             if (str.length() == 1) {
                 return Optional.of(str.charAt(0));
@@ -191,7 +197,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Array
-        addConverter(CharSequence.class, Object[].class, (Class<Object[]> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, Map<String, Class> typeArguments) -> {
             String str = object.toString();
             String[] strings = str.split(",");
             Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
@@ -207,7 +213,7 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // String -> Enum
-        addConverter(CharSequence.class, Enum.class, (Class<Enum> targetType, CharSequence object) -> {
+        addConverter(CharSequence.class, Enum.class, (CharSequence object, Class<Enum> targetType, Map<String, Class> typeArguments) -> {
             try {
                 Enum val = Enum.valueOf(targetType, object.toString());
                 return Optional.of(val);
@@ -222,10 +228,10 @@ public class DefaultConversionService implements ConversionService {
         });
 
         // Object -> String
-        addConverter(Object.class, String.class, (Class<String> targetType, Object object) -> Optional.of(object.toString()));
+        addConverter(Object.class, String.class, (Object object, Class<String> targetType, Map<String, Class> typeArguments) -> Optional.of(object.toString()));
 
         // Number -> Number
-        addConverter(Number.class, Number.class, (Class<Number> targetType, Number object) -> {
+        addConverter(Number.class, Number.class, (Number object, Class<Number> targetType, Map<String, Class> typeArguments) -> {
             Class targetNumberType = ReflectionUtils.getWrapperType(targetType);
             if (targetNumberType.isInstance(object)) {
                 return Optional.of(object);
@@ -252,6 +258,24 @@ public class DefaultConversionService implements ConversionService {
             }
             return Optional.empty();
         });
+
+        // String -> List/Iterable
+        addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, Map<String, Class> typeArguments) -> {
+            TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
+            String name = typeVariable.getName();
+            Class targetComponentType = typeArguments.get(name);
+            if(targetComponentType == null) targetComponentType = Object.class;
+            targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
+            String[] strings = object.toString().split(",");
+            List list = new ArrayList();
+            for (String string : strings) {
+                Optional converted = convert(string, targetComponentType);
+                if(converted.isPresent()) {
+                    list.add(converted.get());
+                }
+            }
+            return Optional.of(list);
+        });
     }
 
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType) {
@@ -272,11 +296,14 @@ public class DefaultConversionService implements ConversionService {
     }
 
     private void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
-        hierarchy.add(superclass);
+        if (!hierarchy.contains(superclass)) {
+            hierarchy.add(superclass);
+        }
         for (Class<?> aClass : superclass.getInterfaces()) {
             if (!hierarchy.contains(aClass)) {
                 hierarchy.add(aClass);
             }
+            populateHierarchyInterfaces(aClass, hierarchy);
         }
     }
 
@@ -291,6 +318,10 @@ public class DefaultConversionService implements ConversionService {
                 superclass = superclass.getSuperclass();
             }
         }
+        else if(type.isInterface()) {
+            populateHierarchyInterfaces(type, hierarchy);
+        }
+
         if (type.isArray()) {
             hierarchy.add(Object[].class);
         } else {

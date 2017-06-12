@@ -27,8 +27,8 @@ public class MapPropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType) {
+    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
         Object value = map.get(name);
-        return conversionService.convert(value, requiredType);
+        return conversionService.convert(value, requiredType, typeArguments);
     }
 }

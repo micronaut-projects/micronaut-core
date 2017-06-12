@@ -6,10 +6,8 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
 
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -24,15 +22,33 @@ public class DefaultEnvironment implements Environment {
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     private final Map<String,Object>[] catalog = new Map[57];
+    private final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
 
     public DefaultEnvironment(String name) {
-        this.name = name;
-        this.conversionService = new DefaultConversionService();
+        this(name, new DefaultConversionService());
     }
 
     public DefaultEnvironment(String name, ConversionService conversionService) {
         this.name = name;
         this.conversionService = conversionService;
+        addPropertySource(new MapPropertySource(System.getProperties()));
+        addPropertySource(new MapPropertySource(System.getenv()) {
+            @Override
+            public boolean hasUpperCaseKeys() {
+                return true;
+            }
+        });
+
+        ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
+        for (PropertySourceLoader loader : propertySources) {
+            addPropertySource(loader.load(this));
+        }
+    }
+
+    @Override
+    public Environment addPropertySource(PropertySource propertySource) {
+        propertySources.add(propertySource);
+        return this;
     }
 
     @Override
@@ -41,7 +57,7 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType) {
+    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
         if(name.length() == 0) {
             return Optional.empty();
         }
@@ -50,7 +66,7 @@ public class DefaultEnvironment implements Environment {
             if(entries != null) {
                 Object value = entries.get(name);
                 if(value != null) {
-                    return conversionService.convert(value, requiredType);
+                    return conversionService.convert(value, requiredType, typeArguments);
                 }
                 else if(Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
@@ -75,8 +91,9 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment start() {
-        processPropertySource(new MapPropertySource(System.getProperties()), false);
-        processPropertySource(new MapPropertySource(System.getenv()), true);
+        for (PropertySource propertySource : propertySources) {
+            processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
+        }
         return this;
     }
 
@@ -121,12 +138,13 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType) {
-        return conversionService.convert(object, targetType);
+    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
+        return conversionService.convert(object, targetType, typeArguments);
     }
 
     @Override
-    public <S, T> ConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        return conversionService.addConverter(sourceType, targetType, typeConverter);
+    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        conversionService.addConverter(sourceType, targetType, typeConverter);
+        return this;
     }
 }

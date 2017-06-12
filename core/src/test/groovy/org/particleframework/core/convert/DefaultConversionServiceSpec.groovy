@@ -38,4 +38,18 @@ class DefaultConversionServiceSpec extends Specification {
         "monday"          | DayOfWeek  | DayOfWeek.MONDAY
 
     }
+
+    void "test conversion service with type arguments"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+
+        expect:
+        conversionService.convert(sourceObject, targetType, typeArguments).get() == result
+
+        where:
+        sourceObject | targetType | typeArguments | result
+        "1,2"        | List       | [E: Integer]  | [1, 2]
+        "1,2"        | Iterable   | [T: Long]     | [1l, 2l]
+
+    }
 }
