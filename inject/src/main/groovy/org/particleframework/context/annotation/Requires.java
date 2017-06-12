@@ -17,6 +17,13 @@ import java.lang.annotation.*;
 public @interface Requires {
 
     /**
+     * Expresses that the configuration will only load within the given environments
+     *
+     * @return The names of the environments this configuration will load in
+     */
+    String[] env() default {};
+
+    /**
      * Expresses that the given property should be set for the bean to load. By default the value of the property
      * should be "yes", "YES", "true", "TRUE", "y" or "Y" for it to be considered to be set. If a different value is to be used then
      * the {@link #value()} method should be used

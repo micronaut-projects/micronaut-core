@@ -10,11 +10,7 @@ import org.particleframework.context.exceptions.BeanContextException;
  */
 public class PropertyNotFoundException extends BeanContextException {
 
-    public PropertyNotFoundException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public PropertyNotFoundException(String message) {
-        super(message);
+    public PropertyNotFoundException(String name, Class type) {
+        super("No property found for name ["+name+"] and type ["+type.getName()+"]");
     }
 }

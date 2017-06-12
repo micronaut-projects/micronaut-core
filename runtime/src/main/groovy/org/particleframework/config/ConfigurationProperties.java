@@ -9,7 +9,15 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Defines a singleton bean whose property values are resolved from a {@link PropertyResolver}
+ * <p>Defines a singleton bean whose property values are resolved from a {@link PropertyResolver}.</p>
+ *
+ * <p>The {@link PropertyResolver} is typically the Particle {@link org.particleframework.application.env.Environment}.</p>
+ *
+ * <p>The value of the annotation is used to indicate the prefix where the configuration properties are located.
+ * The class can define properties or fields which will have the configuration properties to them at runtime.
+ * </p>
+ *
+ * <p>Complex nested properties are supported via classes that are public static inner classes.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

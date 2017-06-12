@@ -25,6 +25,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     private final Collection<BeanDefinitionClass> beanDefinitionClasses = new ArrayList<>();
     private final Condition condition;
     private Boolean enabled = null;
+
     protected AbstractBeanConfiguration(Package thePackage) {
         this.thePackage = thePackage;
         this.packageName = thePackage.getName();

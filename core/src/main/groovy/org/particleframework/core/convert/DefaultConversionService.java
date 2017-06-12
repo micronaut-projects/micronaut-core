@@ -39,6 +39,10 @@ public class DefaultConversionService implements ConversionService {
         if (object == null) {
             return Optional.empty();
         }
+        if(targetType.isInstance(object)) {
+            return Optional.of((T) object);
+        }
+
         Class<?> sourceType = ReflectionUtils.getWrapperType(object.getClass());
         targetType = ReflectionUtils.getWrapperType(targetType);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
