@@ -1,8 +1,10 @@
 package org.particleframework.context.condition;
 
 import groovy.lang.GroovySystem;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
 import org.slf4j.Logger;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -34,6 +37,9 @@ public class RequiresCondition implements Condition {
             if(!matchesPresenceOfClasses(annotation)) {
                 return false;
             }
+            if(!matchesEnvironment(context, annotation)) {
+                return false;
+            }
             if(!matchesPresenceOfBean(context, annotation)) {
                 return false;
             }
@@ -45,6 +51,22 @@ public class RequiresCondition implements Condition {
             }
             if(!matchesConditions(context, annotation)) {
                 return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesEnvironment(ConditionContext context, Requires annotation) {
+        String[] env = annotation.env();
+        if(env.length == 0) {
+            return true;
+        }
+        else {
+            BeanContext beanContext = context.getBeanContext();
+            if(beanContext instanceof ApplicationContext) {
+                ApplicationContext applicationContext = (ApplicationContext) beanContext;
+                Environment environment = applicationContext.getEnvironment();
+                return Arrays.stream(env).anyMatch(name -> name.equalsIgnoreCase(environment.getName()));
             }
         }
         return true;
