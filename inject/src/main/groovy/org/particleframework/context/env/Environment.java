@@ -1,4 +1,4 @@
-package org.particleframework.application.env;
+package org.particleframework.context.env;
 
 import org.particleframework.config.PropertyResolver;
 import org.particleframework.context.LifeCycle;

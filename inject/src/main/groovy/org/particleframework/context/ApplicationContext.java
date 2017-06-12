@@ -1,8 +1,7 @@
-package org.particleframework.application.context;
+package org.particleframework.context;
 
-import org.particleframework.application.env.Environment;
+import org.particleframework.context.env.Environment;
 import org.particleframework.config.PropertyResolver;
-import org.particleframework.context.BeanContext;
 import org.particleframework.core.convert.ConversionService;
 
 /**

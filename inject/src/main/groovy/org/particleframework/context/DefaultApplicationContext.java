@@ -1,8 +1,7 @@
-package org.particleframework.application.context;
+package org.particleframework.context;
 
-import org.particleframework.application.env.DefaultEnvironment;
-import org.particleframework.application.env.Environment;
-import org.particleframework.context.DefaultBeanContext;
+import org.particleframework.context.env.DefaultEnvironment;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 
@@ -74,7 +73,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     public ApplicationContext start() {
         Environment environment = getEnvironment();
         environment.start();
-        registerSingleton(environment);
+        registerSingleton(Environment.class, environment);
         return (ApplicationContext) super.start();
     }
 

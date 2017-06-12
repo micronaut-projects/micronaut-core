@@ -83,11 +83,10 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public BeanContext registerSingleton(Object singleton) {
+    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
         if(singleton == null) {
             throw new IllegalArgumentException("Passed singleton cannot be null");
         }
-        Class<?> beanType = singleton.getClass();
         BeanKey beanKey = new BeanKey(beanType, null);
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
@@ -105,6 +104,7 @@ public class DefaultBeanContext implements BeanContext {
         }
         return this;
     }
+
 
     /**
      * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
@@ -344,6 +344,17 @@ public class DefaultBeanContext implements BeanContext {
                 return doCreateBean(resolutionContext, definition, qualifier, false);
             }
         } else {
+            for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
+                BeanKey key = entry.getKey();
+                if(qualifier == null || qualifier.equals(key.qualifier)) {
+                    BeanRegistration reg = entry.getValue();
+                    if(beanType.isInstance(reg.bean)) {
+                        T bean = (T) reg.bean;
+                        registerSingletonBean(definition, beanType, bean, qualifier, true);
+                        return bean;
+                    }
+                }
+            }
             throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
         }
     }

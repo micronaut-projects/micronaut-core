@@ -1,4 +1,4 @@
-package org.particleframework.application.env;
+package org.particleframework.context.env;
 
 import org.particleframework.config.MapPropertyResolver;
 import org.particleframework.config.PropertyResolver;

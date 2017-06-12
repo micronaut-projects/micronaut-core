@@ -168,7 +168,23 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      *
      * @return This bean context
      */
-    BeanContext registerSingleton(Object singleton);
+    default BeanContext registerSingleton(Object singleton) {
+        Class type = singleton.getClass();
+        return registerSingleton(type, singleton);
+    }
+
+    /**
+     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
+     *
+     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     *
+     * <p>If no bean definition data is found the bean is registered as is.</p>
+     *
+     * @param singleton The singleton bean
+     *
+     * @return This bean context
+     */
+    <T> BeanContext registerSingleton(Class<T> type, T singleton);
 
     /**
      * Obtain a bean configuration by name
