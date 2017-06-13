@@ -20,10 +20,20 @@ class DefaultArgument implements Argument {
     private final String name;
     private final Annotation qualifier;
     private final Class[] genericTypes;
+    private final Annotation[] annotations;
 
-    DefaultArgument(Class type, String name, Annotation qualifier, Class...genericTypes) {
+    DefaultArgument(Class type, String name, Annotation qualifier, Annotation[] annotations, Class...genericTypes) {
         this.type = type;
         this.name = name;
+        this.annotations = annotations;
+        this.qualifier = qualifier;
+        this.genericTypes = genericTypes;
+    }
+
+    DefaultArgument(Class type, String name, Annotation qualifier,  Class...genericTypes) {
+        this.type = type;
+        this.name = name;
+        this.annotations = new Annotation[0];
         this.qualifier = qualifier;
         this.genericTypes = genericTypes;
     }
@@ -38,20 +48,27 @@ class DefaultArgument implements Argument {
      *
      * @param arguments The arguments
      * @param qualifiers The qualifiers
-     * @return
+     * @param genericTypes The generic types
+     *
+     * @return The argument array
      */
-    static Argument[] from(Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
+    static Argument[] from(Map<String, Class> arguments,
+                           Map<String, Annotation> qualifiers,
+                           Map<String, List<Class>> genericTypes,
+                           AnnotationResolver annotationResolver) {
         if(arguments == null) {
             return new Argument[0];
         }
 
         List<Argument> args = new ArrayList<>(arguments.size());
+        int i = 0;
         for (Map.Entry<String, Class> entry : arguments.entrySet()) {
             String name = entry.getKey();
+            Annotation[] annotations = annotationResolver.resolveAnnotations(i++);
             Annotation qualifier = qualifiers != null ? qualifiers.get(name) : null;
             List<Class> genericTypeList = genericTypes != null ? genericTypes.get(name) : null;
             Class[] genericsArray = genericTypeList != null ? genericTypeList.toArray(new Class[genericTypeList.size()]) : new Class[0];
-            args.add( new DefaultArgument(entry.getValue(), name, qualifier, genericsArray));
+            args.add( new DefaultArgument(entry.getValue(), name, qualifier, annotations, genericsArray));
         }
         return args.toArray(new Argument[arguments.size()]);
     }
@@ -64,6 +81,16 @@ class DefaultArgument implements Argument {
     @Override
     public Annotation getQualifier() {
         return this.qualifier;
+    }
+
+    @Override
+    public Annotation getAnnotation(Class type) {
+        for (Annotation annotation : annotations) {
+            if(type.isInstance(annotation)) {
+                return annotation;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -94,5 +121,9 @@ class DefaultArgument implements Argument {
         result = 31 * result + name.hashCode();
         result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
         return result;
+    }
+
+    interface AnnotationResolver {
+        Annotation[] resolveAnnotations(int index);
     }
 }

@@ -18,6 +18,7 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Context
 import org.particleframework.context.annotation.Replaces
+import org.particleframework.context.annotation.Value
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
@@ -260,7 +261,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitField(FieldNode fieldNode) {
             ClassNode declaringClass = fieldNode.declaringClass
-            if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && declaringClass.getProperty(fieldNode.getName()) == null) {
+            boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
+            boolean isValue = stereoTypeFinder.hasStereoType(fieldNode, Value)
+            if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
                     Object qualifierRef = resolveQualifier(fieldNode)
@@ -269,12 +272,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
 
-                    beanWriter.visitFieldInjectionPoint(
-                            declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
-                            requiresReflection,
-                            fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
-                            fieldNode.name
-                    )
+                    if(isValue) {
+                        beanWriter.visitFieldValue(
+                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                requiresReflection,
+                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
+                                fieldNode.name
+                        )
+                    }
+                    else {
+                        beanWriter.visitFieldInjectionPoint(
+                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                requiresReflection,
+                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
+                                fieldNode.name
+                        )
+                    }
                 }
             }
         }
@@ -289,7 +302,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
-            if (fieldNode != null && !propertyNode.isStatic() && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
+            boolean isInject = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)
+            boolean isValue = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Value)
+            if (!propertyNode.isStatic() && (isInject || isValue)) {
                 defineBeanDefinition(concreteClass)
                 Object qualifier = resolveQualifier(fieldNode)
 
@@ -308,15 +323,30 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     genericTypeList.add(resolveTypeReference(fieldType.componentType))
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
-                beanWriter.visitSetterInjectionPoint(
-                        resolveTypeReference(declaringClass),
-                        qualifier,
-                        false,
-                        resolveTypeReference(fieldType),
-                        fieldNode.name,
-                        getSetterName(propertyNode.name),
-                        genericTypeList
-                )
+
+                if(isInject) {
+
+                    beanWriter.visitSetterInjectionPoint(
+                            resolveTypeReference(declaringClass),
+                            qualifier,
+                            false,
+                            resolveTypeReference(fieldType),
+                            fieldNode.name,
+                            getSetterName(propertyNode.name),
+                            genericTypeList
+                    )
+                }
+                else {
+                    beanWriter.visitSetterValue(
+                            resolveTypeReference(declaringClass),
+                            qualifier,
+                            false,
+                            resolveTypeReference(fieldType),
+                            fieldNode.name,
+                            getSetterName(propertyNode.name),
+                            genericTypeList
+                    )
+                }
             }
         }
 

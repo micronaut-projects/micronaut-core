@@ -9,6 +9,7 @@ import org.particleframework.core.annotation.Internal;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -32,12 +33,38 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Method method,
                                 boolean requiresReflection,
                                 Map<String, Class> arguments,
-                                Map<String, Annotation> qualifiers, Map<String,
-                                List<Class>> genericTypes) {
+                                Map<String, Annotation> qualifiers,
+                                Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
         this.method.setAccessible(true);
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes);
+        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
+            if(index < parameterAnnotations.length) {
+                return parameterAnnotations[index];
+            }
+            return new Annotation[0];
+        });
+        this.declaringComponent = declaringComponent;
+    }
+
+    DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
+                                Field field,
+                                Method method,
+                                boolean requiresReflection,
+                                Map<String, Class> arguments,
+                                Map<String, Annotation> qualifiers,
+                                Map<String, List<Class>> genericTypes) {
+        this.method = method;
+        this.requiresReflection = requiresReflection;
+        this.method.setAccessible(true);
+        Annotation[] annotations = field.getAnnotations();
+        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
+            if(index == 0) {
+                return annotations;
+            }
+            return new Annotation[0];
+        });
         this.declaringComponent = declaringComponent;
     }
 

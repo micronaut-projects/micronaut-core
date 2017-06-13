@@ -20,9 +20,12 @@ class ConstructorSimpleInjectionSpec extends Specification {
 
         when:"A bean is obtained that has a constructor with @Inject"
         B b =  context.getBean(B)
+        B2 b2 =  context.getBean(B2)
 
         then:"The implementation is injected"
         b.a != null
+        b2.a != null
+        b2.a2 != null
     }
 
     static interface A {
@@ -47,6 +50,24 @@ class ConstructorSimpleInjectionSpec extends Specification {
         }
     }
 
+    static class B2 {
+        private A a
+        private A a2
+
+        @Inject
+        B(A a, A a2) {
+            this.a = a
+            this.a2 = a2
+        }
+
+        A getA() {
+            return this.a
+        }
+
+        A getA2() {
+            return a2
+        }
+    }
 }
 
 
