@@ -416,7 +416,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 }
                 else {
                     return value.orElseGet(() -> {
-                        throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
+                        if(!Iterable.class.isAssignableFrom(argumentType)) {
+                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
+                        }
+                        else {
+                            return null;
+                        }
                     });
                 }
             } finally {

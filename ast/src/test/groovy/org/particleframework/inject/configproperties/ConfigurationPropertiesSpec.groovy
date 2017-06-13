@@ -35,6 +35,7 @@ class ConfigurationPropertiesSpec extends Specification {
         config.urlList == [new URL('http://test.com'),new URL('http://test2.com')]
         config.urlList2 == [new URL('http://test.com'),new URL('http://test2.com')]
         config.stringList == ["1", "2"]
+        config.emptyList == null
         config.url.get() == new URL('http://test.com')
         !config.anotherUrl.isPresent()
     }
@@ -47,6 +48,7 @@ class ConfigurationPropertiesSpec extends Specification {
         List<Integer> intList
         List<URL> urlList
         List<URL> urlList2
+        List<URL> emptyList
         Optional<URL> url
         Optional<URL> anotherUrl
     }
