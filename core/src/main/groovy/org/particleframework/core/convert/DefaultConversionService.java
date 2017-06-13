@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -45,7 +46,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (object == null) {
             return Optional.empty();
         }
-        if(targetType.isInstance(object)) {
+        if(targetType.isInstance(object) && !Iterable.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
@@ -293,8 +294,62 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.of(Optional.empty());
             }
         });
+
+        addConverter(Iterable.class, Iterable.class, (object, targetType, typeArguments) -> {
+            TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
+            String name = typeVariable.getName();
+            Class targetComponentType = typeArguments.get(name);
+            if(targetType.isInstance(object)) {
+                if(targetComponentType == null) {
+                    return Optional.of(object);
+                }
+                else {
+                    List list = new ArrayList();
+                    for (Object o : object) {
+                        Optional converted = convert(o, targetComponentType);
+                        if(converted.isPresent()) {
+                            list.add(converted.get());
+                        }
+                    }
+                    try {
+                        return Optional.of(coerceToType(list, targetType));
+                    } catch (Exception e) {
+                        return Optional.empty();
+                    }
+                }
+            }
+            else {
+                targetComponentType = Object.class;
+                List list = new ArrayList();
+                for (Object o : object) {
+                    list.add(convert(o, targetComponentType));
+                }
+                try {
+                    return Optional.of(coerceToType(list, targetType));
+                } catch (Exception e) {
+                    return Optional.empty();
+                }
+            }
+        });
     }
 
+    private Iterable coerceToType(Collection beans, Class<? extends Iterable> componentType) throws Exception {
+        if (componentType.isInstance(beans)) {
+            return beans;
+        }
+        if (componentType == Set.class) {
+            return new HashSet<>(beans);
+        } else if (componentType == Queue.class) {
+            return new LinkedList<>(beans);
+        } else if (componentType == List.class) {
+            return new ArrayList<>(beans);
+        } else if (!componentType.isInterface()) {
+            Constructor<? extends Iterable> constructor = componentType.getConstructor(Collection.class);
+            return constructor.newInstance(beans);
+        } else {
+            return null;
+        }
+    }
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType) {
         TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = resolveHierarchy(sourceType);

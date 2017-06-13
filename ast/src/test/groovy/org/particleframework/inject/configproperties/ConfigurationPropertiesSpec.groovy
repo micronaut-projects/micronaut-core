@@ -19,6 +19,8 @@ class ConfigurationPropertiesSpec extends Specification {
             'foo.bar.anotherPort':'9090',
             'foo.bar.intList':"1,2,3",
             'foo.bar.stringList':"1,2",
+            'foo.bar.urlList':"http://test.com, http://test2.com",
+            'foo.bar.urlList2':["http://test.com", "http://test2.com"],
             'foo.bar.url':'http://test.com'
         ))
 
@@ -30,6 +32,8 @@ class ConfigurationPropertiesSpec extends Specification {
         config.port == 8080
         config.anotherPort == 9090
         config.intList == [1,2,3]
+        config.urlList == [new URL('http://test.com'),new URL('http://test2.com')]
+        config.urlList2 == [new URL('http://test.com'),new URL('http://test2.com')]
         config.stringList == ["1", "2"]
         config.url.get() == new URL('http://test.com')
         !config.anotherUrl.isPresent()
@@ -41,6 +45,8 @@ class ConfigurationPropertiesSpec extends Specification {
         Integer anotherPort
         List<String> stringList
         List<Integer> intList
+        List<URL> urlList
+        List<URL> urlList2
         Optional<URL> url
         Optional<URL> anotherUrl
     }
