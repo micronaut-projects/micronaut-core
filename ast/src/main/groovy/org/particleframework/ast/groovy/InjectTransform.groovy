@@ -15,6 +15,7 @@ import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
+import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Context
 import org.particleframework.context.annotation.Replaces
@@ -148,6 +149,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         final SourceUnit sourceUnit
         final ClassNode concreteClass
+        final boolean isConfigurationProperties
         final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
         AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -155,6 +157,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
+            this.isConfigurationProperties = stereoTypeFinder.hasStereoType(concreteClass, ConfigurationProperties)
             if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -262,7 +265,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitField(FieldNode fieldNode) {
             ClassNode declaringClass = fieldNode.declaringClass
             boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
-            boolean isValue = stereoTypeFinder.hasStereoType(fieldNode, Value)
+            boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
             if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
@@ -303,7 +306,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             boolean isInject = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)
-            boolean isValue = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Value)
+            boolean isValue = !isInject && fieldNode != null && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
             if (!propertyNode.isStatic() && (isInject || isValue)) {
                 defineBeanDefinition(concreteClass)
                 Object qualifier = resolveQualifier(fieldNode)
@@ -336,7 +339,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             genericTypeList
                     )
                 }
-                else {
+                else if(isValue){
                     beanWriter.visitSetterValue(
                             resolveTypeReference(declaringClass),
                             qualifier,

@@ -201,7 +201,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param qualifierTypes The qualifier type names for each parameter
      * @param genericTypes   The generic types for each parameter
      */
-    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes,
+                                               Map<String, Object> qualifierTypes,
+                                               Map<String, List<Object>> genericTypes) {
         if (constructorVisitor == null) {
             // first build the constructor
             visitBeanDefinitionConstructorInternal(argumentTypes, qualifierTypes, genericTypes);

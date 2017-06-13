@@ -264,7 +264,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
             Class targetComponentType = typeArguments.get(name);
-            if(targetComponentType == null) targetComponentType = Object.class;
+            if(targetComponentType == null) {
+                targetComponentType = Object.class;
+            }
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             String[] strings = object.toString().split(",");
             List list = new ArrayList();
@@ -275,6 +277,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
             return Optional.of(list);
+        });
+
+        addConverter(Object.class, Optional.class, (object, targetType, typeArguments) -> {
+            TypeVariable<Class<Optional>> typeVariable = targetType.getTypeParameters()[0];
+            String name = typeVariable.getName();
+            Class targetComponentType = typeArguments.get(name);
+            if(targetComponentType == null) targetComponentType = Object.class;
+            targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
+            Optional converted = convert(object, targetComponentType);
+            if(converted.isPresent()) {
+                return Optional.of(converted);
+            }
+            else {
+                return Optional.of(Optional.empty());
+            }
         });
     }
 

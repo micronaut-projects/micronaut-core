@@ -50,6 +50,7 @@ class DefaultConversionServiceSpec extends Specification {
         sourceObject | targetType | typeArguments | result
         "1,2"        | List       | [E: Integer]  | [1, 2]
         "1,2"        | Iterable   | [T: Long]     | [1l, 2l]
+        "1"          | Optional   | [T: Long]     | Optional.of(1L)
 
     }
 }

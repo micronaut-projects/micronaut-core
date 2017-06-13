@@ -22,6 +22,8 @@ class ValueSpec extends Specification {
 
         expect:
         a.port == 8080
+        a.optionalPort.get() == 8080
+        !a.optionalPort2.isPresent()
         a.fieldPort == 8080
         a.anotherPort == 8080
         a.defaultPort == 9090
@@ -36,9 +38,16 @@ class ValueSpec extends Specification {
     @Singleton
     static class A {
         int fromConstructor
+
         A(@Value('foo.bar') int port) {
             this.fromConstructor = port
         }
+
+        @Value('foo.bar')
+        Optional<Integer> optionalPort
+
+        @Value('foo.another')
+        Optional<Integer> optionalPort2
 
         @Value('foo.bar')
         int port
