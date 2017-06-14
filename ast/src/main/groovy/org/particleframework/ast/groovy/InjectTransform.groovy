@@ -280,7 +280,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
                                 requiresReflection,
                                 fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
-                                fieldNode.name
+                                fieldNode.name,
+                                isConfigurationProperties
                         )
                     }
                     else {

@@ -46,7 +46,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (object == null) {
             return Optional.empty();
         }
-        if(targetType.isInstance(object) && !Iterable.class.isInstance(object)) {
+        if(targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
@@ -295,6 +295,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, typeArguments) -> {
             TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
@@ -330,6 +331,38 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     return Optional.empty();
                 }
             }
+        });
+
+        // Map -> Map (inner type conversion)
+        addConverter(Map.class, Map.class, (object, targetType, typeArguments) -> {
+            Class keyType = typeArguments.get(targetType.getTypeParameters()[0].getName());
+            Class valueType = typeArguments.get(targetType.getTypeParameters()[1].getName());
+            Map newMap = new LinkedHashMap();
+            for (Object o : object.entrySet()) {
+                Map.Entry entry = (Map.Entry) o;
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+                if(!keyType.isInstance(key)) {
+                    Optional convertedKey = convert(key, keyType);
+                    if(convertedKey.isPresent()) {
+                        key = convertedKey.get();
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                if(!valueType.isInstance(value)) {
+                    Optional converted = convert(value, valueType);
+                    if(converted.isPresent()) {
+                        value = converted.get();
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                newMap.put(key, value);
+            }
+            return Optional.of(newMap);
         });
     }
 

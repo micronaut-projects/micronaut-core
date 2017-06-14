@@ -133,6 +133,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     // the instance being built position in the index
     private int buildInstanceIndex;
+    private Integer injectValueIndex;
     private int injectInstanceIndex;
     private int postConstructInstanceIndex;
     private int preDestroyInstanceIndex;
@@ -419,6 +420,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushIntegerConstant(injectMethodVisitor, 0);
         // invoke getBeanForField
         pushInvokeMethodOnSuperClass(injectMethodVisitor, resolveMethod);
+        if(resolveMethod == GET_VALUE_FOR_METHOD_ARGUMENT) {
+            if(injectValueIndex == null) {
+                injectValueIndex = pushNewInjectLocalVariable();
+            }
+            else {
+                injectMethodVisitor.visitVarInsn(ASTORE, injectValueIndex);
+            }
+            injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
+        }
         // cast the return value to the correct type
         pushCastToType(injectMethodVisitor, fieldType);
         injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
@@ -693,7 +703,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD);
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD, false);
     }
 
     /**
@@ -709,16 +719,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                          Object qualifierType,
                                          boolean requiresReflection,
                                          Object fieldType,
-                                         String fieldName) {
+                                         String fieldName,
+                                         boolean isOptional) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD);
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD,isOptional);
     }
 
-    private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke) {
+    private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isOptional) {
         // ready this
         MethodVisitor constructorVisitor = this.constructorVisitor;
         constructorVisitor.visitVarInsn(ALOAD, 0);
@@ -765,9 +776,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
             // cast the return value to the correct type
+            Label label = null;
+            if(methodToInvoke == GET_VALUE_FOR_FIELD && isOptional) {
+                if(injectValueIndex == null) {
+                    injectValueIndex = pushNewInjectLocalVariable();
+                }
+                else {
+                    injectMethodVisitor.visitVarInsn(ASTORE, injectValueIndex);
+                }
+                injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
+                label = new Label();
+                injectMethodVisitor.visitJumpInsn(IFNONNULL, label);
+                injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
+            }
             pushCastToType(injectMethodVisitor, fieldType);
 
             injectMethodVisitor.visitFieldInsn(PUTFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
+            if(label != null) {
+                injectMethodVisitor.visitLabel(label);
+            }
         }
         currentFieldIndex++;
     }

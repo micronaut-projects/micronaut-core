@@ -46,6 +46,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private boolean hasPreDestroyMethods = false;
     private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
+    private final boolean isConfigurationProperties;
     private final Collection<Class> requiredComponents = new HashSet<>(3);
     protected final List<MethodInjectionPoint> methodInjectionPoints = new ArrayList<>(3);
     protected final List<FieldInjectionPoint> fieldInjectionPoints = new ArrayList<>(3);
@@ -64,6 +65,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.singleton = singleton;
         this.type = type;
         this.provided = type.getAnnotation(Provided.class) != null;
+        this.isConfigurationProperties = type.getAnnotation(ConfigurationProperties.class) != null;
         LinkedHashMap<String, Annotation> qualifierMap = null;
         if (qualifiers != null) {
             qualifierMap = new LinkedHashMap<>();
@@ -416,7 +418,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 }
                 else {
                     return value.orElseGet(() -> {
-                        if(!Iterable.class.isAssignableFrom(argumentType)) {
+                        if(valAnn == null && isConfigurationProperties) {
+                            return null;
+                        }
+                        else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
                             throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
                         }
                         else {
@@ -448,7 +453,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         if(typeParameters.length == genericTypes.length) {
             for (int j = 0; j < typeParameters.length; j++) {
                 TypeVariable typeParameter = typeParameters[j];
-                typeParameterMap.put(typeParameter.getName(), genericTypes[0]);
+                typeParameterMap.put(typeParameter.getName(), genericTypes[j]);
             }
         }
         value = context.getProperty(valString, (Class<?>) type, typeParameterMap);
@@ -462,8 +467,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private String resolveValueString(String name, Value val) {
         String valString;
         if (val == null) {
-            ConfigurationProperties configurationProperties = getType().getAnnotation(ConfigurationProperties.class);
-            if(configurationProperties != null) {
+            if(isConfigurationProperties) {
+                ConfigurationProperties configurationProperties = getType().getAnnotation(ConfigurationProperties.class);
                 valString = configurationProperties.value() + "." + name;
             }
             else {
@@ -745,17 +750,18 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         if (context instanceof PropertyResolver) {
             Field field = injectionPoint.getField();
             Value valueAnn = field.getAnnotation(Value.class);
-            if (valueAnn == null) {
-                throw new IllegalStateException("Compiled getValueForField(..) call present but @Value annotation missing from field.");
-            } else {
-                Class<?> fieldType = field.getType();
-                String valString = resolveValueString(injectionPoint.getName(), valueAnn);
-                Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArgument(field));
-                if(!value.isPresent() && fieldType == Optional.class) {
-                    return value;
+            Class<?> fieldType = field.getType();
+            String valString = resolveValueString(injectionPoint.getName(), valueAnn);
+            Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArgument(field));
+            if(!value.isPresent() && fieldType == Optional.class) {
+                return value;
+            }
+            else {
+                if(isConfigurationProperties && valueAnn == null) {
+                    return value.orElse(null);
                 }
                 else {
-                    return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valueAnn.value() + "]. Property doesn't exist"));
+                    return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
                 }
             }
 

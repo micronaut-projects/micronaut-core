@@ -70,7 +70,7 @@ public class DefaultEnvironment implements Environment {
                 }
                 else if(Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return Optional.of((T) subMap);
+                    return conversionService.convert(subMap, requiredType, typeArguments);
                 }
                 else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);

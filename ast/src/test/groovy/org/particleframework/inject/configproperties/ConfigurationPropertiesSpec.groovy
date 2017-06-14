@@ -19,6 +19,9 @@ class ConfigurationPropertiesSpec extends Specification {
             'foo.bar.anotherPort':'9090',
             'foo.bar.intList':"1,2,3",
             'foo.bar.stringList':"1,2",
+            'foo.bar.inner.enabled':'true',
+            'foo.bar.flags.one':'1',
+            'foo.bar.flags.two':'2',
             'foo.bar.urlList':"http://test.com, http://test2.com",
             'foo.bar.urlList2':["http://test.com", "http://test2.com"],
             'foo.bar.url':'http://test.com'
@@ -32,24 +35,38 @@ class ConfigurationPropertiesSpec extends Specification {
         config.port == 8080
         config.anotherPort == 9090
         config.intList == [1,2,3]
+        config.flags == [one:1, two:2]
         config.urlList == [new URL('http://test.com'),new URL('http://test2.com')]
         config.urlList2 == [new URL('http://test.com'),new URL('http://test2.com')]
         config.stringList == ["1", "2"]
         config.emptyList == null
         config.url.get() == new URL('http://test.com')
         !config.anotherUrl.isPresent()
+        config.defaultValue == 9999
+//        config.inner.enabled
     }
 
     @ConfigurationProperties('foo.bar')
     static class MyConfig {
         int port
-        Integer anotherPort
+        Integer defaultValue = 9999
+        protected Integer anotherPort
         List<String> stringList
         List<Integer> intList
         List<URL> urlList
         List<URL> urlList2
         List<URL> emptyList
+        Map<String,Integer> flags
         Optional<URL> url
         Optional<URL> anotherUrl
+//        Inner inner
+
+        Integer getAnotherPort() {
+            return anotherPort
+        }
+
+        static class Inner {
+            boolean enabled
+        }
     }
 }
