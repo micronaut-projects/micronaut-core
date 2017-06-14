@@ -33,6 +33,7 @@ class ConfigurationPropertiesSpec extends Specification {
 
         expect:
         config.port == 8080
+
         config.anotherPort == 9090
         config.intList == [1,2,3]
         config.flags == [one:1, two:2]
@@ -42,7 +43,9 @@ class ConfigurationPropertiesSpec extends Specification {
         config.emptyList == null
         config.url.get() == new URL('http://test.com')
         !config.anotherUrl.isPresent()
+        config.defaultPort == 9999
         config.defaultValue == 9999
+        config.primitiveDefaultValue == 9999
 //        config.inner.enabled
     }
 
@@ -50,6 +53,8 @@ class ConfigurationPropertiesSpec extends Specification {
     static class MyConfig {
         int port
         Integer defaultValue = 9999
+        int primitiveDefaultValue = 9999
+        protected int defaultPort = 9999
         protected Integer anotherPort
         List<String> stringList
         List<Integer> intList
@@ -59,14 +64,18 @@ class ConfigurationPropertiesSpec extends Specification {
         Map<String,Integer> flags
         Optional<URL> url
         Optional<URL> anotherUrl
-//        Inner inner
-
+////        Inner inner
+//
         Integer getAnotherPort() {
             return anotherPort
         }
 
-        static class Inner {
-            boolean enabled
+        int getDefaultPort() {
+            return defaultPort
         }
+//
+//        static class Inner {
+//            boolean enabled
+//        }
     }
 }

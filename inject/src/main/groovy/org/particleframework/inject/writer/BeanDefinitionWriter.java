@@ -3,6 +3,8 @@ package org.particleframework.inject.writer;
 import groovyjarjarasm.asm.*;
 import groovyjarjarasm.asm.signature.SignatureVisitor;
 import groovyjarjarasm.asm.signature.SignatureWriter;
+import org.codehaus.groovy.ast.tools.GeneralUtils;
+import org.codehaus.groovy.runtime.MetaClassHelper;
 import org.particleframework.context.AbstractBeanDefinition;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
@@ -91,11 +93,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             new IllegalStateException("AbstractBeanDefinition.getValueForField(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
+    private static final Method GET_OPTIONAL_VALUE_FOR_FIELD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class, Object.class).orElseThrow(() ->
+            new IllegalStateException("AbstractBeanDefinition.getValueForField(..) method not found. Incompatible version of Particle on the classpath?")
+    );
+
     private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getBeanForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.getBeanForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
     private static final Method GET_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class).orElseThrow(() ->
+            new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
+    );
+
+    private static final Method GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
@@ -338,7 +348,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT);
+            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT);
 
         }
         currentMethodIndex++;
@@ -359,13 +369,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                  Object fieldType,
                                  String fieldName,
                                  String setterName,
-                                 List<Object> genericTypes) {
+                                 List<Object> genericTypes,
+                                 boolean isOptional) {
         Type declaringTypeRef = getTypeReference(declaringType);
 
         addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT);
+            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, isOptional ? GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT :  GET_VALUE_FOR_METHOD_ARGUMENT);
         }
         currentMethodIndex++;
     }
@@ -403,7 +414,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushInvokeMethodOnSuperClass(constructorVisitor, ADD_SETTER_INJECTION_POINT_METHOD);
     }
 
-    private void resolveBeanOrValueForSetter(Type declaringTypeRef, String setterName, Object fieldType, Method resolveMethod) {
+    private void resolveBeanOrValueForSetter(Type declaringTypeRef, String fieldName, String setterName, Object fieldType, Method resolveMethod) {
         // invoke the method on this injected instance
         injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
         String methodDescriptor = getMethodDescriptor("void", Collections.singletonList(fieldType));
@@ -418,17 +429,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushIntegerConstant(injectMethodVisitor, currentMethodIndex);
         // 4th argument the argument index
         pushIntegerConstant(injectMethodVisitor, 0);
+        if(resolveMethod == GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT) {
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+            String getterName = "get" + MetaClassHelper.capitalize(fieldName);
+            groovyjarjarasm.asm.commons.Method getterMethod = groovyjarjarasm.asm.commons.Method.getMethod(getTypeReference(fieldType).getClassName() + " " + getterName + "()");
+            injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL, declaringTypeRef.getInternalName(), getterName, getterMethod.getDescriptor(), false);
+            pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
+        }
         // invoke getBeanForField
         pushInvokeMethodOnSuperClass(injectMethodVisitor, resolveMethod);
-        if(resolveMethod == GET_VALUE_FOR_METHOD_ARGUMENT) {
-            if(injectValueIndex == null) {
-                injectValueIndex = pushNewInjectLocalVariable();
-            }
-            else {
-                injectMethodVisitor.visitVarInsn(ASTORE, injectValueIndex);
-            }
-            injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
-        }
         // cast the return value to the correct type
         pushCastToType(injectMethodVisitor, fieldType);
         injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
@@ -726,7 +735,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD,isOptional);
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName,isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD,isOptional);
     }
 
     private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isOptional) {
@@ -763,6 +772,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         if (!requiresReflection) {
             // if reflection is not required then set the field automatically within the body of the "injectBean" method
 
+            boolean isOptionalValue = methodToInvoke == GET_OPTIONAL_VALUE_FOR_FIELD && isOptional;
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
             // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
             // load 'this'
@@ -773,30 +783,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             injectMethodVisitor.visitVarInsn(ALOAD, 2);
             // 3rd argument the field index
             pushIntegerConstant(injectMethodVisitor, currentFieldIndex);
+            // 4th argument the current value
+            if(isOptionalValue) {
+                injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+                injectMethodVisitor.visitFieldInsn(GETFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
+                pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
+            }
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
             // cast the return value to the correct type
-            Label label = null;
-            if(methodToInvoke == GET_VALUE_FOR_FIELD && isOptional) {
-                if(injectValueIndex == null) {
-                    injectValueIndex = pushNewInjectLocalVariable();
-                }
-                else {
-                    injectMethodVisitor.visitVarInsn(ASTORE, injectValueIndex);
-                }
-                injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
-                label = new Label();
-                injectMethodVisitor.visitJumpInsn(IFNONNULL, label);
-                injectMethodVisitor.visitVarInsn(ALOAD, injectValueIndex);
-            }
             pushCastToType(injectMethodVisitor, fieldType);
 
             injectMethodVisitor.visitFieldInsn(PUTFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
-            if(label != null) {
-                injectMethodVisitor.visitLabel(label);
-            }
         }
         currentFieldIndex++;
+    }
+
+    private void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
+        Class wrapperType = getWrapperType(fieldType);
+        if(wrapperType != null) {
+            Class primitiveType = (Class) fieldType;
+            Type wrapper = Type.getType(wrapperType);
+            String primitiveName = primitiveType.getName();
+            String sig = wrapperType.getName() + " valueOf(" + primitiveName +")";
+            groovyjarjarasm.asm.commons.Method valueOfMethod = groovyjarjarasm.asm.commons.Method.getMethod(sig);
+            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+        }
+    }
+
+    private Class getWrapperType(Object type) {
+        if(type instanceof Class) {
+            Class typeClass = (Class) type;
+            if(typeClass.isPrimitive()) {
+                return ReflectionUtils.getWrapperType(typeClass);
+            }
+        }
+        return null;
     }
 
     private int pushGetFieldFromTypeLocalVariable(MethodVisitor methodVisitor, Type declaringType, String fieldName) {

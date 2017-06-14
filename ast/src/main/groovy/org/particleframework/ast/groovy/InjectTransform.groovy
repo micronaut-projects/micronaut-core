@@ -263,6 +263,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitField(FieldNode fieldNode) {
+            if(fieldNode.name == 'metaClass') return
             ClassNode declaringClass = fieldNode.declaringClass
             boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
             boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
@@ -306,6 +307,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
+            if(fieldNode.name == 'metaClass') return
             boolean isInject = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)
             boolean isValue = !isInject && fieldNode != null && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
             if (!propertyNode.isStatic() && (isInject || isValue)) {
@@ -348,7 +350,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             resolveTypeReference(fieldType),
                             fieldNode.name,
                             getSetterName(propertyNode.name),
-                            genericTypeList
+                            genericTypeList,
+                            isConfigurationProperties
                     )
                 }
             }

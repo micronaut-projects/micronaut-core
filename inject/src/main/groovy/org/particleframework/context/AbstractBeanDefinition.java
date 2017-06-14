@@ -400,10 +400,26 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) throws Throwable {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument);
+        return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, null);
     }
 
-    private Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
+    /**
+     * Obtains a value for the given method argument
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param methodIndex       The method index
+     * @param argIndex          The argument index
+     * @return The value
+     */
+    @Internal
+    protected Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Object defaultValue) throws Throwable {
+        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
+        Argument argument = injectionPoint.getArguments()[argIndex];
+        return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, defaultValue);
+    }
+
+    private Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument, Object defaultValue) {
         if (context instanceof ApplicationContext) {
             BeanResolutionContext.Path path = resolutionContext.getPath();
             path.pushMethodArgumentResolve(this, injectionPoint, argument);
@@ -419,7 +435,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 else {
                     return value.orElseGet(() -> {
                         if(valAnn == null && isConfigurationProperties) {
-                            return null;
+                            return defaultValue;
                         }
                         else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
                             throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
@@ -497,7 +513,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
         if (argument.getAnnotation(Value.class) != null) {
-            return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument);
+            return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, null);
         } else {
             return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
         }
@@ -746,6 +762,22 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      */
     @Internal
     protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
+        return getValueForField(resolutionContext, context, fieldIndex, null);
+    }
+
+
+    /**
+     * Obtains a value for the given field from the bean context
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param fieldIndex        The index of the field
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Object defaultValue) throws Throwable {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
         if (context instanceof PropertyResolver) {
             Field field = injectionPoint.getField();
@@ -758,7 +790,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             }
             else {
                 if(isConfigurationProperties && valueAnn == null) {
-                    return value.orElse(null);
+                    return value.orElse(defaultValue);
                 }
                 else {
                     return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
