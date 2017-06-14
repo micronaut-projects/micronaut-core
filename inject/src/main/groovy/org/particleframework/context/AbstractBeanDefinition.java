@@ -11,6 +11,7 @@ import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.inject.*;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
@@ -427,23 +428,28 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             try {
                 Value valAnn = (Value) argument.getAnnotation(Value.class);
                 Class argumentType = argument.getType();
-                String valString = resolveValueString(argument.getName(), valAnn);
-                Optional value = resolveValue((ApplicationContext) context, argumentType, valString, argument.getGenericTypes());
-                if(!value.isPresent() && argumentType == Optional.class) {
-                    return value;
+                if(isInnerConfiguration(argumentType)) {
+                    return context.createBean(argumentType);
                 }
                 else {
-                    return value.orElseGet(() -> {
-                        if(valAnn == null && isConfigurationProperties) {
-                            return defaultValue;
-                        }
-                        else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
-                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
-                        }
-                        else {
-                            return null;
-                        }
-                    });
+                    String valString = resolveValueString(argument.getName(), valAnn);
+                    Optional value = resolveValue((ApplicationContext) context, argumentType, valString, argument.getGenericTypes());
+                    if(!value.isPresent() && argumentType == Optional.class) {
+                        return value;
+                    }
+                    else {
+                        return value.orElseGet(() -> {
+                            if(valAnn == null && isConfigurationProperties) {
+                                return defaultValue;
+                            }
+                            else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
+                                throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
+                            }
+                            else {
+                                return null;
+                            }
+                        });
+                    }
                 }
             } finally {
                 path.pop();
@@ -451,6 +457,13 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         } else {
             throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
         }
+    }
+
+    private boolean isInnerConfiguration(Class argumentType) {
+        return isConfigurationProperties &&
+                argumentType.getName().indexOf('$') > -1 &&
+                Arrays.asList(getType().getClasses()).contains(argumentType) &&
+                Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
     private Optional resolveValue(ApplicationContext context, Class type, String valString, Class... genericTypes) {
@@ -485,7 +498,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         if (val == null) {
             if(isConfigurationProperties) {
                 ConfigurationProperties configurationProperties = getType().getAnnotation(ConfigurationProperties.class);
-                valString = configurationProperties.value() + "." + name;
+                String value = configurationProperties.value();
+                valString = value + "." + name;
             }
             else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");

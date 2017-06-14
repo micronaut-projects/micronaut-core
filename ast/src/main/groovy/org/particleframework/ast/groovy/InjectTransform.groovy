@@ -33,8 +33,10 @@ import javax.inject.Provider
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.beans.Introspector
 import java.lang.reflect.Modifier
 
+import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
@@ -152,12 +154,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isConfigurationProperties
         final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
-        AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
+        static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
+            this(sourceUnit, targetClassNode, stereoTypeFinder.hasStereoType(targetClassNode, ConfigurationProperties))
+        }
+
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, boolean isConfigurationProperties) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
-            this.isConfigurationProperties = stereoTypeFinder.hasStereoType(concreteClass, ConfigurationProperties)
+            this.isConfigurationProperties = isConfigurationProperties
             if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -297,7 +303,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        public Object resolveQualifier(AnnotatedNode annotatedNode) {
+        Object resolveQualifier(AnnotatedNode annotatedNode) {
             AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(annotatedNode, Qualifier)
             ClassNode qualifierClassNode = qualifierAnn?.classNode
             Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
@@ -426,6 +432,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
                     } else {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
+                    }
+                }
+
+                if(isConfigurationProperties) {
+                    SourceUnit su = sourceUnit
+                    classNode.getInnerClasses().each { InnerClassNode inner->
+                        def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
+                        AnnotationNode parentAnn = AstAnnotationUtils.findAnnotation(classNode, ConfigurationProperties)
+                        String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()
+                        innerClassName = innerClassName.substring(1) // remove starting dollar
+                        String newPath = parentAnn.getMember("value").text + ".${Introspector.decapitalize(innerClassName)}"
+                        innerAnnotation.setMember("value", constX(newPath))
+                        inner.addAnnotation(innerAnnotation)
+                        new InjectVisitor(su, inner,true).visitClass(inner)
                     }
                 }
 

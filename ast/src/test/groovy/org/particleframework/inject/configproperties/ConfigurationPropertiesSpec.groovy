@@ -46,7 +46,7 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultPort == 9999
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
-//        config.inner.enabled
+        config.inner.enabled
     }
 
     @ConfigurationProperties('foo.bar')
@@ -64,8 +64,8 @@ class ConfigurationPropertiesSpec extends Specification {
         Map<String,Integer> flags
         Optional<URL> url
         Optional<URL> anotherUrl
-////        Inner inner
-//
+        Inner inner
+
         Integer getAnotherPort() {
             return anotherPort
         }
@@ -73,9 +73,9 @@ class ConfigurationPropertiesSpec extends Specification {
         int getDefaultPort() {
             return defaultPort
         }
-//
-//        static class Inner {
-//            boolean enabled
-//        }
+
+        static class Inner {
+            boolean enabled
+        }
     }
 }
