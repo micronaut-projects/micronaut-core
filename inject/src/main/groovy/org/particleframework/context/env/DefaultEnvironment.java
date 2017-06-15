@@ -23,14 +23,20 @@ public class DefaultEnvironment implements Environment {
     // this allows optimization of searches by prefix
     private final Map<String,Object>[] catalog = new Map[57];
     private final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
+    private final ClassLoader classLoader;
 
-    public DefaultEnvironment(String name) {
-        this(name, new DefaultConversionService());
+    public DefaultEnvironment(String name, ClassLoader classLoader) {
+        this(name,classLoader, new DefaultConversionService());
     }
 
-    public DefaultEnvironment(String name, ConversionService conversionService) {
+    public DefaultEnvironment(String name) {
+        this(name,DefaultEnvironment.class.getClassLoader(), new DefaultConversionService());
+    }
+
+    public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {
         this.name = name;
         this.conversionService = conversionService;
+        this.classLoader = classLoader;
         addPropertySource(new MapPropertySource(System.getProperties()));
         addPropertySource(new MapPropertySource(System.getenv()) {
             @Override
@@ -41,8 +47,14 @@ public class DefaultEnvironment implements Environment {
 
         ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
         for (PropertySourceLoader loader : propertySources) {
-            addPropertySource(loader.load(this));
+            Optional<PropertySource> propertySource = loader.load(this);
+            propertySource.ifPresent(this::addPropertySource);
         }
+    }
+
+    @Override
+    public ClassLoader getClassLoader() {
+        return classLoader;
     }
 
     @Override

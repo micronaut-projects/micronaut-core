@@ -47,7 +47,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @return The environment instance
      */
     protected Environment createEnvironment(String environmentName) {
-        return new DefaultEnvironment(environmentName, conversionService);
+        return new DefaultEnvironment(environmentName, getClassLoader(), conversionService);
     }
 
     /**

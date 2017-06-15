@@ -1,4 +1,7 @@
 dependencies {
     compile project(":core")
+    compileOnly 'org.yaml:snakeyaml:1.18'
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
+
+    testRuntime 'org.yaml:snakeyaml:1.18'
 }

@@ -1,5 +1,7 @@
 package org.particleframework.context.env;
 
+import java.util.Optional;
+
 /**
  * Loads the given property source for the given environment
  *
@@ -12,7 +14,7 @@ public interface PropertySourceLoader {
      * Load a {@link PropertySource} for the given {@link Environment}
      *
      * @param environment The environment
-     * @return The property source
+     * @return An optional of {@link PropertySource}
      */
-    PropertySource load(Environment environment);
+    Optional<PropertySource> load(Environment environment);
 }
