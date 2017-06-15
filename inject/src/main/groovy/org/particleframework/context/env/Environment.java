@@ -33,7 +33,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     /**
      * @return The class loader for the environment
      */
-    ClassLoader getClassLoader();
+    default ClassLoader getClassLoader() {
+        return Environment.class.getClassLoader();
+    }
 
     /**
      * Check whether the given class is present within this environment

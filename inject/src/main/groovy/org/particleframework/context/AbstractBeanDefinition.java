@@ -11,7 +11,6 @@ import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.inject.*;
 import org.particleframework.inject.qualifiers.Qualifiers;
 

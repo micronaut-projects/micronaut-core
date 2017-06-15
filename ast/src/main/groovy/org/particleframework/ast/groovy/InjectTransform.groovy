@@ -273,6 +273,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode declaringClass = fieldNode.declaringClass
             boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
             boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
+
             if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
@@ -281,7 +282,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
-
+                    if(!beanWriter.isValidated()) {
+                        if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
+                            beanWriter.setValidated(true)
+                        }
+                    }
                     if(isValue) {
                         beanWriter.visitFieldValue(
                                 declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
@@ -335,6 +340,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     genericTypeList.add(resolveTypeReference(fieldType.componentType))
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
+                if(!beanWriter.isValidated()) {
+                    if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
+                        beanWriter.setValidated(true)
+                    }
+                }
 
                 if(isInject) {
 

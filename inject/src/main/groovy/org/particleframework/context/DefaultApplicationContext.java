@@ -71,10 +71,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     public ApplicationContext start() {
+        startEnvironment();
+        return (ApplicationContext) super.start();
+    }
+
+    protected void startEnvironment() {
         Environment environment = getEnvironment();
         environment.start();
         registerSingleton(Environment.class, environment);
-        return (ApplicationContext) super.start();
     }
 
     @Override

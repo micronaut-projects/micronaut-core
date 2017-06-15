@@ -344,19 +344,31 @@ public class DefaultBeanContext implements BeanContext {
                 return doCreateBean(resolutionContext, definition, qualifier, false);
             }
         } else {
-            for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
-                BeanKey key = entry.getKey();
-                if(qualifier == null || qualifier.equals(key.qualifier)) {
-                    BeanRegistration reg = entry.getValue();
-                    if(beanType.isInstance(reg.bean)) {
-                        T bean = (T) reg.bean;
-                        registerSingletonBean(definition, beanType, bean, qualifier, true);
-                        return bean;
+            T bean = findExistingCompatibleSingleton(beanType, qualifier);
+            if(bean == null) {
+                throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+            }
+            else {
+                return bean;
+            }
+        }
+    }
+
+    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier) {
+        T bean = null;
+        for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
+            BeanKey key = entry.getKey();
+            if(qualifier == null || qualifier.equals(key.qualifier)) {
+                BeanRegistration reg = entry.getValue();
+                if(beanType.isInstance(reg.bean)) {
+                    synchronized (singletonObjects) {
+                        bean = (T) reg.bean;
+                        registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
                     }
                 }
             }
-            throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
         }
+        return bean;
     }
 
     <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
@@ -384,7 +396,13 @@ public class DefaultBeanContext implements BeanContext {
                 return Optional.of(bean);
             }
         } else {
-            return Optional.empty();
+            T bean = findExistingCompatibleSingleton(beanType, qualifier);
+            if(bean == null) {
+                return Optional.empty();
+            }
+            else {
+                return Optional.of(bean);
+            }
         }
     }
 
@@ -473,6 +491,9 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }
+        }
+        if(beanDefinition instanceof ValidatedBeanDefinition) {
+            bean = ((ValidatedBeanDefinition<T>)beanDefinition).validate(resolutionContext, bean);
         }
         return bean;
     }

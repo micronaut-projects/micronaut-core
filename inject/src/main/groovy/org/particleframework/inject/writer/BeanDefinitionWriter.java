@@ -10,10 +10,7 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.DefaultBeanContext;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.BeanFactory;
-import org.particleframework.inject.DisposableBeanDefinition;
-import org.particleframework.inject.InitializingBeanDefinition;
+import org.particleframework.inject.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -189,6 +186,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         this.isSingleton = isSingleton;
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
+    }
+
+    /**
+     * Make the bean definition as validated by javax.validation
+     *
+     * @param validated Whether the bean definition is validated
+     */
+    public void setValidated(boolean validated) {
+        if(validated) {
+            this.interfaceTypes.add(ValidatedBeanDefinition.class);
+        }
+        else {
+            this.interfaceTypes.remove(ValidatedBeanDefinition.class);
+        }
+    }
+
+    /**
+     * @return Return whether the bean definition is validated
+     */
+    public boolean isValidated() {
+        return this.interfaceTypes.contains(ValidatedBeanDefinition.class);
     }
 
     /**
