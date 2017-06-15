@@ -10,7 +10,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-interface Qualifier<T> {
+public interface Qualifier<T> {
 
     /**
      * Qualify the candidate from the stream of candidates
