@@ -14,7 +14,15 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
+@Repeatable(Requirements.class)
 public @interface Requires {
+
+    /**
+     * Expresses that the configuration will only load within the given environments
+     *
+     * @return The names of the environments this configuration will load in
+     */
+    String[] env() default {};
 
     /**
      * Expresses that the given property should be set for the bean to load. By default the value of the property

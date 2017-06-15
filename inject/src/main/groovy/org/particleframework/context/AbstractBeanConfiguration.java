@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.context.annotation.Requirements;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
@@ -25,10 +26,17 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     private final Collection<BeanDefinitionClass> beanDefinitionClasses = new ArrayList<>();
     private final Condition condition;
     private Boolean enabled = null;
+
     protected AbstractBeanConfiguration(Package thePackage) {
         this.thePackage = thePackage;
         this.packageName = thePackage.getName();
         Requires[] annotations = thePackage.getAnnotationsByType(Requires.class);
+        if(annotations.length == 0) {
+            Requirements requirements = thePackage.getAnnotation(Requirements.class);
+            if(requirements != null) {
+                annotations = requirements.value();
+            }
+        }
         this.condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
     }
 

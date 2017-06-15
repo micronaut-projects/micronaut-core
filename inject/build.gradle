@@ -1,5 +1,11 @@
 dependencies {
     compile project(":core")
-    compile 'com.github.ben-manes.caffeine:caffeine:2.5.0'
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
+
+    ['javax.validation:validation-api:1.1.0.Final',
+     'org.yaml:snakeyaml:1.18'].each { String dep ->
+        compileOnly dep
+        testCompile dep
+    }
+
 }

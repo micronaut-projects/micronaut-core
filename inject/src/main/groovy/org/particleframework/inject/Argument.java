@@ -28,4 +28,13 @@ public interface Argument<T> {
      * @return The qualifier
      */
     Annotation getQualifier();
+
+    /**
+     * Obtain an annotation for the given type
+     *
+     * @param type The annotation type
+     * @param <A> The annotation concrete type
+     * @return The annotation or null
+     */
+    <A extends Annotation> A getAnnotation(Class<A> type);
 }

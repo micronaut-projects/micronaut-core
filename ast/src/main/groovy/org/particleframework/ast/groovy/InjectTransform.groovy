@@ -15,9 +15,11 @@ import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
+import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Context
 import org.particleframework.context.annotation.Replaces
+import org.particleframework.context.annotation.Value
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
@@ -31,8 +33,10 @@ import javax.inject.Provider
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.beans.Introspector
 import java.lang.reflect.Modifier
 
+import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.*
 
@@ -147,13 +151,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         final SourceUnit sourceUnit
         final ClassNode concreteClass
+        final boolean isConfigurationProperties
         final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
-        AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
+        static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
+            this(sourceUnit, targetClassNode, stereoTypeFinder.hasStereoType(targetClassNode, ConfigurationProperties))
+        }
+
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, boolean isConfigurationProperties) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
+            this.isConfigurationProperties = isConfigurationProperties
             if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -259,8 +269,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitField(FieldNode fieldNode) {
+            if(fieldNode.name == 'metaClass') return
             ClassNode declaringClass = fieldNode.declaringClass
-            if (stereoTypeFinder.hasStereoType(fieldNode, Inject) && declaringClass.getProperty(fieldNode.getName()) == null) {
+            boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
+            boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
+
+            if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
                 if (!fieldNode.isStatic()) {
                     Object qualifierRef = resolveQualifier(fieldNode)
@@ -268,18 +282,33 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
-
-                    beanWriter.visitFieldInjectionPoint(
-                            declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
-                            requiresReflection,
-                            fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
-                            fieldNode.name
-                    )
+                    if(!beanWriter.isValidated()) {
+                        if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
+                            beanWriter.setValidated(true)
+                        }
+                    }
+                    if(isValue) {
+                        beanWriter.visitFieldValue(
+                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                requiresReflection,
+                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
+                                fieldNode.name,
+                                isConfigurationProperties
+                        )
+                    }
+                    else {
+                        beanWriter.visitFieldInjectionPoint(
+                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                requiresReflection,
+                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
+                                fieldNode.name
+                        )
+                    }
                 }
             }
         }
 
-        public Object resolveQualifier(AnnotatedNode annotatedNode) {
+        Object resolveQualifier(AnnotatedNode annotatedNode) {
             AnnotationNode qualifierAnn = stereoTypeFinder.findAnnotationWithStereoType(annotatedNode, Qualifier)
             ClassNode qualifierClassNode = qualifierAnn?.classNode
             Object qualifierRef = qualifierClassNode?.isResolved() ? qualifierClassNode.typeClass : qualifierClassNode?.name
@@ -289,7 +318,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
-            if (fieldNode != null && !propertyNode.isStatic() && stereoTypeFinder.hasStereoType(fieldNode, Inject)) {
+            if(fieldNode.name == 'metaClass') return
+            boolean isInject = fieldNode != null && stereoTypeFinder.hasStereoType(fieldNode, Inject)
+            boolean isValue = !isInject && fieldNode != null && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
+            if (!propertyNode.isStatic() && (isInject || isValue)) {
                 defineBeanDefinition(concreteClass)
                 Object qualifier = resolveQualifier(fieldNode)
 
@@ -308,15 +340,36 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     genericTypeList.add(resolveTypeReference(fieldType.componentType))
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
-                beanWriter.visitSetterInjectionPoint(
-                        resolveTypeReference(declaringClass),
-                        qualifier,
-                        false,
-                        resolveTypeReference(fieldType),
-                        fieldNode.name,
-                        getSetterName(propertyNode.name),
-                        genericTypeList
-                )
+                if(!beanWriter.isValidated()) {
+                    if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
+                        beanWriter.setValidated(true)
+                    }
+                }
+
+                if(isInject) {
+
+                    beanWriter.visitSetterInjectionPoint(
+                            resolveTypeReference(declaringClass),
+                            qualifier,
+                            false,
+                            resolveTypeReference(fieldType),
+                            fieldNode.name,
+                            getSetterName(propertyNode.name),
+                            genericTypeList
+                    )
+                }
+                else if(isValue){
+                    beanWriter.visitSetterValue(
+                            resolveTypeReference(declaringClass),
+                            qualifier,
+                            false,
+                            resolveTypeReference(fieldType),
+                            fieldNode.name,
+                            getSetterName(propertyNode.name),
+                            genericTypeList,
+                            isConfigurationProperties
+                    )
+                }
             }
         }
 
@@ -389,6 +442,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
                     } else {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
+                    }
+                }
+
+                if(isConfigurationProperties) {
+                    SourceUnit su = sourceUnit
+                    classNode.getInnerClasses().each { InnerClassNode inner->
+                        if(Modifier.isStatic(inner.getModifiers()) && Modifier.isPublic(inner.getModifiers()) && inner.getDeclaredConstructors().size() == 0) {
+
+                            def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
+                            AnnotationNode parentAnn = AstAnnotationUtils.findAnnotation(classNode, ConfigurationProperties)
+                            String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()
+                            innerClassName = innerClassName.substring(1) // remove starting dollar
+                            String newPath = parentAnn.getMember("value").text + ".${Introspector.decapitalize(innerClassName)}"
+                            innerAnnotation.setMember("value", constX(newPath))
+                            inner.addAnnotation(innerAnnotation)
+                            new InjectVisitor(su, inner,true).visitClass(inner)
+                        }
                     }
                 }
 

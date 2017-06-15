@@ -1,8 +1,8 @@
-package org.particleframework.context
+package org.particleframework.context;
 
-import org.particleframework.inject.BeanDefinition
+import org.particleframework.inject.BeanDefinition;
 
-import java.util.stream.Stream
+import java.util.stream.Stream;
 
 /**
  * Used to qualify which bean to select in the case of multiple possible options
@@ -10,7 +10,7 @@ import java.util.stream.Stream
  * @author Graeme Rocher
  * @since 1.0
  */
-interface Qualifier<T> {
+public interface Qualifier<T> {
 
     /**
      * Qualify the candidate from the stream of candidates
@@ -18,5 +18,5 @@ interface Qualifier<T> {
      * @param candidates The candidates
      * @return The qualified candidate or null it it cannot be qualified
      */
-    BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates)
+    BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates);
 }

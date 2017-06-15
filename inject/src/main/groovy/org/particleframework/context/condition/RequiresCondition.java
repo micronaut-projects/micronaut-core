@@ -1,8 +1,11 @@
 package org.particleframework.context.condition;
 
 import groovy.lang.GroovySystem;
+import org.particleframework.config.PropertyResolver;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
 import org.slf4j.Logger;
@@ -10,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -34,6 +38,12 @@ public class RequiresCondition implements Condition {
             if(!matchesPresenceOfClasses(annotation)) {
                 return false;
             }
+            if(!matchesEnvironment(context, annotation)) {
+                return false;
+            }
+            if(!matchesProperty(context, annotation)) {
+                return false;
+            }
             if(!matchesPresenceOfBean(context, annotation)) {
                 return false;
             }
@@ -45,6 +55,44 @@ public class RequiresCondition implements Condition {
             }
             if(!matchesConditions(context, annotation)) {
                 return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesProperty(ConditionContext context, Requires annotation) {
+        String property = annotation.property();
+        if(property.length() > 0) {
+            String value = annotation.value();
+            BeanContext beanContext = context.getBeanContext();
+            if(beanContext instanceof PropertyResolver) {
+                PropertyResolver propertyResolver = (PropertyResolver) beanContext;
+                Optional<String> resolved = propertyResolver.getProperty(property, String.class);
+                if(!resolved.isPresent()) {
+                    return false;
+                }
+                else if(value.length()>0) {
+                    String resolvedValue = resolved.get();
+                    if(!resolvedValue.equals(value)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesEnvironment(ConditionContext context, Requires annotation) {
+        String[] env = annotation.env();
+        if(env.length == 0) {
+            return true;
+        }
+        else {
+            BeanContext beanContext = context.getBeanContext();
+            if(beanContext instanceof ApplicationContext) {
+                ApplicationContext applicationContext = (ApplicationContext) beanContext;
+                Environment environment = applicationContext.getEnvironment();
+                return Arrays.stream(env).anyMatch(name -> name.equalsIgnoreCase(environment.getName()));
             }
         }
         return true;

@@ -24,8 +24,15 @@ class MessageUtils {
      */
     static String buildMessage(BeanResolutionContext resolutionContext, String message) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
-        BeanResolutionContext.Segment segment = path.peek();
-        BeanDefinition declaringType = segment.getDeclaringType();
+        BeanDefinition declaringType;
+        boolean hasPath = !path.isEmpty();
+        if(hasPath) {
+            BeanResolutionContext.Segment segment = path.peek();
+            declaringType = segment.getDeclaringType();
+        }
+        else {
+            declaringType = resolutionContext.getRootDefinition();
+        }
         String ls = System.getProperty("line.separator");
         StringBuilder builder = new StringBuilder("Error instantiating bean of type  [");
         builder.append(declaringType.getName())
@@ -36,8 +43,10 @@ class MessageUtils {
         if(message != null) {
             builder.append("Message: ").append(message).append(ls);
         }
-        String pathString =  path.toString();
-        builder.append("Path Taken: ").append(pathString);
+        if(hasPath) {
+            String pathString =  path.toString();
+            builder.append("Path Taken: ").append(pathString);
+        }
         return builder.toString();
     }
 

@@ -29,4 +29,15 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable  {
     default void close() throws IOException {
         stop();
     }
+
+    /**
+     * Refreshes the current life cycle object. Effectively this calls {@link #stop()} followed by {@link #start()}
+     *
+     * @return This lifecycle component
+     */
+    default T refresh() {
+        stop();
+        start();
+        return (T) this;
+    }
 }

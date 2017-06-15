@@ -1,0 +1,4 @@
+dependencies {
+    compile project(":ast")
+    compile "org.grails:grails-datastore-gorm-hibernate5:6.1.4.RELEASE"
+}

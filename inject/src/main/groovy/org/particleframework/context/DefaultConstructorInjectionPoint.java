@@ -30,7 +30,13 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         this.declaringComponent = declaringComponent;
         this.constructor = constructor;
         this.requiresReflection = Modifier.isPrivate(constructor.getModifiers());
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes);
+        Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
+        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
+            if(index < parameterAnnotations.length) {
+                return parameterAnnotations[index];
+            }
+            return new Annotation[0];
+        });
     }
 
     @Override

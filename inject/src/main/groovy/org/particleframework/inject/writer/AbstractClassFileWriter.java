@@ -1,6 +1,7 @@
 package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
+import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -216,7 +217,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     protected String getInternalNameForCast(Object type) {
         if(type instanceof Class) {
-            return Type.getInternalName((Class) type);
+            Class typeClass = (Class) type;
+            if(typeClass.isPrimitive()) {
+                typeClass = ReflectionUtils.getWrapperType(typeClass);
+            }
+            return Type.getInternalName(typeClass);
         }
         else {
             String className = type.toString();
