@@ -20,7 +20,7 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> qualify(String name) {
-        return new NameQualifier<T>(name);
+        return new NameQualifier<>(name);
     }
 
     /**
@@ -31,6 +31,6 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> qualify(Annotation annotation) {
-        return new AnnotationQualifier<T>(annotation);
+        return new AnnotationQualifier<>(annotation);
     }
 }
