@@ -8,3 +8,5 @@ include "runtime"
 include "runtime-netty"
 include "test-suite"
 
+// configurations
+include "configurations/hibernate-validator"
