@@ -14,6 +14,7 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
+@Repeatable(Requirements.class)
 public @interface Requires {
 
     /**

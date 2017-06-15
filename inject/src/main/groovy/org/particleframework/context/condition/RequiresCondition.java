@@ -1,6 +1,7 @@
 package org.particleframework.context.condition;
 
 import groovy.lang.GroovySystem;
+import org.particleframework.config.PropertyResolver;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
@@ -40,6 +41,9 @@ public class RequiresCondition implements Condition {
             if(!matchesEnvironment(context, annotation)) {
                 return false;
             }
+            if(!matchesProperty(context, annotation)) {
+                return false;
+            }
             if(!matchesPresenceOfBean(context, annotation)) {
                 return false;
             }
@@ -51,6 +55,28 @@ public class RequiresCondition implements Condition {
             }
             if(!matchesConditions(context, annotation)) {
                 return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesProperty(ConditionContext context, Requires annotation) {
+        String property = annotation.property();
+        if(property.length() > 0) {
+            String value = annotation.value();
+            BeanContext beanContext = context.getBeanContext();
+            if(beanContext instanceof PropertyResolver) {
+                PropertyResolver propertyResolver = (PropertyResolver) beanContext;
+                Optional<String> resolved = propertyResolver.getProperty(property, String.class);
+                if(!resolved.isPresent()) {
+                    return false;
+                }
+                else if(value.length()>0) {
+                    String resolvedValue = resolved.get();
+                    if(!resolvedValue.equals(value)) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
