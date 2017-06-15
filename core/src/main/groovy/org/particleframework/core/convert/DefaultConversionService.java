@@ -336,7 +336,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Map -> Map (inner type conversion)
         addConverter(Map.class, Map.class, (object, targetType, typeArguments) -> {
             Class keyType = typeArguments.get(targetType.getTypeParameters()[0].getName());
+            if(keyType == null) {
+                keyType = String.class;
+            }
             Class valueType = typeArguments.get(targetType.getTypeParameters()[1].getName());
+            if(valueType == null) {
+                valueType = Object.class;
+            }
             Map newMap = new LinkedHashMap();
             for (Object o : object.entrySet()) {
                 Map.Entry entry = (Map.Entry) o;
