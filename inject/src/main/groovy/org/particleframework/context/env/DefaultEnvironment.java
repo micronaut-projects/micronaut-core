@@ -24,6 +24,7 @@ public class DefaultEnvironment implements Environment {
     private final Map<String,Object>[] catalog = new Map[57];
     private final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
     private final ClassLoader classLoader;
+    private final Collection<String> packages = new ConcurrentLinkedQueue<>();
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
         this(name,classLoader, new DefaultConversionService());
@@ -61,6 +62,17 @@ public class DefaultEnvironment implements Environment {
     public Environment addPropertySource(PropertySource propertySource) {
         propertySources.add(propertySource);
         return this;
+    }
+
+    @Override
+    public Environment addPackage(String pkg) {
+        this.packages.add(pkg);
+        return this;
+    }
+
+    @Override
+    public Collection<String> getPackages() {
+        return Collections.unmodifiableCollection(packages);
     }
 
     @Override
