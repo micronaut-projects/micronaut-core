@@ -38,7 +38,6 @@ import java.util.stream.Stream;
 
 /**
  * <p>An optimized classpath scanner that includes the ability to optionally scan JAR files.</p>
- * <p>
  * <p>The implementation avoids loading the classes themselves by parsing the class definitions and reading
  * only the annotations.</p>
  *

@@ -50,6 +50,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return new DefaultEnvironment(environmentName, getClassLoader(), conversionService);
     }
 
+    @Override
+    <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+        if(ApplicationContext.class == beanType) {
+            return (T) this;
+        }
+        else {
+            return super.getBean(resolutionContext, beanType, qualifier);
+        }
+    }
+
     /**
      * Creates the default conversion service
      *

@@ -1,7 +1,7 @@
 @org.particleframework.context.annotation.Configuration
 @Requirements([
-    @Requires(classes = HibernateDatastore),
-    @Requires(property = 'dataSource.url')
+//    @Requires(property = 'dataSource.url'),
+    @Requires(classes = HibernateDatastore)
 ])
 package org.particleframework.configuration.hibernate.gorm
 
