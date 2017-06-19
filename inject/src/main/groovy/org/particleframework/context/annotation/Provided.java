@@ -17,6 +17,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Scope
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
 public @interface Provided {
 }

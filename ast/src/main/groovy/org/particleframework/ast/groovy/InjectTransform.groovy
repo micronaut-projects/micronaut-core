@@ -16,8 +16,10 @@ import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.config.ConfigurationProperties
+import org.particleframework.context.annotation.Bean
 import org.particleframework.context.annotation.Configuration
 import org.particleframework.context.annotation.Context
+import org.particleframework.context.annotation.Factory
 import org.particleframework.context.annotation.Replaces
 import org.particleframework.context.annotation.Value
 import org.particleframework.inject.BeanConfiguration
@@ -152,6 +154,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final SourceUnit sourceUnit
         final ClassNode concreteClass
         final boolean isConfigurationProperties
+        final boolean isFactoryClass
         final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -163,8 +166,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, boolean isConfigurationProperties) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
+            this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
             this.isConfigurationProperties = isConfigurationProperties
-            if (stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
+            if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
         }
@@ -188,7 +192,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
+            if( isFactoryClass && !isConstructor && stereoTypeFinder.hasStereoType(methodNode, Bean)) {
+                ClassNode producedType = methodNode.returnType
+                AnnotationNode scopeAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Scope.class)
+                AnnotationNode singletonAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Singleton.class)
+
+                BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(producedType.packageName, producedType.nameWithoutPackage,scopeAnn?.classNode?.name, singletonAnn != null )
+                Map<String, Object> paramsToType = [:]
+                Map<String, Object> qualifierTypes = [:]
+                Map<String, List<Object>> genericTypeMap = [:]
+                populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+
+                beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodNode.name, paramsToType, qualifierTypes, genericTypeMap)
+                beanDefinitionWriters.put(producedType, beanMethodWriter)
+            }
+            else if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
                 defineBeanDefinition(concreteClass)
 
                 if (!isConstructor) {

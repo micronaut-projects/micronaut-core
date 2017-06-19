@@ -17,6 +17,7 @@ package org.particleframework.configuration.hibernate.gorm
 
 import grails.gorm.annotation.Entity
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import org.grails.datastore.mapping.services.Service
 import org.grails.orm.hibernate.HibernateDatastore
 import org.particleframework.context.ApplicationContext
@@ -34,9 +35,11 @@ import java.util.stream.Stream
  */
 @CompileStatic
 @Context
+@Slf4j
 class HibernateDatastoreProvider implements Provider<HibernateDatastore> {
 
     final ApplicationContext context
+
 
     HibernateDatastoreProvider(ApplicationContext context) {
         this.context = context
@@ -53,4 +56,5 @@ class HibernateDatastoreProvider implements Provider<HibernateDatastore> {
         }
         return datastore
     }
+
 }

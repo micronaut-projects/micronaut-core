@@ -16,6 +16,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Context
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
 public @interface Infrastructure {
 }

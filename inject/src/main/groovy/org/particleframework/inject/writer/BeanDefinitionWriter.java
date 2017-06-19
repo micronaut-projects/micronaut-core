@@ -194,10 +194,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param validated Whether the bean definition is validated
      */
     public void setValidated(boolean validated) {
-        if(validated) {
+        if (validated) {
             this.interfaceTypes.add(ValidatedBeanDefinition.class);
-        }
-        else {
+        } else {
             this.interfaceTypes.remove(ValidatedBeanDefinition.class);
         }
     }
@@ -222,6 +221,76 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     public String getBeanDefinitionClassFile() {
         return getBeanDefinitionName().replace('.', File.separatorChar) + ".class";
     }
+
+    /**
+     * <p>In the case where the produced class is produced by a factory method annotated with {@link org.particleframework.context.annotation.Bean} this method should be called</p>
+     *
+     * @param factoryClass   The factory class
+     * @param methodName     The method name
+     * @param argumentTypes  The arguments to the method
+     * @param qualifierTypes The qualifiers for the method parameters
+     * @param genericTypes   The generic types for the method parameters
+     */
+    public void visitBeanFactoryMethod(Object factoryClass,
+                                       String methodName,
+                                       Map<String, Object> argumentTypes,
+                                       Map<String, Object> qualifierTypes,
+                                       Map<String, List<Object>> genericTypes) {
+        if (constructorVisitor != null) {
+            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+        } else {
+            buildFactoryMethodClassConstructor(factoryClass, methodName, argumentTypes, qualifierTypes, genericTypes);
+
+            // now implement the build method
+            // now prepare the implementation of the build method. See BeanFactory interface
+            visitBuildFactoryMethodDefinition(factoryClass, methodName, argumentTypes);
+
+            // now override the injectBean method
+            visitInjectMethodDefinition();
+
+        }
+    }
+
+    private void buildFactoryMethodClassConstructor(Object factoryClass, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        Type factoryTypeRef = getTypeReference(factoryClass);
+        this.constructorVisitor = startConstructor(classWriter);
+        // ALOAD 0
+        constructorVisitor.visitVarInsn(ALOAD, 0);
+
+        // First constructor argument: The factory method
+        boolean hasArgs = !argumentTypes.isEmpty();
+        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
+        // load 'this'
+        constructorVisitor.visitVarInsn(ALOAD, 0);
+
+        pushGetMethodFromTypeCall(constructorVisitor, factoryTypeRef, methodName, argumentTypeClasses);
+
+
+        if(hasArgs) {
+            // 2nd Argument: Create a call to createMap from an argument types
+            pushCreateMapCall(this.constructorVisitor, argumentTypes);
+
+            // 3rd Argument: Create a call to createMap from qualifier types
+            if (qualifierTypes != null) {
+                pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+            } else {
+                constructorVisitor.visitInsn(ACONST_NULL);
+            }
+
+            // 4th Argument: Create a call to createMap from generic types
+            if (genericTypes != null) {
+                pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+            } else {
+                constructorVisitor.visitInsn(ACONST_NULL);
+            }
+            // now invoke super(..) if no arg constructor
+            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class);
+        }
+        else {
+            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class);
+        }
+    }
+
 
     /**
      * Visits the constructor used to create the bean definition.
@@ -394,7 +463,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, isOptional ? GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT :  GET_VALUE_FOR_METHOD_ARGUMENT);
+            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, isOptional ? GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT : GET_VALUE_FOR_METHOD_ARGUMENT);
         }
         currentMethodIndex++;
     }
@@ -447,7 +516,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushIntegerConstant(injectMethodVisitor, currentMethodIndex);
         // 4th argument the argument index
         pushIntegerConstant(injectMethodVisitor, 0);
-        if(resolveMethod == GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT) {
+        if (resolveMethod == GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT) {
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
             String getterName = "get" + MetaClassHelper.capitalize(fieldName);
             groovyjarjarasm.asm.commons.Method getterMethod = groovyjarjarasm.asm.commons.Method.getMethod(getTypeReference(fieldType).getClassName() + " " + getterName + "()");
@@ -743,17 +812,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param fieldName          The name of the field
      */
     public void visitFieldValue(Object declaringType,
-                                         Object qualifierType,
-                                         boolean requiresReflection,
-                                         Object fieldType,
-                                         String fieldName,
-                                         boolean isOptional) {
+                                Object qualifierType,
+                                boolean requiresReflection,
+                                Object fieldType,
+                                String fieldName,
+                                boolean isOptional) {
         // Implementation notes.
         // This method modifies the constructor adding addInjectPoint calls for each field that is annotated with @Inject
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName,isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD,isOptional);
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD, isOptional);
     }
 
     private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isOptional) {
@@ -802,7 +871,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             // 3rd argument the field index
             pushIntegerConstant(injectMethodVisitor, currentFieldIndex);
             // 4th argument the current value
-            if(isOptionalValue) {
+            if (isOptionalValue) {
                 injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
                 injectMethodVisitor.visitFieldInsn(GETFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
                 pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
@@ -819,20 +888,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     private void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
         Class wrapperType = getWrapperType(fieldType);
-        if(wrapperType != null) {
+        if (wrapperType != null) {
             Class primitiveType = (Class) fieldType;
             Type wrapper = Type.getType(wrapperType);
             String primitiveName = primitiveType.getName();
-            String sig = wrapperType.getName() + " valueOf(" + primitiveName +")";
+            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
             groovyjarjarasm.asm.commons.Method valueOfMethod = groovyjarjarasm.asm.commons.Method.getMethod(sig);
             injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
         }
     }
 
     private Class getWrapperType(Object type) {
-        if(type instanceof Class) {
+        if (type instanceof Class) {
             Class typeClass = (Class) type;
-            if(typeClass.isPrimitive()) {
+            if (typeClass.isPrimitive()) {
                 return ReflectionUtils.getWrapperType(typeClass);
             }
         }
@@ -977,37 +1046,59 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushInvokeMethodOnSuperClass(methodVisitor, methodToInvoke);
     }
 
+    private void visitBuildFactoryMethodDefinition(Object factoryClass, String methodName, Map<String, Object> argumentTypes) {
+        if (buildMethodVisitor == null) {
+            defineBuilderMethod();
+            // load this
+
+            MethodVisitor buildMethodVisitor = this.buildMethodVisitor;
+            // Load the BeanContext for the method call
+            buildMethodVisitor.visitVarInsn(ALOAD, 2);
+            pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
+            // load the first argument of the method (the BeanResolutionContext) to be passed to the method
+            buildMethodVisitor.visitVarInsn(ALOAD, 1);
+            // second argument is the bean type
+            Type factoryType = getTypeReference(factoryClass);
+            buildMethodVisitor.visitLdcInsn(factoryType);
+            Method getBeanMethod = ReflectionUtils.getDeclaredMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class).orElseThrow(()->
+                new IllegalStateException("DefaultContext.getBean(..) method not found. Incompatible version of Particle?")
+            );
+            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    Type.getInternalName(DefaultBeanContext.class),
+                    "getBean",
+                    Type.getMethodDescriptor(getBeanMethod), false);
+
+            // store a reference to the bean being built at index 3
+            int factoryVar = pushNewBuildLocalVariable();
+            buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
+            pushCastToType(buildMethodVisitor, factoryClass);
+            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    factoryType.getInternalName(),
+                    methodName,
+                    Type.getMethodDescriptor(beanType), false);
+            this.buildInstanceIndex = pushNewBuildLocalVariable();
+
+//            pushContructorArguments(buildMethodVisitor, argumentTypes);
+//            String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
+//            buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
+//            // store a reference to the bean being built at index 3
+//            this.buildInstanceIndex = pushNewBuildLocalVariable();
+            pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
+            pushCastToType(buildMethodVisitor, beanFullClassName);
+            buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
+            buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
+        }
+    }
+
     private void visitBuildMethodDefinition(Map<String, Object> argumentTypes) {
         if (buildMethodVisitor == null) {
-            this.buildMethodVisitor = classWriter.visitMethod(
-                    ACC_PUBLIC,
-                    "build",
-                    getMethodDescriptor(Object.class.getName(), BeanResolutionContext.class.getName(), BeanContext.class.getName(), BeanDefinition.class.getName()),
-                    getMethodSignature(getTypeDescriptor(providedBeanClassName), getTypeDescriptor(BeanResolutionContext.class.getName()), getTypeDescriptor(BeanContext.class.getName()), getTypeDescriptor(BeanDefinition.class.getName(), providedBeanClassName)),
-                    null);
+            defineBuilderMethod();
             // load this
 
             MethodVisitor buildMethodVisitor = this.buildMethodVisitor;
             buildMethodVisitor.visitTypeInsn(NEW, beanType.getInternalName());
             buildMethodVisitor.visitInsn(DUP);
-            int size = argumentTypes.size();
-            if (size > 0) {
-                Iterator<Object> iterator = argumentTypes.values().iterator();
-                for (int i = 0; i < size; i++) {
-                    // Load this for method call
-                    buildMethodVisitor.visitVarInsn(ALOAD, 0);
-                    Object argType = iterator.next();
-
-                    // load the first two arguments of the method (the BeanResolutionContext and the BeanContext) to be passed to the method
-                    buildMethodVisitor.visitVarInsn(ALOAD, 1);
-                    buildMethodVisitor.visitVarInsn(ALOAD, 2);
-                    // pass the index of the method as the third argument
-                    pushIntegerConstant(buildMethodVisitor, i);
-                    // invoke the getBeanForConstructorArgument method
-                    pushInvokeMethodOnSuperClass(buildMethodVisitor, GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT);
-                    pushCastToType(buildMethodVisitor, argType);
-                }
-            }
+            pushContructorArguments(buildMethodVisitor, argumentTypes);
             String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
             buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
             // store a reference to the bean being built at index 3
@@ -1017,6 +1108,36 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
             buildMethodVisitor.visitVarInsn(ALOAD, buildInstanceIndex);
         }
+    }
+
+    private void pushContructorArguments(MethodVisitor buildMethodVisitor, Map<String, Object> argumentTypes) {
+        int size = argumentTypes.size();
+        if (size > 0) {
+            Iterator<Object> iterator = argumentTypes.values().iterator();
+            for (int i = 0; i < size; i++) {
+                // Load this for method call
+                buildMethodVisitor.visitVarInsn(ALOAD, 0);
+                Object argType = iterator.next();
+
+                // load the first two arguments of the method (the BeanResolutionContext and the BeanContext) to be passed to the method
+                buildMethodVisitor.visitVarInsn(ALOAD, 1);
+                buildMethodVisitor.visitVarInsn(ALOAD, 2);
+                // pass the index of the method as the third argument
+                pushIntegerConstant(buildMethodVisitor, i);
+                // invoke the getBeanForConstructorArgument method
+                pushInvokeMethodOnSuperClass(buildMethodVisitor, GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT);
+                pushCastToType(buildMethodVisitor, argType);
+            }
+        }
+    }
+
+    private void defineBuilderMethod() {
+        this.buildMethodVisitor = classWriter.visitMethod(
+                ACC_PUBLIC,
+                "build",
+                getMethodDescriptor(Object.class.getName(), BeanResolutionContext.class.getName(), BeanContext.class.getName(), BeanDefinition.class.getName()),
+                getMethodSignature(getTypeDescriptor(providedBeanClassName), getTypeDescriptor(BeanResolutionContext.class.getName()), getTypeDescriptor(BeanContext.class.getName()), getTypeDescriptor(BeanDefinition.class.getName(), providedBeanClassName)),
+                null);
     }
 
 
@@ -1255,12 +1376,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         // the type reference
         if (type instanceof Class) {
             Class typeClass = (Class) type;
-            if(typeClass.isPrimitive()) {
+            if (typeClass.isPrimitive()) {
                 Type wrapperType = Type.getType(ReflectionUtils.getWrapperType(typeClass));
 
                 methodVisitor.visitFieldInsn(GETSTATIC, wrapperType.getInternalName(), "TYPE", Type.getDescriptor(Class.class));
-            }
-            else {
+            } else {
                 methodVisitor.visitLdcInsn(Type.getType(typeClass));
             }
         } else {
@@ -1334,6 +1454,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      */
     private void pushGetAnnotationForType(Type targetClass, Type annotationType) {
         constructorVisitor.visitLdcInsn(targetClass);
+        pushGetAnnotationCall(annotationType);
+    }
+
+    private void pushGetAnnotationCall(Type annotationType) {
         constructorVisitor.visitLdcInsn(annotationType);
         Method method = ReflectionUtils.getDeclaredMethod(Class.class, "getAnnotation", Class.class)
                 .orElseThrow(() ->

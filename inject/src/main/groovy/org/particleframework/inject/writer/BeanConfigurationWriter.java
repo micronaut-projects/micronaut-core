@@ -7,6 +7,7 @@ import org.particleframework.context.AbstractBeanConfiguration;
 import org.particleframework.core.annotation.Internal;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Writes configuration classes for configuration packages using ASM
@@ -73,6 +74,8 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
             writeClassToDisk(targetDir, classWriter, configurationClassName);
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Particle version?: " + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
         }
     }
 

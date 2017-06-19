@@ -316,11 +316,11 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType) {
+    public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBean(resolutionContext, beanType, null);
     }
 
-    <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         // allow injection the bean context
         if (beanType == BeanContext.class) {
             return (T) this;
@@ -619,19 +619,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private BeanConfiguration findBeanConfiguration(BeanDefinitionClass definitionClass) {
-        if (beanConfigurations.isEmpty()) {
-            return null;
-        } else {
-            Optional<BeanConfiguration> result = beanConfigurations.values()
-                    .stream()
-                    .filter(beanConfiguration -> beanConfiguration.isWithin(definitionClass))
-                    .findFirst();
-
-            return result.orElse(null);
-        }
-    }
-
     private <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
         Collection<BeanDefinition<T>> candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
@@ -729,9 +716,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    <T> AbstractBeanDefinition<T> getComponentDefinition(Class<T> beanType) {
-        return (AbstractBeanDefinition<T>) findConcreteCandidate(beanType, null, true, true);
-    }
 
     private static final class BeanRegistration<T> {
         private final BeanDefinition<T> beanDefinition;

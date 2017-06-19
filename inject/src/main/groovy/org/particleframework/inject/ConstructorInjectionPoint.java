@@ -1,7 +1,5 @@
 package org.particleframework.inject;
 
-import java.lang.reflect.Constructor;
-
 /**
  * A constructor injection point
  *
@@ -9,11 +7,6 @@ import java.lang.reflect.Constructor;
  * @since 1.0
  */
 public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint {
-
-    /**
-     * @return The setter to invoke to set said property
-     */
-    Constructor<T> getConstructor();
 
     /**
      * Invoke the constructor

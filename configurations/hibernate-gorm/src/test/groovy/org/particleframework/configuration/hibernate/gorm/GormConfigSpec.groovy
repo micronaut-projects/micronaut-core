@@ -51,6 +51,8 @@ class GormConfigSpec extends Specification {
         applicationContext.containsBean(DataSource)
         count == 0
 
+        cleanup:
+        applicationContext.stop()
     }
 }
 

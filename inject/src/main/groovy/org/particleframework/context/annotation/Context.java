@@ -21,6 +21,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Singleton
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
 public @interface Context {
 }

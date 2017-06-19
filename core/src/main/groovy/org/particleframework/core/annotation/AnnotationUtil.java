@@ -23,6 +23,17 @@ public class AnnotationUtil {
      */
     public static Annotation findAnnotationWithStereoType(Class cls, Class<? extends Annotation> stereotype) {
         Annotation[] annotations = cls.getAnnotations();
+        return findAnnotationWithStereoType(stereotype, annotations);
+    }
+
+    /**
+     * Finds an annotation on the given class for the given stereotype
+     *
+     * @param stereotype The stereotype
+     * @param annotations The annotations to search
+     * @return The annotation
+     */
+    public static Annotation findAnnotationWithStereoType(Class<? extends Annotation> stereotype, Annotation... annotations) {
         for(Annotation ann : annotations) {
             if(stereotype.isInstance(ann)) {
                 return ann;

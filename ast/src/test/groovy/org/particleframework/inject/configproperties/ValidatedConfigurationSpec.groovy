@@ -31,16 +31,8 @@ class ValidatedConfigurationSpec extends Specification {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message == '''\
-Error instantiating bean of type  [org.particleframework.inject.configproperties.ValidatedConfigurationSpec$ValidatedConfig]
-
-Message: Validation failed for bean definition [org.particleframework.inject.configproperties.ValidatedConfigurationSpec$ValidatedConfig]
-List of constraint violations:[
-\turl - may not be null
-\tname - may not be empty
-]
-'''
-
+        e.message.contains('url - may not be null')
+        e.message.contains('name - may not be empty')
     }
 
     void "test validated config with valid config"() {

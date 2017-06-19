@@ -9,6 +9,7 @@ import org.particleframework.context.event.BeanInitializingEvent;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.*;
@@ -17,6 +18,8 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Provider;
+import javax.inject.Scope;
+import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
@@ -54,6 +57,48 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
 
 
+    /**
+     * Constructs a bean definition that is produced from a method call on another type
+     *
+     * @param method     The method to call
+     * @param arguments  The arguments
+     * @param qualifiers The qualifiers
+     */
+    @Internal
+    protected AbstractBeanDefinition(Method method,
+                                     Map<String, Class> arguments,
+                                     Map<String, Class> qualifiers,
+                                     Map<String, List<Class>> genericTypes) {
+        this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations());
+        this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()) != null;
+        this.type = (Class<T>) method.getReturnType();
+        this.provided = method.getAnnotation(Provided.class) != null;
+        this.isConfigurationProperties = false;
+        LinkedHashMap<String, Annotation> qualifierMap = null;
+        if (qualifiers != null) {
+            qualifierMap = new LinkedHashMap<>();
+            populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, method.getParameterAnnotations());
+        }
+        this.constructor = new MethodConstructorInjectionPoint(
+                this,
+                method,
+                Modifier.isPrivate(method.getModifiers()),
+                arguments,
+                qualifierMap,
+                genericTypes);
+    }
+
+    /**
+     * Constructs a bean definition that is produced from a method call on another type
+     *
+     * @param method The method to call
+     */
+    @Internal
+    protected AbstractBeanDefinition(Method method) {
+        this(method, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Internal
     protected AbstractBeanDefinition(Annotation scope,
                                      boolean singleton,
                                      Class<T> type,
@@ -74,6 +119,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments, qualifierMap, genericTypes);
     }
 
+    @Internal
     protected AbstractBeanDefinition(Annotation scope,
                                      boolean singleton,
                                      Class<T> type,
@@ -294,6 +340,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
      */
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        if (bean == null) {
+            throw new BeanInstantiationException(resolutionContext, "Bean factory returned null");
+        }
         return defaultContext.inject(resolutionContext, this, bean);
     }
 
@@ -427,24 +476,20 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             try {
                 Value valAnn = (Value) argument.getAnnotation(Value.class);
                 Class argumentType = argument.getType();
-                if(isInnerConfiguration(argumentType)) {
+                if (isInnerConfiguration(argumentType)) {
                     return context.createBean(argumentType);
-                }
-                else {
+                } else {
                     String valString = resolveValueString(argument.getName(), valAnn);
                     Optional value = resolveValue((ApplicationContext) context, argumentType, valString, argument.getGenericTypes());
-                    if(!value.isPresent() && argumentType == Optional.class) {
+                    if (!value.isPresent() && argumentType == Optional.class) {
                         return value;
-                    }
-                    else {
+                    } else {
                         return value.orElseGet(() -> {
-                            if(valAnn == null && isConfigurationProperties) {
+                            if (valAnn == null && isConfigurationProperties) {
                                 return defaultValue;
-                            }
-                            else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
-                                throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString  + "]. Property doesn't exist");
-                            }
-                            else {
+                            } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
+                                throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
+                            } else {
                                 return null;
                             }
                         });
@@ -469,7 +514,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
 
         int i = valString.indexOf(':');
         Object defaultValue = null;
-        if(i > -1) {
+        if (i > -1) {
             Optional converted = context.getConversionService().convert(valString.substring(i + 1, valString.length()), type);
             valString = valString.substring(0, i);
             defaultValue = converted.orElse(null);
@@ -478,7 +523,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
 
         TypeVariable[] typeParameters = type.getTypeParameters();
         Map<String, Class> typeParameterMap = new HashMap<>();
-        if(typeParameters.length == genericTypes.length) {
+        if (typeParameters.length == genericTypes.length) {
             for (int j = 0; j < typeParameters.length; j++) {
                 TypeVariable typeParameter = typeParameters[j];
                 typeParameterMap.put(typeParameter.getName(), genericTypes[j]);
@@ -486,8 +531,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         }
         value = context.getProperty(valString, (Class<?>) type, typeParameterMap);
 
-        if(defaultValue != null && !value.isPresent()) {
-            value = Optional.of( defaultValue );
+        if (defaultValue != null && !value.isPresent()) {
+            value = Optional.of(defaultValue);
         }
         return value;
     }
@@ -495,16 +540,14 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     private String resolveValueString(String name, Value val) {
         String valString;
         if (val == null) {
-            if(isConfigurationProperties) {
+            if (isConfigurationProperties) {
                 ConfigurationProperties configurationProperties = getType().getAnnotation(ConfigurationProperties.class);
                 String value = configurationProperties.value();
                 valString = value + "." + name;
-            }
-            else {
+            } else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");
             }
-        }
-        else {
+        } else {
             valString = val.value();
         }
         return valString;
@@ -798,14 +841,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Class<?> fieldType = field.getType();
             String valString = resolveValueString(injectionPoint.getName(), valueAnn);
             Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArgument(field));
-            if(!value.isPresent() && fieldType == Optional.class) {
+            if (!value.isPresent() && fieldType == Optional.class) {
                 return value;
-            }
-            else {
-                if(isConfigurationProperties && valueAnn == null) {
+            } else {
+                if (isConfigurationProperties && valueAnn == null) {
                     return value.orElse(defaultValue);
-                }
-                else {
+                } else {
                     return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
                 }
             }

@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class DefaultEnvironment implements Environment {
+
     private final String name;
     private final ConversionService conversionService;
     // properties are stored in an array of maps organized by character in the alphabet
@@ -38,6 +39,14 @@ public class DefaultEnvironment implements Environment {
         this.name = name;
         this.conversionService = conversionService;
         this.classLoader = classLoader;
+
+
+        ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
+        for (PropertySourceLoader loader : propertySources) {
+            Optional<PropertySource> propertySource = loader.load(this);
+            propertySource.ifPresent(this::addPropertySource);
+        }
+
         addPropertySource(new MapPropertySource(System.getProperties()));
         addPropertySource(new MapPropertySource(System.getenv()) {
             @Override
@@ -45,12 +54,6 @@ public class DefaultEnvironment implements Environment {
                 return true;
             }
         });
-
-        ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
-        for (PropertySourceLoader loader : propertySources) {
-            Optional<PropertySource> propertySource = loader.load(this);
-            propertySource.ifPresent(this::addPropertySource);
-        }
     }
 
     @Override

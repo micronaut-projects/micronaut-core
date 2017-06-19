@@ -151,7 +151,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param classWriter The current class writer
      * @param className The class name
      */
-    protected void writeClassToDisk(File targetDir, ClassWriter classWriter, String className) {
+    protected void writeClassToDisk(File targetDir, ClassWriter classWriter, String className) throws IOException {
         if(targetDir != null) {
 
             byte[] bytes = classWriter.toByteArray();
@@ -161,8 +161,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
             try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
                 outputStream.write(bytes);
-            } catch (IOException e) {
-                e.printStackTrace();
             }
         }
     }

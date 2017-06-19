@@ -17,6 +17,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Qualifier
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
 public @interface Primary {
 }

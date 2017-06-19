@@ -55,11 +55,6 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
-    public Constructor<T> getConstructor() {
-        return constructor;
-    }
-
-    @Override
     public T invoke(Object... args) {
         this.constructor.setAccessible(true);
         Argument[] componentTypes = getArguments();
