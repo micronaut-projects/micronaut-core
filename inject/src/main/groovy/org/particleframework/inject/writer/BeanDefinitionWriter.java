@@ -284,7 +284,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 constructorVisitor.visitInsn(ACONST_NULL);
             }
             // now invoke super(..) if no arg constructor
-            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class);
+            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class, Map.class);
         }
         else {
             invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class);
@@ -1063,6 +1063,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             Method getBeanMethod = ReflectionUtils.getDeclaredMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class).orElseThrow(()->
                 new IllegalStateException("DefaultContext.getBean(..) method not found. Incompatible version of Particle?")
             );
+
             buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                     Type.getInternalName(DefaultBeanContext.class),
                     "getBean",
@@ -1072,13 +1073,26 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             int factoryVar = pushNewBuildLocalVariable();
             buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
-            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                    factoryType.getInternalName(),
-                    methodName,
-                    Type.getMethodDescriptor(beanType), false);
+
+
+            if(argumentTypes.isEmpty()) {
+                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                        factoryType.getInternalName(),
+                        methodName,
+                        Type.getMethodDescriptor(beanType), false);
+            }
+            else {
+
+                pushContructorArguments(buildMethodVisitor, argumentTypes);
+                String methodDescriptor = getMethodDescriptor(beanFullClassName, argumentTypes.values());
+                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                        factoryType.getInternalName(),
+                        methodName,
+                        methodDescriptor, false);
+            }
             this.buildInstanceIndex = pushNewBuildLocalVariable();
 
-//            pushContructorArguments(buildMethodVisitor, argumentTypes);
+
 //            String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
 //            buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
 //            // store a reference to the bean being built at index 3

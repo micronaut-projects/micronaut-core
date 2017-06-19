@@ -187,7 +187,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                     superConstructor.getDescriptor(),
                     false);
         } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("Particle version on compile classpath doesn't match");
+            throw new IllegalStateException("Particle version on compile classpath doesn't match", e);
         }
     }
 
