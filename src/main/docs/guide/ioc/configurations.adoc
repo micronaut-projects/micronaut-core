@@ -32,15 +32,24 @@ The link:{api}/org/particleframework/context/annotation/Requires.html[@Requires]
 
 .Using @Requires
 |===
-|Header 1 | Example
+|Requirement | Example
 
-|Column 1, row 1
-|Column 2, row 1
+|Require the presence of one ore more classes
+|`@Requires(classes=javax.servlet.Servlet)`
 
-|Column 1, row 2
-|Column 2, row 2
+|Require the presence one or more beans
+|`@Requires(beans=javax.sql.DataSource)`
 
-|Column 1, row 3
-|Column 2, row 3
+|Require the presence of an environment variable
+|`@Requires(env='TRAVIS')`
+
+|Require the presence of another configuration package
+|`@Requires(configuration='foo.bar')`
+
+|Require particular SDK version
+|`@Requires(sdk=Sdk.JAVA, value="1.8")`
+
+|Require a property with an optional value
+|`@Requires(property='dataSource.url')`
 |===
 
