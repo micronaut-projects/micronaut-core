@@ -1,0 +1,46 @@
+A bean link:{api}/org/particleframework/context/annotation/Configuration.html[@Configuration] is a grouping of multiple bean definitions within a package.
+
+The `@Configuration` annotation is applied at the package level and informs Particle that the bean defined with the package form a logical grouping.
+
+The `@Configuration` annotation is typically applied to `package-info` class. For example:
+
+.package-info.groovy
+[source,groovy]
+----
+@Configuration
+package my.package
+
+import org.particleframework.context.annotation.Configuration
+----
+
+Where this grouping becomes useful is when the bean configuration is made conditional via the `@Requires` annotation. For example:
+
+.package-info.groovy
+[source,groovy]
+----
+@Configuration
+@Requires(beans = javax.sql.DataSource)
+package my.package
+----
+
+In the above example all bean definitions within the annotated package will only be loaded and made available if a `javax.sql.DataSource` bean is present. This allows you to implement conditional auto-configuration of bean definitions.
+
+=== Configuration Requirements
+
+The link:{api}/org/particleframework/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
+
+
+.Using @Requires
+|===
+|Header 1 | Example
+
+|Column 1, row 1
+|Column 2, row 1
+
+|Column 1, row 2
+|Column 2, row 2
+
+|Column 1, row 3
+|Column 2, row 3
+|===
+

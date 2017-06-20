@@ -13,23 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.annotation;
+package org.particleframework.docs.qualifiers.annotation
 
-import javax.inject.Singleton;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * <p>A factory is a {@link Singleton} that produces one or many other bean implementations.</p>
- *
- * <p>Each produced bean is defined by method that is annotated with {@link Bean}</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
+// tag::class[]
 @Singleton
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
-public @interface Factory {
+class Vehicle {
+    final Engine engine
+
+    // tag::constructor[]
+    @Inject Vehicle(@V8 Engine engine) {
+        this.engine = engine
+    }
+    // end::constructor[]
+
+    String start() {
+        engine.start() // <5>
+    }
 }
+// end::class[]

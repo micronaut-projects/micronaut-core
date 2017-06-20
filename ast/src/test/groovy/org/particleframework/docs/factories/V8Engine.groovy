@@ -13,32 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.hibernate.gorm
+package org.particleframework.docs.factories
 
-import groovy.transform.CompileStatic
-import org.grails.orm.hibernate.HibernateDatastore
-import org.springframework.transaction.PlatformTransactionManager
-
-import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
- * Provides the transaction manager as a bean
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-@CompileStatic
-class TransactionManagerProvider implements Provider<PlatformTransactionManager> {
-    final HibernateDatastore datastore
+// tag::class[]
+class V8Engine implements Engine {
+    final int cylinders = 8
+    final CrankShaft crankShaft
 
-    TransactionManagerProvider(HibernateDatastore datastore) {
-        this.datastore = datastore
+    V8Engine(CrankShaft crankShaft) {
+        this.crankShaft = crankShaft
     }
 
-    @Override
-    PlatformTransactionManager get() {
-        return datastore.getTransactionManager()
+    String start() {
+        "Starting V8"
     }
 }
+// end::class[]

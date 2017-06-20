@@ -39,6 +39,9 @@ class FactorySpec extends Specification {
         expect:
         beanContext.getBean(BFactory)
         beanContext.getBean(B) != null
+        beanContext.getBean(B) == beanContext.getBean(B)
+        beanContext.getBean(C) != beanContext.getBean(C)
+        beanContext.getBean(C).b == beanContext.getBean(B)
         beanContext.getBean(B).name == "FROMFACTORY"
 
     }
@@ -50,6 +53,10 @@ class FactorySpec extends Specification {
     @Singleton
     static class A {
         String name = "A"
+    }
+
+    static class C {
+        B b
     }
 
     @Factory
@@ -84,12 +91,18 @@ class FactorySpec extends Specification {
         }
 
         @Bean
+        @Singleton
         B get() {
             assert postConstructCalled : "post construct should have been called"
             assertState()
 
             getCalled = true
             return new B(name: name )
+        }
+
+        @Bean
+        C buildC(B b) {
+            return new C(b:b)
         }
 
         private void assertState() {

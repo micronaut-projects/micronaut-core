@@ -32,7 +32,7 @@ public interface PropertyResolver {
      */
     default <T> Optional<T> getProperty(String name, Class<T> requiredType) {
         return getProperty(name, requiredType, Collections.emptyMap());
-    };
+    }
 
     /**
      * Resolve the given property for the given name

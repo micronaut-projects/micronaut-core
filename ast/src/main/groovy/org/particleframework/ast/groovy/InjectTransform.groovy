@@ -5,6 +5,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
+import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -58,7 +59,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
-        Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
+        Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
 
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
@@ -109,9 +110,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
             String beanDefinitionClassName = null
-            ClassNode beanClassNode = entry.key
+            String beanTypeName = beanDefWriter.beanTypeName
+            AnnotatedNode beanClassNode = entry.key
             try {
-                BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(beanClassNode.name, beanDefWriter.beanDefinitionName)
+                String beanDefinitionName = beanDefWriter.beanDefinitionName
+                BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(beanTypeName, beanDefinitionName)
                 beanClassWriter.setContextScope(stereoTypeFinder.hasStereoType(beanClassNode, Context.name))
                 AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
                 if(replacesAnn != null) {
@@ -120,7 +123,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 beanDefinitionClassName = beanClassWriter.getBeanDefinitionClassName()
                 beanClassWriter.writeTo(classesDir)
             } catch (Throwable e) {
-                AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanClassNode.name}]: $e.message")
+                AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
             }
 
             if (beanDefinitionClassName != null) {
@@ -130,14 +133,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 catch (Throwable e) {
                     abort = true
-                    AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanClassNode.name}]: $e.message")
+                    AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanTypeName}]: $e.message")
                 }
                 if(!abort) {
                     try {
                         beanDefWriter.visitBeanDefinitionEnd()
                         beanDefWriter.writeTo(classesDir)
                     } catch (Throwable e) {
-                        AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanClassNode.name}]: $e.message")
+                        AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanTypeName}]: $e.message")
                     }
                 }
             }
@@ -155,7 +158,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final ClassNode concreteClass
         final boolean isConfigurationProperties
         final boolean isFactoryClass
-        final Map<ClassNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
+        final Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
 
@@ -193,18 +196,31 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
             if( isFactoryClass && !isConstructor && stereoTypeFinder.hasStereoType(methodNode, Bean)) {
+                AnnotationNode beanAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Bean)
                 ClassNode producedType = methodNode.returnType
                 AnnotationNode scopeAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Scope.class)
                 AnnotationNode singletonAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Singleton.class)
 
-                BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(producedType.packageName, producedType.nameWithoutPackage,scopeAnn?.classNode?.name, singletonAnn != null )
+                BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(producedType.packageName,
+                                                                                 producedType.nameWithoutPackage,
+                                                                                 scopeAnn?.classNode?.name,
+                                                                                 singletonAnn != null,
+                                                                                 concreteClass.packageName )
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> qualifierTypes = [:]
                 Map<String, List<Object>> genericTypeMap = [:]
                 populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                 beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodNode.name, paramsToType, qualifierTypes, genericTypeMap)
-                beanDefinitionWriters.put(producedType, beanMethodWriter)
+                Expression preDestroy = beanAnn.getMember("preDestroy")
+                if(preDestroy != null) {
+                    String destroyMethodName = preDestroy.text
+                    MethodNode destroyMethod = producedType.getMethod(destroyMethodName)
+                    if(destroyMethod != null) {
+                        beanMethodWriter.visitPreDestroyMethod(destroyMethod.declaringClass.name, destroyMethodName)
+                    }
+                }
+                beanDefinitionWriters.put(methodNode, beanMethodWriter)
             }
             else if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
                 defineBeanDefinition(concreteClass)

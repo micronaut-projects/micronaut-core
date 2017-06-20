@@ -161,6 +161,41 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         this(packageName, className, packageName + '.' + className, scope, isSingleton);
     }
 
+
+
+    /**
+     * Creates a bean definition writer
+     *
+     * @param packageName       The package name of the bean
+     * @param className         The class name, without the package, of the bean
+     * @param providedClassName The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
+     * @param scope             The scope of the bean
+     * @param isSingleton       Is the scope a singleton
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String providedClassName,
+                                String scope,
+                                boolean isSingleton) {
+        this(packageName, className, packageName, providedClassName, scope, isSingleton);
+    }
+
+    /**
+     * Creates a singleton bean definition writer
+     *
+     * @param packageName        The package name of the bean
+     * @param className          The class name, without the package, of the bean
+     * @param scope              The scope of the bean
+     * @param beanDefinitionPackageName The name of the package to store the bean definition within
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                String scope,
+                                boolean isSingleton,
+                                String beanDefinitionPackageName) {
+        this(packageName, className, beanDefinitionPackageName, packageName + '.' + className,  scope, isSingleton);
+    }
+
     /**
      * Creates a bean definition writer
      *
@@ -172,13 +207,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      */
     public BeanDefinitionWriter(String packageName,
                                 String className,
+                                String beanDefinitionPackageName,
                                 String providedClassName,
                                 String scope,
                                 boolean isSingleton) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = packageName + '.' + className;
         this.providedBeanClassName = providedClassName;
-        this.beanDefinitionName = packageName + ".$" + className + "Definition";
+        this.beanDefinitionName = beanDefinitionPackageName + ".$" + className + "Definition";
         this.beanType = getTypeReference(beanFullClassName);
         this.providedType = getTypeReference(providedBeanClassName);
         this.scope = scope != null ? getTypeReference(scope) : null;
@@ -186,6 +222,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         this.isSingleton = isSingleton;
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
+    }
+
+    /**
+     * @return The full class name of the bean
+     */
+    public String getBeanTypeName() {
+        return beanFullClassName;
     }
 
     /**
@@ -251,6 +294,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
+
+
     private void buildFactoryMethodClassConstructor(Object factoryClass, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
         Type factoryTypeRef = getTypeReference(factoryClass);
         this.constructorVisitor = startConstructor(classWriter);
@@ -284,7 +329,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 constructorVisitor.visitInsn(ACONST_NULL);
             }
             // now invoke super(..) if no arg constructor
-            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class);
+            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class, Map.class);
         }
         else {
             invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class);
@@ -562,6 +607,48 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param requiresReflection Whether the method requires reflection
      * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
      * @param methodName         The method name
+     */
+    public void visitPreDestroyMethod(Object declaringType,
+                                      boolean requiresReflection,
+                                      Object returnType,
+                                      String methodName) {
+        visitPreDestroyMethodDefinition();
+        visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
+    }
+
+
+    /**
+     * Visits a method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     */
+    public void visitPreDestroyMethod(Object declaringType,
+                                      Object returnType,
+                                      String methodName) {
+        visitPreDestroyMethodDefinition();
+        visitMethodInjectionPointInternal(declaringType, false, returnType, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
+    }
+
+    /**
+     * Visits a pre-destroy method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     */
+    public void visitPreDestroyMethod(Object declaringType,
+                                      String methodName) {
+        visitPreDestroyMethodDefinition();
+        visitMethodInjectionPointInternal(declaringType, false, Void.TYPE, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
+    }
+    /**
+     * Visits a method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
      * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes     The qualifier types of each argument. Can be null.
      * @param genericTypes       The generic types of each argument. Can be null.
@@ -576,8 +663,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         visitPreDestroyMethodDefinition();
         visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
     }
-
-
     /**
      * Visits a method injection point
      *
@@ -1063,6 +1148,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             Method getBeanMethod = ReflectionUtils.getDeclaredMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class).orElseThrow(()->
                 new IllegalStateException("DefaultContext.getBean(..) method not found. Incompatible version of Particle?")
             );
+
             buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                     Type.getInternalName(DefaultBeanContext.class),
                     "getBean",
@@ -1072,13 +1158,26 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             int factoryVar = pushNewBuildLocalVariable();
             buildMethodVisitor.visitVarInsn(ALOAD, factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
-            buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                    factoryType.getInternalName(),
-                    methodName,
-                    Type.getMethodDescriptor(beanType), false);
+
+
+            if(argumentTypes.isEmpty()) {
+                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                        factoryType.getInternalName(),
+                        methodName,
+                        Type.getMethodDescriptor(beanType), false);
+            }
+            else {
+
+                pushContructorArguments(buildMethodVisitor, argumentTypes);
+                String methodDescriptor = getMethodDescriptor(beanFullClassName, argumentTypes.values());
+                buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                        factoryType.getInternalName(),
+                        methodName,
+                        methodDescriptor, false);
+            }
             this.buildInstanceIndex = pushNewBuildLocalVariable();
 
-//            pushContructorArguments(buildMethodVisitor, argumentTypes);
+
 //            String constructorDescriptor = getConstructorDescriptor(argumentTypes.values());
 //            buildMethodVisitor.visitMethodInsn(INVOKESPECIAL, beanType.getInternalName(), "<init>", constructorDescriptor, false);
 //            // store a reference to the bean being built at index 3
@@ -1516,4 +1615,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         return sv.toString();
     }
 
+    @Override
+    public String toString() {
+        return "BeanDefinitionWriter{" +
+                "beanFullClassName='" + beanFullClassName + '\'' +
+                '}';
+    }
 }

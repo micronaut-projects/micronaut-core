@@ -1,0 +1,13 @@
+Particle is a modern, JVM-based, full stack Micro Services framework designed for building modular, easily testable Micro Service applications.
+
+Particle is developed by the creators of the Grails framework and takes inspiration from many lessons learned over the years building real world applications from monoliths to Micro Services using Spring and Grails.
+
+Particle aims to provide all the tools necessary to build Micro Service applications including:
+
+* Dependency Injection and Inversion of Control (IoC)
+* Sensible Defaults and Auto-Configuration
+* Configuration and Configuration Sharing
+* Service Discovery
+* HTTP Routing
+* HTTP Client with Client-Side Load Balancing
+

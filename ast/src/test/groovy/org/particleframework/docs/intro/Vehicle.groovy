@@ -13,32 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.hibernate.gorm
+package org.particleframework.docs.intro
 
-import groovy.transform.CompileStatic
-import org.grails.orm.hibernate.HibernateDatastore
-import org.grails.orm.hibernate.connections.HibernateConnectionSource
-
-import javax.inject.Provider
+import javax.inject.Inject
 import javax.inject.Singleton
-import javax.sql.DataSource
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@CompileStatic
+// tag::class[]
 @Singleton
-class DataSourceProvider implements Provider<DataSource> {
-    final HibernateDatastore datastore
+class Vehicle {
+    final Engine engine
 
-    DataSourceProvider(HibernateDatastore datastore) {
-        this.datastore = datastore
+    @Inject Vehicle(Engine engine) { // <3>
+        this.engine = engine
     }
 
-    @Override
-    DataSource get() {
-        HibernateConnectionSource connectionSource = (HibernateConnectionSource)datastore.connectionSources.defaultConnectionSource
-        return connectionSource.dataSource
+    String start() {
+        engine.start()
     }
 }
+// end::class[]
