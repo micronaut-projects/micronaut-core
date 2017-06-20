@@ -1,0 +1,12 @@
+If you wish for a particular method to be invoked when a bean is constructed then you can use the `javax.annotation.PostConstruct` annotation:
+
+[source,groovy]
+----
+include::{testsdir}/lifecycle/V8Engine.groovy[tags=imports, indent=0]
+
+include::{testsdir}/lifecycle/V8Engine.groovy[tags=class, indent=0]
+----
+
+<1> The `PostConstruct` annotation is imported
+<2> A field is defined that requires initialization
+<3> A method is annotated with `@PostConstruct` and will be invoked once the object is constructed and fully injected.
