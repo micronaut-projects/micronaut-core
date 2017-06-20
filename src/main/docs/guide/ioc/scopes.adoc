@@ -1,0 +1,13 @@
+Particle features an extensible bean scoping mechanism based on JSR-303. The following default scopes are supported:
+
+.Particle Scopes
+|===
+|Type |Description |Example
+
+|link:{jeeapi}/javax/inject/Singleton.html[Singleton]
+|Singleton scope indicates only one instance of the bean should exist
+|`@Singleton`
+
+|===
+
+TODO: Complete remaining scopes

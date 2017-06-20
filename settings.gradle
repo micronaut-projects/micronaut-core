@@ -4,10 +4,12 @@ include "ast"
 include "core"
 include "inject"
 include "aop"
+include "spring"
+include "http"
+include "router"
 include "runtime"
 include "runtime-netty"
 include "test-suite"
-include "spring"
 
 // configurations
 include "configurations/hibernate-validator"

@@ -1,0 +1,28 @@
+In addition to be being able to inject beans Particle natively supports injecting the following types:
+
+
+.Injectable Container Types
+|===
+|Type |Description |Example
+
+|link:{jdkapi}/java/util/Optional.html[java.util.Optional]
+|An `Optional` of a bean. If the bean doesn't exists `empty()` is injected
+|`Optional<Engine>`
+
+|link:{jdkapi}/java/util/Iterable.html[java.util.Iterable]
+|An `Iterable` or subtype of `Iterable` (example `List`, `Collection` etc.)
+|`Iterable<Engine>`
+
+|link:{jdkapi}/java/util/stream/Stream.html[java.util.stream.Stream]
+|A lazy `Stream` of beans
+|`Stream<Engine>`
+
+|link:{jdkapi}/java/lang/reflect/Array.html[Array]
+|A native array of beans of a given type
+|`Engine[]`
+
+|link:{jeeapi}/javax/inject/Provider.html[Provider]
+|A `javax.inject.Provider` if a circular dependency requires it
+|`Provider<Engine>`
+
+|===

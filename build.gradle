@@ -55,4 +55,4 @@ subprojects {
 
 }
 
-// apply from:"${commonBuild}/common-docs.gradle"
+apply from:"${commonBuild}/common-docs.gradle"

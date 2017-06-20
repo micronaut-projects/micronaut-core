@@ -1,0 +1,36 @@
+Particle implements the http://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification hence to use Particle you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
+
+The following is a simply example:
+
+[source,groovy]
+----
+import javax.inject.*
+
+include::{testsdir}/intro/Engine.groovy[tags=class, indent=0]
+
+include::{testsdir}/intro/V8Engine.groovy[tags=class, indent=0]
+
+include::{testsdir}/intro/Vehicle.groovy[tags=class, indent=0]
+----
+
+<1> A common `Engine` interface is defined
+<2> A `V8Engine` implementation is defined and marked with `Singleton` scope
+<3> The `Engine` is injected via constructor injection
+
+To perform dependency injection simply instantiate an instance of link:{api}/org/particleframework/context/BeanContext.html[BeanContext] and call the `start()` method as per the following example:
+
+[source,groovy]
+----
+import org.particleframework.context.*
+...
+include::{testsdir}/intro/VehicleSpec.groovy[tags=start, indent=0]
+----
+
+Particle will automatically discover dependency injection metadata on the classpath and wire the beans together according to injection points you define.
+
+Particle supports the following types of dependency injection:
+
+* Constructor injection (must be one public constructor)
+* Field injection
+* JavaBean property injection
+* Method parameter injection

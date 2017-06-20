@@ -1,0 +1,44 @@
+The classic requirement of dependency injection is the interface and multiple possible implementations.
+
+Once again Particle leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
+
+=== Qualifying By Name
+
+To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example consider the following classes:
+
+[source,groovy]
+----
+import javax.inject.*
+
+include::{testsdir}/qualifiers/named/Engine.groovy[tags=class, indent=0]
+
+include::{testsdir}/qualifiers/named/V6Engine.groovy[tags=class, indent=0]
+
+include::{testsdir}/qualifiers/named/V8Engine.groovy[tags=class, indent=0]
+
+include::{testsdir}/qualifiers/named/Vehicle.groovy[tags=class, indent=0]
+----
+
+<1> The `Engine` interface defines the common contract
+<2> The `V6Engine` class is the first implementation
+<3> The `V8Engine` class is the second implementation
+<4> The link:{jeeapi}/javax/inject/Named.html[Named] annotation is used to indicate the `V8Engine` implementation is required
+<5> Calling the start method prints: `"Starting V8"`
+
+=== Qualifying By Annotation
+
+In addition to being able to qualify by name you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example consider the following annotation:
+
+[source,groovy]
+----
+include::{testsdir}/qualifiers/annotation/V8.groovy[tags=imports, indent=0]
+
+include::{testsdir}/qualifiers/annotation/V8.groovy[tags=class, indent=0]
+----
+
+The above annotation is itself annotated with the `@Qualifier` annotation to designate it as a qualifier. You can then use the annotation at any injection point in your code. For example:
+
+[source,groovy]
+----
+include::{testsdir}/qualifiers/annotation/Vehicle.groovy[tags=constructor, indent=0]
+----
