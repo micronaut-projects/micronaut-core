@@ -27,4 +27,20 @@ In the above example all bean definitions within the annotated package will only
 
 === Configuration Requirements
 
+The link:{api}/org/particleframework/context/annotation/Requires.html[@Requires] annotation is very flexible and can be used for a variety of use cases. The following table summarizes some of the possibilities:
+
+
+.Using @Requires
+|===
+|Header 1 | Example
+
+|Column 1, row 1
+|Column 2, row 1
+
+|Column 1, row 2
+|Column 2, row 2
+
+|Column 1, row 3
+|Column 2, row 3
+|===
 
