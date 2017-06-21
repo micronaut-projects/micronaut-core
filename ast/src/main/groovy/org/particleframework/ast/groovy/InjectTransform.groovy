@@ -483,7 +483,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     SourceUnit su = sourceUnit
                     classNode.getInnerClasses().each { InnerClassNode inner->
                         if(Modifier.isStatic(inner.getModifiers()) && Modifier.isPublic(inner.getModifiers()) && inner.getDeclaredConstructors().size() == 0) {
-
                             def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
                             AnnotationNode parentAnn = AstAnnotationUtils.findAnnotation(classNode, ConfigurationProperties)
                             String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()

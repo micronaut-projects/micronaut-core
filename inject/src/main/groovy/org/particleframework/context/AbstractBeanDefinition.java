@@ -20,6 +20,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
+import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
@@ -110,13 +111,23 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.singleton = singleton;
         this.type = type;
         this.provided = type.getAnnotation(Provided.class) != null;
-        this.isConfigurationProperties = type.getAnnotation(ConfigurationProperties.class) != null;
+        this.isConfigurationProperties = isConfigurationProperties(type);
         LinkedHashMap<String, Annotation> qualifierMap = null;
         if (qualifiers != null) {
             qualifierMap = new LinkedHashMap<>();
             populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, constructor.getParameterAnnotations());
         }
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments, qualifierMap, genericTypes);
+    }
+
+    private boolean isConfigurationProperties(Class type) {
+        while(type != null) {
+            if(type.getAnnotation(ConfigurationProperties.class) != null) {
+                return true;
+            }
+            type = type.getDeclaringClass();
+        }
+        return false;
     }
 
     @Internal
@@ -541,9 +552,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         String valString;
         if (val == null) {
             if (isConfigurationProperties) {
-                ConfigurationProperties configurationProperties = getType().getAnnotation(ConfigurationProperties.class);
-                String value = configurationProperties.value();
-                valString = value + "." + name;
+                String prefix = resolvePrefix();
+                valString = prefix + "." + name;
             } else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");
             }
@@ -551,6 +561,37 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             valString = val.value();
         }
         return valString;
+    }
+
+    private String resolvePrefix() {
+        Class type = getType();
+        ConfigurationProperties configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
+        String prefix = null;
+        if(configurationProperties != null) {
+            prefix = configurationProperties.value();
+        }
+        else {
+            StringBuilder path = new StringBuilder();
+            while(type != null) {
+                String name = type.getName();
+                int i = name.indexOf('$');
+                if(i >  -1) {
+                    name = Introspector.decapitalize(name.substring(i, name.length()));
+                    path.append('.').append(name);
+                }
+
+                type = type.getDeclaringClass();
+                configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
+                if(configurationProperties != null) {
+                    prefix = configurationProperties.value() + path;
+                    break;
+                }
+            }
+        }
+        if(prefix == null) {
+            throw new IllegalStateException("Unable to resolve configuration prefix. No @ConfigurationProperties root found");
+        }
+        return prefix;
     }
 
     /**

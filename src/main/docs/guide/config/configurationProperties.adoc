@@ -1,0 +1,38 @@
+Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/org/particleframework/config/ConfigurationProperties.html[ConfigurationProperties].
+
+Unlike the aforementioned frameworks, however, Particle uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
+
+An example of a configuration class can be seen below:
+
+.@ConfigurationProperties Example
+[source,groovy]
+----
+include::{testsdir}/config/properties/EngineConfig.groovy[tags=imports, indent=0]
+
+include::{testsdir}/config/properties/EngineConfig.groovy[tags=class, indent=0]
+----
+
+<1> The `@ConfigProperties` annotation takes the configuration prefix
+<2> You can use `javax.validation` to validate the configuration
+<3> Default values can be assigned to the property
+<4> Static inner classes can provided nested configuration
+<5> Optional configuration values can be wrapped in a `java.util.Optional`
+
+Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:
+
+.@ConfigurationProperties Dependency Injection
+[source,groovy]
+----
+include::{testsdir}/config/properties/EngineImpl.groovy[tags=class, indent=0]
+----
+
+Configuration values can then be supplied from one of the link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances. For example:
+
+.Supply Configuration
+[source,groovy]
+----
+include::{testsdir}/config/properties/VehicleSpec.groovy[tags=start, indent=0]
+----
+
+The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
+
