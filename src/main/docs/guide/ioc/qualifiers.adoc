@@ -4,7 +4,7 @@ Once again Particle leverages JSR-303 and the link:{jeeapi}/javax/inject/Qualifi
 
 === Qualifying By Name
 
-To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example consider the following classes:
+To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example, consider the following classes:
 
 [source,groovy]
 ----
@@ -27,7 +27,7 @@ include::{testsdir}/qualifiers/named/Vehicle.groovy[tags=class, indent=0]
 
 === Qualifying By Annotation
 
-In addition to being able to qualify by name you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example consider the following annotation:
+In addition to being able to qualify by name, you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
 
 [source,groovy]
 ----

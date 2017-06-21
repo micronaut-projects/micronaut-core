@@ -23,7 +23,7 @@ Where this grouping becomes useful is when the bean configuration is made condit
 package my.package
 ----
 
-In the above example all bean definitions within the annotated package will only be loaded and made available if a `javax.sql.DataSource` bean is present. This allows you to implement conditional auto-configuration of bean definitions.
+In the above example, all bean definitions within the annotated package will only be loaded and made available if a `javax.sql.DataSource` bean is present. This allows you to implement conditional auto-configuration of bean definitions.
 
 === Configuration Requirements
 
