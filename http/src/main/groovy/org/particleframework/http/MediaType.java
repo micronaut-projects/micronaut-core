@@ -17,11 +17,12 @@ package org.particleframework.http;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Represents a media type. See https://www.iana.org/assignments/media-types/media-types.xhtml
+ * Represents a media type. See https://www.iana.org/assignments/media-types/media-types.xhtml and https://tools.ietf.org/html/rfc2046
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -96,33 +97,56 @@ public class MediaType implements CharSequence {
 
     private BigDecimal qualityNumberField;
 
+    /**
+     * Constructs a new media type for the given string
+     *
+     * @param name The name of the media type. For example application/json
+     */
     public MediaType(String name) {
-        this(name, null, new LinkedHashMap<>());
+        this(name, null, Collections.emptyMap());
     }
 
+    /**
+     * Constructs a new media type for the given string and parameters
+     *
+     * @param name The name of the media type. For example application/json
+     * @param params The parameters
+     */
     public MediaType(String name, Map<String, String> params) {
         this(name, null, params);
     }
 
+    /**
+     * Constructs a new media type for the given string and extension
+     *
+     * @param name The name of the media type. For example application/json
+     * @param extension The extension of the file using this media type if it differs from the subtype
+     */
     public MediaType(String name, String extension) {
-        this(name, extension, new LinkedHashMap<>());
+        this(name, extension, Collections.emptyMap());
     }
 
+    /**
+     * Constructs a new media type for the given string and extension
+     *
+     * @param name The name of the media type. For example application/json
+     * @param extension The extension of the file using this media type if it differs from the subtype
+     */
     public MediaType(String name, String extension, Map<String, String> params) {
         this.fullName = name;
         this.parameters = new LinkedHashMap<>();
-        this.parameters.put("q", QUALITY_RATING);
+        this.parameters.put(Q_PARAMETER, QUALITY_RATING);
         if(name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
         if(name.indexOf(';') > -1) {
             String[] tokenWithArgs = name.split(";");
             name = tokenWithArgs[0];
-            String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length - 1);
+            String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length);
             for(String param : paramsList) {
                 int i = param.indexOf('=');
                 if (i > -1) {
-                    parameters.put(param.substring(0, i-1).trim(), param.substring(i+1).trim() );
+                    parameters.put(param.substring(0, i).trim(), param.substring(i+1).trim() );
                 }
             }
         }
@@ -148,7 +172,9 @@ public class MediaType implements CharSequence {
                 this.extension = subtype;
             }
         }
-        parameters.putAll(params);
+        if(params != null) {
+            parameters.putAll(params);
+        }
     }
 
     /**
@@ -234,6 +260,21 @@ public class MediaType implements CharSequence {
 
     public String toString() {
         return fullName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MediaType mediaType = (MediaType) o;
+
+        return name.equals(mediaType.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
     }
 
     private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {
