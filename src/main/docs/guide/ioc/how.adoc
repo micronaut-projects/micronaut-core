@@ -1,6 +1,6 @@
 At this point you may be wondering how Particle performs the above dependency injection without requiring reflection.
 
-The key is a set of AST transformations and annotation processors that generic classes that implement the link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] interface.
+The key is a set of AST transformations and annotation processors that generate classes that implement the link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] interface.
 
 The ASM byte-code library is used to generate classes. In the case of the `Vehicle` class from the previous example a class that looks like the following is generated (shortened for brevity):
 
