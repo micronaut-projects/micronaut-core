@@ -1,10 +1,10 @@
 When most developers thing of Inversion of Control (also known as Dependency Injection and referred to as such from this point onwards) the Spring Framework comes to mind.
 
-Particle takes heavy inspiration from Spring and in fact the core developers of Particle are former SpringSource/Pivotal engineers now working for https://objectcomputing.com[OCi].
+Particle takes heavy inspiration from Spring, and in fact, the core developers of Particle are former SpringSource/Pivotal engineers now working for https://objectcomputing.com[OCI].
 
-Unlike Spring which relies exclusively on runtime reflection and proxies, Particle on the other hand uses compile time data to implement dependency injection.
+Unlike Spring which relies exclusively on runtime reflection and proxies, Particle, on the other hand, uses compile time data to implement dependency injection.
 
-This is a similar approach taken as tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Particle on the other hand is designed for building server-side Micro Services and provides many of the same tools and utilities as Spring does but without using reflection.
+This is a similar approach taken by tools such as Google's https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Particle, on the other hand, is designed for building server-side Micro Services and provides many of the same tools and utilities as Spring does but without using reflection.
 
 The goals of the Particle IoC container are summarized as:
 

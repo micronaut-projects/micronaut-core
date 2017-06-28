@@ -1,4 +1,4 @@
-In addition to be being able to inject beans Particle natively supports injecting the following types:
+In addition to being able to inject beans Particle natively supports injecting the following types:
 
 
 .Injectable Container Types
