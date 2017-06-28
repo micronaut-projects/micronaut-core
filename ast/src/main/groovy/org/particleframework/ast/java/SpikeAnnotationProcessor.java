@@ -36,8 +36,10 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
             for (TypeElement annotation : annotations) {
                 for (final Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
 
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        String.format("found @%s for %s definition at %s",
+                            annotation.getSimpleName(), element.getKind(), element));
 
-                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, "found @Inject at " + element);
 
                     if (element.getKind() == ElementKind.METHOD) {
                         String generatedDefinitionClassName = "org.particleframework.inject.field.$JavaClassDefinition";
@@ -78,7 +80,13 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
         return true;
     }
 
+    /*
+        String generatedDefinitionClassName = "org.particleframework.inject.field.$JavaSingletonDefinition";
+        String beanClassName = "JavaSingleton";
+        String fullyQualifiedBeanClassName = "org.particleframework.inject.field.JavaSingleton";
+        String packageName = "org.particleframework.inject.field";
 
+     */
     protected void generateSupportFiles(File targetDirectory, String generatedDefinitionClassName, String beanClassName, String fullyQualifiedBeanClassName, String packageName, File compilationDir) throws IOException {
         generateBeanDefinitionServiceDescriptor(targetDirectory, generatedDefinitionClassName);
 

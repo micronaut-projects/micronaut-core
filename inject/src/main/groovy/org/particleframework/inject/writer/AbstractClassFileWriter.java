@@ -6,6 +6,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -154,15 +155,19 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected void writeClassToDisk(File targetDir, ClassWriter classWriter, String className) throws IOException {
         if(targetDir != null) {
 
-            byte[] bytes = classWriter.toByteArray();
             String fileName = className.replace('.','/') + ".class";
             File targetFile = new File(targetDir, fileName);
             targetFile.getParentFile().mkdirs();
 
             try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
-                outputStream.write(bytes);
+                writeClassToDisk(outputStream, classWriter);
             }
         }
+    }
+
+    protected void writeClassToDisk(OutputStream out, ClassWriter classWriter) throws IOException {
+        byte[] bytes = classWriter.toByteArray();
+        out.write(bytes);
     }
 
     protected MethodVisitor startConstructor(ClassVisitor classWriter) {

@@ -1,7 +1,5 @@
 package org.particleframework.inject.field;
 
-import org.particleframework.context.annotation.Configuration;
-
 import javax.inject.Inject;
 
 
