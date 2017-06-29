@@ -214,6 +214,9 @@ public class UriTemplate {
                         switch (c) {
                             case ':':
                             case '*': // arrived to expansion modifier
+                                if(state == STATE_VAR_MODIFIER || state == STATE_VAR_NEXT_MODIFIER) {
+                                    modBuff.append(c); continue;
+                                }
                                 modifier = c;
                                 state = state == STATE_VAR_NEXT ? STATE_VAR_NEXT_MODIFIER : STATE_VAR_MODIFIER;
                                 continue;

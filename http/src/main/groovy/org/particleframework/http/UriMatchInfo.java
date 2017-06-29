@@ -30,6 +30,7 @@ public interface UriMatchInfo {
      * @return The matched URI
      */
     String getUri();
+
     /**
      * @return The variable values following a successful match
      */

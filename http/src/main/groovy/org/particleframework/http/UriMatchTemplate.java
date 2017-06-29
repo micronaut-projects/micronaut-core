@@ -160,25 +160,36 @@ public class UriMatchTemplate extends UriTemplate {
             matchTemplate.variableList.add(variable);
             StringBuilder pattern = matchTemplate.pattern;
             boolean hasMod = modifierChar == ':' && modifierStr.length() > 0;
-            String prefixQuantifier = "";
+            String operatorPrefix = "";
+            String operatorQuantifier = "";
             String variableQuantifier = "+)";
+            String variablePattern = VARIABLE_MATCH_PATTERN;
             if (hasMod) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
-                    prefixQuantifier = modifierStr;
+                    operatorQuantifier = modifierStr;
                     variableQuantifier = variableQuantifier + modifierStr;
                 }
                 else if(Character.isDigit(firstChar)) {
                     variableQuantifier = "{1," + modifierStr + "})";
                 }
+                else {
+                    if(modifierStr.endsWith("*") || modifierStr.endsWith("*?")) {
+                        operatorQuantifier = "?";
+                    }
+                    operatorPrefix = "(";
+                    variablePattern =  modifierStr + ")";
+                    variableQuantifier = "";
+                }
             }
+            pattern.append(operatorPrefix);
             switch (operator) {
                 case '.':
                 case '/':
                     pattern.append("\\").append(String.valueOf(operator))
-                            .append(prefixQuantifier);
+                            .append(operatorQuantifier);
                 case '0': // no active operator
-                    pattern.append(VARIABLE_MATCH_PATTERN)
+                    pattern.append(variablePattern)
                             .append(variableQuantifier);
                     break;
             }
