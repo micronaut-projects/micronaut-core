@@ -16,7 +16,8 @@
 package org.particleframework.http;
 
 import java.net.URI;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -28,7 +29,10 @@ import java.util.regex.Pattern;
 public class UriMatchTemplate extends UriTemplate {
 
     private StringBuilder pattern;
+    private List<String> variableList;
     private final Pattern matchPattern;
+    private final String[] variables;
+
     /**
      * Construct a new URI template for the given template
      *
@@ -36,16 +40,22 @@ public class UriMatchTemplate extends UriTemplate {
      */
     public UriMatchTemplate(CharSequence templateString) {
         super(templateString);
+
         this.matchPattern = Pattern.compile(pattern.toString());
+        this.variables = variableList.toArray(new String[variableList.size()]);
+        // cleanup / reduce memory consumption
+        this.pattern = null;
+        this.variableList = null;
     }
 
     /**
      * Match the given {@link URI} object
+     *
      * @param uri The URI
      * @return True if it matches
      */
-    public boolean matches(URI uri) {
-        return matches(uri.toString());
+    public Optional<UriMatchInfo> match(URI uri) {
+        return match(uri.toString());
     }
 
     /**
@@ -54,18 +64,76 @@ public class UriMatchTemplate extends UriTemplate {
      * @param uri The uRI
      * @return True if it matches
      */
-    boolean matches(String uri) {
-        return matchPattern.matcher(uri).matches();
+    public Optional<UriMatchInfo> match(String uri) {
+        Matcher matcher = matchPattern.matcher(uri);
+        if (matcher.matches()) {
+            if (variables.length == 0) {
+                return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap()));
+            } else {
+                Map<String, Object> variableMap = new LinkedHashMap<>();
+                int count = matcher.groupCount();
+                for (int j = 0; j < variables.length; j++) {
+                    int index = j + 1;
+                    if (index > count) break;
+                    String variable = variables[j];
+                    String value = matcher.group(index);
+                    variableMap.put(variable, value);
+                }
+                return Optional.of(new DefaultUriMatchInfo(uri, variableMap));
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
     protected UrlTemplateParser createParser(String templateString) {
         this.pattern = new StringBuilder();
+        this.variableList = new ArrayList<>();
         return new UrlMatchTemplateParser(templateString, this);
     }
 
+    protected static class DefaultUriMatchInfo implements UriMatchInfo {
+        private final String uri;
+        private final Map<String, Object> variables;
+
+        protected DefaultUriMatchInfo(String uri, Map<String, Object> variables) {
+            this.uri = uri;
+            this.variables = variables;
+        }
+
+        @Override
+        public String getUri() {
+            return uri;
+        }
+
+        @Override
+        public Map<String, Object> getVariables() {
+            return variables;
+        }
+
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            DefaultUriMatchInfo that = (DefaultUriMatchInfo) o;
+            return uri.equals(that.uri) && variables.equals(that.variables);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = uri.hashCode();
+            result = 31 * result + variables.hashCode();
+            return result;
+        }
+    }
+
     protected static class UrlMatchTemplateParser extends UrlTemplateParser {
+        private static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.]";
+
         final UriMatchTemplate matchTemplate;
+
         UrlMatchTemplateParser(String templateText, UriMatchTemplate matchTemplate) {
             super(templateText);
             this.matchTemplate = matchTemplate;
@@ -74,27 +142,47 @@ public class UriMatchTemplate extends UriTemplate {
 
         @Override
         protected void addRawContentSegment(List<PathSegment> segments, String value) {
-            String escaped = value.replace("/", "\\/");
-            matchTemplate.pattern.append(escaped);
+            matchTemplate.pattern.append(Pattern.quote(value));
             super.addRawContentSegment(segments, value);
         }
 
         @Override
-        protected void addVariableSegment(List<PathSegment> segments, String variable, String prefix, String delimiter, boolean encode, boolean repeatPrefix, String modifierStr, char modifierChar, String previousDelimiter) {
+        protected void addVariableSegment(List<PathSegment> segments,
+                                          String variable,
+                                          String prefix,
+                                          String delimiter,
+                                          boolean encode,
+                                          boolean repeatPrefix,
+                                          String modifierStr,
+                                          char modifierChar,
+                                          char operator,
+                                          String previousDelimiter) {
+            matchTemplate.variableList.add(variable);
             StringBuilder pattern = matchTemplate.pattern;
-            if(prefix != null) {
-                if(prefix.length() == 1) {
-                    switch (prefix.charAt(0)) {
-                        case '/': pattern.append("\\/"); break;
-                        default: pattern.append(prefix);
-                    }
+            boolean hasMod = modifierChar == ':' && modifierStr.length() > 0;
+            String prefixQuantifier = "";
+            String variableQuantifier = "+)";
+            if (hasMod) {
+                char firstChar = modifierStr.charAt(0);
+                if (firstChar == '?') {
+                    prefixQuantifier = modifierStr;
+                    variableQuantifier = variableQuantifier + modifierStr;
                 }
-                else {
-                    pattern.append(prefix);
+                else if(Character.isDigit(firstChar)) {
+                    variableQuantifier = "{1," + modifierStr + "})";
                 }
             }
-            pattern.append("([^\\/]+)");
-            super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, previousDelimiter);
+            switch (operator) {
+                case '.':
+                case '/':
+                    pattern.append("\\").append(String.valueOf(operator))
+                            .append(prefixQuantifier);
+                case '0': // no active operator
+                    pattern.append(VARIABLE_MATCH_PATTERN)
+                            .append(variableQuantifier);
+                    break;
+            }
+            super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter);
         }
     }
 }

@@ -274,7 +274,7 @@ public class UriTemplate {
                                     String modifierStr = modBuff.toString();
                                     char modifierChar = modifier;
                                     String previous = state == STATE_VAR_NEXT || state == STATE_VAR_NEXT_MODIFIER ? this.varDelimiter : null;
-                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, previous);
+                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previous);
                                 }
                                 boolean hasAnotherVar = state == STATE_VAR_NEXT && c != '}';
                                 if (hasAnotherVar) {
@@ -357,8 +357,7 @@ public class UriTemplate {
 
         /**
          * Adds a new variable segment
-         *
-         * @param segments The segments to augment
+         *  @param segments The segments to augment
          * @param variable The variable
          * @param prefix The prefix to use when expanding the variable
          * @param delimiter The delimiter to use when expanding the variable
@@ -366,6 +365,7 @@ public class UriTemplate {
          * @param repeatPrefix Whether to repeat the prefix for each expanded variable
          * @param modifierStr The modifier string
          * @param modifierChar The modifier as char
+         * @param operator The currently active operator
          * @param previousDelimiter The delimiter to use if a variable appeared before this variable
          */
         protected void addVariableSegment(List<PathSegment> segments,
@@ -376,6 +376,7 @@ public class UriTemplate {
                                           boolean repeatPrefix,
                                           String modifierStr,
                                           char modifierChar,
+                                          char operator,
                                           String previousDelimiter) {
             segments.add((parameters, previousHasContent) -> {
                 Object found = parameters.get(variable);
@@ -385,7 +386,7 @@ public class UriTemplate {
                     if (found.getClass().isArray()) {
                         found = Arrays.asList((Object[]) found);
                     }
-                    boolean isQuery = operator == '?';
+                    boolean isQuery = this.operator == '?';
                     if (found instanceof Iterable) {
                         Iterable iter = ((Iterable) found);
                         if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
@@ -405,14 +406,14 @@ public class UriTemplate {
                         final StringJoiner joiner;
                         if(modifierChar == '*') {
 
-                            switch (operator) {
+                            switch (this.operator) {
                                 case '&':
                                 case '?':
-                                    prefixToUse = String.valueOf(operator);
+                                    prefixToUse = String.valueOf(this.operator);
                                     joiner = new StringJoiner(String.valueOf('&'));
                                 break;
                                 case ';':
-                                    prefixToUse = String.valueOf(operator);
+                                    prefixToUse = String.valueOf(this.operator);
                                     joiner = new StringJoiner(String.valueOf(prefixToUse));
                                     break;
                                 default:
@@ -446,7 +447,7 @@ public class UriTemplate {
                     int len = result.length();
                     StringBuilder finalResult = new StringBuilder(previousHasContent && previousDelimiter != null ? previousDelimiter : "");
                     if (len == 0) {
-                        switch (operator) {
+                        switch (this.operator) {
                             case '/':
                                 break;
                             case ';':
@@ -468,7 +469,7 @@ public class UriTemplate {
                     }
                     return finalResult.toString();
                 } else {
-                    switch (operator) {
+                    switch (this.operator) {
                         case '/':
                             return null;
                         default:
