@@ -114,6 +114,7 @@ class UriTemplateSpec extends Specification {
         'X{.empty_keys}'      | [empty_keys: []]                                   | 'X'
         '{/who}'              | [who: 'fred']                                      | '/fred' // Section 3.2.6 - Level 3 - Path Segment Expansion: {/var}
         '{/who,who}'          | [who: 'fred']                                      | '/fred/fred'
+        '{/var,empty,empty}'  | [var: 'fred']                                      | '/fred'
         '{/half,who}'         | [half: '50%', who: 'fred']                         | '/50%25/fred'
         '{/who,dub}'          | [who: 'fred', dub: 'me/too']                       | '/fred/me%2Ftoo'
         '{/var}'              | [var: 'value']                                     | '/value'
@@ -149,6 +150,7 @@ class UriTemplateSpec extends Specification {
         '{?list*}'            | [list: ['red', 'green', 'blue']]                   | '?list=red&list=green&list=blue'
         '{?keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '?keys=semi,%3B,dot,.,comma,%2C'
         '{?keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '?semi=%3B&dot=.&comma=%2C'
+        '{?hello}'            | [hello: "Hello World!"]                            | '?hello=Hello+World%21'
         '?fixed=yes{&x}'      | [x: 1024]                                          | '?fixed=yes&x=1024' // Section 3.2.9 - Level 3 - Form-style query continuation
         '{&x,y,empty}'        | [x: 1024, y: 768, empty: '']                       | '&x=1024&y=768&empty='
         '{&var:3}'            | [var: 'value']                                     | '&var=val' // Section 3.2.9 - Level 4 - Form-style query continuation

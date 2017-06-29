@@ -55,13 +55,6 @@ public class UriTemplate {
 
 
     private final String templateString;
-    private final String scheme;
-    private final String userInfo;
-    private final String host;
-    private final String port;
-    private final String path;
-    private final String query;
-    private final String fragment;
     private final List<PathSegment> segments = new ArrayList<>();
 
     /**
@@ -77,50 +70,44 @@ public class UriTemplate {
             Matcher matcher = PATTERN_FULL_URI.matcher(templateString);
 
             if (matcher.find()) {
-                this.scheme = matcher.group(2);
+                this.templateString = templateString.toString();
+                String scheme = matcher.group(2);
                 if (scheme != null) {
                     segments.add((parameters, previousHasContent) -> scheme + "://");
                 }
-                this.userInfo = matcher.group(5);
-                this.host = matcher.group(6);
-                this.port = matcher.group(8);
-                this.path = matcher.group(9);
-                this.query = matcher.group(11);
-                this.fragment = matcher.group(13);
+                String userInfo = matcher.group(5);
+                String host = matcher.group(6);
+                String port = matcher.group(8);
+                String path = matcher.group(9);
+                String query = matcher.group(11);
+                String fragment = matcher.group(13);
                 if (userInfo != null) {
-                    new UrlTemplateParser(userInfo).parse(segments);
+                    createParser(userInfo).parse(segments);
                 }
                 if (host != null) {
-                    new UrlTemplateParser(host).parse(segments);
+                    createParser(host).parse(segments);
                 }
                 if (port != null) {
-                    new UrlTemplateParser(':' + port).parse(segments);
+                    createParser(':' + port).parse(segments);
                 }
                 if (path != null) {
 
                     if (fragment != null) {
-                        new UrlTemplateParser(path + '#' + fragment).parse(segments);
+                        createParser(path + '#' + fragment).parse(segments);
                     } else {
-                        new UrlTemplateParser(path).parse(segments);
+                        createParser(path).parse(segments);
                     }
                 }
                 if (query != null) {
-                    new UrlTemplateParser(query).parse(segments);
+                    createParser(query).parse(segments);
                 }
             } else {
                 throw new IllegalArgumentException("Invalid URI template: " + templateString);
             }
         } else {
-            scheme = null;
-            userInfo = null;
-            host = null;
-            port = null;
-            path = templateString.toString();
-            query = null;
-            fragment = null;
-            new UrlTemplateParser(path).parse(segments);
+            this.templateString = templateString.toString();
+            createParser(this.templateString).parse(segments);
         }
-        this.templateString = templateString.toString();
     }
 
     /**
@@ -144,39 +131,57 @@ public class UriTemplate {
         return builder.toString();
     }
 
-    /**
-     * Test whether the given URI matches this URI
-     *
-     * @param uri The URI
-     * @return True it it does
-     */
-    public boolean matches(String uri) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
-    }
-
     @Override
     public String toString() {
         return templateString;
     }
 
-    private interface PathSegment {
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        UriTemplate that = (UriTemplate) o;
+
+        return templateString.equals(that.templateString);
+    }
+
+    @Override
+    public int hashCode() {
+        return templateString.hashCode();
+    }
+
+    /**
+     * Creates a parser
+     *
+     * @param templateString
+     * @return The created parser
+     */
+    protected UrlTemplateParser createParser(String templateString) {
+        return new UrlTemplateParser(templateString);
+    }
+
+    /**
+     * Represents an expandable path segment
+     */
+    protected interface PathSegment {
         String expand(Map<String, Object> parameters, boolean previousHasContent);
     }
 
-    private static class UrlTemplateParser {
-        private static final int STATE_TEXT = 0;
-        private static final int STATE_VAR_START = 1;
-        private static final int STATE_VAR_CONTENT = 2;
-        private static final int STATE_VAR_NEXT = 11;
-        private static final int STATE_VAR_MODIFIER = 12;
-        private static final int STATE_VAR_NEXT_MODIFIER = 13;
+    protected static class UrlTemplateParser {
+        private static final int STATE_TEXT = 0; // raw text
+        private static final int STATE_VAR_START = 1; // the start of a URI variable ie. {
+        private static final int STATE_VAR_CONTENT = 2; // within a URI variable. ie. {var}
+        private static final int STATE_VAR_NEXT = 11; // within the next variable in a URI variable declaration ie. {var, var2}
+        private static final int STATE_VAR_MODIFIER = 12; // within a variable modifier ie. {var:1}
+        private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable ie. {var, var2:1}
         String templateText;
         private int state = STATE_TEXT;
         private char operator = '0';
         private char modifier = '0';
         private String varDelimiter;
 
-        public UrlTemplateParser(String templateText) {
+        UrlTemplateParser(String templateText) {
             this.templateText = templateText;
         }
 
@@ -191,7 +196,7 @@ public class UriTemplate {
                         if (c == '{') {
                             if (buff.length() > 0) {
                                 String val = buff.toString();
-                                segments.add((parameters, previousHasContent) -> val);
+                                addRawContentSegment(segments, val);
                             }
                             buff.delete(0, buff.length());
                             state = STATE_VAR_START;
@@ -269,104 +274,7 @@ public class UriTemplate {
                                     String modifierStr = modBuff.toString();
                                     char modifierChar = modifier;
                                     String previous = state == STATE_VAR_NEXT || state == STATE_VAR_NEXT_MODIFIER ? this.varDelimiter : null;
-                                    segments.add((parameters, previousHasContent) -> {
-                                        Object found = parameters.get(val);
-                                        if (found != null) {
-                                            String prefixToUse = prefix;
-                                            String result;
-                                            if (found.getClass().isArray()) {
-                                                found = Arrays.asList((Object[]) found);
-                                            }
-                                            if (found instanceof Iterable) {
-                                                Iterable iter = ((Iterable) found);
-                                                if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
-                                                    return "";
-                                                }
-                                                StringJoiner joiner = new StringJoiner(delimiter);
-                                                for (Object o : iter) {
-                                                    if (o != null) {
-                                                        String v = o.toString();
-                                                        joiner.add(encode ? encode(v) : escape(v));
-                                                    }
-                                                }
-                                                result = joiner.toString();
-                                            } else if (found instanceof Map) {
-                                                Map<Object, Object> map = (Map<Object, Object>) found;
-                                                if (map.isEmpty()) return "";
-                                                final StringJoiner joiner;
-                                                if(modifierChar == '*') {
-
-                                                    switch (operator) {
-                                                        case '&':
-                                                        case '?':
-                                                            prefixToUse = String.valueOf(operator);
-                                                            joiner = new StringJoiner(String.valueOf('&'));
-                                                        break;
-                                                        case ';':
-                                                            prefixToUse = String.valueOf(operator);
-                                                            joiner = new StringJoiner(String.valueOf(prefixToUse));
-                                                            break;
-                                                        default:
-                                                            joiner = new StringJoiner(delimiter);
-                                                    }
-                                                }
-                                                else {
-                                                    joiner = new StringJoiner(delimiter);
-                                                }
-
-                                                map.forEach((key, value) -> {
-                                                    String ks = key.toString();
-                                                    String vs = value == null ? "" : value.toString();
-                                                    String ek = encode ? encode(ks) : escape(ks);
-                                                    String ev = encode ? encode(vs) : escape(vs);
-                                                    if (modifierChar == '*') {
-                                                        String finalValue = ek + '=' + ev;
-                                                        joiner.add(finalValue);
-
-                                                    } else {
-                                                        joiner.add(ek);
-                                                        joiner.add(ev);
-                                                    }
-                                                });
-                                                result = joiner.toString();
-                                            } else {
-                                                String str = found.toString();
-                                                str = applyModifier(modifierStr, modifierChar, str, str.length());
-                                                result = encode ? encode(str) : escape(str);
-                                            }
-                                            int len = result.length();
-                                            StringBuilder finalResult = new StringBuilder(previousHasContent && previous != null ? previous : "");
-                                            if (len == 0) {
-                                                switch (operator) {
-                                                    case '/':
-                                                        break;
-                                                    case ';':
-                                                        if (prefixToUse != null && prefixToUse.endsWith("=")) {
-                                                            finalResult.append(prefixToUse.substring(0, prefixToUse.length() - 1)).append(result);
-                                                            break;
-                                                        }
-                                                    default:
-                                                        if (prefixToUse != null) {
-                                                            finalResult.append(prefixToUse).append(result);
-                                                        } else {
-                                                            finalResult.append(result);
-                                                        }
-                                                }
-                                            } else if (prefixToUse != null && repeatPrefix) {
-                                                finalResult.append(prefixToUse).append(result);
-                                            } else {
-                                                finalResult.append(result);
-                                            }
-                                            return finalResult.toString();
-                                        } else {
-                                            switch (operator) {
-                                                case '/':
-                                                    return null;
-                                                default:
-                                                    return "";
-                                            }
-                                        }
-                                    });
+                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, previous);
                                 }
                                 boolean hasAnotherVar = state == STATE_VAR_NEXT && c != '}';
                                 if (hasAnotherVar) {
@@ -433,8 +341,141 @@ public class UriTemplate {
 
             if (state == STATE_TEXT && buff.length() > 0) {
                 String val = buff.toString();
-                segments.add((parameters, previousHasContent) -> val);
+                addRawContentSegment(segments, val);
             }
+        }
+
+        /**
+         * Adds a raw content segment
+         *
+         * @param segments The segments
+         * @param value The value
+         */
+        protected void addRawContentSegment(List<PathSegment> segments, String value) {
+            segments.add((parameters, previousHasContent) -> value);
+        }
+
+        /**
+         * Adds a new variable segment
+         *
+         * @param segments The segments to augment
+         * @param variable The variable
+         * @param prefix The prefix to use when expanding the variable
+         * @param delimiter The delimiter to use when expanding the variable
+         * @param encode Whether to URL encode the variable
+         * @param repeatPrefix Whether to repeat the prefix for each expanded variable
+         * @param modifierStr The modifier string
+         * @param modifierChar The modifier as char
+         * @param previousDelimiter The delimiter to use if a variable appeared before this variable
+         */
+        protected void addVariableSegment(List<PathSegment> segments,
+                                          String variable,
+                                          String prefix,
+                                          String delimiter,
+                                          boolean encode,
+                                          boolean repeatPrefix,
+                                          String modifierStr,
+                                          char modifierChar,
+                                          String previousDelimiter) {
+            segments.add((parameters, previousHasContent) -> {
+                Object found = parameters.get(variable);
+                if (found != null) {
+                    String prefixToUse = prefix;
+                    String result;
+                    if (found.getClass().isArray()) {
+                        found = Arrays.asList((Object[]) found);
+                    }
+                    boolean isQuery = operator == '?';
+                    if (found instanceof Iterable) {
+                        Iterable iter = ((Iterable) found);
+                        if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
+                            return "";
+                        }
+                        StringJoiner joiner = new StringJoiner(delimiter);
+                        for (Object o : iter) {
+                            if (o != null) {
+                                String v = o.toString();
+                                joiner.add(encode ? encode(v, isQuery) : escape(v));
+                            }
+                        }
+                        result = joiner.toString();
+                    } else if (found instanceof Map) {
+                        Map<Object, Object> map = (Map<Object, Object>) found;
+                        if (map.isEmpty()) return "";
+                        final StringJoiner joiner;
+                        if(modifierChar == '*') {
+
+                            switch (operator) {
+                                case '&':
+                                case '?':
+                                    prefixToUse = String.valueOf(operator);
+                                    joiner = new StringJoiner(String.valueOf('&'));
+                                break;
+                                case ';':
+                                    prefixToUse = String.valueOf(operator);
+                                    joiner = new StringJoiner(String.valueOf(prefixToUse));
+                                    break;
+                                default:
+                                    joiner = new StringJoiner(delimiter);
+                            }
+                        }
+                        else {
+                            joiner = new StringJoiner(delimiter);
+                        }
+
+                        map.forEach((key, value) -> {
+                            String ks = key.toString();
+                            String vs = value == null ? "" : value.toString();
+                            String ek = encode ? encode(ks, isQuery) : escape(ks);
+                            String ev = encode ? encode(vs, isQuery) : escape(vs);
+                            if (modifierChar == '*') {
+                                String finalValue = ek + '=' + ev;
+                                joiner.add(finalValue);
+
+                            } else {
+                                joiner.add(ek);
+                                joiner.add(ev);
+                            }
+                        });
+                        result = joiner.toString();
+                    } else {
+                        String str = found.toString();
+                        str = applyModifier(modifierStr, modifierChar, str, str.length());
+                        result = encode ? encode(str, isQuery) : escape(str);
+                    }
+                    int len = result.length();
+                    StringBuilder finalResult = new StringBuilder(previousHasContent && previousDelimiter != null ? previousDelimiter : "");
+                    if (len == 0) {
+                        switch (operator) {
+                            case '/':
+                                break;
+                            case ';':
+                                if (prefixToUse != null && prefixToUse.endsWith("=")) {
+                                    finalResult.append(prefixToUse.substring(0, prefixToUse.length() - 1)).append(result);
+                                    break;
+                                }
+                            default:
+                                if (prefixToUse != null) {
+                                    finalResult.append(prefixToUse).append(result);
+                                } else {
+                                    finalResult.append(result);
+                                }
+                        }
+                    } else if (prefixToUse != null && repeatPrefix) {
+                        finalResult.append(prefixToUse).append(result);
+                    } else {
+                        finalResult.append(result);
+                    }
+                    return finalResult.toString();
+                } else {
+                    switch (operator) {
+                        case '/':
+                            return null;
+                        default:
+                            return "";
+                    }
+                }
+            });
         }
 
         private String escape(String v) {
@@ -458,10 +499,15 @@ public class UriTemplate {
             return result;
         }
 
-        private String encode(String str) {
+        private String encode(String str, boolean query) {
             try {
-                String encode = URLEncoder.encode(str, "UTF-8");
-                return encode.replaceAll("\\+", "%20");
+                String encoded = URLEncoder.encode(str, "UTF-8");
+                if(query) {
+                    return encoded;
+                }
+                else {
+                    return encoded.replaceAll("\\+", "%20");
+                }
             } catch (UnsupportedEncodingException e) {
                 throw new IllegalStateException("No available encoding", e);
             }
