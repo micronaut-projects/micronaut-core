@@ -130,7 +130,7 @@ public class UriMatchTemplate extends UriTemplate {
     }
 
     protected static class UrlMatchTemplateParser extends UrlTemplateParser {
-        private static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.]";
+        private static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.#&;\\+]";
 
         final UriMatchTemplate matchTemplate;
 
@@ -177,8 +177,14 @@ public class UriMatchTemplate extends UriTemplate {
                     if(modifierStr.endsWith("*") || modifierStr.endsWith("*?")) {
                         operatorQuantifier = "?";
                     }
-                    operatorPrefix = "(";
-                    variablePattern =  modifierStr + ")";
+                    if(operator != '.') {
+
+                        operatorPrefix = "(";
+                        variablePattern =  modifierStr + ")";
+                    }
+                    else {
+                        variablePattern =  "(" + modifierStr + ")";
+                    }
                     variableQuantifier = "";
                 }
             }

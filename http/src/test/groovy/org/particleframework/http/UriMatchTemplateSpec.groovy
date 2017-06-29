@@ -36,36 +36,41 @@ class UriMatchTemplateSpec extends Specification {
 
 
         where:
-        template                    | uri                  | matches | variables
-        "/books/{id:\\d+}"          | '/books/test'        | false   | null
-        "/books/{id:\\d+}"          | '/books/101'         | true    | [id: '101']
-        "/books{/path:.*}"          | '/books'             | true    | [path: '']
-        "/books{/path:.*}"          | '/books/foo/bar'     | true    | [path: '/foo/bar']
-        "/books{/path:.*}{.ext}"    | '/books/foo/bar.xml' | true    | [path: '/foo/bar', ext: 'xml']
-        "/books{/path:.*?}{.ext:?}" | '/books/foo/bar.xml' | true    | [path: '/foo/bar', ext: 'xml']
-        "/books{/path:.*}{.ext:?}"  | '/books/foo/bar'     | true    | [path: '/foo/bar', ext: null]
-        "/books/{id}"               | '/books'             | false   | null
-        "/books/{id}"               | '/books/1'           | true    | [id: '1']
-        "/books/{id}"               | '/books/test'        | true    | [id: 'test']
-        "/books/{id:2}"             | '/books/1'           | true    | [id: '1']
-        "/books/{id:2}"             | '/books/100'         | false   | null
-        "/books{/id:?}"             | '/books'             | true    | [id: null]
-        "/books{/id}{.ext}"         | '/books/1.xml'       | true    | [id: '1', ext: 'xml']
-        "/books{/id}{.ext}"         | '/books/1'           | false   | null
-        "/books{/id}{.ext:?}"       | '/books/1'           | true    | [id: '1', ext: null]
-        "/books{/id:?}{.ext:?}"     | '/books'             | true    | [id: null, ext: null]
-        "/books{/action}{/id:?}"    | '/books/show'        | true    | [id: null, action: 'show']
-        "/books{/action}{/id:?}"    | '/books/show/1'      | true    | [id: '1', action: 'show']
-        "/books{/action}{/id:2}"    | '/books/show/1'      | true    | [id: '1', action: 'show']
-        "/books{/action}{/id:2}"    | '/books/show/100'    | false   | null
-        "/book{/id}"                | '/book/1'            | true    | [id: '1']
-        "/book{/id}"                | '/book'              | false   | null
-        "/book{/id}"                | '/book'              | false   | null
-        "/book{/action}{/id}"       | '/book/show/1'       | true    | [action: 'show', id: '1']
-        "/book{/action}{/id}"       | '/book/1'            | false   | null
-        "/book/show{/id}"           | '/book/show/1'       | true    | [id: '1']
-        "/book/show{/id}"           | '/book/1'            | false   | null
-        "/books{?max,offset}"       | "/books"             | true    | [:]
-        "/books{#hashtag}"          | "/books"             | true    | [:]
+        template                         | uri                   | matches | variables
+        "/books{/id}/authors{/authorId}" | "/books/1/authors/2"  | true    | [id: '1', authorId: '2']
+        "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.xml'  | true    | [path: '/foo/bar', ext: 'xml']
+        "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.json' | false   | null
+        "/books/{id:\\d+}"               | '/books/test'         | false   | null
+        "/books/{id:\\d+}"               | '/books/101'          | true    | [id: '101']
+        "/books/{id:\\d+}"               | '/books'              | false   | null
+        "/books{/path:.*}"               | '/books'              | true    | [path: '']
+        "/books{/path:.*}"               | '/books/foo/bar'      | true    | [path: '/foo/bar']
+        "/books{/path:.*}{.ext}"         | '/books/foo/bar.xml'  | true    | [path: '/foo/bar', ext: 'xml']
+        "/books{/path:.*?}{.ext:?}"      | '/books/foo/bar.xml'  | true    | [path: '/foo/bar', ext: 'xml']
+        "/books{/path:.*}{.ext:?}"       | '/books/foo/bar'      | true    | [path: '/foo/bar', ext: null]
+        "/books/{id}"                    | '/books'              | false   | null
+        "/books/{id}"                    | '/books/1'            | true    | [id: '1']
+        "/books/{id}"                    | '/books/test'         | true    | [id: 'test']
+        "/books/{id:2}"                  | '/books/1'            | true    | [id: '1']
+        "/books/{id:2}"                  | '/books/100'          | false   | null
+        "/books{/id:?}"                  | '/books'              | true    | [id: null]
+        "/books{/id}{.ext}"              | '/books/1.xml'        | true    | [id: '1', ext: 'xml']
+        "/books{/id}{.ext}"              | '/books/1'            | false   | null
+        "/books{/id}{.ext:?}"            | '/books/1'            | true    | [id: '1', ext: null]
+        "/books{/id}{.ext:?}"            | '/books/1.xml'        | true    | [id: '1', ext: 'xml']
+        "/books{/id:?}{.ext:?}"          | '/books'              | true    | [id: null, ext: null]
+        "/books{/action}{/id:?}"         | '/books/show'         | true    | [id: null, action: 'show']
+        "/books{/action}{/id:?}"         | '/books/show/1'       | true    | [id: '1', action: 'show']
+        "/books{/action}{/id:2}"         | '/books/show/1'       | true    | [id: '1', action: 'show']
+        "/books{/action}{/id:2}"         | '/books/show/100'     | false   | null
+        "/book{/id}"                     | '/book/1'             | true    | [id: '1']
+        "/book{/id}"                     | '/book'               | false   | null
+        "/book{/id}"                     | '/book'               | false   | null
+        "/book{/action}{/id}"            | '/book/show/1'        | true    | [action: 'show', id: '1']
+        "/book{/action}{/id}"            | '/book/1'             | false   | null
+        "/book/show{/id}"                | '/book/show/1'        | true    | [id: '1']
+        "/book/show{/id}"                | '/book/1'             | false   | null
+        "/books{?max,offset}"            | "/books"              | true    | [:]
+        "/books{#hashtag}"               | "/books"              | true    | [:]
     }
 }
