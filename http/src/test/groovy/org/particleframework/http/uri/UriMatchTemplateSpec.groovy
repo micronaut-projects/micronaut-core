@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http
+package org.particleframework.http.uri
 
+import org.particleframework.http.uri.UriMatchInfo
+import org.particleframework.http.uri.UriMatchTemplate
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -23,6 +25,23 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class UriMatchTemplateSpec extends Specification {
+
+    @Unroll
+    void "Test URI template #template matches #uri when nested with #nested"() {
+        given:
+        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        Optional<UriMatchInfo> info = matchTemplate.nest(nested).match(uri)
+
+        expect:
+        info.isPresent() == matches
+        info.orElse(null)?.variables == variables
+
+
+        where:
+        template      | uri                  | nested                | matches | variables
+        "/books{/id}" | "/books/1/authors/2" | '/authors{/authorId}' | true    | [id: '1', authorId: '2']
+
+    }
 
     @Unroll
     void "Test URI template #template matches #uri"() {

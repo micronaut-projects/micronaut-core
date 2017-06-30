@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http
+package org.particleframework.http.uri
 
+import org.particleframework.http.uri.UriTemplate
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -23,6 +24,26 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class UriTemplateSpec extends Specification {
+
+    @Unroll
+    void "Test nest template #template with path #nested and #arguments"() {
+        given:
+        UriTemplate uriTemplate = new UriTemplate(template)
+
+        expect:
+        uriTemplate.nest(nested).expand(arguments) == result
+
+        where:
+        template       | nested               | arguments                               | result
+        '{var}'        | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '/book{/id}'   | '/author{/authorId}' | [id: 'foo', authorId: 'bar']            | '/book/foo/author/bar'
+        '{var}/'       | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '{var}'        | '/{var2}'            | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '{var}{?q}'    | '/{var2}'            | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
+        '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
+        '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | 'foo/bar#test'
+
+    }
 
     @Unroll
     void "Test expand URI template #template with arguments #arguments for path"() {

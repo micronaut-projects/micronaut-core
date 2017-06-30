@@ -13,26 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http;
+package org.particleframework.context.router.exceptions;
 
-import java.net.URI;
-import java.util.Map;
+import org.particleframework.context.exceptions.BeanContextException;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(URI)}
+ * <p>An exception that occurs when building routes</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriMatchInfo {
+public class RoutingException extends BeanContextException {
+    public RoutingException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    /**
-     * @return The matched URI
-     */
-    String getUri();
-
-    /**
-     * @return The variable values following a successful match
-     */
-    Map<String, Object> getVariables();
+    public RoutingException(String message) {
+        super(message);
+    }
 }

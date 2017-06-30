@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http;
+package org.particleframework.http.uri;
 
 import java.net.URI;
 import java.util.*;
@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class UriMatchTemplate extends UriTemplate {
+public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     private StringBuilder pattern;
     private List<String> variableList;
@@ -48,14 +48,10 @@ public class UriMatchTemplate extends UriTemplate {
         this.variableList = null;
     }
 
-    /**
-     * Match the given {@link URI} object
-     *
-     * @param uri The URI
-     * @return True if it matches
-     */
-    public Optional<UriMatchInfo> match(URI uri) {
-        return match(uri.toString());
+    protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, String...variables ) {
+        super(templateString, segments);
+        this.matchPattern = matchPattern;
+        this.variables = variables;
     }
 
     /**
@@ -64,6 +60,7 @@ public class UriMatchTemplate extends UriTemplate {
      * @param uri The uRI
      * @return True if it matches
      */
+    @Override
     public Optional<UriMatchInfo> match(String uri) {
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
@@ -83,6 +80,22 @@ public class UriMatchTemplate extends UriTemplate {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public UriMatchTemplate nest(CharSequence uriTemplate) {
+        return (UriMatchTemplate) super.nest(uriTemplate);
+    }
+
+    @Override
+    protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
+        Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
+        List<String> newList = new ArrayList<>();
+        newList.addAll(Arrays.asList(variables));
+        newList.addAll(variableList);
+        pattern = null;
+        variableList = null;
+        return new UriMatchTemplate(uriTemplate, newSegments, newPattern,newList.toArray(new String[newList.size()]));
     }
 
     @Override
@@ -130,7 +143,7 @@ public class UriMatchTemplate extends UriTemplate {
     }
 
     /**
-     * <p>Extended version of {@link org.particleframework.http.UriTemplate.UriTemplateParser} that builds
+     * <p>Extended version of {@link UriTemplateParser} that builds
      * a regular expression to match a path. Note that fragments (#) and queries (?) are ignored for the purposes of matching.</p>
      */
     protected static class UriMatchTemplateParser extends UriTemplateParser {
@@ -145,9 +158,9 @@ public class UriMatchTemplate extends UriTemplate {
 
 
         @Override
-        protected void addRawContentSegment(List<PathSegment> segments, String value) {
+        protected void addRawContentSegment(List<PathSegment> segments, String value, boolean isQuerySegment) {
             matchTemplate.pattern.append(Pattern.quote(value));
-            super.addRawContentSegment(segments, value);
+            super.addRawContentSegment(segments, value, isQuerySegment);
         }
 
         @Override
@@ -160,7 +173,7 @@ public class UriMatchTemplate extends UriTemplate {
                                           String modifierStr,
                                           char modifierChar,
                                           char operator,
-                                          String previousDelimiter) {
+                                          String previousDelimiter, boolean isQuerySegment) {
             matchTemplate.variableList.add(variable);
             StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
@@ -207,7 +220,7 @@ public class UriMatchTemplate extends UriTemplate {
                             .append(variableQuantifier);
                     break;
             }
-            super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter);
+            super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter, isQuerySegment);
         }
     }
 }
