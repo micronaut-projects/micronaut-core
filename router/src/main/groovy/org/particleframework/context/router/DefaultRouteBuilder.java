@@ -24,6 +24,9 @@ import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.http.uri.UriTemplate;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -37,7 +40,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private final BeanContext beanContext;
     private final UriNamingStrategy uriNamingStrategy = new UriNamingStrategy() {};
 
-    private UriMatchTemplate currentNestedTemplate = null;
+    private DefaultRoute currentParentRoute = null;
+    private List<DefaultRoute> builtRoutes = new ArrayList<>();
 
     public DefaultRouteBuilder(BeanContext beanContext) {
         this.beanContext = beanContext;
@@ -48,9 +52,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return uriNamingStrategy;
     }
 
+
     @Override
     public ResourceRoute resources(Class cls) {
         return null;
+    }
+
+    public List<Route> getBuiltRoutes() {
+        return Collections.unmodifiableList(builtRoutes);
     }
 
     @Override
@@ -70,101 +79,98 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public Route GET(String uri, Object target, String method) {
-        Class<?> type = target.getClass();
-        if(beanContext.containsBean(type)) {
-
-        }
-        else {
-            throw new RuntimeException("Target of route must be a bean within ");
-        }
-        return null;
+        return buildRoute(HttpMethod.GET, uri);
     }
 
     @Override
     public Route GET(String uri, Class<?> type, String method) {
-        Object instance = beanContext.findBean(type)
-                .orElseThrow(() -> new RoutingException("No bean found for route "));
-        HttpMethod httpMethod = HttpMethod.GET;
+//        Object instance = beanContext.findBean(type)
+//                .orElseThrow(() -> new RoutingException("No bean found for route "));
+        return buildRoute(HttpMethod.GET, uri);
+    }
 
+    protected Route buildRoute(HttpMethod httpMethod, String uri) {
         DefaultRoute route;
-        if (currentNestedTemplate != null) {
-            route = new DefaultRoute(HttpMethod.GET, currentNestedTemplate.nest(uri) );
+        if (currentParentRoute != null) {
+            route = new DefaultRoute(HttpMethod.GET, currentParentRoute.uriMatchTemplate.nest(uri) );
+            currentParentRoute.nestedRoutes.add(route);
         }
         else {
             route = new DefaultRoute(httpMethod, uri);
         }
+        this.builtRoutes.add(route);
         return route;
     }
 
     @Override
     public Route POST(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.POST, uri);
     }
 
     @Override
     public Route POST(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.POST, uri);
     }
 
     @Override
     public Route PUT(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.PUT, uri);
     }
 
     @Override
     public Route PUT(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.PUT, uri);
     }
 
     @Override
     public Route PATCH(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.PATCH, uri);
     }
 
     @Override
     public Route PATCH(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.PATCH, uri);
     }
 
     @Override
     public Route DELETE(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.DELETE, uri);
     }
 
     @Override
     public Route DELETE(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.DELETE, uri);
     }
 
     @Override
     public Route OPTIONS(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.OPTIONS, uri);
     }
 
     @Override
     public Route OPTIONS(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.OPTIONS, uri);
     }
 
     @Override
     public Route HEAD(String uri, Object target, String method) {
-        return null;
+        return buildRoute(HttpMethod.HEAD, uri);
     }
 
     @Override
     public Route HEAD(String uri, Class type, String method) {
-        return null;
+        return buildRoute(HttpMethod.HEAD, uri);
     }
 
     /**
-     * @author Graeme Rocher
-     * @since 1.0
+     * The default route impl
      */
     class DefaultRoute implements Route {
 
         private final HttpMethod httpMethod;
         private final MediaType mediaType;
         private final UriMatchTemplate uriMatchTemplate;
+        private final List<DefaultRoute> nestedRoutes = new ArrayList<>();
 
         DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate) {
             this(httpMethod, uriTemplate, MediaType.JSON);
@@ -201,17 +207,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public Route accept(MediaType mediaType) {
-            return new DefaultRoute(httpMethod, uriMatchTemplate, mediaType);
+            DefaultRouteBuilder.this.builtRoutes.remove(this);
+            DefaultRoute newRoute = new DefaultRoute(httpMethod, uriMatchTemplate, mediaType);
+            DefaultRouteBuilder.this.builtRoutes.add(newRoute);
+            return newRoute;
         }
 
         @Override
         public Route nest(Runnable nested) {
-            UriMatchTemplate previous = DefaultRouteBuilder.this.currentNestedTemplate;
-            DefaultRouteBuilder.this.currentNestedTemplate = uriMatchTemplate;
+            DefaultRoute previous = DefaultRouteBuilder.this.currentParentRoute;
+            DefaultRouteBuilder.this.currentParentRoute = this;
             try {
                 nested.run();
             } finally {
-                DefaultRouteBuilder.this.currentNestedTemplate = previous;
+                DefaultRouteBuilder.this.currentParentRoute = previous;
             }
             return this;
         }

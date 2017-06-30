@@ -38,6 +38,36 @@ public class NameUtils {
     }
 
     /**
+     * Converts class name to property name using JavaBean decapitalization
+     *
+     * @param name The class name
+     * @param suffixes The suffix to remove
+     * @return The decapitalized name
+     */
+    public static String decapitalizeWithoutSuffix(String name, String... suffixes) {
+        String decapitalized = Introspector.decapitalize(name);
+        return trimSuffix(decapitalized, suffixes);
+    }
+
+    /**
+     * Trims the given suffixes
+     *
+     * @param string The string to trim
+     * @param suffixes The suffixes
+     * @return The trimmed string
+     */
+    public static String trimSuffix(String string, String... suffixes) {
+        if(suffixes != null) {
+            for (String suffix : suffixes) {
+                if(string.endsWith(suffix)) {
+                    return string.substring(0, string.length() - suffix.length());
+                }
+            }
+        }
+        return string;
+    }
+
+    /**
      * Converts a property name to class name according to the JavaBean convention
      *
      * @param name The property name

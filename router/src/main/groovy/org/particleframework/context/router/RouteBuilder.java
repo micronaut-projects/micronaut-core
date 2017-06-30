@@ -741,7 +741,7 @@ public interface RouteBuilder {
          */
         default String resolveUri(Class type) {
             String simpleName = type.getSimpleName();
-            return '/' + NameUtils.decapitalize(simpleName);
+            return '/' + NameUtils.decapitalizeWithoutSuffix(simpleName, "Controller");
         }
 
         /**

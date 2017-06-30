@@ -17,11 +17,15 @@ package org.particleframework.context.router;
 
 import org.junit.Test;
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.DefaultBeanContext;
+import org.particleframework.http.HttpMethod;
 
 import javax.inject.Inject;
 
-import static org.particleframework.http.MediaType.*;
+import java.util.List;
 
+import static org.particleframework.http.MediaType.*;
+import static org.junit.Assert.*;
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +34,40 @@ public class RouteBuilderTests {
 
     @Test
     public void testRouterBuilder() {
+        MyRouteBuilder routeBuilder = new MyRouteBuilder(new DefaultBeanContext().start());
+        routeBuilder.someRoutes(new BookController(), new AuthorController());
+        List<Route> builtRoutes = routeBuilder.getBuiltRoutes();
 
+        assertTrue(builtRoutes
+                        .stream()
+                        .anyMatch(route ->
+                                route.match("/books/1").isPresent() && route.getHttpMethod() == HttpMethod.GET)
+                        );
+        assertTrue(builtRoutes
+                .stream()
+                .anyMatch(route ->
+                        route.match("/books/1/authors").isPresent() && route.getHttpMethod() == HttpMethod.GET)
+        );
+        assertTrue(builtRoutes
+                .stream()
+                .anyMatch(route ->
+                        route.match("/books").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+        );
+        assertTrue(builtRoutes
+                .stream()
+                .anyMatch(route ->
+                        route.match("/book").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+        );
+        assertFalse(builtRoutes
+                .stream()
+                .anyMatch(route ->
+                        route.match("/boo").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+        );
+        assertTrue(builtRoutes
+                .stream()
+                .anyMatch(route ->
+                        route.match("/book/1").isPresent() && route.getHttpMethod() == HttpMethod.GET)
+        );
     }
 
     static class MyRouteBuilder extends DefaultRouteBuilder {
@@ -65,9 +102,9 @@ public class RouteBuilderTests {
             // REST resources
             resources(controller);
             resources(Book.class);
-            single(Book.class).nest(()->
-                resources(Author.class)
-            );
+//            single(Book.class).nest(()->
+//                resources(Author.class)
+//            );
         }
     }
 
