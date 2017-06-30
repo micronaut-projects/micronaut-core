@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Extends {@link UriTemplate} and adds the ability to match a URI to a given template.
+ * Extends {@link UriTemplate} and adds the ability to match a URI to a given template using the {@link #match(URI)} method.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -86,10 +86,10 @@ public class UriMatchTemplate extends UriTemplate {
     }
 
     @Override
-    protected UrlTemplateParser createParser(String templateString) {
+    protected UriTemplateParser createParser(String templateString) {
         this.pattern = new StringBuilder();
         this.variableList = new ArrayList<>();
-        return new UrlMatchTemplateParser(templateString, this);
+        return new UriMatchTemplateParser(templateString, this);
     }
 
     protected static class DefaultUriMatchInfo implements UriMatchInfo {
@@ -129,12 +129,16 @@ public class UriMatchTemplate extends UriTemplate {
         }
     }
 
-    protected static class UrlMatchTemplateParser extends UrlTemplateParser {
+    /**
+     * <p>Extended version of {@link org.particleframework.http.UriTemplate.UriTemplateParser} that builds
+     * a regular expression to match a path. Note that fragments (#) and queries (?) are ignored for the purposes of matching.</p>
+     */
+    protected static class UriMatchTemplateParser extends UriTemplateParser {
         private static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.#&;\\+]";
 
         final UriMatchTemplate matchTemplate;
 
-        UrlMatchTemplateParser(String templateText, UriMatchTemplate matchTemplate) {
+        UriMatchTemplateParser(String templateText, UriMatchTemplate matchTemplate) {
             super(templateText);
             this.matchTemplate = matchTemplate;
         }
@@ -159,7 +163,8 @@ public class UriMatchTemplate extends UriTemplate {
                                           String previousDelimiter) {
             matchTemplate.variableList.add(variable);
             StringBuilder pattern = matchTemplate.pattern;
-            boolean hasMod = modifierChar == ':' && modifierStr.length() > 0;
+            int modLen = modifierStr.length();
+            boolean hasMod = modifierChar == ':' && modLen > 0;
             String operatorPrefix = "";
             String operatorQuantifier = "";
             String variableQuantifier = "+)";
@@ -170,11 +175,13 @@ public class UriMatchTemplate extends UriTemplate {
                     operatorQuantifier = modifierStr;
                     variableQuantifier = variableQuantifier + modifierStr;
                 }
-                else if(Character.isDigit(firstChar)) {
+                else if(modifierStr.chars().allMatch(Character::isDigit)) {
                     variableQuantifier = "{1," + modifierStr + "})";
                 }
                 else {
-                    if(modifierStr.endsWith("*") || modifierStr.endsWith("*?")) {
+                    char lastChar = modifierStr.charAt(modLen - 1);
+                    if(lastChar == '*' ||
+                            (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen-2) == '+'))) {
                         operatorQuantifier = "?";
                     }
                     if(operator != '.') {
@@ -194,6 +201,7 @@ public class UriMatchTemplate extends UriTemplate {
                 case '/':
                     pattern.append("\\").append(String.valueOf(operator))
                             .append(operatorQuantifier);
+                case '+':
                 case '0': // no active operator
                     pattern.append(variablePattern)
                             .append(variableQuantifier);

@@ -157,8 +157,8 @@ public class UriTemplate {
      * @param templateString
      * @return The created parser
      */
-    protected UrlTemplateParser createParser(String templateString) {
-        return new UrlTemplateParser(templateString);
+    protected UriTemplateParser createParser(String templateString) {
+        return new UriTemplateParser(templateString);
     }
 
     /**
@@ -168,7 +168,7 @@ public class UriTemplate {
         String expand(Map<String, Object> parameters, boolean previousHasContent);
     }
 
-    protected static class UrlTemplateParser {
+    protected static class UriTemplateParser {
         private static final int STATE_TEXT = 0; // raw text
         private static final int STATE_VAR_START = 1; // the start of a URI variable ie. {
         private static final int STATE_VAR_CONTENT = 2; // within a URI variable. ie. {var}
@@ -181,7 +181,7 @@ public class UriTemplate {
         private char modifier = '0';
         private String varDelimiter;
 
-        UrlTemplateParser(String templateText) {
+        UriTemplateParser(String templateText) {
             this.templateText = templateText;
         }
 
