@@ -27,9 +27,9 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
-
-    private StringBuilder pattern;
-    private List<String> variableList;
+    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.#&;\\+]";
+    protected StringBuilder pattern;
+    protected List<String> variableList;
     private final Pattern matchPattern;
     private final String[] variables;
 
@@ -39,7 +39,16 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @param templateString The template string
      */
     public UriMatchTemplate(CharSequence templateString) {
-        super(templateString);
+        this(templateString, new Object[0]);
+    }
+
+    /**
+     * Construct a new URI template for the given template
+     *
+     * @param templateString The template string
+     */
+    protected UriMatchTemplate(CharSequence templateString, Object...parserArguments) {
+        super(templateString,parserArguments);
 
         this.matchPattern = Pattern.compile(pattern.toString());
         this.variables = variableList.toArray(new String[variableList.size()]);
@@ -49,7 +58,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     }
 
     protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, String...variables ) {
-        super(templateString, segments);
+        super(templateString.toString(), segments);
         this.matchPattern = matchPattern;
         this.variables = variables;
     }
@@ -95,14 +104,20 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         newList.addAll(variableList);
         pattern = null;
         variableList = null;
-        return new UriMatchTemplate(uriTemplate, newSegments, newPattern,newList.toArray(new String[newList.size()]));
+        String[] variables = newList.toArray(new String[newList.size()]);
+        return newUriMatchTemplate(uriTemplate, newSegments, newPattern, variables);
+    }
+
+    protected UriMatchTemplate newUriMatchTemplate(CharSequence uriTemplate, List<PathSegment> newSegments, Pattern newPattern, String[] variables) {
+        return new UriMatchTemplate(uriTemplate, newSegments, newPattern, variables);
     }
 
     @Override
-    protected UriTemplateParser createParser(String templateString) {
+    protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
         this.pattern = new StringBuilder();
         this.variableList = new ArrayList<>();
         return new UriMatchTemplateParser(templateString, this);
+
     }
 
     protected static class DefaultUriMatchInfo implements UriMatchInfo {
@@ -147,15 +162,17 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * a regular expression to match a path. Note that fragments (#) and queries (?) are ignored for the purposes of matching.</p>
      */
     protected static class UriMatchTemplateParser extends UriTemplateParser {
-        private static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?\\.#&;\\+]";
 
         final UriMatchTemplate matchTemplate;
 
-        UriMatchTemplateParser(String templateText, UriMatchTemplate matchTemplate) {
+        protected UriMatchTemplateParser(String templateText, UriMatchTemplate matchTemplate) {
             super(templateText);
             this.matchTemplate = matchTemplate;
         }
 
+        public UriMatchTemplate getMatchTemplate() {
+            return matchTemplate;
+        }
 
         @Override
         protected void addRawContentSegment(List<PathSegment> segments, String value, boolean isQuerySegment) {
@@ -181,7 +198,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             String operatorPrefix = "";
             String operatorQuantifier = "";
             String variableQuantifier = "+)";
-            String variablePattern = VARIABLE_MATCH_PATTERN;
+            String variablePattern = getVariablePattern(variable, operator);
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
@@ -221,6 +238,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                     break;
             }
             super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter, isQuerySegment);
+        }
+
+        protected String getVariablePattern(String variable, char operator) {
+            return VARIABLE_MATCH_PATTERN;
         }
     }
 }

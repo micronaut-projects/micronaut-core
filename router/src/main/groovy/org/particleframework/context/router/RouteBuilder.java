@@ -20,6 +20,9 @@ import org.particleframework.core.naming.conventions.TypeConvention;
 
 import static org.particleframework.core.naming.conventions.MethodConvention.*;
 /**
+ *
+ * <p>An interface for classes capable of building HTTP routing information.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

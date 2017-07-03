@@ -99,19 +99,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildRoute(HttpMethod.GET, uri);
     }
 
-    protected Route buildRoute(HttpMethod httpMethod, String uri) {
-        DefaultRoute route;
-        if (currentParentRoute != null) {
-            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri) );
-            currentParentRoute.nestedRoutes.add(route);
-        }
-        else {
-            route = new DefaultRoute(httpMethod, uri);
-        }
-        this.builtRoutes.add(route);
-        return route;
-    }
-
     @Override
     public Route POST(String uri, Object target, String method) {
         return buildRoute(HttpMethod.POST, uri);
@@ -170,6 +157,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Override
     public Route HEAD(String uri, Class type, String method) {
         return buildRoute(HttpMethod.HEAD, uri);
+    }
+
+    protected Route buildRoute(HttpMethod httpMethod, String uri) {
+        DefaultRoute route;
+        if (currentParentRoute != null) {
+            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri) );
+            currentParentRoute.nestedRoutes.add(route);
+        }
+        else {
+            route = new DefaultRoute(httpMethod, uri);
+        }
+        this.builtRoutes.add(route);
+        return route;
     }
 
     /**
@@ -318,10 +318,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return newResourceRoute(newMap, getRoute);
         }
 
-        protected ResourceRoute newResourceRoute(Map<HttpMethod, Route> newMap, DefaultRoute getRoute) {
-            return new DefaultResourceRoute(newMap, getRoute);
-        }
-
         @Override
         public ResourceRoute nest(Runnable nested) {
             DefaultRoute previous = DefaultRouteBuilder.this.currentParentRoute;
@@ -334,16 +330,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return this;
         }
 
-
         @Override
         public ResourceRoute readOnly(boolean readOnly) {
             List<HttpMethod> excluded = Arrays.asList(HttpMethod.DELETE, HttpMethod.PATCH, HttpMethod.POST, HttpMethod.PUT);
             return handleExclude(excluded);
         }
 
+
         @Override
         public ResourceRoute exclude(HttpMethod... methods) {
             return handleExclude(Arrays.asList(methods));
+        }
+
+        protected ResourceRoute newResourceRoute(Map<HttpMethod, Route> newMap, DefaultRoute getRoute) {
+            return new DefaultResourceRoute(newMap, getRoute);
         }
 
         protected DefaultRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {

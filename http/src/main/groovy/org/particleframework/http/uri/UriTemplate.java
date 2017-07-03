@@ -63,6 +63,15 @@ public class UriTemplate {
      * @param templateString The template string
      */
     public UriTemplate(CharSequence templateString) {
+        this(templateString, new Object[0]);
+    }
+
+    /**
+     * Construct a new URI template for the given template
+     *
+     * @param templateString The template string
+     */
+    protected UriTemplate(CharSequence templateString, Object...parserArguments) {
         if (templateString == null) {
             throw new IllegalArgumentException("Argument [templateString] should not be null");
         }
@@ -82,36 +91,36 @@ public class UriTemplate {
                 String query = matcher.group(11);
                 String fragment = matcher.group(13);
                 if (userInfo != null) {
-                    createParser(userInfo).parse(segments);
+                    createParser(userInfo,  parserArguments).parse(segments);
                 }
                 if (host != null) {
-                    createParser(host).parse(segments);
+                    createParser(host,  parserArguments).parse(segments);
                 }
                 if (port != null) {
-                    createParser(':' + port).parse(segments);
+                    createParser(':' + port,  parserArguments).parse(segments);
                 }
                 if (path != null) {
 
                     if (fragment != null) {
                         createParser(path + '#' + fragment).parse(segments);
                     } else {
-                        createParser(path).parse(segments);
+                        createParser(path,  parserArguments).parse(segments);
                     }
                 }
                 if (query != null) {
-                    createParser(query).parse(segments);
+                    createParser(query,  parserArguments).parse(segments);
                 }
             } else {
                 throw new IllegalArgumentException("Invalid URI template: " + templateString);
             }
         } else {
             this.templateString = templateString.toString();
-            createParser(this.templateString).parse(segments);
+            createParser(this.templateString,  parserArguments).parse(segments);
         }
     }
 
-    protected UriTemplate(CharSequence templateString, List<PathSegment> segments ) {
-        this.templateString = templateString.toString();
+    protected UriTemplate(String templateString, List<PathSegment> segments ) {
+        this.templateString = templateString;
         this.segments.addAll(segments);
     }
 
@@ -123,11 +132,22 @@ public class UriTemplate {
      * @return The new URI template
      */
     public UriTemplate nest(CharSequence uriTemplate) {
+        return nest(uriTemplate, new Object[0]);
+    }
+
+    /**
+     * Nests another URI template with this template
+     *
+     * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
+     *
+     * @return The new URI template
+     */
+    protected UriTemplate nest(CharSequence uriTemplate, Object...parserArguments) {
         if(uriTemplate == null) return this;
         int len = uriTemplate.length();
         if(len == 0) return this;
 
-        List<PathSegment> newSegments = buildNestedSegments(uriTemplate, len);
+        List<PathSegment> newSegments = buildNestedSegments(uriTemplate, len, parserArguments);
         return newUriTemplate(uriTemplate, newSegments);
     }
 
@@ -135,7 +155,7 @@ public class UriTemplate {
         return new UriTemplate(this.templateString + uriTemplate, newSegments);
     }
 
-    protected List<PathSegment> buildNestedSegments(CharSequence uriTemplate, int len) {
+    protected List<PathSegment> buildNestedSegments(CharSequence uriTemplate, int len, Object...parserArguments) {
         List<PathSegment> newSegments = new ArrayList<>();
         List<PathSegment> querySegments = new ArrayList<>();
         for (PathSegment segment : segments) {
@@ -150,7 +170,7 @@ public class UriTemplate {
         if(shouldPrependSlash(templateString, len)) {
             templateString = '/' + templateString;
         }
-        createParser(templateString).parse(newSegments);
+        createParser(templateString, parserArguments).parse(newSegments);
         newSegments.addAll(querySegments);
         return newSegments;
     }
@@ -207,7 +227,7 @@ public class UriTemplate {
      * @param templateString
      * @return The created parser
      */
-    protected UriTemplateParser createParser(String templateString) {
+    protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
         return new UriTemplateParser(templateString);
     }
 
