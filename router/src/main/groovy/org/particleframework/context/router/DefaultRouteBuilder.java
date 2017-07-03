@@ -17,13 +17,11 @@ package org.particleframework.context.router;
 
 
 import org.particleframework.context.BeanContext;
-import org.particleframework.context.router.exceptions.RoutingException;
-import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.naming.conventions.TypeConvention;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
-import org.particleframework.http.uri.UriTemplate;
 
 import java.util.*;
 
@@ -35,14 +33,28 @@ import java.util.*;
  */
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
+    public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {};
+    public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
+        @Override
+        public String resolveUri(Class type) {
+            return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
+        }
+    };
+
     private final BeanContext beanContext;
-    private final UriNamingStrategy uriNamingStrategy = new UriNamingStrategy() {};
+    private final UriNamingStrategy uriNamingStrategy;
 
     private DefaultRoute currentParentRoute = null;
     private List<DefaultRoute> builtRoutes = new ArrayList<>();
 
     public DefaultRouteBuilder(BeanContext beanContext) {
         this.beanContext = beanContext;
+        this.uriNamingStrategy = CAMEL_CASE_NAMING_STRATEGY;
+    }
+
+    public DefaultRouteBuilder(BeanContext beanContext, UriNamingStrategy uriNamingStrategy) {
+        this.beanContext = beanContext;
+        this.uriNamingStrategy = uriNamingStrategy;
     }
 
     @Override
@@ -235,6 +247,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        protected ResourceRoute newResourceRoute(Map<HttpMethod, Route> newMap, DefaultRoute getRoute) {
+            return new DefaultSingleRoute(newMap, getRoute);
+        }
+
+        @Override
         protected DefaultRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
             DefaultRoute getRoute = (DefaultRoute) DefaultRouteBuilder.this.GET(type);
             routeMap.put(
@@ -263,6 +280,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             );
         }
     }
+
     class DefaultResourceRoute implements ResourceRoute {
 
         private final Map<HttpMethod, Route> resourceRoutes;
@@ -297,6 +315,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     DefaultRouteBuilder.this.builtRoutes.add(defaultRoute);
                 }
             });
+            return newResourceRoute(newMap, getRoute);
+        }
+
+        protected ResourceRoute newResourceRoute(Map<HttpMethod, Route> newMap, DefaultRoute getRoute) {
             return new DefaultResourceRoute(newMap, getRoute);
         }
 
@@ -365,7 +387,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     newMap.put(key, value);
                 }
             });
-            return new DefaultResourceRoute(newMap, getRoute);
+            return newResourceRoute(newMap, getRoute);
         }
     }
 }

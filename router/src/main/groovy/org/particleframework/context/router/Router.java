@@ -18,6 +18,7 @@ package org.particleframework.context.router;
 import org.particleframework.http.HttpMethod;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * <p>Core Router interface that allows discovery of a route given an HTTP method and URI</p>
@@ -28,11 +29,11 @@ import java.util.Optional;
 public interface Router {
 
     /**
-     * Finds a route for the given HTTP method and URI
+     * Finds all of the possible routes for the given HTTP method and URI
      *
      * @param httpMethod The HTTP method
      * @param uri The URI
-     * @return An {@link Optional} of {@link Route}
+     * @return A {@link Stream} of possible {@link Route} instances.
      */
-    Optional<Route> route(HttpMethod httpMethod, CharSequence uri);
+    Stream<Route> find(HttpMethod httpMethod, CharSequence uri);
 }

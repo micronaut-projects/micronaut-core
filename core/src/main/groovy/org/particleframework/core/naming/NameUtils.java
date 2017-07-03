@@ -76,4 +76,41 @@ public class NameUtils {
     public static String capitalize(String name) {
         return MetaClassHelper.capitalize(name);
     }
+
+
+    /**
+     * Converts camel case to hyphenated
+     *
+     * @param name The name
+     * @return The hyphenated string
+     *
+     */
+    public static String hyphenate(String name) {
+        StringBuilder newName = new StringBuilder();
+        char[] chars = name.toCharArray();
+        boolean first = true;
+        char last = '0';
+        for (char c : chars) {
+
+            if(Character.isLowerCase(c)) {
+                newName.append(c);
+            }
+            else {
+                char lowerCaseChar = Character.toLowerCase(c);
+                if(first) {
+                    first = false;
+                    newName.append(lowerCaseChar);
+                }
+                else if(Character.isUpperCase(last)) {
+                    newName.append(lowerCaseChar);
+                }
+                else {
+                    newName.append('-').append(lowerCaseChar);
+                }
+            }
+            last = c;
+        }
+
+        return newName.toString();
+    }
 }

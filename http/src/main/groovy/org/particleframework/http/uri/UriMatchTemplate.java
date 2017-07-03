@@ -177,12 +177,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             matchTemplate.variableList.add(variable);
             StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
-            boolean hasMod = modifierChar == ':' && modLen > 0;
+            boolean hasModifier = modifierChar == ':' && modLen > 0;
             String operatorPrefix = "";
             String operatorQuantifier = "";
             String variableQuantifier = "+)";
             String variablePattern = VARIABLE_MATCH_PATTERN;
-            if (hasMod) {
+            if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
                     operatorQuantifier = modifierStr;
