@@ -27,11 +27,6 @@ import org.particleframework.http.uri.UriTemplate;
 public interface Route extends UriMatcher {
 
     /**
-     * @return The URI template for this route
-     */
-    UriTemplate getUriTemplate();
-
-    /**
      * @return The HTTP method for this route
      */
     HttpMethod getHttpMethod();

@@ -15,8 +15,10 @@
  */
 package org.particleframework.context.router;
 
-import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.naming.conventions.PropertyConvention;
+import org.particleframework.core.naming.conventions.TypeConvention;
 
+import static org.particleframework.core.naming.conventions.MethodConvention.*;
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -25,42 +27,8 @@ public interface RouteBuilder {
     /**
      * Used to signify to the route that the ID of the resource is used
      */
-    RouteId ID = new RouteId();
+    PropertyConvention ID = PropertyConvention.ID;
 
-    /**
-     * The index method of controllers
-     */
-    String INDEX = "index";
-
-    /**
-     * The show method of controllers
-     */
-    String SHOW = "show";
-
-    /**
-     * The show method of controllers
-     */
-    String SAVE = "save";
-
-    /**
-     * The default update method of controllers
-     */
-    String UPDATE = "update";
-
-    /**
-     * The default delete method of controllers
-     */
-    String DELETE = "delete";
-
-    /**
-     * The default options method of controllers
-     */
-    String OPTIONS = "options";
-
-    /**
-     * The default head method of controllers
-     */
-    String HEAD = "head";
 
     /**
      * @return The URI naming strategy
@@ -183,7 +151,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route GET(String uri, Object target) {
-        return GET(uri, target, INDEX);
+        return GET(uri, target, INDEX.lowerCaseName());
     }
 
     /**
@@ -203,9 +171,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route GET(Object target, RouteId id) {
+    default Route GET(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return GET(getUriNamingStrategy().resolveUri(type, id), target, SHOW);
+        return GET(getUriNamingStrategy().resolveUri(type, id), target, SHOW.lowerCaseName());
     }
 
     /**
@@ -215,7 +183,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route GET(Class type) {
-        return GET(getUriNamingStrategy().resolveUri(type), type, INDEX);
+        return GET(getUriNamingStrategy().resolveUri(type), type, INDEX.lowerCaseName());
     }
 
     /**
@@ -224,8 +192,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route GET(Class type, RouteId id) {
-        return GET(getUriNamingStrategy().resolveUri(type, id), type, SHOW);
+    default Route GET(Class type, PropertyConvention id) {
+        return GET(getUriNamingStrategy().resolveUri(type, id), type, SHOW.lowerCaseName());
     }
 
     /**
@@ -261,7 +229,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route POST(String uri, Object target) {
-        return POST(uri, target, SAVE);
+        return POST(uri, target, SAVE.lowerCaseName());
     }
 
     /**
@@ -281,9 +249,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route POST(Object target, RouteId id) {
+    default Route POST(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return POST(getUriNamingStrategy().resolveUri(type, id), target, UPDATE);
+        return POST(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.lowerCaseName());
     }
 
     /**
@@ -293,7 +261,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route POST(Class type) {
-        return POST(getUriNamingStrategy().resolveUri(type), type, SAVE);
+        return POST(getUriNamingStrategy().resolveUri(type), type, SAVE.lowerCaseName());
     }
 
     /**
@@ -302,8 +270,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route POST(Class type, RouteId id) {
-        return POST(getUriNamingStrategy().resolveUri(type, id), type, UPDATE);
+    default Route POST(Class type, PropertyConvention id) {
+        return POST(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.lowerCaseName());
     }
 
     /**
@@ -339,7 +307,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route PUT(String uri, Object target) {
-        return PUT(uri, target, UPDATE);
+        return PUT(uri, target, UPDATE.lowerCaseName());
     }
 
     /**
@@ -359,9 +327,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PUT(Object target, RouteId id) {
+    default Route PUT(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return PUT(getUriNamingStrategy().resolveUri(type, id), target, UPDATE);
+        return PUT(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.lowerCaseName());
     }
 
     /**
@@ -371,7 +339,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route PUT(Class type) {
-        return PUT(getUriNamingStrategy().resolveUri(type), type, UPDATE);
+        return PUT(getUriNamingStrategy().resolveUri(type), type, UPDATE.lowerCaseName());
     }
 
     /**
@@ -380,8 +348,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PUT(Class type, RouteId id) {
-        return PUT(getUriNamingStrategy().resolveUri(type, id), type, UPDATE);
+    default Route PUT(Class type, PropertyConvention id) {
+        return PUT(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.lowerCaseName());
     }
 
     /**
@@ -417,7 +385,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route PATCH(String uri, Object target) {
-        return PATCH(uri, target, UPDATE);
+        return PATCH(uri, target, UPDATE.lowerCaseName());
     }
 
     /**
@@ -437,9 +405,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PATCH(Object target, RouteId id) {
+    default Route PATCH(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return PATCH(getUriNamingStrategy().resolveUri(type, id), target, UPDATE);
+        return PATCH(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.lowerCaseName());
     }
 
     /**
@@ -449,7 +417,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route PATCH(Class type) {
-        return PATCH(getUriNamingStrategy().resolveUri(type), type, UPDATE);
+        return PATCH(getUriNamingStrategy().resolveUri(type), type, UPDATE.lowerCaseName());
     }
 
     /**
@@ -458,8 +426,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PATCH(Class type, RouteId id) {
-        return PATCH(getUriNamingStrategy().resolveUri(type, id), type, UPDATE);
+    default Route PATCH(Class type, PropertyConvention id) {
+        return PATCH(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.lowerCaseName());
     }
 
     /**
@@ -495,7 +463,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route DELETE(String uri, Object target) {
-        return DELETE(uri, target, DELETE);
+        return DELETE(uri, target, DELETE.lowerCaseName());
     }
 
     /**
@@ -515,9 +483,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route DELETE(Object target, RouteId id) {
+    default Route DELETE(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return DELETE(getUriNamingStrategy().resolveUri(type, id), target, DELETE);
+        return DELETE(getUriNamingStrategy().resolveUri(type, id), target, DELETE.lowerCaseName());
     }
 
     /**
@@ -527,7 +495,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route DELETE(Class type) {
-        return DELETE(getUriNamingStrategy().resolveUri(type), type, DELETE);
+        return DELETE(getUriNamingStrategy().resolveUri(type), type, DELETE.lowerCaseName());
     }
 
     /**
@@ -536,8 +504,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route DELETE(Class type, RouteId id) {
-        return DELETE(getUriNamingStrategy().resolveUri(type, id), type, DELETE);
+    default Route DELETE(Class type, PropertyConvention id) {
+        return DELETE(getUriNamingStrategy().resolveUri(type, id), type, DELETE.lowerCaseName());
     }
 
     /**
@@ -573,7 +541,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route OPTIONS(String uri, Object target) {
-        return OPTIONS(uri, target, OPTIONS);
+        return OPTIONS(uri, target, OPTIONS.lowerCaseName());
     }
 
     /**
@@ -593,9 +561,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route OPTIONS(Object target, RouteId id) {
+    default Route OPTIONS(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return OPTIONS(getUriNamingStrategy().resolveUri(type, id), target, OPTIONS);
+        return OPTIONS(getUriNamingStrategy().resolveUri(type, id), target, OPTIONS.lowerCaseName());
     }
 
     /**
@@ -605,7 +573,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route OPTIONS(Class type) {
-        return OPTIONS(getUriNamingStrategy().resolveUri(type), type, OPTIONS);
+        return OPTIONS(getUriNamingStrategy().resolveUri(type), type, OPTIONS.lowerCaseName());
     }
 
     /**
@@ -614,8 +582,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route OPTIONS(Class type, RouteId id) {
-        return OPTIONS(getUriNamingStrategy().resolveUri(type, id), type, OPTIONS);
+    default Route OPTIONS(Class type, PropertyConvention id) {
+        return OPTIONS(getUriNamingStrategy().resolveUri(type, id), type, OPTIONS.lowerCaseName());
     }
 
     /**
@@ -651,7 +619,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route HEAD(String uri, Object target) {
-        return HEAD(uri, target, HEAD);
+        return HEAD(uri, target, HEAD.lowerCaseName());
     }
 
     /**
@@ -671,9 +639,9 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route HEAD(Object target, RouteId id) {
+    default Route HEAD(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
-        return HEAD(getUriNamingStrategy().resolveUri(type, id), target, HEAD);
+        return HEAD(getUriNamingStrategy().resolveUri(type, id), target, HEAD.lowerCaseName());
     }
 
     /**
@@ -683,7 +651,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default Route HEAD(Class type) {
-        return HEAD(getUriNamingStrategy().resolveUri(type), type, HEAD);
+        return HEAD(getUriNamingStrategy().resolveUri(type), type, HEAD.lowerCaseName());
     }
 
     /**
@@ -692,8 +660,8 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route HEAD(Class type, RouteId id) {
-        return HEAD(getUriNamingStrategy().resolveUri(type, id), type, HEAD);
+    default Route HEAD(Class type, PropertyConvention id) {
+        return HEAD(getUriNamingStrategy().resolveUri(type, id), type, HEAD.lowerCaseName());
     }
 
     /**
@@ -727,7 +695,7 @@ public interface RouteBuilder {
      *
      * <ul>
      *     <li>{@link #resolveUri(Class)} - Where type is <code>example.BookController</code> value is <code>/book</code></li>
-     *     <li>{@link #resolveUri(Class, RouteId)} - Where type is <code>example.BookController</code> value is <code>/book{/id}</code></li>
+     *     <li>{@link #resolveUri(Class, PropertyConvention)} - Where type is <code>example.BookController</code> value is <code>/book{/id}</code></li>
      * </ul>
      *
      * <p>Implementers can override to provide other strategies such as pluralization etc.</p>
@@ -740,8 +708,7 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(Class type) {
-            String simpleName = type.getSimpleName();
-            return '/' + NameUtils.decapitalizeWithoutSuffix(simpleName, "Controller");
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
 
         /**
@@ -751,8 +718,8 @@ public interface RouteBuilder {
          * @param id the route id
          * @return The URI to use
          */
-        default String resolveUri(Class type, RouteId id) {
-            return resolveUri(type) + "{/id}";
+        default String resolveUri(Class type, PropertyConvention id) {
+            return resolveUri(type) + "{/" + id.lowerCaseName() + "}";
         }
     }
 

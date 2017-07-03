@@ -18,16 +18,14 @@ package org.particleframework.context.router;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.router.exceptions.RoutingException;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.http.uri.UriTemplate;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * A DefaultRouteBuilder implementation for building roots
@@ -55,7 +53,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ResourceRoute resources(Class cls) {
-        return null;
+        return new DefaultResourceRoute(cls);
     }
 
     public List<Route> getBuiltRoutes() {
@@ -64,17 +62,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ResourceRoute single(Class cls) {
-        return null;
+        return new DefaultSingleRoute(cls);
     }
 
     @Override
     public Route status(int code, Class type, String method) {
-        return null;
+        throw new UnsupportedOperationException("not yet implemented");
     }
 
     @Override
     public Route error(Class<? extends Throwable> error, Class type, String method) {
-        return null;
+        throw new UnsupportedOperationException("not yet implemented");
     }
 
     @Override
@@ -92,7 +90,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected Route buildRoute(HttpMethod httpMethod, String uri) {
         DefaultRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultRoute(HttpMethod.GET, currentParentRoute.uriMatchTemplate.nest(uri) );
+            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri) );
             currentParentRoute.nestedRoutes.add(route);
         }
         else {
@@ -191,11 +189,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriTemplate getUriTemplate() {
-            return uriMatchTemplate;
-        }
-
-        @Override
         public HttpMethod getHttpMethod() {
             return httpMethod;
         }
@@ -231,4 +224,148 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     }
 
+    class DefaultSingleRoute extends DefaultResourceRoute {
+
+        DefaultSingleRoute(Map<HttpMethod, Route> resourceRoutes, DefaultRoute getRoute) {
+            super(resourceRoutes, getRoute);
+        }
+
+        DefaultSingleRoute(Class type) {
+            super(type);
+        }
+
+        @Override
+        protected DefaultRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+            DefaultRoute getRoute = (DefaultRoute) DefaultRouteBuilder.this.GET(type);
+            routeMap.put(
+                    HttpMethod.GET, getRoute
+            );
+            return getRoute;
+        }
+
+        @Override
+        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+            // POST /foo
+            routeMap.put(
+                    HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
+            );
+            // DELETE /foo
+            routeMap.put(
+                    HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type)
+            );
+            // PATCH /foo
+            routeMap.put(
+                    HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type)
+            );
+            // PUT /foo
+            routeMap.put(
+                    HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type)
+            );
+        }
+    }
+    class DefaultResourceRoute implements ResourceRoute {
+
+        private final Map<HttpMethod, Route> resourceRoutes;
+        private final DefaultRoute getRoute;
+
+        DefaultResourceRoute(Map<HttpMethod, Route> resourceRoutes, DefaultRoute getRoute) {
+            this.resourceRoutes = resourceRoutes;
+            this.getRoute = getRoute;
+        }
+
+        DefaultResourceRoute(Class type) {
+            this.resourceRoutes = new LinkedHashMap<>();
+            // GET /foo/1
+            Map<HttpMethod, Route> routeMap = this.resourceRoutes;
+            this.getRoute = buildGetRoute(type, routeMap);
+            buildRemainingRoutes(type, routeMap);
+        }
+
+        @Override
+        public ResourceRoute accept(MediaType mediaType) {
+            DefaultRouteBuilder.this.builtRoutes.remove(getRoute);
+            DefaultRoute getRoute = new DefaultRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, mediaType);
+            DefaultRouteBuilder.this.builtRoutes.add(getRoute);
+
+            Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
+            this.resourceRoutes.forEach((key,value)->{
+                if(value != this.getRoute) {
+                    DefaultRoute defaultRoute = (DefaultRoute) value;
+                    DefaultRouteBuilder.this.builtRoutes.remove(defaultRoute);
+                    DefaultRoute newRoute = new DefaultRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, mediaType);
+                    newMap.put(key, newRoute);
+                    DefaultRouteBuilder.this.builtRoutes.add(defaultRoute);
+                }
+            });
+            return new DefaultResourceRoute(newMap, getRoute);
+        }
+
+        @Override
+        public ResourceRoute nest(Runnable nested) {
+            DefaultRoute previous = DefaultRouteBuilder.this.currentParentRoute;
+            DefaultRouteBuilder.this.currentParentRoute = getRoute;
+            try {
+                nested.run();
+            } finally {
+                DefaultRouteBuilder.this.currentParentRoute = previous;
+            }
+            return this;
+        }
+
+
+        @Override
+        public ResourceRoute readOnly(boolean readOnly) {
+            List<HttpMethod> excluded = Arrays.asList(HttpMethod.DELETE, HttpMethod.PATCH, HttpMethod.POST, HttpMethod.PUT);
+            return handleExclude(excluded);
+        }
+
+        @Override
+        public ResourceRoute exclude(HttpMethod... methods) {
+            return handleExclude(Arrays.asList(methods));
+        }
+
+        protected DefaultRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+            DefaultRoute getRoute = (DefaultRoute) DefaultRouteBuilder.this.GET(type, ID);
+            routeMap.put(
+                    HttpMethod.GET, getRoute
+            );
+            return getRoute;
+        }
+
+        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+            // GET /foo
+            routeMap.put(
+                    HttpMethod.GET, DefaultRouteBuilder.this.GET(type)
+            );
+            // POST /foo
+            routeMap.put(
+                    HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
+            );
+            // DELETE /foo/1
+            routeMap.put(
+                    HttpMethod.DELETE, DefaultRouteBuilder.this.DELETE(type, ID)
+            );
+            // PATCH /foo/1
+            routeMap.put(
+                    HttpMethod.PATCH, DefaultRouteBuilder.this.PATCH(type, ID)
+            );
+            // PUT /foo/1
+            routeMap.put(
+                    HttpMethod.PUT, DefaultRouteBuilder.this.PUT(type, ID)
+            );
+        }
+
+        private ResourceRoute handleExclude(List<HttpMethod> excluded) {
+            Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
+            this.resourceRoutes.forEach((key,value)->{
+                if(excluded.contains(key)) {
+                    DefaultRouteBuilder.this.builtRoutes.remove(value);
+                }
+                else {
+                    newMap.put(key, value);
+                }
+            });
+            return new DefaultResourceRoute(newMap, getRoute);
+        }
+    }
 }

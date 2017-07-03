@@ -94,10 +94,10 @@ public class RouteBuilderTests {
             GET("/books", controller);
             POST("/books", controller, "save").accept(JSON);
 
-            // handle errors
-            error(RuntimeException.class, controller, "error");
-            // handle status codes
-            status(404, controller, "notFound");
+            // handle errors TODO
+//            error(RuntimeException.class, controller, "error");
+            // handle status codes TODO
+//            status(404, controller, "notFound");
 
             // REST resources
             resources(controller);

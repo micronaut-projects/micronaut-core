@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.router;
 
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 
 /**
@@ -23,12 +24,10 @@ import org.particleframework.http.MediaType;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ResourceRoute extends Route {
+public interface ResourceRoute  {
 
-    @Override
     ResourceRoute accept(MediaType mediaType);
 
-    @Override
     ResourceRoute nest(Runnable nested);
 
     /**
@@ -38,4 +37,12 @@ public interface ResourceRoute extends Route {
      * @return A new {@link ResourceRoute}
      */
     ResourceRoute readOnly(boolean readOnly);
+
+    /**
+     * Exclude a particular HTTP method from this resource route
+     *
+     * @param methods The methods to exclude
+     * @return The resource route
+     */
+    ResourceRoute exclude(HttpMethod... methods);
 }
