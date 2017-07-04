@@ -10,20 +10,17 @@ import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
-import javax.inject.Singleton;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.BinaryOperator;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -146,12 +143,33 @@ public class DefaultBeanContext implements BeanContext {
 
 
     @Override
-    public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
+    public Optional<BeanConfiguration> findBeanConfiguration(String configurationName) {
         BeanConfiguration configuration = this.beanConfigurations.get(configurationName);
         if (configuration != null) {
             return Optional.of(configuration);
         } else {
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
+        BeanKey beanKey = new BeanKey(beanType, null);
+        BeanRegistration reg = singletonObjects.get(beanKey);
+        if(reg != null) {
+            return Optional.of(reg.beanDefinition);
+        }
+        Collection<BeanDefinition<T>> beanCandidates = findBeanCandidates(beanType);
+        if(beanCandidates.isEmpty()) {
+            return Optional.empty();
+        }
+        else {
+            if(beanCandidates.size() == 1) {
+                return Optional.of(beanCandidates.iterator().next());
+            }
+            else {
+                throw new NonUniqueBeanException(beanType, beanCandidates.iterator());
+            }
         }
     }
 
@@ -815,6 +833,17 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public String getName() {
             return singletonClass.getName();
+        }
+
+        @Override
+        public Optional<ExecutableMethod> findMethod(String name, Class[] argumentTypes) {
+            Optional<Method> method = ReflectionUtils.findMethod(singletonClass, name, argumentTypes);
+            return method.map(theMethod -> new ReflectionExecutableMethod(this, theMethod) );
+        }
+
+        @Override
+        public Stream<ExecutableMethod> findPossibleMethods(String name) {
+            return Stream.empty();
         }
 
         @Override

@@ -1,13 +1,16 @@
 package org.particleframework.core.reflect;
 
+import org.particleframework.core.reflect.exception.InvocationException;
+
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Stream;
 
 /**
+ * Utility methods for reflection related tasks.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -70,5 +73,69 @@ public class ReflectionUtils {
         } catch (NoSuchMethodException e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Invokes a method
+     *
+     * @param instance The instance
+     * @param method The method
+     * @param arguments The arguments
+     * @param <R> The return type
+     * @param <T> The instance type
+     * @return The result
+     */
+    public static <R, T> R invokeMethod(T instance, Method method, Object... arguments) {
+        try {
+            return (R) method.invoke(instance, arguments);
+        } catch (IllegalAccessException e) {
+            throw new InvocationException("Illegal access invoking method ["+method+"]: " + e.getMessage(), e);
+        } catch (InvocationTargetException e) {
+            throw new InvocationException("Exception occurred invoking method ["+method+"]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Finds a method on the given type for the given name
+     *
+     * @param type The type
+     * @param name The name
+     * @param argumentTypes The argument types
+     * @return An {@link Optional} contains the method or empty
+     */
+    public static Optional<Method> findMethod(Class type, String name, Class... argumentTypes) {
+        Class currentType = type;
+        while(currentType != null) {
+            Method[] methods = currentType.isInterface() ? currentType.getMethods() : currentType.getDeclaredMethods();
+            for (Method method : methods) {
+                if(name.equals(method.getName()) && Arrays.equals(argumentTypes, method.getParameterTypes())) {
+                    return Optional.of(method);
+                }
+            }
+            currentType = currentType.getSuperclass();
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Finds a method on the given type for the given name
+     *
+     * @param type The type
+     * @param name The name
+     * @return An {@link Optional} contains the method or empty
+     */
+    public static Stream<Method> findMethodsByName(Class type, String name) {
+        Class currentType = type;
+        Set<Method> methodSet = new HashSet<>();
+        while(currentType != null) {
+            Method[] methods = currentType.isInterface() ? currentType.getMethods() : currentType.getDeclaredMethods();
+            for (Method method : methods) {
+                if(name.equals(method.getName())) {
+                    methodSet.add(method);
+                }
+            }
+            currentType = currentType.getSuperclass();
+        }
+        return methodSet.stream();
     }
 }

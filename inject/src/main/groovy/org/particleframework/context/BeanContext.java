@@ -1,6 +1,8 @@
 package org.particleframework.context;
 
+import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.BeanDefinition;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -22,6 +24,7 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      * @param beanType The bean type
      * @param <T> The bean type parameter
      * @return An instanceof said bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
     default <T> T getBean(Class<T> beanType) {
         return getBean(beanType, null);
@@ -35,6 +38,7 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      *
      * @param <T> The bean type parameter
      * @return An instanceof said bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
     <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
 
@@ -45,6 +49,7 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      * @param beanType The bean type
      * @param <T> The bean type parameter
      * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
     default <T> Optional<T> findBean(Class<T> beanType) {
         return findBean(beanType, null);
@@ -58,6 +63,7 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      *
      * @param <T> The bean type parameter
      * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
     <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier);
 
@@ -192,5 +198,15 @@ public interface BeanContext extends LifeCycle<BeanContext> {
      * @param configurationName The configuration name
      * @return An optional with the configuration either present or not
      */
-    Optional<BeanConfiguration> getBeanConfiguration(String configurationName);
+    Optional<BeanConfiguration> findBeanConfiguration(String configurationName);
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given type
+     *
+     * @param beanType The type
+     * @param <T> The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
+     */
+    <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType);
 }

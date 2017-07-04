@@ -13,34 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.uri;
-
-import java.net.URI;
-import java.util.Optional;
+package org.particleframework.core.reflect.exception;
 
 /**
- * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}</p>
+ * Runtime exception equivalent of {@link java.lang.reflect.InvocationTargetException}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriMatcher {
-
-    /**
-     * Match the given {@link URI} object
-     *
-     * @param uri The URI
-     * @return True if it matches
-     */
-    default Optional<? extends UriMatchInfo> match(URI uri) {
-        return match(uri.toString());
+public class InvocationException extends RuntimeException {
+    public InvocationException(String message) {
+        super(message);
     }
 
-    /**
-     * Match the given URI string
-     *
-     * @param uri The uRI
-     * @return True if it matches
-     */
-    Optional<? extends UriMatchInfo> match(String uri);
+    public InvocationException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

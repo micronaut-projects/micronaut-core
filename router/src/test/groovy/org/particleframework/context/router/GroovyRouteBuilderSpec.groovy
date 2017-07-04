@@ -18,6 +18,8 @@ package org.particleframework.context.router
 import groovy.transform.CompileStatic
 import groovy.transform.InheritConstructors
 import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultApplicationContext
+import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.router.RouteBuilderTests.AuthorController
 import org.particleframework.context.router.RouteBuilderTests.BookController
 import org.particleframework.http.HttpMethod
@@ -35,7 +37,7 @@ class GroovyRouteBuilderSpec extends Specification {
     @Unroll
     void "Test uri #method #uri matches route"() {
         given:
-        MyRoutes routes = new MyRoutes(Mock(BeanContext))
+        MyRoutes routes = new MyRoutes(new DefaultApplicationContext("test").registerSingleton(new BookController()).registerSingleton(new AuthorController()).start())
         routes."$routesMethod"(new BookController(), new AuthorController())
         def result = routes.builtRoutes.find() { it.match(uri).isPresent() && it.httpMethod == method }
         Optional route = result != null ? Optional.of(result) : Optional.empty()
@@ -65,8 +67,9 @@ class GroovyRouteBuilderSpec extends Specification {
 
         @Inject
         void books(BookController bookController, AuthorController authorController) {
+
             GET(bookController) {
-                POST("/hello", bookController.&hello)
+                POST("/hello", bookController.&hello )
             }
             GET(bookController, ID) {
                 GET(authorController)

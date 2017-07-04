@@ -8,9 +8,9 @@ package org.particleframework.inject;
  */
 public interface InjectionPoint {
     /**
-     * @return The component that declares this injection point
+     * @return The bean that declares this injection point
      */
-    BeanDefinition getDeclaringComponent();
+    BeanDefinition getDeclaringBean();
 
     /**
      * @return Whether reflection is required to satisfy the injection point

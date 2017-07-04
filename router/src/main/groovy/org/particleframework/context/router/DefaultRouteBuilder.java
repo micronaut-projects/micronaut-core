@@ -16,13 +16,23 @@
 package org.particleframework.context.router;
 
 
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.exceptions.NoSuchBeanException;
+import org.particleframework.context.router.exceptions.RoutingException;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.TypeConvention;
+import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
+import org.particleframework.inject.Argument;
+import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.ExecutableHandle;
+import org.particleframework.inject.ExecutableMethod;
 
+import java.net.URI;
 import java.util.*;
 
 /**
@@ -41,20 +51,25 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     };
 
-    private final BeanContext beanContext;
+    private final ApplicationContext beanContext;
     private final UriNamingStrategy uriNamingStrategy;
 
     private DefaultRoute currentParentRoute = null;
     private List<DefaultRoute> builtRoutes = new ArrayList<>();
 
-    public DefaultRouteBuilder(BeanContext beanContext) {
+    public DefaultRouteBuilder(ApplicationContext beanContext) {
         this.beanContext = beanContext;
         this.uriNamingStrategy = CAMEL_CASE_NAMING_STRATEGY;
     }
 
-    public DefaultRouteBuilder(BeanContext beanContext, UriNamingStrategy uriNamingStrategy) {
+    public DefaultRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
         this.beanContext = beanContext;
         this.uriNamingStrategy = uriNamingStrategy;
+    }
+
+    @Override
+    public List<Route> getConstructedRoutes() {
+        return Collections.unmodifiableList(builtRoutes);
     }
 
     @Override
@@ -88,90 +103,127 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public Route GET(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.GET, uri);
+    public Route GET(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.GET, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route GET(String uri, Class<?> type, String method) {
-//        Object instance = beanContext.findBean(type)
-//                .orElseThrow(() -> new RoutingException("No bean found for route "));
-        return buildRoute(HttpMethod.GET, uri);
+    public Route GET(String uri, Class<?> type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.GET, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route POST(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.POST, uri);
+    public Route POST(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.POST, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route POST(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.POST, uri);
+    public Route POST(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.POST, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route PUT(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.PUT, uri);
+    public Route PUT(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.PUT, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route PUT(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.PUT, uri);
+    public Route PUT(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.PUT, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route PATCH(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.PATCH, uri);
+    public Route PATCH(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.PATCH, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route PATCH(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.PATCH, uri);
+    public Route PATCH(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.PATCH, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route DELETE(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.DELETE, uri);
+    public Route DELETE(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.DELETE, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route DELETE(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.DELETE, uri);
+    public Route DELETE(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.DELETE, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route OPTIONS(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.OPTIONS, uri);
+    public Route OPTIONS(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.OPTIONS, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route OPTIONS(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.OPTIONS, uri);
+    public Route OPTIONS(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.OPTIONS, uri, type, method,parameterTypes);
     }
 
     @Override
-    public Route HEAD(String uri, Object target, String method) {
-        return buildRoute(HttpMethod.HEAD, uri);
+    public Route HEAD(String uri, Object target, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.HEAD, uri, target.getClass(), method,parameterTypes);
     }
 
     @Override
-    public Route HEAD(String uri, Class type, String method) {
-        return buildRoute(HttpMethod.HEAD, uri);
+    public Route HEAD(String uri, Class type, String method, Class...parameterTypes) {
+        return buildRoute(HttpMethod.HEAD, uri, type, method,parameterTypes);
     }
 
-    protected Route buildRoute(HttpMethod httpMethod, String uri) {
+    protected Route buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class...parameterTypes) {
+        BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(type).orElseThrow(() -> new NoSuchBeanException(type));
+        ExecutableMethod executableMethod;
+
+        if(parameterTypes.length>0) {
+            executableMethod = beanDefinition.findMethod(method, parameterTypes).orElseThrow(() -> new RoutingException("No such route: " + type.getName() + "." + method ));
+        }
+        else {
+            Optional<? extends ExecutableMethod<?, ?>> noArgsMethod = beanDefinition.findMethod(method, parameterTypes);
+            if(noArgsMethod.isPresent()) {
+                executableMethod = noArgsMethod.get();
+            }
+            else {
+                Optional<? extends ExecutableMethod<?, ?>> first = beanDefinition.findPossibleMethods(method).findFirst();
+                executableMethod = first.orElseThrow(()-> new RoutingException("No such route: " + type.getName() + "." + method ));
+            }
+        }
+
         DefaultRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri) );
+            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableMethod);
             currentParentRoute.nestedRoutes.add(route);
         }
         else {
-            route = new DefaultRoute(httpMethod, uri);
+            route = new DefaultRoute(httpMethod, uri, executableMethod);
         }
         this.builtRoutes.add(route);
         return route;
     }
 
+    class RouteHandle implements ExecutableHandle {
+        final ExecutableMethod target;
+
+        public RouteHandle(ExecutableMethod target) {
+            this.target = target;
+        }
+
+        @Override
+        public Argument[] getArguments() {
+            return target.getArguments();
+        }
+
+        @Override
+        public Object invoke(Object... arguments) {
+            return null;
+        }
+
+        @Override
+        public String toString() {
+            return target.toString();
+        }
+    }
     /**
      * The default route impl
      */
@@ -181,23 +233,31 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final MediaType mediaType;
         private final UriMatchTemplate uriMatchTemplate;
         private final List<DefaultRoute> nestedRoutes = new ArrayList<>();
+        private final ExecutableMethod targetMethod;
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate) {
-            this(httpMethod, uriTemplate, MediaType.JSON);
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, ExecutableMethod targetMethod) {
+            this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaType);
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, ExecutableMethod targetMethod) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaType, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate) {
-            this(httpMethod, uriTemplate, MediaType.JSON);
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, ExecutableMethod targetMethod) {
+            this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType) {
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, ExecutableMethod targetMethod) {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.mediaType = mediaType;
+            this.targetMethod = targetMethod;
+        }
+
+
+        @Override
+        public String toString() {
+            return httpMethod + " " + uriMatchTemplate + " -> " + targetMethod;
         }
 
         @Override
@@ -213,7 +273,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route accept(MediaType mediaType) {
             DefaultRouteBuilder.this.builtRoutes.remove(this);
-            DefaultRoute newRoute = new DefaultRoute(httpMethod, uriMatchTemplate, mediaType);
+            DefaultRoute newRoute = new DefaultRoute(httpMethod, uriMatchTemplate, mediaType, targetMethod);
             DefaultRouteBuilder.this.builtRoutes.add(newRoute);
             return newRoute;
         }
@@ -231,8 +291,72 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Optional<UriMatchInfo> match(String uri) {
-            return uriMatchTemplate.match(uri);
+        public Optional<RouteMatch> match(String uri) {
+            Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
+            return matchInfo.map((info)-> new DefaultRouteMatch(info, targetMethod) );
+        }
+
+    }
+
+    class DefaultRouteMatch implements RouteMatch {
+        private final UriMatchInfo matchInfo;
+        private final ExecutableMethod executableMethod;
+
+        public DefaultRouteMatch(UriMatchInfo matchInfo, ExecutableMethod executableMethod) {
+            this.matchInfo = matchInfo;
+            this.executableMethod = executableMethod;
+        }
+
+        @Override
+        public Argument[] getArguments() {
+            return executableMethod.getArguments();
+        }
+
+        @Override
+        public Object invoke(Object... arguments) {
+            Object targetBean = beanContext.getBean(executableMethod.getDeclaringBean().getType());
+            ConversionService conversionService = beanContext.getConversionService();
+
+            Argument[] targetArguments = executableMethod.getArguments();
+            if(targetArguments.length == 0) {
+                return executableMethod.invoke(targetBean);
+            }
+            else {
+                List argumentList = new ArrayList();
+                Map<String, Object> variables = getVariables();
+                Iterator<Object> valueIterator = variables.values().iterator();
+                int i = 0;
+                for (Argument targetArgument : targetArguments) {
+                    String name = targetArgument.getName();
+                    Object value = variables.get(name);
+                    if(value != null) {
+                        Optional<?> result = conversionService.convert(value, targetArgument.getType());
+                        argumentList.add( result.orElseThrow(()-> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    }
+                    else if(valueIterator.hasNext()) {
+                        Optional<?> result = conversionService.convert(valueIterator.next(), targetArgument.getType());
+                        argumentList.add( result.orElseThrow(()-> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    }
+                    else if(i < arguments.length) {
+                        Optional<?> result = conversionService.convert(arguments[i++], targetArgument.getType());
+                        argumentList.add( result.orElseThrow(()-> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    }
+                    else {
+                        throw new IllegalArgumentException("Wrong number of arguments to method: " + executableMethod);
+                    }
+                }
+                return executableMethod.invoke(targetBean, argumentList.toArray());
+            }
+        }
+
+        @Override
+        public String getUri() {
+            return matchInfo.getUri();
+        }
+
+        @Override
+        public Map<String, Object> getVariables() {
+            return matchInfo.getVariables();
         }
     }
 
@@ -302,7 +426,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public ResourceRoute accept(MediaType mediaType) {
             DefaultRouteBuilder.this.builtRoutes.remove(getRoute);
-            DefaultRoute getRoute = new DefaultRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, mediaType);
+            DefaultRoute getRoute = new DefaultRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, mediaType, this.getRoute.targetMethod);
             DefaultRouteBuilder.this.builtRoutes.add(getRoute);
 
             Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
@@ -310,7 +434,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 if(value != this.getRoute) {
                     DefaultRoute defaultRoute = (DefaultRoute) value;
                     DefaultRouteBuilder.this.builtRoutes.remove(defaultRoute);
-                    DefaultRoute newRoute = new DefaultRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, mediaType);
+                    DefaultRoute newRoute = new DefaultRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, mediaType, this.getRoute.targetMethod);
                     newMap.put(key, newRoute);
                     DefaultRouteBuilder.this.builtRoutes.add(defaultRoute);
                 }

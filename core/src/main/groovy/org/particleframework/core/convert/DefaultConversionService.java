@@ -3,9 +3,9 @@ package org.particleframework.core.convert;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.CollectionUtils;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -312,11 +312,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                             list.add(converted.get());
                         }
                     }
-                    try {
-                        return Optional.of(coerceToType(list, targetType));
-                    } catch (Exception e) {
-                        return Optional.empty();
-                    }
+                    return CollectionUtils.convertCollection((Class)targetType, list);
                 }
             }
             else {
@@ -325,11 +321,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 for (Object o : object) {
                     list.add(convert(o, targetComponentType));
                 }
-                try {
-                    return Optional.of(coerceToType(list, targetType));
-                } catch (Exception e) {
-                    return Optional.empty();
-                }
+                return CollectionUtils.convertCollection((Class)targetType, list);
             }
         });
 
@@ -383,23 +375,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
     }
 
-    private Iterable coerceToType(Collection beans, Class<? extends Iterable> componentType) throws Exception {
-        if (componentType.isInstance(beans)) {
-            return beans;
-        }
-        if (componentType == Set.class) {
-            return new HashSet<>(beans);
-        } else if (componentType == Queue.class) {
-            return new LinkedList<>(beans);
-        } else if (componentType == List.class) {
-            return new ArrayList<>(beans);
-        } else if (!componentType.isInterface()) {
-            Constructor<? extends Iterable> constructor = componentType.getConstructor(Collection.class);
-            return constructor.newInstance(beans);
-        } else {
-            return null;
-        }
-    }
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType) {
         TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = resolveHierarchy(sourceType);

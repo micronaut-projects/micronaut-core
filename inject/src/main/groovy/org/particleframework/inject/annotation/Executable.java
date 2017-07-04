@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.annotation;
+package org.particleframework.inject.annotation;
+
+import org.particleframework.inject.ExecutableMethod;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -23,18 +25,15 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Annotation used to configure a bean. Typically used in conjunction with {@link Factory}</p>
+ * <p>Annotation applied to the method or type indicating to particle that a {@link ExecutableMethod} should be produced for this method</p>
+ *
+ * <p>When applied to a type all public methods will be considered executable and the necessary metadata produced</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-public @interface Bean {
-
-    /**
-     * @return The method to invoke to destroy the bean
-     */
-    String preDestroy() default "";
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+public @interface Executable {
 }

@@ -37,7 +37,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
-        this.method.setAccessible(true);
+        if (requiresReflection) {
+            this.method.setAccessible(true);
+        }
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
             if(index < parameterAnnotations.length) {
@@ -57,7 +59,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
-        this.method.setAccessible(true);
+        if(requiresReflection) {
+            this.method.setAccessible(true);
+        }
         Annotation[] annotations = field.getAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
             if(index == 0) {
@@ -84,7 +88,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public BeanDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringBean() {
         return this.declaringComponent;
     }
 

@@ -16,7 +16,9 @@
 package org.particleframework.context.router;
 
 import org.junit.Test;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.DefaultApplicationContext;
 import org.particleframework.context.DefaultBeanContext;
 import org.particleframework.http.HttpMethod;
 
@@ -34,10 +36,14 @@ public class RouteBuilderTests {
 
     @Test
     public void testRouterBuilder() {
-        MyRouteBuilder routeBuilder = new MyRouteBuilder(new DefaultBeanContext().start());
+        ApplicationContext beanContext = new DefaultApplicationContext("test").start();
+        beanContext.registerSingleton(new BookController())
+                    .registerSingleton(new AuthorController());
+        MyRouteBuilder routeBuilder = new MyRouteBuilder(beanContext);
         routeBuilder.someRoutes(new BookController(), new AuthorController());
         List<Route> builtRoutes = routeBuilder.getBuiltRoutes();
-
+        Router router = new DefaultRouter(routeBuilder);
+        assertEquals("Hello World", router.GET("/message/World").get().invoke());
         assertTrue(builtRoutes
                         .stream()
                         .anyMatch(route ->
@@ -71,13 +77,13 @@ public class RouteBuilderTests {
     }
 
     static class MyRouteBuilder extends DefaultRouteBuilder {
-        public MyRouteBuilder(BeanContext beanContext) {
+        public MyRouteBuilder(ApplicationContext beanContext) {
             super(beanContext);
         }
 
         @Inject
         void someRoutes(BookController controller, AuthorController authorController) {
-            GET("{/message}", controller, "hello").accept(JSON);
+            GET("/message{/message}", controller, "hello", String.class).accept(JSON);
             GET("/books{/id}", controller, "show").nest(() ->
                     GET("/authors", controller)
             );
@@ -86,7 +92,7 @@ public class RouteBuilderTests {
             PUT(controller, ID);
             GET(controller, ID);
             GET(BookController.class, ID);
-            GET(Book.class, ID);
+//            GET(Book.class, ID);
             GET(controller, ID).nest(() ->
                     GET(authorController)
             );
@@ -96,12 +102,12 @@ public class RouteBuilderTests {
 
             // handle errors TODO
 //            error(RuntimeException.class, controller, "error");
-            // handle status codes TODO
+            // handle status codes
 //            status(404, controller, "notFound");
 
             // REST resources
             resources(controller);
-            resources(Book.class);
+//            resources(Book.class);
 //            single(Book.class).nest(()->
 //                resources(Author.class)
 //            );
@@ -112,12 +118,25 @@ public class RouteBuilderTests {
         String hello(String message) {
             return "Hello " + message;
         }
+
+        String show() { return "dummy"; }
+        String index() { return "dummy"; }
+        String save() { return "dummy"; }
+        String delete() { return "dummy"; }
+        String update() { return "dummy"; }
     }
 
     static class AuthorController {
         String hello(String message) {
             return "Hello " + message;
         }
+
+        String show() { return "dummy"; }
+        String index() { return "dummy"; }
+        String save() { return "dummy"; }
+        String delete() { return "dummy"; }
+        String update() { return "dummy"; }
+
     }
 
     static class Author {}

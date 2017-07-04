@@ -35,5 +35,59 @@ public interface Router {
      * @param uri The URI
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    Stream<Route> find(HttpMethod httpMethod, CharSequence uri);
+    Stream<RouteMatch> find(HttpMethod httpMethod, CharSequence uri);
+
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> GET(CharSequence uri);
+
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#POST} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> POST(CharSequence uri);
+
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#PUT} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> PUT(CharSequence uri);
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#PATCH} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> PATCH(CharSequence uri);
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#DELETE} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> DELETE(CharSequence uri);
+
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#OPTIONS} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> OPTIONS(CharSequence uri);
+
+    /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#HEAD} method and the given URI
+     *
+     * @param uri The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    Optional<RouteMatch> HEAD(CharSequence uri);
 }

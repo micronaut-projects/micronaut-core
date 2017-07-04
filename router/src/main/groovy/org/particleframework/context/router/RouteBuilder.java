@@ -18,6 +18,8 @@ package org.particleframework.context.router;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.core.naming.conventions.TypeConvention;
 
+import java.util.List;
+
 import static org.particleframework.core.naming.conventions.MethodConvention.*;
 /**
  *
@@ -32,7 +34,10 @@ public interface RouteBuilder {
      */
     PropertyConvention ID = PropertyConvention.ID;
 
-
+    /**
+     * @return Obtain a list of constructed routes
+     */
+    List<Route> getConstructedRoutes();
     /**
      * @return The URI naming strategy
      */
@@ -209,7 +214,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route GET(String uri, Object target, String method);
+    Route GET(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -221,7 +226,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route GET(String uri, Class<?> type, String method);
+    Route GET(String uri, Class<?> type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP POST. Since the method to execute is not
@@ -231,7 +236,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route POST(String uri, Object target) {
+    default Route POST(String uri, Object target, Class...parameterTypes) {
         return POST(uri, target, SAVE.lowerCaseName());
     }
 
@@ -287,7 +292,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route POST(String uri, Object target, String method);
+    Route POST(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -299,7 +304,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route POST(String uri, Class type, String method);
+    Route POST(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PUT. Since the method to execute is not
@@ -365,7 +370,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PUT(String uri, Object target, String method);
+    Route PUT(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -377,7 +382,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PUT(String uri, Class type, String method);
+    Route PUT(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PATCH. Since the method to execute is not
@@ -443,7 +448,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PATCH(String uri, Object target, String method);
+    Route PATCH(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -455,7 +460,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PATCH(String uri, Class type, String method);
+    Route PATCH(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP DELETE. Since the method to execute is not
@@ -521,7 +526,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route DELETE(String uri, Object target, String method);
+    Route DELETE(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -533,7 +538,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route DELETE(String uri, Class type, String method);
+    Route DELETE(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP OPTIONS. Since the method to execute is not
@@ -599,7 +604,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route OPTIONS(String uri, Object target, String method);
+    Route OPTIONS(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -611,7 +616,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route OPTIONS(String uri, Class type, String method);
+    Route OPTIONS(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
@@ -677,7 +682,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route HEAD(String uri, Object target, String method);
+    Route HEAD(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -689,7 +694,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route HEAD(String uri, Class type, String method);
+    Route HEAD(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * <p>A URI naming strategy is used to dictate the default name to use when building a URI for a class</p>

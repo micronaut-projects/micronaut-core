@@ -15,6 +15,11 @@ import java.lang.annotation.Target;
 public class AnnotationUtil {
 
     /**
+     * Constant indicating an zero annotation
+     */
+    public static final Annotation[] ZERO_ANNOTATIONS = new Annotation[0];
+
+    /**
      * Finds an annotation on the given class for the given stereotype
      *
      * @param cls The class

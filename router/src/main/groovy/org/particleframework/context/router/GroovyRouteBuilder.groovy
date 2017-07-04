@@ -45,7 +45,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route GET(String uri, MethodClosure methodClosure) {
-        GET(uri, methodClosure.owner, methodClosure.method)
+        GET(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // POST methods
@@ -59,7 +59,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route POST(String uri, MethodClosure methodClosure) {
-        POST(uri, methodClosure.owner, methodClosure.method)
+        POST(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // PUT methods
@@ -73,7 +73,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route PUT(String uri, MethodClosure methodClosure) {
-        PUT(uri, methodClosure.owner, methodClosure.method)
+        PUT(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // PATCH methods
@@ -87,7 +87,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route PATCH(String uri, MethodClosure methodClosure) {
-        PATCH(uri, methodClosure.owner, methodClosure.method)
+        PATCH(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // DELETE methods
@@ -101,7 +101,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route DELETE(String uri, MethodClosure methodClosure) {
-        DELETE(uri, methodClosure.owner, methodClosure.method)
+        DELETE(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // OPTIONS methods
@@ -115,7 +115,7 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route OPTIONS(String uri, MethodClosure methodClosure) {
-        OPTIONS(uri, methodClosure.owner, methodClosure.method)
+        OPTIONS(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 
     // HEAD methods
@@ -129,6 +129,6 @@ class GroovyRouteBuilder extends DefaultRouteBuilder {
     }
 
     Route HEAD(String uri, MethodClosure methodClosure) {
-        HEAD(uri, methodClosure.owner, methodClosure.method)
+        HEAD(uri, methodClosure.owner, methodClosure.method, methodClosure.parameterTypes)
     }
 }

@@ -13,34 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.uri;
+package org.particleframework.inject.factory
 
-import java.net.URI;
-import java.util.Optional;
+import org.particleframework.context.BeanContext
+import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.annotation.Bean
+import spock.lang.Specification
 
 /**
- * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriMatcher {
+class BeanAnnotationSpec extends Specification{
 
-    /**
-     * Match the given {@link URI} object
-     *
-     * @param uri The URI
-     * @return True if it matches
-     */
-    default Optional<? extends UriMatchInfo> match(URI uri) {
-        return match(uri.toString());
+    void "test @bean annotation makes a class available as a bean"() {
+
+        given:
+        BeanContext beanContext = new DefaultBeanContext().start()
+
+        expect:
+        beanContext.getBean(A) != beanContext.getBean(A) // prototype by default
     }
 
-    /**
-     * Match the given URI string
-     *
-     * @param uri The uRI
-     * @return True if it matches
-     */
-    Optional<? extends UriMatchInfo> match(String uri);
+    @Bean
+    static class A {
+
+    }
 }

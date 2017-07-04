@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.annotation;
+package org.particleframework.stereotype;
+
+import org.particleframework.context.annotation.Bean;
+import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -23,18 +26,22 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Annotation used to configure a bean. Typically used in conjunction with {@link Factory}</p>
+ * <p>Indicates that the role of a class is a controller within an application.</p>
+ *
+ * <p>By default all public methods of a controller are considered {@link Executable} and
+ * the necessary classes generated to perform the invocation.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-public @interface Bean {
-
+@Target(ElementType.TYPE)
+@Bean
+@Executable
+public @interface Controller {
     /**
-     * @return The method to invoke to destroy the bean
+     * @return The base URI of the controller in the case of web applications
      */
-    String preDestroy() default "";
+    String value() default "";
 }

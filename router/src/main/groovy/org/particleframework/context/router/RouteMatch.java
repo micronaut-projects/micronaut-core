@@ -13,34 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.uri;
+package org.particleframework.context.router;
 
-import java.net.URI;
-import java.util.Optional;
+import org.particleframework.http.uri.UriMatchInfo;
+import org.particleframework.inject.ExecutableHandle;
 
 /**
- * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}</p>
+ * A {@link Route} that is executable
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriMatcher {
-
-    /**
-     * Match the given {@link URI} object
-     *
-     * @param uri The URI
-     * @return True if it matches
-     */
-    default Optional<? extends UriMatchInfo> match(URI uri) {
-        return match(uri.toString());
-    }
-
-    /**
-     * Match the given URI string
-     *
-     * @param uri The uRI
-     * @return True if it matches
-     */
-    Optional<? extends UriMatchInfo> match(String uri);
+public interface RouteMatch<R> extends ExecutableHandle<R>, UriMatchInfo {
 }

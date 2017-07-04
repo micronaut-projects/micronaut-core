@@ -17,8 +17,12 @@ package org.particleframework.context.router;
 
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatcher;
 import org.particleframework.http.uri.UriTemplate;
+
+import java.net.URI;
+import java.util.Optional;
 
 /**
  * @author Graeme Rocher
@@ -51,4 +55,12 @@ public interface Route extends UriMatcher {
      * @return This route
      */
     Route nest(Runnable nested);
+
+    @Override
+    default Optional<RouteMatch> match(URI uri) {
+        return match(uri.toString());
+    }
+
+    @Override
+    Optional<RouteMatch> match(String uri);
 }

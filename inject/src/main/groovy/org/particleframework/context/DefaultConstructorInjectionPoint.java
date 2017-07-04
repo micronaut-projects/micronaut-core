@@ -40,7 +40,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
-    public BeanDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringBean() {
         return this.declaringComponent;
     }
 

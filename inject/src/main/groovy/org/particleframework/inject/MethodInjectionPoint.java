@@ -8,7 +8,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint extends CallableInjectionPoint {
+public interface MethodInjectionPoint extends CallableInjectionPoint, Executable {
 
     /**
      * @return The setter to invoke to set said property

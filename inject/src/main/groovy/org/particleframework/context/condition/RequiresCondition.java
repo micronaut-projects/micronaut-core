@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.function.Predicate;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -170,7 +169,7 @@ public class RequiresCondition implements Condition {
 
         BeanContext beanContext = context.getBeanContext();
         String minimumVersion = requires.version();
-        Optional<BeanConfiguration> beanConfiguration = beanContext.getBeanConfiguration(configurationName);
+        Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
         if(!beanConfiguration.isPresent()) {
             return false;
         }

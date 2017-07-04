@@ -13,34 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.uri;
-
-import java.net.URI;
-import java.util.Optional;
+package org.particleframework.inject;
 
 /**
- * <p>A URI matcher is capable of matching a URI and producing a {@link UriMatchInfo}</p>
+ * <p>An invocable method is a compile time produced invocation of a method call. Avoiding the use of reflection and allowing the JIT to optimize the call</p>
  *
  * @author Graeme Rocher
  * @since 1.0
+ *
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
  */
-public interface UriMatcher {
+public interface ExecutableMethod<T, R> extends Executable<T,R> {
 
     /**
-     * Match the given {@link URI} object
-     *
-     * @param uri The URI
-     * @return True if it matches
+     * @return The bean that declares this injection point
      */
-    default Optional<? extends UriMatchInfo> match(URI uri) {
-        return match(uri.toString());
-    }
+    BeanDefinition<T> getDeclaringBean();
 
     /**
-     * Match the given URI string
-     *
-     * @param uri The uRI
-     * @return True if it matches
+     * @return The name of the method
      */
-    Optional<? extends UriMatchInfo> match(String uri);
+    String getMethodName();
+
+    /**
+     * @return The argument types
+     */
+    Class[] getArgumentTypes();
+
 }
