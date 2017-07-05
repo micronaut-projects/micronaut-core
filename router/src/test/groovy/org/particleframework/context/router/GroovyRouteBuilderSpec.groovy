@@ -98,31 +98,24 @@ class GroovyRouteBuilderSpec extends Specification {
     @Controller
     static class BookController {
 
-        @Executable
         String hello(String message) {
             "Hello $message"
         }
 
-        @Executable
         List index() { ['book1'] }
 
-        @Executable
         String show(String id) {
             "book $id"
         }
 
-
-        @Executable
         String save() {
             "saved"
         }
 
-        @Executable
         String delete(Long id) {
             "deleted $id"
         }
 
-        @Executable
         String update(Integer id) {
             "updated $id"
         }
@@ -130,22 +123,18 @@ class GroovyRouteBuilderSpec extends Specification {
 
     @Controller
     static class AuthorController {
-        @Executable
         List index() {
             ["author"]
         }
 
-        @Executable
         String save() {
             "author saved"
         }
 
-        @Executable
         String delete(Long id) {
             "author $id deleted"
         }
 
-        @Executable
         String update(Integer id) {
             "author $id updated"
         }

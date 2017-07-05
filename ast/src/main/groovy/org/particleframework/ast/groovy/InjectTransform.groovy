@@ -159,6 +159,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final ClassNode concreteClass
         final boolean isConfigurationProperties
         final boolean isFactoryClass
+        final boolean isExecutableType
         final Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -171,6 +172,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
+            this.isExecutableType = stereoTypeFinder.hasStereoType(targetClassNode, Executable)
             this.isConfigurationProperties = isConfigurationProperties
             if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope) || stereoTypeFinder.hasStereoType(concreteClass, Bean)) {
                 defineBeanDefinition(concreteClass)
@@ -294,20 +296,26 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
             }
-            else if(!isConstructor && stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
-                defineBeanDefinition(concreteClass)
-                Map<String, Object> paramsToType = [:]
-                Map<String, Object> qualifierTypes = [:]
-                Map<String, List<Object>> genericTypeMap = [:]
-                populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+            else if(!isConstructor) {
 
-                beanWriter.visitExecutableMethod(
-                        resolveTypeReference(concreteClass),
-                        resolveTypeReference(methodNode.returnType),
-                        methodNode.name,
-                        paramsToType,
-                        qualifierTypes,
-                        genericTypeMap)
+                if((isExecutableType && methodNode.isPublic() && !methodNode.isStatic()) && !methodNode.isAbstract() || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                    if(methodNode.declaringClass != ClassHelper.OBJECT_TYPE) {
+
+                        defineBeanDefinition(concreteClass)
+                        Map<String, Object> paramsToType = [:]
+                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, List<Object>> genericTypeMap = [:]
+                        populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+
+                        beanWriter.visitExecutableMethod(
+                                resolveTypeReference(concreteClass),
+                                resolveTypeReference(methodNode.returnType),
+                                methodNode.name,
+                                paramsToType,
+                                qualifierTypes,
+                                genericTypeMap)
+                    }
+                }
             }
 
         }
