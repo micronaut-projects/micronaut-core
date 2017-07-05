@@ -37,7 +37,7 @@ class GroovyRouteBuilderSpec extends Specification {
 
         given:
         def context = new DefaultApplicationContext("test").start()
-        Router router = new DefaultRouter(context.getBean(routeBean))
+        Router router = context.getBean(Router)
 
         Optional<RouteMatch> route = router."${method}"(uri)
 
@@ -50,7 +50,7 @@ class GroovyRouteBuilderSpec extends Specification {
         '/book'             | HttpMethod.GET    | true      | MyRoutes       | ['book1']
         '/book/hello/World' | HttpMethod.POST   | true      | MyRoutes       | "Hello World"
         '/bo'               | HttpMethod.GET    | false     | MyRoutes       | null
-        '/book'             | HttpMethod.POST   | false     | MyRoutes       | null
+        '/book'             | HttpMethod.POST   | true      | MyRoutes       | "saved"
         '/book/1'           | HttpMethod.GET    | true      | MyRoutes       | "book 1"
         '/book/1/author'    | HttpMethod.GET    | true      | MyRoutes       | ['author']
         '/book/1/author/1'  | HttpMethod.GET    | false     | MyRoutes       | null

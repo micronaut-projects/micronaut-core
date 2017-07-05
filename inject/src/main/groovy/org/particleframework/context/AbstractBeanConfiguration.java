@@ -58,7 +58,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     @Override
     public boolean isEnabled(BeanContext context) {
         if(enabled == null) {
-            enabled = condition.matches(new DefaultConditionContext(context, this));
+            enabled = condition == null || condition.matches(new DefaultConditionContext(context, this));
         }
         return enabled;
     }
