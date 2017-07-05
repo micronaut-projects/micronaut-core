@@ -1,4 +1,6 @@
 dependencies {
     compile project(":inject")
     compile project(":http")
+
+    testCompile project(":ast")
 }

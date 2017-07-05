@@ -25,6 +25,7 @@ import org.particleframework.inject.ExecutableMethod;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +56,10 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
             }
             return AnnotationUtil.ZERO_ANNOTATIONS;
         });
+    }
+
+    protected AbstractExecutableMethod(Method method) {
+        this(method, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Override

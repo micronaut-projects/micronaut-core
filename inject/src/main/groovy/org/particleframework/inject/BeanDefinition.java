@@ -84,7 +84,7 @@ public interface BeanDefinition<T> {
      * @param argumentTypes The argument types
      * @return An optional {@link ExecutableMethod}
      */
-    Optional<ExecutableMethod<T,?>> findMethod(String name, Class...argumentTypes);
+    <R> Optional<ExecutableMethod<T,R>> findMethod(String name, Class...argumentTypes);
 
     /**
      * Finds possible methods for the given method name

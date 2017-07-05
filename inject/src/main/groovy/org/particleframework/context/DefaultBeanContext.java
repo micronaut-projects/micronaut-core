@@ -67,9 +67,21 @@ public class DefaultBeanContext implements BeanContext {
         Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
         if(foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
-            return beanDefinition.findMethod(method, arguments).map((ExecutableMethod executableMethod)->
-                    new BeanExecutionHandle(this, beanType, executableMethod)
-            );
+            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
+            if(foundMethod.isPresent()) {
+
+                Optional<ExecutableHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
+                        new BeanExecutionHandle<>(this, beanType, executableMethod)
+                );
+                return executionHandle;
+            }
+            else {
+                return beanDefinition.findPossibleMethods(method)
+                              .findFirst()
+                              .map((ExecutableMethod executableMethod) ->
+                        new BeanExecutionHandle<>(this, beanType, executableMethod)
+                );
+            }
         }
         return Optional.empty();
     }
@@ -880,7 +892,8 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Stream<ExecutableMethod> findPossibleMethods(String name) {
-            return Stream.empty();
+            return ReflectionUtils.findMethodsByName(singletonClass, name)
+                                  .map((method -> new ReflectionExecutableMethod(this, method)));
         }
 
         @Override

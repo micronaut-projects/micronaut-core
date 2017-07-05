@@ -175,7 +175,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected Route buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class...parameterTypes) {
         Optional<ExecutableHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
 
-        ExecutableHandle<Object> executableHandle = executionHandle.orElseThrow(() -> new RoutingException("No such route: " + type.getName() + "." + method));
+        ExecutableHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
+                new RoutingException("No such route: " + type.getName() + "." + method)
+        );
 
         DefaultRoute route;
         if (currentParentRoute != null) {

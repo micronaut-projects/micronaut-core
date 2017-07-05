@@ -43,12 +43,15 @@ public class RouteBuilderTests {
         routeBuilder.someRoutes(new BookController(), new AuthorController());
         List<Route> builtRoutes = routeBuilder.getBuiltRoutes();
         Router router = new DefaultRouter(routeBuilder);
+
+        // test invoking routes
+        assertTrue(router.GET("/books/1").isPresent());
+
         assertEquals("Hello World", router.GET("/message/World").get().invoke());
-        assertTrue(builtRoutes
-                        .stream()
-                        .anyMatch(route ->
-                                route.match("/books/1").isPresent() && route.getHttpMethod() == HttpMethod.GET)
-                        );
+        assertEquals("Book 1", router.GET("/books/1").get().invoke());
+
+        // test route state
+
         assertTrue(builtRoutes
                 .stream()
                 .anyMatch(route ->
@@ -119,7 +122,7 @@ public class RouteBuilderTests {
             return "Hello " + message;
         }
 
-        String show() { return "dummy"; }
+        String show(Long id) { return "Book " + id; }
         String index() { return "dummy"; }
         String save() { return "dummy"; }
         String delete() { return "dummy"; }

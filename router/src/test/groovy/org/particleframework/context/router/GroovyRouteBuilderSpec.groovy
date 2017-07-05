@@ -15,18 +15,16 @@
  */
 package org.particleframework.context.router
 
-import groovy.transform.CompileStatic
-import groovy.transform.InheritConstructors
-import org.particleframework.context.BeanContext
+import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.context.DefaultBeanContext
-import org.particleframework.context.router.RouteBuilderTests.AuthorController
-import org.particleframework.context.router.RouteBuilderTests.BookController
 import org.particleframework.http.HttpMethod
+import org.particleframework.inject.annotation.Executable
+import org.particleframework.stereotype.Controller
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -35,52 +33,122 @@ import javax.inject.Inject
 class GroovyRouteBuilderSpec extends Specification {
 
     @Unroll
-    void "Test uri #method #uri matches route"() {
+    void "Test uri #method #uri matches route for routes #routeBean.name"() {
+
         given:
-        MyRoutes routes = new MyRoutes(new DefaultApplicationContext("test").registerSingleton(new BookController()).registerSingleton(new AuthorController()).start())
-        routes."$routesMethod"(new BookController(), new AuthorController())
-        def result = routes.builtRoutes.find() { it.match(uri).isPresent() && it.httpMethod == method }
-        Optional route = result != null ? Optional.of(result) : Optional.empty()
+        def context = new DefaultApplicationContext("test").start()
+        Router router = new DefaultRouter(context.getBean(routeBean))
+
+        Optional<RouteMatch> route = router."${method}"(uri)
 
         expect:
         route.isPresent() == isPresent
+        route.isPresent() ? route.get().invoke() : null == result
 
         where:
-        uri                | method            | isPresent | routesMethod
-        '/book'            | HttpMethod.GET    | true      | "books"
-        '/book/hello'      | HttpMethod.POST   | true      | "books"
-        '/bo'              | HttpMethod.GET    | false     | "books"
-        '/book'            | HttpMethod.POST   | false     | "books"
-        '/book/1'          | HttpMethod.GET    | true      | "books"
-        '/book/1/author'   | HttpMethod.GET    | true      | "books"
-        '/book/1/author/1' | HttpMethod.GET    | false     | "books"
-        '/book/1'          | HttpMethod.GET    | true      | "bookResources"
-        '/book'            | HttpMethod.GET    | true      | "bookResources"
-        '/book/1'          | HttpMethod.PUT    | true      | "bookResources"
-        '/book/1'          | HttpMethod.DELETE | true      | "bookResources"
-        '/book/1'          | HttpMethod.PATCH  | true      | "bookResources"
-        '/book/1/author'   | HttpMethod.GET    | true      | "bookResources"
+        uri                 | method            | isPresent | routeBean      | result
+        '/book'             | HttpMethod.GET    | true      | MyRoutes       | ['book1']
+        '/book/hello/World' | HttpMethod.POST   | true      | MyRoutes       | "Hello World"
+        '/bo'               | HttpMethod.GET    | false     | MyRoutes       | null
+        '/book'             | HttpMethod.POST   | false     | MyRoutes       | null
+        '/book/1'           | HttpMethod.GET    | true      | MyRoutes       | "book 1"
+        '/book/1/author'    | HttpMethod.GET    | true      | MyRoutes       | ['author']
+        '/book/1/author/1'  | HttpMethod.GET    | false     | MyRoutes       | null
+        '/book/1'           | HttpMethod.GET    | true      | ResourceRoutes | "book 1"
+        '/book'             | HttpMethod.GET    | true      | ResourceRoutes | ['book1']
+        '/book/1'           | HttpMethod.PUT    | true      | ResourceRoutes | "updated 1"
+        '/book/1'           | HttpMethod.DELETE | true      | ResourceRoutes | "deleted 1"
+        '/book/1'           | HttpMethod.PATCH  | true      | ResourceRoutes | "updated 1"
+        '/book/1/author'    | HttpMethod.GET    | true      | ResourceRoutes | ['author']
     }
 
-    @InheritConstructors
+    @Singleton
     static class MyRoutes extends GroovyRouteBuilder {
 
-        @Inject
-        void books(BookController bookController, AuthorController authorController) {
+        MyRoutes(ApplicationContext beanContext) {
+            super(beanContext)
+        }
 
+        @Inject
+        void bookResources(BookController bookController, AuthorController authorController) {
             GET(bookController) {
-                POST("/hello", bookController.&hello )
+                POST("/hello{/message}", bookController.&hello)
             }
             GET(bookController, ID) {
                 GET(authorController)
             }
         }
+    }
+
+    @Singleton
+    static class ResourceRoutes extends GroovyRouteBuilder {
+
+        ResourceRoutes(ApplicationContext beanContext) {
+            super(beanContext)
+        }
 
         @Inject
-        void bookResources(BookController bookController, AuthorController authorController) {
+        void books(BookController bookController, AuthorController authorController) {
             resources(bookController) {
                 single(authorController)
             }
         }
+    }
+
+    @Controller
+    static class BookController {
+
+        @Executable
+        String hello(String message) {
+            "Hello $message"
+        }
+
+        @Executable
+        List index() { ['book1'] }
+
+        @Executable
+        String show(String id) {
+            "book $id"
+        }
+
+
+        @Executable
+        String save() {
+            "saved"
+        }
+
+        @Executable
+        String delete(Long id) {
+            "deleted $id"
+        }
+
+        @Executable
+        String update(Integer id) {
+            "updated $id"
+        }
+    }
+
+    @Controller
+    static class AuthorController {
+        @Executable
+        List index() {
+            ["author"]
+        }
+
+        @Executable
+        String save() {
+            "author saved"
+        }
+
+        @Executable
+        String delete(Long id) {
+            "author $id deleted"
+        }
+
+        @Executable
+        String update(Integer id) {
+            "author $id updated"
+        }
+
     }
 }
