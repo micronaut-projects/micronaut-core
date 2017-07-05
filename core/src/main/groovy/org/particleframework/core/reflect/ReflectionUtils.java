@@ -67,7 +67,7 @@ public class ReflectionUtils {
      * @param argTypes The argument types
      * @return The method
      */
-    public static Optional<Constructor> getConstructor(Class type, Class... argTypes) {
+    public static <T> Optional<Constructor<T>> findConstructor(Class<T> type, Class... argTypes) {
         try {
             return Optional.of(type.getConstructor(argTypes));
         } catch (NoSuchMethodException e) {

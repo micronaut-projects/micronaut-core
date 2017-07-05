@@ -173,57 +173,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     protected Route buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class...parameterTypes) {
-        BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(type).orElseThrow(() -> new NoSuchBeanException(type));
-        ExecutableMethod executableMethod;
+        Optional<ExecutableHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
 
-        if(parameterTypes.length>0) {
-            executableMethod = beanDefinition.findMethod(method, parameterTypes).orElseThrow(() -> new RoutingException("No such route: " + type.getName() + "." + method ));
-        }
-        else {
-            Optional<? extends ExecutableMethod<?, ?>> noArgsMethod = beanDefinition.findMethod(method, parameterTypes);
-            if(noArgsMethod.isPresent()) {
-                executableMethod = noArgsMethod.get();
-            }
-            else {
-                Optional<? extends ExecutableMethod<?, ?>> first = beanDefinition.findPossibleMethods(method).findFirst();
-                executableMethod = first.orElseThrow(()-> new RoutingException("No such route: " + type.getName() + "." + method ));
-            }
-        }
+        ExecutableHandle<Object> executableHandle = executionHandle.orElseThrow(() -> new RoutingException("No such route: " + type.getName() + "." + method));
 
         DefaultRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableMethod);
+            route = new DefaultRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle);
             currentParentRoute.nestedRoutes.add(route);
         }
         else {
-            route = new DefaultRoute(httpMethod, uri, executableMethod);
+            route = new DefaultRoute(httpMethod, uri, executableHandle);
         }
         this.builtRoutes.add(route);
         return route;
     }
 
-    class RouteHandle implements ExecutableHandle {
-        final ExecutableMethod target;
-
-        public RouteHandle(ExecutableMethod target) {
-            this.target = target;
-        }
-
-        @Override
-        public Argument[] getArguments() {
-            return target.getArguments();
-        }
-
-        @Override
-        public Object invoke(Object... arguments) {
-            return null;
-        }
-
-        @Override
-        public String toString() {
-            return target.toString();
-        }
-    }
     /**
      * The default route impl
      */
@@ -233,21 +198,21 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final MediaType mediaType;
         private final UriMatchTemplate uriMatchTemplate;
         private final List<DefaultRoute> nestedRoutes = new ArrayList<>();
-        private final ExecutableMethod targetMethod;
+        private final ExecutableHandle targetMethod;
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, ExecutableMethod targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, ExecutableHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, ExecutableMethod targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, ExecutableHandle targetMethod) {
             this(httpMethod, new UriMatchTemplate(uriTemplate), mediaType, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, ExecutableMethod targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, ExecutableHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, ExecutableMethod targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, ExecutableHandle targetMethod) {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.mediaType = mediaType;
@@ -300,11 +265,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     class DefaultRouteMatch implements RouteMatch {
         private final UriMatchInfo matchInfo;
-        private final ExecutableMethod executableMethod;
+        private final ExecutableHandle executableMethod;
 
-        public DefaultRouteMatch(UriMatchInfo matchInfo, ExecutableMethod executableMethod) {
+        public DefaultRouteMatch(UriMatchInfo matchInfo, ExecutableHandle executableMethod) {
             this.matchInfo = matchInfo;
             this.executableMethod = executableMethod;
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return executableMethod.getDeclaringType();
         }
 
         @Override
@@ -314,12 +284,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public Object invoke(Object... arguments) {
-            Object targetBean = beanContext.getBean(executableMethod.getDeclaringBean().getType());
             ConversionService conversionService = beanContext.getConversionService();
 
             Argument[] targetArguments = executableMethod.getArguments();
             if(targetArguments.length == 0) {
-                return executableMethod.invoke(targetBean);
+                return executableMethod.invoke();
             }
             else {
                 List argumentList = new ArrayList();
@@ -345,7 +314,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                         throw new IllegalArgumentException("Wrong number of arguments to method: " + executableMethod);
                     }
                 }
-                return executableMethod.invoke(targetBean, argumentList.toArray());
+                return executableMethod.invoke(argumentList.toArray());
             }
         }
 

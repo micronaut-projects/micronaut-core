@@ -66,8 +66,8 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
-    public BeanDefinition<T> getDeclaringBean() {
-        return beanDefinition;
+    public Class getDeclaringType() {
+        return beanDefinition.getType();
     }
 
     @Override

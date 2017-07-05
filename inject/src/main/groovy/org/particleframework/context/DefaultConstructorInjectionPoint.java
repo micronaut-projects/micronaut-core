@@ -50,6 +50,11 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
+    public Class getDeclaringType() {
+        return getDeclaringBean().getType();
+    }
+
+    @Override
     public Argument[] getArguments() {
         return arguments;
     }

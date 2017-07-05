@@ -252,12 +252,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     /**
      * Adds a new {@link ExecutableMethod}
      *
-     * @param method The method
+     * @param  executableMethod The method
      * @return The bean definition
      */
-    protected AbstractBeanDefinition<T> addInvocableMethod(ExecutableMethod<T,?> method) {
-        MethodKey key = new MethodKey(method.getMethodName(), method.getArgumentTypes());
-        invocableMethodMap.put(key, method);
+    protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T,?> executableMethod) {
+        MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
+        invocableMethodMap.put(key, executableMethod);
         return this;
     }
 
@@ -1267,5 +1267,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
 
     private interface BeanResolver<T> {
         T resolveBean(Class<T> beanType, Qualifier<T> qualifier);
+    }
+
+    protected interface MethodExecutor {
+        Object invoke(Object target, Object...arguments);
     }
 }

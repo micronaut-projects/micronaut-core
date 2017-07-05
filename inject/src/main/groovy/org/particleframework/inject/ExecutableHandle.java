@@ -16,12 +16,19 @@
 package org.particleframework.inject;
 
 /**
- * Represents a handle to an executable object
+ * <p>Represents a handle to an executable object. Differs from {@link Executable} in that the first argument to {@link #invoke(Object...)} is
+ * not the object instead the object is typically held within the handle itself</p>
+ *
+ * <p>Executable handles are also applicable to constructors and static methods</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface ExecutableHandle<R> {
+    /**
+     * @return The declaring type
+     */
+    Class getDeclaringType();
     /**
      * The required argument types
      */

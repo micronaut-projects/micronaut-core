@@ -1,15 +1,13 @@
 package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
+import groovyjarjarasm.asm.commons.GeneratorAdapter;
 import groovyjarjarasm.asm.signature.SignatureVisitor;
 import groovyjarjarasm.asm.signature.SignatureWriter;
-import org.codehaus.groovy.ast.tools.GeneralUtils;
 import org.codehaus.groovy.runtime.MetaClassHelper;
-import org.particleframework.context.AbstractBeanDefinition;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.BeanResolutionContext;
-import org.particleframework.context.DefaultBeanContext;
+import org.particleframework.context.*;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 
 import java.io.File;
@@ -44,8 +42,8 @@ import java.util.*;
  * @since 1.0
  */
 public class BeanDefinitionWriter extends AbstractClassFileWriter {
-    private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "createMap", Object[].class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.createMap(..) method not found. Incompatible version of Particle on the classpath?")
+    private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(CollectionUtils.class, "createMap", Object[].class).orElseThrow(() ->
+            new IllegalStateException("CollectionUtils.createMap(..) method not found. Incompatible version of Particle on the classpath?")
     );
     private static final Method INJECT_BEAN_FIELDS_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBeanFields", BeanResolutionContext.class, DefaultBeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.injectBeanFields(..) method not found. Incompatible version of Particle on the classpath?")
@@ -72,6 +70,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             new IllegalStateException("AbstractBeanDefinition.addInjectionPoint(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
+    private static final Method ADD_EXECUTABLE_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addExecutableMethod", ExecutableMethod.class).orElseThrow(() ->
+            new IllegalStateException("AbstractBeanDefinition.addExecutableMethod(..) method not found. Incompatible version of Particle on the classpath?")
+    );
 
     private static final Method CREATE_LIST_METHOD = ReflectionUtils.getDeclaredMethod(Arrays.class, "asList", Object[].class).orElseThrow(() ->
             new IllegalStateException("Arrays.asList(..) method not found. Incompatible JVM?")
@@ -115,12 +116,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private final Type scope;
     private final boolean isSingleton;
     private final Set<Class> interfaceTypes;
+    private final Map<String, ClassWriter> methodExecutors = new LinkedHashMap<>();
     private final String providedBeanClassName;
+    private final String packageName;
+    private final String beanSimpleClassName;
     private MethodVisitor constructorVisitor;
     private MethodVisitor buildMethodVisitor;
     private MethodVisitor injectMethodVisitor;
     private MethodVisitor preDestroyMethodVisitor;
     private MethodVisitor postConstructMethodVisitor;
+    private int methodExecutorIndex = 0;
     private int defaultMaxStack = 13;
     private int constructorLocalVariableCount = 1;
     private int currentFieldIndex = 0;
@@ -212,7 +217,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                 String scope,
                                 boolean isSingleton) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        this.packageName = packageName;
         this.beanFullClassName = packageName + '.' + className;
+        this.beanSimpleClassName = className;
         this.providedBeanClassName = providedClassName;
         this.beanDefinitionName = beanDefinitionPackageName + ".$" + className + "Definition";
         this.beanType = getTypeReference(beanFullClassName);
@@ -262,7 +269,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @return The name of the bean definition class
      */
     public String getBeanDefinitionClassFile() {
-        return getBeanDefinitionName().replace('.', File.separatorChar) + ".class";
+        String className = getBeanDefinitionName();
+        return getClassFileName(className);
+    }
+
+    protected String getClassFileName(String className) {
+        return className.replace('.', File.separatorChar) + ".class";
     }
 
     /**
@@ -429,7 +441,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @throws IOException If an error occurs
      */
     public void writeTo(OutputStream outputStream) throws IOException {
-        outputStream.write(toByteArray());
+        byte[] bytes = toByteArray();
+        writeTo(outputStream, bytes);
+    }
+
+    protected void writeTo(OutputStream outputStream, byte[] bytes) throws IOException {
+        outputStream.write(bytes);
     }
 
     /**
@@ -456,6 +473,26 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
         try (FileOutputStream out = new FileOutputStream(targetFile)) {
             writeTo(out);
+            try {
+                methodExecutors.forEach((path, classWriter) ->{
+                    try {
+                        try(FileOutputStream executorOut = new FileOutputStream(new File(compilationDir, path))) {
+                            writeTo(executorOut, classWriter.toByteArray());
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            } catch (RuntimeException e) {
+                Throwable cause = e.getCause();
+                if(cause instanceof IOException) {
+                    throw (IOException) cause;
+                }
+                else {
+                    throw e;
+                }
+            }
+
         }
     }
 
@@ -721,6 +758,123 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         int injectInstanceIndex = this.injectInstanceIndex;
 
         visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, injectMethodVisitor, injectInstanceIndex);
+    }
+
+    /**
+     * Visit a method that is to be made executable allow invocation of said method without reflection
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     */
+    public void visitExecutableMethod(Object declaringType,
+                                      Object returnType,
+                                      String methodName,
+                                      Map<String, Object> argumentTypes,
+                                      Map<String, Object> qualifierTypes,
+                                      Map<String, List<Object>> genericTypes) {
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+
+        Type returnTypeObject = getTypeReference(returnType);
+        Type declaringTypeObject = getTypeReference(declaringType);
+        String methodExecutorShortName = beanSimpleClassName + "Definition" + "$" + ++methodExecutorIndex;
+        String methodExecutorClassName = packageName + ".$" + methodExecutorShortName;
+        String methodExecutorInternalName = getInternalName(methodExecutorClassName);
+        classWriter.visit(V1_8, ACC_PUBLIC,
+                methodExecutorInternalName,
+                null,
+                Type.getInternalName(AbstractExecutableMethod.class),
+                null);
+
+        MethodVisitor executorMethodConstructor = startConstructor(classWriter);
+        GeneratorAdapter generatorAdapter = new GeneratorAdapter(executorMethodConstructor, Opcodes.ACC_PUBLIC, "<init>", "()V");
+        // ALOAD 0
+        generatorAdapter.loadThis();
+
+        // First constructor argument: The factory method
+        boolean hasArgs = !argumentTypes.isEmpty();
+        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
+        // load 'this'
+        generatorAdapter.loadThis();
+
+        pushGetMethodFromTypeCall(executorMethodConstructor, declaringTypeObject, methodName, argumentTypeClasses);
+
+
+        if(hasArgs) {
+            // 2nd Argument: Create a call to createMap from an argument types
+            pushCreateMapCall(executorMethodConstructor, argumentTypes);
+
+            // 3rd Argument: Create a call to createMap from qualifier types
+            if (qualifierTypes != null) {
+                pushCreateMapCall(executorMethodConstructor, qualifierTypes);
+            } else {
+                executorMethodConstructor.visitInsn(ACONST_NULL);
+            }
+
+            // 4th Argument: Create a call to createMap from generic types
+            if (genericTypes != null) {
+                pushCreateGenericsMapCall(executorMethodConstructor, genericTypes);
+            } else {
+                executorMethodConstructor.visitInsn(ACONST_NULL);
+            }
+            // now invoke super(..) if no arg constructor
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Map.class, Map.class, Map.class);
+        }
+        else {
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class);
+        }
+        generatorAdapter.visitInsn(RETURN);
+        generatorAdapter.visitMaxs(defaultMaxStack, 1);
+
+        // invoke the methods with the passed arguments
+        String invokeDescriptor = groovyjarjarasm.asm.commons.Method.getMethod(
+                ReflectionUtils.getDeclaredMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class).orElseThrow(()-> new IllegalStateException("AbstractExecutableMethod.invokeInternal(..) method not found. Incompatible version of Particle on the classpath?"))
+        ).getDescriptor();
+        MethodVisitor invokeMethod = classWriter.visitMethod(
+                Opcodes.ACC_PUBLIC,
+                "invokeInternal",
+                invokeDescriptor,
+                null,
+                null);
+
+        invokeMethod.visitVarInsn(ALOAD, 1);
+        pushCastToType(invokeMethod, beanFullClassName);
+
+        String methodDescriptor;
+        if (hasArgs) {
+            int argCount = argumentTypes.size();
+            methodDescriptor = getMethodDescriptor(returnType, argumentTypeClasses);
+            Iterator<Object> argIterator = argumentTypeClasses.iterator();
+            for (int i = 0; i < argCount; i++) {
+                invokeMethod.visitVarInsn(ALOAD, 2);
+                pushIntegerConstant(invokeMethod, i);
+                invokeMethod.visitInsn(AALOAD);
+                // cast the return value to the correct type
+                pushCastToType(invokeMethod, argIterator.next());
+            }
+        } else {
+            methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
+        }
+        invokeMethod.visitMethodInsn(INVOKEVIRTUAL,
+                declaringTypeObject.getInternalName(), methodName,
+                methodDescriptor, false);
+        invokeMethod.visitInsn(ARETURN);
+        invokeMethod.visitMaxs(defaultMaxStack, 1);
+        methodExecutors.put(getClassFileName(methodExecutorClassName), classWriter);
+
+        constructorVisitor.visitVarInsn(ALOAD, 0);
+        constructorVisitor.visitTypeInsn(NEW, methodExecutorInternalName);
+        constructorVisitor.visitInsn(DUP);
+        constructorVisitor.visitMethodInsn(INVOKESPECIAL,
+                methodExecutorInternalName,
+                "<init>",
+                "()V",
+                false);
+
+        pushInvokeMethodOnSuperClass(constructorVisitor, ADD_EXECUTABLE_METHOD);
     }
 
     private void visitMethodInjectionPointInternal(Object declaringType,
@@ -1398,7 +1552,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 pushStoreTypeInArray(methodVisitor, i++, totalSize, entry.getValue());
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(AbstractBeanDefinition.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
+            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(CollectionUtils.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -1427,7 +1581,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                     methodVisitor.visitInsn(DUP);
                 }
             }
-            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(AbstractBeanDefinition.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
+            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(CollectionUtils.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -1591,16 +1745,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     protected String generateBeanDefSig(String typeParameter) {
         SignatureVisitor sv = new SignatureWriter();
+        visitSuperTypeParameters(sv, typeParameter);
+
         String beanTypeInternalName = getInternalName(typeParameter);
-
-        // visit super class
-        SignatureVisitor psv = sv.visitSuperclass();
-        psv.visitClassType(Type.getInternalName(AbstractBeanDefinition.class));
-        SignatureVisitor ppsv = psv.visitTypeArgument('=');
-        ppsv.visitClassType(beanTypeInternalName);
-        ppsv.visitEnd();
-        psv.visitEnd();
-
         // visit BeanFactory interface
         for (Class interfaceType : interfaceTypes) {
 
@@ -1613,6 +1760,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
 //        sv.visitEnd();
         return sv.toString();
+    }
+
+    private void visitSuperTypeParameters(SignatureVisitor sv, String... typeParameters) {
+
+        // visit super class
+        SignatureVisitor psv = sv.visitSuperclass();
+        psv.visitClassType(Type.getInternalName(AbstractBeanDefinition.class));
+        for (String typeParameter : typeParameters) {
+
+            SignatureVisitor ppsv = psv.visitTypeArgument('=');
+            String beanTypeInternalName = getInternalName(typeParameter);
+            ppsv.visitClassType(beanTypeInternalName);
+            ppsv.visitEnd();
+        }
+
+        psv.visitEnd();
     }
 
     @Override

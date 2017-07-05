@@ -25,6 +25,7 @@ import org.particleframework.context.annotation.Replaces
 import org.particleframework.context.annotation.Value
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
+import org.particleframework.inject.annotation.Executable
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionWriter
 import org.particleframework.inject.writer.BeanConfigurationWriter
@@ -292,6 +293,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     }
                 }
+            }
+            else if(!isConstructor && stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                defineBeanDefinition(concreteClass)
+                Map<String, Object> paramsToType = [:]
+                Map<String, Object> qualifierTypes = [:]
+                Map<String, List<Object>> genericTypeMap = [:]
+                populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+
+                beanWriter.visitExecutableMethod(
+                        resolveTypeReference(concreteClass),
+                        resolveTypeReference(methodNode.returnType),
+                        methodNode.name,
+                        paramsToType,
+                        qualifierTypes,
+                        genericTypeMap)
             }
 
         }

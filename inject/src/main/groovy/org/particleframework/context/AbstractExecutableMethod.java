@@ -17,6 +17,7 @@ package org.particleframework.context;
 
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
@@ -35,19 +36,18 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractExecutableMethod<T, R> implements ExecutableMethod<T, R> {
+public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
-    private final BeanDefinition<T> beanDefinition;
     private final String methodName;
     private final Argument[] arguments;
+    private final Class declaringType;
 
-    protected AbstractExecutableMethod(BeanDefinition<T> declaringBean,
-                                       Method method,
+    protected AbstractExecutableMethod(Method method,
                                        Map<String, Class> arguments,
                                        Map<String, Annotation> qualifiers,
                                        Map<String, List<Class>> genericTypes) {
-        this.beanDefinition = declaringBean;
         this.methodName = method.getName();
+        this.declaringType = method.getDeclaringClass();
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
             if (index < parameterAnnotations.length) {
@@ -65,8 +65,8 @@ public abstract class AbstractExecutableMethod<T, R> implements ExecutableMethod
     }
 
     @Override
-    public BeanDefinition<T> getDeclaringBean() {
-        return beanDefinition;
+    public Class getDeclaringType() {
+        return declaringType;
     }
 
     @Override
@@ -78,4 +78,30 @@ public abstract class AbstractExecutableMethod<T, R> implements ExecutableMethod
     public Argument[] getArguments() {
         return arguments;
     }
+
+    @Override
+    public final Object invoke(Object instance, Object... arguments) {
+        validateArguments(arguments);
+        return invokeInternal(instance, arguments);
+    }
+
+    private void validateArguments(Object[] argArray) {
+        int requiredCount = this.arguments.length;
+        int actualCount = argArray == null ? 0 : argArray.length;
+        if(requiredCount != actualCount) {
+            throw new IllegalArgumentException("Wrong number of arguments to method: " + methodName);
+        }
+        if(requiredCount > 0) {
+            for (int i = 0; i < arguments.length; i++) {
+                Argument argument = arguments[i];
+                Class type = ReflectionUtils.getWrapperType(argument.getType());
+                Object value = argArray[i];
+                if(value != null && !type.isInstance(value)) {
+                    throw new IllegalArgumentException("Invalid type ["+argArray[i].getClass().getName()+"] for argument ["+argument+"] of method: " + methodName);
+                }
+            }
+        }
+    }
+
+    protected abstract Object invokeInternal(Object instance, Object[] arguments);
 }

@@ -16,7 +16,7 @@
 package org.particleframework.inject;
 
 /**
- * <p>Represents an executable component</p>
+ * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
  *
  * @author Graeme Rocher
  * @since 1.0
