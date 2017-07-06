@@ -42,10 +42,10 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
 
 
                     if (element.getKind() == ElementKind.METHOD) {
-                        String generatedDefinitionClassName = "org.particleframework.inject.field.$JavaClassDefinition";
+                        String generatedDefinitionClassName = "org.particleframework.inject.method.$JavaClassDefinition";
                         generateBeanDefinitionServiceDescriptor(targetDirectory, generatedDefinitionClassName);
 
-                        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter("org.particleframework.inject.field", "JavaClass", null, true);
+                        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter("org.particleframework.inject.method", "JavaClass", null, true);
                         beanDefinitionWriter.visitBeanDefinitionConstructor();
 
                         ExecutableType typeMirror = (ExecutableType) element.asType();
@@ -60,15 +60,15 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
 
 
                         String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
-                        BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter("org.particleframework.inject.field.JavaClass", beanDefinitionName);
+                        BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter("org.particleframework.inject.method.JavaClass", beanDefinitionName);
                         beanClassWriter.writeTo(targetDirectory);
                         generateBeanDefinitionClassServiceDescriptor(targetDirectory, beanClassWriter);
 
                     } else if(element.getKind() == ElementKind.CLASS){
-                        String generatedDefinitionClassName = "org.particleframework.inject.field.$JavaSingletonDefinition";
+                        String generatedDefinitionClassName = "org.particleframework.inject.method.$JavaSingletonDefinition";
                         String beanClassName = "JavaSingleton";
-                        String fullyQualifiedBeanClassName = "org.particleframework.inject.field.JavaSingleton";
-                        String packageName = "org.particleframework.inject.field";
+                        String fullyQualifiedBeanClassName = "org.particleframework.inject.method.JavaSingleton";
+                        String packageName = "org.particleframework.inject.method";
 
                         generateSupportFiles(targetDirectory, generatedDefinitionClassName, beanClassName, fullyQualifiedBeanClassName, packageName, targetDirectory);
                     }

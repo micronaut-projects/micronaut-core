@@ -1,5 +1,9 @@
 package org.particleframework.ast.java;
 
+import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.processing.JavacProcessingEnvironment;
+import com.sun.tools.javac.util.Options;
+import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.inject.writer.BeanDefinitionClassWriter;
@@ -7,21 +11,16 @@ import org.particleframework.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
-import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
-import javax.tools.StandardLocation;
-import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @SupportedAnnotationTypes({
     "javax.inject.Singleton",
@@ -33,9 +32,13 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     public static final String META_INF_SERVICES_DIR = "META-INF/services/";
     private Messager messager;
     private Filer filer;
+    private Elements elementUtils;
 
-    private Map<String, Set<String>> serviceProviders = new HashMap<>();
+    private Map<Class, Set<String>> serviceProviders = new HashMap<>();
     private Set<String> beanDefinitionClassNames = new HashSet<>();
+
+    private String buildPath;
+
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -52,41 +55,46 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                     } else {
                         try {
                             note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
-                            String generatedDefinitionClassName = null;
-                            String fullyQualifiedBeanClassName = null;
-                            String beanClassName = null;
-                            String packageName = null;
-                            switch (elementKind) {
-                                case CLASS:
-                                    generatedDefinitionClassName = "org.particleframework.inject.field.$JavaSingletonDefinition";
-                                    beanClassName = "JavaSingleton";
-                                    fullyQualifiedBeanClassName = "org.particleframework.inject.field.JavaSingleton";
-                                    packageName = "org.particleframework.inject.field";
+                            TypeElement typeElement = getTypeElementFor(element);
+                            PackageElement packageElement = getPackageElementFor(element);
+                            String beanClassName = typeElement.getSimpleName().toString();
+                            String packageName = packageElement.getQualifiedName().toString();
+                            String fullyQualifiedBeanClassName = typeElement.getQualifiedName().toString();
+                            String generatedDefinitionClassName = packageName + ".$" + beanClassName + "Definition";
+//                            addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
 
-                                    addServiceProvider(element, BeanDefinition.class.getName(), generatedDefinitionClassName);
-                                    // SMELL hack for now, see what's needed later
+//                            if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
+//                                beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
+
+                                switch (elementKind) {
+                                case CLASS:
+                                    beanClassName = "JavaSingleton";
+                                    packageName = "org.particleframework.inject.method";
+                                    fullyQualifiedBeanClassName = "org.particleframework.inject.method.JavaSingleton";
+                                    generatedDefinitionClassName = "org.particleframework.inject.method.$JavaSingletonDefinition";
+                                    addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
                                     if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
                                         beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
-                                        String beanDefinitionName = generateSingletonBeanClass(element, packageName, beanClassName);
-                                        BeanDefinitionClassWriter beanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, beanDefinitionName);
-                                        addServiceProvider(element, BeanDefinitionClass.class.getName(), beanClassWriter.getBeanDefinitionClassName());
+                                        String classBeanDefinitionName = generateSingletonBeanClass(element, packageName, beanClassName);
+                                        BeanDefinitionClassWriter classBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, classBeanDefinitionName);
+                                        addServiceProvider(element, BeanDefinitionClass.class, classBeanClassWriter.getBeanDefinitionClassName());
                                     }
                                     break;
                                 case METHOD:
-                                    generatedDefinitionClassName = "org.particleframework.inject.field.$JavaClassDefinition";
+                                    generatedDefinitionClassName = "org.particleframework.inject.method.$JavaClassDefinition";
                                     beanClassName = "JavaClass";
-                                    fullyQualifiedBeanClassName = "org.particleframework.inject.field.JavaClass";
-                                    packageName = "org.particleframework.inject.field";
+                                    fullyQualifiedBeanClassName = "org.particleframework.inject.method.JavaClass";
+                                    packageName = "org.particleframework.inject.method";
+                                    addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
 
-                                    addServiceProvider(element, BeanDefinition.class.getName(), generatedDefinitionClassName);
-                                    // SMELL hack for now, see what's needed later
                                     if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
                                         beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
-                                        String beanDefinitionName = generateInjectBeanClass(element, packageName, beanClassName);
-                                        BeanDefinitionClassWriter beanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, beanDefinitionName);
-                                        addServiceProvider(element, BeanDefinitionClass.class.getName(), beanClassWriter.getBeanDefinitionClassName());
+                                        String methodBeanDefinitionName = generateInjectBeanClass(element, packageName, beanClassName);
+                                        BeanDefinitionClassWriter methodBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, methodBeanDefinitionName);
+                                        addServiceProvider(element, BeanDefinitionClass.class, methodBeanClassWriter.getBeanDefinitionClassName());
                                     }
                                     break;
+//                                }
                             }
                         } catch (IOException ioe) {
                             error("Unexpected error: %s", ioe.getMessage());
@@ -100,13 +108,27 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return true;
     }
 
+    private PackageElement getPackageElementFor(Element element) {
+        while (ElementKind.PACKAGE != element.getKind() ) {
+            element = element.getEnclosingElement();
+        }
+        return (PackageElement) element;
+    }
+
+    private TypeElement getTypeElementFor(Element element) {
+        while (ElementKind.CLASS != element.getKind() ) {
+            element = element.getEnclosingElement();
+        }
+        return (TypeElement) element;
+    }
+
     // really want a multimap for this...Guava?
-    private void addServiceProvider(Element element, String name, String generatedDefinitionClassName) {
-        Set<String> serviceProviderClassNames = serviceProviders.get(name);
-        note(element, "Adding service provider %s to %s", generatedDefinitionClassName, name);
+    private void addServiceProvider(Element element, Class descriptor, String generatedDefinitionClassName) {
+        Set<String> serviceProviderClassNames = serviceProviders.get(descriptor);
+        note(element, "Adding service provider %s to %s", generatedDefinitionClassName, descriptor.getName());
         if (serviceProviderClassNames == null) {
             serviceProviderClassNames = new HashSet<>();
-            serviceProviders.put(name, serviceProviderClassNames);
+            serviceProviders.put(descriptor, serviceProviderClassNames);
         }
         serviceProviderClassNames.add(generatedDefinitionClassName);
     }
@@ -126,20 +148,29 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     }
 
     private String generateInjectBeanClass(Element element, String packageName, String beanClassName) throws IOException {
+        assert (ElementKind.METHOD == element.getKind()) : "element kind must be METHOD";
+
         BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
         beanDefinitionWriter.visitBeanDefinitionConstructor();
 
-        ExecutableType typeMirror = (ExecutableType) element.asType();
-        List<? extends TypeMirror> parameterTypes = typeMirror.getParameterTypes();
-        Map m = new LinkedHashMap();
-        TypeMirror tm = parameterTypes.get(0);
-        TypeElement typeElement = processingEnv.getElementUtils().getTypeElement(tm.toString());
-        m.put("ji", typeElement.toString());
-        beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, "setJavaInterface", m);
+        Name methodName = element.getSimpleName();
+        ExecutableType execType = (ExecutableType) element.asType();
+        Map<String,Object> methodArgs = new LinkedHashMap<>();
+
+        List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            TypeMirror tm = parameterTypes.get(i);
+            TypeElement typeElement = elementUtils.getTypeElement(tm.toString());
+            String argName = typeElement.getSimpleName().toString();
+            argName = Character.toLowerCase(argName.charAt(0)) + argName.substring(1) + i;
+            methodArgs.put(argName, typeElement.toString());
+        }
+        beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs);
         beanDefinitionWriter.visitBeanDefinitionEnd();
 
-        note("CREATING NEW CLASS FILE %s", packageName + "." + beanClassName);
-        JavaFileObject javaFileObject = filer.createClassFile(beanDefinitionWriter.getBeanDefinitionName(), element);
+        String classFileName = beanDefinitionWriter.getBeanDefinitionName();
+        JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
+        note("CREATING NEW CLASS FILE %s for @Inject", classFileName);
         try (OutputStream outputStream = javaFileObject.openOutputStream()) {
             beanDefinitionWriter.writeTo(outputStream);
         }
@@ -154,6 +185,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     {
         BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(fullyQualifiedBeanClassName, beanDefinitionName);
         String classFileName = beanClassWriter.getBeanDefinitionQualifiedClassName();
+        note("CREATING NEW CLASS FILE %s for @Singleton", classFileName);
         JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
         try (OutputStream out = javaFileObject.openOutputStream()) {
             beanClassWriter.writeTo(out);
@@ -162,41 +194,56 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     }
 
     private void generateBeanDefinitionServiceDescriptors() {
+        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
+        File targetDirectory = new File(buildPath);
         serviceProviders.forEach((serviceDescriptor, providers) -> {
-            try {
-                providers.addAll(existingProvidersFor(serviceDescriptor));
-                FileObject resourceFileObject = filer.createResource(StandardLocation.CLASS_OUTPUT, "",
-                    "META-INF/services/" + serviceDescriptor);
-                try (BufferedWriter bw = new BufferedWriter(resourceFileObject.openWriter())) {
-                    bw.write(providers.stream().collect(Collectors.joining(System.getProperty("line.separator"))));
-                }
-            } catch (IOException e) {
-                error("Unexpected error: %s", e.getMessage());
-                e.printStackTrace();
-            }
+            providers.forEach(provider -> generator.generate(targetDirectory, provider, serviceDescriptor));
         });
     }
 
-    private List<String> existingProvidersFor(String serviceDescriptor) throws IOException {
-        FileObject resourceFileObject = filer.getResource(StandardLocation.CLASS_OUTPUT, "", META_INF_SERVICES_DIR + serviceDescriptor);
-        if (resourceFileObject.getLastModified() != 0) {
-            // the file exists, preserve existing service providers
-            note("Service descriptor exists for %s. Reading entries", serviceDescriptor);
-            CharSequence content = resourceFileObject.getCharContent(true);
-            if (content != null) {
-                Arrays.asList(Pattern.compile("\\n").split(content));
-            }
-            return content != null ? Arrays.asList(Pattern.compile("\\n").split(content)) : Collections.emptyList();
-        }
-        return Collections.emptyList();
-    }
+//    private String metaInfPath;
+//    private String getMetaInfPath(String descriptor) throws IOException {
+//        // SMELL this is a total hack to get the output directory. This is likely rather fragile as it is
+//        if (metaInfPath == null) {
+//            FileObject fo;
+//            try {
+//                // does it exist?
+//                fo = filer.getResource(StandardLocation.CLASS_OUTPUT, "", "META-INF/services/" + descriptor);
+//            } catch (IOException ioe) {
+//                fo = filer.createResource(StandardLocation.CLASS_OUTPUT, "", "META-INF/services/" + descriptor);
+//            }
+//            String uri = fo.toUri().toURL().getFile();
+//            metaInfPath = uri.replaceFirst("(.*)META-INF/services/" + descriptor,"$1");
+//        }
+//        return metaInfPath;
+//    }
+//
+//    private void generateBeanDefinitionServiceDescriptor(String serviceDescriptor, String provider) {
+//
+//    }
+
+//    private List<String> existingProvidersFor(String serviceDescriptor) throws IOException {
+//        FileObject resourceFileObject = filer.getResource(StandardLocation.CLASS_OUTPUT, "", META_INF_SERVICES_DIR + serviceDescriptor);
+//        if (resourceFileObject.getLastModified() != 0) {
+//            // the file exists, preserve existing service providers
+//            note("Service descriptor exists for %s. Reading entries", serviceDescriptor);
+//            CharSequence content = resourceFileObject.getCharContent(true);
+//            return content != null ? Arrays.asList(Pattern.compile("\\n").split(content)) : Collections.emptyList();
+//        }
+//        return Collections.emptyList();
+//    }
+
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.messager = processingEnv.getMessager();
         this.filer = processingEnv.getFiler();
-        note("Options passed to annotaion processor are %s", processingEnv.getOptions());
+        this.elementUtils = processingEnv.getElementUtils();
+        Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
+        this.buildPath = javacOptions.get(Option.D);
+        Map<String, String> options = processingEnv.getOptions();
+        note("Options passed to annotation processor are %s", options);
     }
 
     private void error(Element e, String msg, Object... args) {

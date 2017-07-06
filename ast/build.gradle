@@ -2,6 +2,7 @@ configurations.all {
     it.exclude(group:"org.slf4j",module:"jcl-over-slf4j")
 }
 dependencies {
+    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compile project(":inject")
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
