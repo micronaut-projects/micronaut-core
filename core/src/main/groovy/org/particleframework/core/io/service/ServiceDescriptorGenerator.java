@@ -16,9 +16,14 @@
 package org.particleframework.core.io.service;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Collections;
 
 /**
  *
@@ -36,20 +41,16 @@ public class ServiceDescriptorGenerator {
         servicesDir.mkdirs();
 
         File descriptor = new File(servicesDir, serviceType.getName());
+        Charset charset = StandardCharsets.UTF_8;
+        Path filePath = descriptor.toPath();
         if (descriptor.exists()) {
-            String contents = new String(Files.readAllBytes(descriptor.toPath()));
+            String contents = new String(Files.readAllBytes(filePath));
             String[] entries = contents.split("\\n");
             if (!Arrays.asList(entries).contains(className)) {
-                try(BufferedWriter output = new BufferedWriter(new FileWriter(descriptor))) {
-                    output.newLine();
-                    output.write(className);
-                }
+                Files.write(filePath, Collections.singletonList(className), charset, StandardOpenOption.APPEND );
             }
         } else {
-            try(BufferedWriter output = new BufferedWriter(new FileWriter(descriptor))) {
-                output.newLine();
-                output.write(className);
-            }
+            Files.write(filePath, Collections.singletonList(className), charset, StandardOpenOption.CREATE );
         }
     }
 }

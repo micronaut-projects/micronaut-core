@@ -12,37 +12,29 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
-import org.particleframework.ast.groovy.descriptor.GroovyServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.config.ConfigurationProperties
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Configuration
-import org.particleframework.context.annotation.Context
-import org.particleframework.context.annotation.Factory
-import org.particleframework.context.annotation.Replaces
-import org.particleframework.context.annotation.Value
+import org.particleframework.context.annotation.*
+import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.annotation.Executable
+import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionWriter
-import org.particleframework.inject.writer.BeanConfigurationWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
-import javax.inject.Inject
-import javax.inject.Provider
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import javax.inject.*
 import java.beans.Introspector
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
-import static org.codehaus.groovy.ast.tools.GeneralUtils.*
+import static org.codehaus.groovy.ast.tools.GeneralUtils.constX
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 
 /**
  * An AST transformation that produces metadata for use by the injection container
@@ -82,7 +74,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(configurationName != null) {
 
                         try {
-                            GroovyServiceDescriptorGenerator generator = new GroovyServiceDescriptorGenerator()
+                            ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
                             File targetDirectory = source.configuration.targetDirectory
                             if (targetDirectory != null) {
                                 generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
@@ -106,7 +98,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
         }
 
-        GroovyServiceDescriptorGenerator generator = new GroovyServiceDescriptorGenerator()
+        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in beanDefinitionWriters) {
             BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
