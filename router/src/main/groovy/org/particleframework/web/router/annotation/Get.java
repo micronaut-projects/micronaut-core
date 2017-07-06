@@ -13,27 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router
+package org.particleframework.web.router.annotation;
 
-import groovy.transform.CompileStatic
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Factory
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import javax.inject.Singleton
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>A factory that builds the default {@link Router}</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-@CompileStatic
-class RouterFactory {
-
-    @Singleton
-    @Bean
-    Router router(RouteBuilder... routeBuilders) {
-        new DefaultRouter(routeBuilders)
-    }
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.METHOD})
+@Action
+public @interface Get {
+    /**
+     * @return The URI of the GET if not specified inferred from the method name and arguments
+     */
+    String value() default "";
 }

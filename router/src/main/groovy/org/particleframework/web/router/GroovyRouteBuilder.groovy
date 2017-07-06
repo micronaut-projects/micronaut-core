@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router
+package org.particleframework.web.router
 
-import groovy.transform.CompileStatic
 import groovy.transform.InheritConstructors
 import org.codehaus.groovy.runtime.MethodClosure
-import org.particleframework.context.router.RouteBuilder.RouteId
 import org.particleframework.core.naming.conventions.PropertyConvention
 
 /**

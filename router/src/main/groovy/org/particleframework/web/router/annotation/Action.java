@@ -13,12 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-@Configuration
-package org.particleframework.context.router
+package org.particleframework.web.router.annotation;
 
-import org.particleframework.context.annotation.Configuration
+import org.particleframework.inject.annotation.Executable;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * <p>A meta annotation for HTTP {@link org.particleframework.stereotype.Controller} actions</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+@Executable
+public @interface Action {
+}

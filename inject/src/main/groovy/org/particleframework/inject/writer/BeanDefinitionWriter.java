@@ -6,6 +6,7 @@ import groovyjarjarasm.asm.signature.SignatureVisitor;
 import groovyjarjarasm.asm.signature.SignatureWriter;
 import org.codehaus.groovy.runtime.MetaClassHelper;
 import org.particleframework.context.*;
+import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
@@ -474,11 +475,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         try (FileOutputStream out = new FileOutputStream(targetFile)) {
             writeTo(out);
             try {
-                methodExecutors.forEach((path, classWriter) ->{
+                ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
+                methodExecutors.forEach((className, classWriter) ->{
                     try {
+                        String path = getClassFileName(className);
                         try(FileOutputStream executorOut = new FileOutputStream(new File(compilationDir, path))) {
                             writeTo(executorOut, classWriter.toByteArray());
                         }
+                        serviceDescriptorGenerator.generate(compilationDir, className, ExecutableMethod.class);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -863,7 +867,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 methodDescriptor, false);
         invokeMethod.visitInsn(ARETURN);
         invokeMethod.visitMaxs(defaultMaxStack, 1);
-        methodExecutors.put(getClassFileName(methodExecutorClassName), classWriter);
+        methodExecutors.put(methodExecutorClassName, classWriter);
 
         constructorVisitor.visitVarInsn(ALOAD, 0);
         constructorVisitor.visitTypeInsn(NEW, methodExecutorInternalName);

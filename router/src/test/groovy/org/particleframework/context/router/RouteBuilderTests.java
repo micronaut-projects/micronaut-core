@@ -17,10 +17,12 @@ package org.particleframework.context.router;
 
 import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.BeanContext;
 import org.particleframework.context.DefaultApplicationContext;
-import org.particleframework.context.DefaultBeanContext;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.web.router.DefaultRouteBuilder;
+import org.particleframework.web.router.DefaultRouter;
+import org.particleframework.web.router.Route;
+import org.particleframework.web.router.Router;
 
 import javax.inject.Inject;
 

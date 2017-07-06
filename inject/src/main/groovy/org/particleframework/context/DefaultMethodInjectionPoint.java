@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
@@ -125,6 +126,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
         } catch (Throwable e) {
             throw new BeanInstantiationException("Cannot inject arguments for method ["+method+"] using arguments ["+ Arrays.asList(args)+"]:" + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public Annotation findAnnotation(Class stereotype) {
+        return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotations());
     }
 
     @Override

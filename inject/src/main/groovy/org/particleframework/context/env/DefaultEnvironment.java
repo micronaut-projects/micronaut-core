@@ -5,9 +5,11 @@ import org.particleframework.config.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.io.service.SoftServiceLoader;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -174,4 +176,32 @@ public class DefaultEnvironment implements Environment {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;
     }
+
+    @Override
+    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
+        SoftServiceLoader<T> services = SoftServiceLoader.load(type, getClassLoader(), condition);
+        Iterator<SoftServiceLoader.Service<T>> iterator = services.iterator();
+        return () -> new Iterator<T>() {
+            SoftServiceLoader.Service<T> nextService = null;
+            @Override
+            public boolean hasNext() {
+                if(nextService != null) return true;
+                while(iterator.hasNext() && (nextService == null || !nextService.isPresent())) {
+                    nextService = iterator.next();
+                }
+                return nextService != null;
+            }
+
+            @Override
+            public T next() {
+                if(!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                SoftServiceLoader.Service<T> next = this.nextService;
+                nextService = null;
+                return next.load();
+            }
+        };
+    }
+
 }

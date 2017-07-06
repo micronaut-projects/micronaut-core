@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router;
+package org.particleframework.web.router;
 
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.core.naming.conventions.TypeConvention;
+import org.particleframework.stereotype.Controller;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 
 import static org.particleframework.core.naming.conventions.MethodConvention.*;
@@ -715,8 +717,10 @@ public interface RouteBuilder {
          * @param type The type
          * @return The URI to use
          */
-        default String resolveUri(Class type) {
-            return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
+        default String resolveUri(Class<?> type) {
+            Controller annotation = type.getAnnotation(Controller.class);
+            String uri = annotation != null ? annotation.value() : null;
+            return uri != null && uri.length() > 0 ? uri : '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
 
         /**
@@ -731,11 +735,4 @@ public interface RouteBuilder {
         }
     }
 
-    /**
-     * Class used to differentiate the route id and represented by the static {@link #ID} property
-     */
-    class RouteId {
-        private RouteId() {
-        }
-    }
 }

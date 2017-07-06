@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject;
 
+import java.lang.annotation.Annotation;
+
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
  *
@@ -39,4 +41,13 @@ public interface Executable<T, R> {
      * @return The result
      */
     R invoke(T instance, Object... arguments);
+
+    /**
+     * Finds an annotation of the {@link Executable} for the given stereotype
+     *
+     * @param stereotype The stereotype class
+     * @param <A> The annotation generic type
+     * @return The Annotation instance
+     */
+    <A extends Annotation> A findAnnotation(Class<A> stereotype);
 }

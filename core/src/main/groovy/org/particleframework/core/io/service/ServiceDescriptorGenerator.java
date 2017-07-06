@@ -25,6 +25,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collections;
 
+import static org.particleframework.core.io.service.SoftServiceLoader.META_INF_SERVICES;
+
 /**
  *
  * <p>Utility class for generated META-INF/services files</p>
@@ -33,8 +35,6 @@ import java.util.Collections;
  * @since 1.0
  */
 public class ServiceDescriptorGenerator {
-
-    public static final String META_INF_SERVICES = "META-INF/services";
 
     public void generate(File targetDirectory, String className, Class serviceType) throws IOException {
         File servicesDir = new File(targetDirectory, META_INF_SERVICES);

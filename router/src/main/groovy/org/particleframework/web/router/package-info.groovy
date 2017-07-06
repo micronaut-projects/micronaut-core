@@ -13,22 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router.exceptions;
+@Configuration
+package org.particleframework.web.router
 
-import org.particleframework.context.exceptions.BeanContextException;
+import org.particleframework.context.annotation.Configuration
 
 /**
- * <p>An exception that occurs when building routes</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class RoutingException extends BeanContextException {
-    public RoutingException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public RoutingException(String message) {
-        super(message);
-    }
-}

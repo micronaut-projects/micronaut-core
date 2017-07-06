@@ -21,13 +21,11 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>Abstract base class for generated {@link ExecutableMethod} classes to implement. The generated classes should implement
@@ -42,12 +40,14 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final String methodName;
     private final Argument[] arguments;
     private final Class declaringType;
+    private final Annotation[] annotations;
 
     protected AbstractExecutableMethod(Method method,
                                        Map<String, Class> arguments,
                                        Map<String, Annotation> qualifiers,
                                        Map<String, List<Class>> genericTypes) {
         this.methodName = method.getName();
+        this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
@@ -60,6 +60,16 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected AbstractExecutableMethod(Method method) {
         this(method, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Override
+    public Set<? extends Annotation> getExecutableAnnotations() {
+        return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, this.annotations);
+    }
+
+    @Override
+    public Annotation findAnnotation(Class stereotype) {
+        return AnnotationUtil.findAnnotationWithStereoType(stereotype, annotations);
     }
 
     @Override

@@ -43,4 +43,24 @@ public interface BeanConfiguration {
      * @return True if it is
      */
     boolean isWithin(BeanDefinitionClass beanDefinitionClass);
+
+    /**
+     * Check whether the specified class is within this bean configuration
+     *
+     * @param className The class name
+     *
+     * @return True if it is
+     */
+    boolean isWithin(String className);
+
+    /**
+     * Check whether the specified class is within this bean configuration
+     *
+     * @param cls The class
+     *
+     * @return True if it is
+     */
+    default boolean isWithin(Class cls) {
+        return isWithin(cls.getName());
+    }
 }

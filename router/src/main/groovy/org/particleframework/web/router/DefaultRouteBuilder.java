@@ -13,26 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router;
+package org.particleframework.web.router;
 
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.exceptions.NoSuchBeanException;
-import org.particleframework.context.router.exceptions.RoutingException;
+import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.TypeConvention;
-import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableHandle;
-import org.particleframework.inject.ExecutableMethod;
 
-import java.net.URI;
 import java.util.*;
 
 /**

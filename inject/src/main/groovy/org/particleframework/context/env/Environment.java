@@ -2,6 +2,7 @@ package org.particleframework.context.env;
 
 import org.particleframework.config.PropertyResolver;
 import org.particleframework.context.LifeCycle;
+import org.particleframework.context.ServiceLocator;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
@@ -10,7 +11,6 @@ import org.particleframework.core.reflect.ClassUtils;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -20,7 +20,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
+public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader, ServiceLocator {
 
     /**
      * @return The name of the environment

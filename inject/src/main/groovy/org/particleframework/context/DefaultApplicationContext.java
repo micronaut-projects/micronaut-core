@@ -4,9 +4,11 @@ import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
+import org.particleframework.inject.BeanConfiguration;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Creates a default implementation of the {@link ApplicationContext} interface
@@ -32,12 +34,25 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * Construct a new ApplicationContext for the given environment name and classloader
      *
      * @param environmentName The environment name
-     * @param classLoader The class loader
+     * @param classLoader     The class loader
      */
     public DefaultApplicationContext(String environmentName, ClassLoader classLoader) {
         super(classLoader);
         this.conversionService = createConversionService();
         this.environment = createEnvironment(environmentName);
+    }
+
+    @Override
+    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
+        return getEnvironment().findServices(type, condition.and((String name) -> {
+                    for (BeanConfiguration beanConfiguration : beanConfigurations.values()) {
+                        if (!beanConfiguration.isEnabled(this) && beanConfiguration.isWithin(name)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+        ));
     }
 
     @Override
@@ -62,10 +77,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        if(ApplicationContext.class == beanType) {
+        if (ApplicationContext.class == beanType) {
             return (T) this;
-        }
-        else {
+        } else {
             return super.getBean(resolutionContext, beanType, qualifier);
         }
     }
@@ -99,6 +113,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Environment environment = getEnvironment();
         environment.start();
         registerSingleton(Environment.class, environment);
+        registerSingleton(new ExecutableMethodProcessorListener());
     }
 
     @Override

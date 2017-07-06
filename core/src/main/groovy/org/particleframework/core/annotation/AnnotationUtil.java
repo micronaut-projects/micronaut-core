@@ -4,6 +4,9 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Utility methods for annotations
@@ -26,7 +29,7 @@ public class AnnotationUtil {
      * @param stereotype The stereotype
      * @return The annotation
      */
-    public static Annotation findAnnotationWithStereoType(Class cls, Class<? extends Annotation> stereotype) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(Class cls, Class stereotype) {
         Annotation[] annotations = cls.getAnnotations();
         return findAnnotationWithStereoType(stereotype, annotations);
     }
@@ -38,17 +41,43 @@ public class AnnotationUtil {
      * @param annotations The annotations to search
      * @return The annotation
      */
-    public static Annotation findAnnotationWithStereoType(Class<? extends Annotation> stereotype, Annotation... annotations) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {
         for(Annotation ann : annotations) {
             if(stereotype.isInstance(ann)) {
-                return ann;
+                return (T) ann;
             }
-            else if(!Retention.class.isInstance(ann) && !Documented.class.isInstance(ann) && !Target.class.isInstance(ann)) {
-                if(findAnnotationWithStereoType(ann.getClass(), stereotype) != null) {
-                    return ann;
+            else if(isNotInternalAnnotation(ann)) {
+                if(findAnnotationWithStereoType(ann.annotationType(), stereotype) != null) {
+                    return (T) ann;
                 }
             }
         }
         return null;
+    }
+
+    /**
+     * Finds an annotation on the given class for the given stereotype
+     *
+     * @param stereotype The stereotype
+     * @param annotations The annotations to search
+     * @return The annotation
+     */
+    public static Set<? extends Annotation> findAnnotationsWithStereoType(Class<?> stereotype, Annotation... annotations) {
+        Set<Annotation> annotationSet = new HashSet<>();
+        for(Annotation ann : annotations) {
+            if(stereotype.isInstance(ann)) {
+                annotationSet.add(  ann);
+            }
+            else if(isNotInternalAnnotation(ann)) {
+                if(findAnnotationWithStereoType(ann.annotationType(), stereotype) != null) {
+                    annotationSet.add( ann);
+                }
+            }
+        }
+        return Collections.unmodifiableSet(annotationSet);
+    }
+
+    private static boolean isNotInternalAnnotation(Annotation ann) {
+        return !Retention.class.isInstance(ann) && !Documented.class.isInstance(ann) && !Target.class.isInstance(ann);
     }
 }

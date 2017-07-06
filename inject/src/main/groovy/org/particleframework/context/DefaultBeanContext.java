@@ -21,6 +21,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,8 +37,8 @@ public class DefaultBeanContext implements BeanContext {
     private final Iterator<BeanDefinitionClass> beanDefinitionClassIterator;
     private final Iterator<BeanConfiguration> beanConfigurationIterator;
     private final Map<String, BeanDefinitionClass> beanDefinitionsClasses = new ConcurrentHashMap<>(30);
-    private final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
-    private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
+    protected final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
+    protected final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(30)
             .build();
@@ -62,30 +63,6 @@ public class DefaultBeanContext implements BeanContext {
         this.beanConfigurationIterator = resolveBeanConfigurarions().iterator();
     }
 
-    @Override
-    public <R> Optional<ExecutableHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
-        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
-        if(foundBean.isPresent()) {
-            BeanDefinition<?> beanDefinition = foundBean.get();
-            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
-            if(foundMethod.isPresent()) {
-
-                Optional<ExecutableHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
-                        new BeanExecutionHandle<>(this, beanType, executableMethod)
-                );
-                return executionHandle;
-            }
-            else {
-                return beanDefinition.findPossibleMethods(method)
-                              .findFirst()
-                              .map((ExecutableMethod executableMethod) ->
-                        new BeanExecutionHandle<>(this, beanType, executableMethod)
-                );
-            }
-        }
-        return Optional.empty();
-    }
-
     /**
      * The start method will read all bean definition classes found on the classpath and initialize any pre-required state
      */
@@ -102,29 +79,6 @@ public class DefaultBeanContext implements BeanContext {
         }
         return this;
     }
-
-    @Override
-    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
-        if (singleton == null) {
-            throw new IllegalArgumentException("Passed singleton cannot be null");
-        }
-        BeanKey beanKey = new BeanKey(beanType, null);
-        synchronized (singletonObjects) {
-            initializedObjectsByType.invalidateAll();
-
-            BeanDefinition<?> beanDefinition = findConcreteCandidate(beanType, null, false, true);
-            if (beanDefinition != null) {
-                if (beanDefinition instanceof InjectableBeanDefinition) {
-                    doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
-                    singletonObjects.put(beanKey, new BeanRegistration(beanDefinition, singleton));
-                }
-            } else {
-                singletonObjects.put(beanKey, new BeanRegistration(new NoInjectionBeanDefinition(beanType), singleton));
-            }
-        }
-        return this;
-    }
-
 
     /**
      * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
@@ -156,6 +110,57 @@ public class DefaultBeanContext implements BeanContext {
             }
         });
 
+        return this;
+    }
+
+    @Override
+    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
+        return ServiceLoader.load(type, getClassLoader());
+    }
+
+    @Override
+    public <R> Optional<ExecutableHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
+        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
+        if(foundBean.isPresent()) {
+            BeanDefinition<?> beanDefinition = foundBean.get();
+            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
+            if(foundMethod.isPresent()) {
+
+                Optional<ExecutableHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
+                        new BeanExecutionHandle<>(this, beanType, executableMethod)
+                );
+                return executionHandle;
+            }
+            else {
+                return beanDefinition.findPossibleMethods(method)
+                        .findFirst()
+                        .map((ExecutableMethod executableMethod) ->
+                                new BeanExecutionHandle<>(this, beanType, executableMethod)
+                        );
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
+        if (singleton == null) {
+            throw new IllegalArgumentException("Passed singleton cannot be null");
+        }
+        BeanKey beanKey = new BeanKey(beanType, null);
+        synchronized (singletonObjects) {
+            initializedObjectsByType.invalidateAll();
+
+            BeanDefinition<?> beanDefinition = findConcreteCandidate(beanType, null, false, true);
+            if (beanDefinition != null) {
+                if (beanDefinition instanceof InjectableBeanDefinition) {
+                    doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
+                    singletonObjects.put(beanKey, new BeanRegistration(beanDefinition, singleton));
+                }
+            } else {
+                singletonObjects.put(beanKey, new BeanRegistration(new NoInjectionBeanDefinition(beanType), singleton));
+            }
+        }
         return this;
     }
 
@@ -704,6 +709,13 @@ public class DefaultBeanContext implements BeanContext {
             beansOfTypeList.add(beanReg.bean);
             beans = Collections.unmodifiableCollection(beansOfTypeList);
         } else {
+            if(qualifier == null) {
+                for(BeanRegistration reg : singletonObjects.values()) {
+                    if(beanType.isInstance(reg.bean)) {
+                        beansOfTypeList.add((T) reg.bean);
+                    }
+                }
+            }
             Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType);
             if (qualifier != null) {
                 BeanDefinition<T> qualified = qualifier.qualify(beanType, candidates.stream());
@@ -731,7 +743,7 @@ public class DefaultBeanContext implements BeanContext {
                 beans = Collections.unmodifiableCollection(beansOfTypeList);
             } else {
                 allCandidatesAreSingleton = true;
-                beans = Collections.emptyList();
+                beans = Collections.unmodifiableCollection(beansOfTypeList);
             }
         }
         if (allCandidatesAreSingleton) {

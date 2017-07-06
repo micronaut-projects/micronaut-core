@@ -15,6 +15,9 @@
  */
 package org.particleframework.inject;
 
+import java.lang.annotation.Annotation;
+import java.util.Set;
+
 /**
  * <p>An invocable method is a compile time produced invocation of a method call. Avoiding the use of reflection and allowing the JIT to optimize the call</p>
  *
@@ -40,5 +43,10 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
      * @return The argument types
      */
     Class[] getArgumentTypes();
+
+    /**
+     * @return One or many {@link org.particleframework.inject.annotation.Executable} annotations for this method
+     */
+    Set<? extends Annotation> getExecutableAnnotations();
 
 }

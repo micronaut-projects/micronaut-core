@@ -15,19 +15,18 @@
  */
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A fallback implementation of {@link ExecutableMethod} that uses reflection in the case where no invocation data has
@@ -66,6 +65,11 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
+    public Set<? extends Annotation> getExecutableAnnotations() {
+        return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, method.getAnnotations());
+    }
+
+    @Override
     public Class getDeclaringType() {
         return beanDefinition.getType();
     }
@@ -83,6 +87,11 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     @Override
     public R invoke(T instance, Object... arguments) {
         return ReflectionUtils.invokeMethod(instance, method, arguments);
+    }
+
+    @Override
+    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
+        return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotations());
     }
 
     @Override

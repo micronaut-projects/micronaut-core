@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context.router;
+package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
