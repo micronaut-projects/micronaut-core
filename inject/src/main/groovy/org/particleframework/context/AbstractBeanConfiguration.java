@@ -58,7 +58,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     @Override
     public boolean isEnabled(BeanContext context) {
         if(enabled == null) {
-            enabled = condition.matches(new DefaultConditionContext(context, this));
+            enabled = condition == null || condition.matches(new DefaultConditionContext(context, this));
         }
         return enabled;
     }
@@ -66,7 +66,12 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     @Override
     public boolean isWithin(BeanDefinitionClass beanDefinitionClass) {
         String beanTypeName = beanDefinitionClass.getBeanTypeName();
-        return beanTypeName.startsWith(packageName);
+        return isWithin(beanTypeName);
+    }
+
+    @Override
+    public boolean isWithin(String className) {
+        return className.startsWith(packageName);
     }
 
     Collection<BeanDefinitionClass> getBeanDefinitionClasses() {

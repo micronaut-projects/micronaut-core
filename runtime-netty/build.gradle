@@ -1,0 +1,5 @@
+dependencies {
+    compile project(":runtime")
+    compile project(":router")
+    compile "io.netty:netty-codec-http:$nettyVersion"
+}

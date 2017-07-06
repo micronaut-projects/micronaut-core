@@ -10,20 +10,18 @@ import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
-import javax.inject.Singleton;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,8 +37,8 @@ public class DefaultBeanContext implements BeanContext {
     private final Iterator<BeanDefinitionClass> beanDefinitionClassIterator;
     private final Iterator<BeanConfiguration> beanConfigurationIterator;
     private final Map<String, BeanDefinitionClass> beanDefinitionsClasses = new ConcurrentHashMap<>(30);
-    private final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
-    private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
+    protected final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
+    protected final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(30)
             .build();
@@ -82,30 +80,6 @@ public class DefaultBeanContext implements BeanContext {
         return this;
     }
 
-    @Override
-    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
-        if(singleton == null) {
-            throw new IllegalArgumentException("Passed singleton cannot be null");
-        }
-        BeanKey beanKey = new BeanKey(beanType, null);
-        synchronized (singletonObjects) {
-            initializedObjectsByType.invalidateAll();
-
-            BeanDefinition<?> beanDefinition = findConcreteCandidate(beanType, null, false, true);
-            if(beanDefinition != null) {
-                if(beanDefinition instanceof InjectableBeanDefinition) {
-                    doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
-                    singletonObjects.put(beanKey, new BeanRegistration(beanDefinition, singleton));
-                }
-            }
-            else {
-                singletonObjects.put(beanKey, new BeanRegistration(new NoInjectionBeanDefinition(beanType), singleton));
-            }
-        }
-        return this;
-    }
-
-
     /**
      * The close method will shut down the context calling {@link javax.annotation.PreDestroy} hooks on loaded singletons.
      */
@@ -140,18 +114,88 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
+        return ServiceLoader.load(type, getClassLoader());
+    }
+
+    @Override
+    public <R> Optional<ExecutableHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
+        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
+        if(foundBean.isPresent()) {
+            BeanDefinition<?> beanDefinition = foundBean.get();
+            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
+            if(foundMethod.isPresent()) {
+
+                Optional<ExecutableHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
+                        new BeanExecutionHandle<>(this, beanType, executableMethod)
+                );
+                return executionHandle;
+            }
+            else {
+                return beanDefinition.findPossibleMethods(method)
+                        .findFirst()
+                        .map((ExecutableMethod executableMethod) ->
+                                new BeanExecutionHandle<>(this, beanType, executableMethod)
+                        );
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
+        if (singleton == null) {
+            throw new IllegalArgumentException("Passed singleton cannot be null");
+        }
+        BeanKey beanKey = new BeanKey(beanType, null);
+        synchronized (singletonObjects) {
+            initializedObjectsByType.invalidateAll();
+
+            BeanDefinition<?> beanDefinition = findConcreteCandidate(beanType, null, false, true);
+            if (beanDefinition != null) {
+                if (beanDefinition instanceof InjectableBeanDefinition) {
+                    doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
+                    singletonObjects.put(beanKey, new BeanRegistration(beanDefinition, singleton));
+                }
+            } else {
+                singletonObjects.put(beanKey, new BeanRegistration(new NoInjectionBeanDefinition(beanType), singleton));
+            }
+        }
+        return this;
+    }
+
+    @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
 
 
     @Override
-    public Optional<BeanConfiguration> getBeanConfiguration(String configurationName) {
+    public Optional<BeanConfiguration> findBeanConfiguration(String configurationName) {
         BeanConfiguration configuration = this.beanConfigurations.get(configurationName);
         if (configuration != null) {
             return Optional.of(configuration);
         } else {
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
+        BeanKey beanKey = new BeanKey(beanType, null);
+        BeanRegistration reg = singletonObjects.get(beanKey);
+        if (reg != null) {
+            return Optional.of(reg.beanDefinition);
+        }
+        Collection<BeanDefinition<T>> beanCandidates = findBeanCandidates(beanType);
+        if (beanCandidates.isEmpty()) {
+            return Optional.empty();
+        } else {
+            if (beanCandidates.size() == 1) {
+                return Optional.of(beanCandidates.iterator().next());
+            } else {
+                throw new NonUniqueBeanException(beanType, beanCandidates.iterator());
+            }
         }
     }
 
@@ -271,7 +315,7 @@ public class DefaultBeanContext implements BeanContext {
         Class<?> beanType = instance.getClass();
         BeanDefinition definition = findConcreteCandidate(beanType, null, false, true);
         if (definition != null) {
-            if(requestingBeanDefinition != null && requestingBeanDefinition.equals(definition)) {
+            if (requestingBeanDefinition != null && requestingBeanDefinition.equals(definition)) {
                 // bail out, don't inject for bean definition in creation
                 return instance;
             }
@@ -284,7 +328,7 @@ public class DefaultBeanContext implements BeanContext {
         if (definition instanceof InjectableBeanDefinition) {
             ((InjectableBeanDefinition) definition).inject(resolutionContext, this, instance);
         }
-        if(definition instanceof InitializingBeanDefinition) {
+        if (definition instanceof InitializingBeanDefinition) {
             ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
         }
     }
@@ -345,10 +389,9 @@ public class DefaultBeanContext implements BeanContext {
             }
         } else {
             T bean = findExistingCompatibleSingleton(beanType, qualifier);
-            if(bean == null) {
+            if (bean == null) {
                 throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
-            }
-            else {
+            } else {
                 return bean;
             }
         }
@@ -358,9 +401,9 @@ public class DefaultBeanContext implements BeanContext {
         T bean = null;
         for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
             BeanKey key = entry.getKey();
-            if(qualifier == null || qualifier.equals(key.qualifier)) {
+            if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
-                if(beanType.isInstance(reg.bean)) {
+                if (beanType.isInstance(reg.bean)) {
                     synchronized (singletonObjects) {
                         bean = (T) reg.bean;
                         registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
@@ -397,10 +440,9 @@ public class DefaultBeanContext implements BeanContext {
             }
         } else {
             T bean = findExistingCompatibleSingleton(beanType, qualifier);
-            if(bean == null) {
+            if (bean == null) {
                 return Optional.empty();
-            }
-            else {
+            } else {
                 return Optional.of(bean);
             }
         }
@@ -479,21 +521,21 @@ public class DefaultBeanContext implements BeanContext {
             inject(resolutionContext, null, bean);
         }
 
-        if(!BeanCreatedEventListener.class.isInstance(bean)) {
+        if (!BeanCreatedEventListener.class.isInstance(bean)) {
 
             Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, null);
             for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
                 Class targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanCreatedEventListener.class);
                 if (targetType == null || targetType.isInstance(bean)) {
                     bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, bean));
-                    if(bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener ["+listener+"] returned null from onCreated event");
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                     }
                 }
             }
         }
-        if(beanDefinition instanceof ValidatedBeanDefinition) {
-            bean = ((ValidatedBeanDefinition<T>)beanDefinition).validate(resolutionContext, bean);
+        if (beanDefinition instanceof ValidatedBeanDefinition) {
+            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
         }
         return bean;
     }
@@ -667,6 +709,13 @@ public class DefaultBeanContext implements BeanContext {
             beansOfTypeList.add(beanReg.bean);
             beans = Collections.unmodifiableCollection(beansOfTypeList);
         } else {
+            if(qualifier == null) {
+                for(BeanRegistration reg : singletonObjects.values()) {
+                    if(beanType.isInstance(reg.bean)) {
+                        beansOfTypeList.add((T) reg.bean);
+                    }
+                }
+            }
             Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType);
             if (qualifier != null) {
                 BeanDefinition<T> qualified = qualifier.qualify(beanType, candidates.stream());
@@ -694,7 +743,7 @@ public class DefaultBeanContext implements BeanContext {
                 beans = Collections.unmodifiableCollection(beansOfTypeList);
             } else {
                 allCandidatesAreSingleton = true;
-                beans = Collections.emptyList();
+                beans = Collections.unmodifiableCollection(beansOfTypeList);
             }
         }
         if (allCandidatesAreSingleton) {
@@ -716,7 +765,37 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
+    private static final class BeanExecutionHandle<T, R> implements ExecutableHandle<R> {
+        private final BeanContext beanContext;
+        private final Class<T> beanType;
+        private final ExecutableMethod<T, R> method;
 
+        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, ExecutableMethod<T, R> method) {
+            this.beanContext = beanContext;
+            this.beanType = beanType;
+            this.method = method;
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return beanType;
+        }
+
+        @Override
+        public Argument[] getArguments() {
+            return method.getArguments();
+        }
+
+        @Override
+        public R invoke(Object... arguments) {
+            return method.invoke(beanContext.getBean(beanType), arguments);
+        }
+
+        @Override
+        public String toString() {
+            return method.toString();
+        }
+    }
     private static final class BeanRegistration<T> {
         private final BeanDefinition<T> beanDefinition;
         private T bean;
@@ -815,6 +894,18 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public String getName() {
             return singletonClass.getName();
+        }
+
+        @Override
+        public Optional<ExecutableMethod> findMethod(String name, Class[] argumentTypes) {
+            Optional<Method> method = ReflectionUtils.findMethod(singletonClass, name, argumentTypes);
+            return method.map(theMethod -> new ReflectionExecutableMethod(this, theMethod));
+        }
+
+        @Override
+        public Stream<ExecutableMethod> findPossibleMethods(String name) {
+            return ReflectionUtils.findMethodsByName(singletonClass, name)
+                                  .map((method -> new ReflectionExecutableMethod(this, method)));
         }
 
         @Override

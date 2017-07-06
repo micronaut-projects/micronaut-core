@@ -25,7 +25,7 @@ public interface Argument<T> {
     Class[] getGenericTypes();
 
     /**
-     * @return The qualifier
+     * @return The qualifier or null if there is none
      */
     Annotation getQualifier();
 

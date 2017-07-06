@@ -41,9 +41,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             String className = type.toString();
 
             String internalName = getInternalName(className);
-//            if(className.endsWith("[]")) {
-//                internalName = '[' + internalName;
-//            }
             return Type.getObjectType(internalName);
         }
         else {

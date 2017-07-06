@@ -1,6 +1,6 @@
-At this point you may be wondering how Particle performs the above dependency injection without requiring reflection.
+At this point, you may be wondering how Particle performs the above dependency injection without requiring reflection.
 
-The key is a set of AST transformations and annotation processors that generic classes that implement the link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] interface.
+The key is a set of AST transformations and annotation processors that generate classes that implement the link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] interface.
 
 The ASM byte-code library is used to generate classes. In the case of the `Vehicle` class from the previous example a class that looks like the following is generated (shortened for brevity):
 
@@ -15,8 +15,8 @@ public class $VehicleDefinition extends AbstractBeanDefinition<Vehicle> implemen
 }
 ----
 
-Because Particle knows ahead of time the injection points there is no need to scan all of the methods, fields, constructors etc. at runtime like frameworks like Spring do.
+Because Particle knows ahead of time the injection points, there is no need to scan all of the methods, fields, constructors, etc. at runtime like other frameworks such as Spring do.
 
-Also since reflection is not used in the construction of the bean the JVM can inline and optimize the code far better resulting in better runtime performance. This is particularly important for non-singleton scopes where the application performance depends on bean creation performance.
+Also since reflection is not used in the construction of the bean, the JVM can inline and optimize the code far better resulting in better runtime performance. This is particularly important for non-singleton scopes where the application performance depends on bean creation performance.
 
-In addition, with Particle your application startup time and memory consumption is not bound to the size of your codebase in the same way as a framework that uses reflection. Reflection based IoC frameworks load and cache reflection data for every single field, method and constructor in your code. Thus as your code grows in size so do your memory requirements, which is not the case with Particle.
+In addition, with Particle your application startup time and memory consumption is not bound to the size of your codebase in the same way as a framework that uses reflection. Reflection based IoC frameworks load and cache reflection data for every single field, method, and constructor in your code. Thus as your code grows in size so do your memory requirements, which is not the case with Particle.

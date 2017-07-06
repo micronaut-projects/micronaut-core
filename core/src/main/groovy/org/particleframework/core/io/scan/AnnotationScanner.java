@@ -92,7 +92,7 @@ public interface AnnotationScanner {
      * @return A stream of classes
      */
     default Stream<Class> scan(String annotation, Collection<String> packages) {
-        return scan(annotation, packages.stream());
+        return scan(annotation, packages.parallelStream());
     }
 
     /**
@@ -103,7 +103,7 @@ public interface AnnotationScanner {
      * @return A stream of classes
      */
     default Stream<Class> scan(Class<? extends Annotation> annotation, Collection<String> packages) {
-        return scan(annotation.getName(), packages.stream());
+        return scan(annotation.getName(), packages.parallelStream());
     }
 
 

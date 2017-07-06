@@ -42,7 +42,7 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public BeanDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringBean() {
         return this.declaringComponent;
     }
 

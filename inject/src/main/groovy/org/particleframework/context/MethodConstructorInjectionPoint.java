@@ -35,6 +35,11 @@ class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implem
     }
 
     @Override
+    public Class getDeclaringType() {
+        return getDeclaringBean().getType();
+    }
+
+    @Override
     public Object invoke(Object... args) {
         throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
     }

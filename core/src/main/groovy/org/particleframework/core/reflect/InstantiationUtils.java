@@ -3,6 +3,8 @@ package org.particleframework.core.reflect;
 import org.particleframework.core.reflect.exception.InstantiationException;
 
 /**
+ * Utility methods for instantiating objects
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -12,36 +12,29 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
-import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.config.ConfigurationProperties
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Configuration
-import org.particleframework.context.annotation.Context
-import org.particleframework.context.annotation.Factory
-import org.particleframework.context.annotation.Replaces
-import org.particleframework.context.annotation.Value
+import org.particleframework.context.annotation.*
+import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
+import org.particleframework.inject.annotation.Executable
+import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionWriter
-import org.particleframework.inject.writer.BeanConfigurationWriter
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
-import javax.inject.Inject
-import javax.inject.Provider
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import javax.inject.*
 import java.beans.Introspector
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
-import static org.codehaus.groovy.ast.tools.GeneralUtils.*
+import static org.codehaus.groovy.ast.tools.GeneralUtils.constX
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 
 /**
  * An AST transformation that produces metadata for use by the injection container
@@ -158,6 +151,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final ClassNode concreteClass
         final boolean isConfigurationProperties
         final boolean isFactoryClass
+        final boolean isExecutableType
         final Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
         BeanDefinitionWriter beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -170,8 +164,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
+            this.isExecutableType = stereoTypeFinder.hasStereoType(targetClassNode, Executable)
             this.isConfigurationProperties = isConfigurationProperties
-            if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope)) {
+            if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope) || stereoTypeFinder.hasStereoType(concreteClass, Bean)) {
                 defineBeanDefinition(concreteClass)
             }
         }
@@ -290,6 +285,27 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
 
+                    }
+                }
+            }
+            else if(!isConstructor) {
+
+                if((isExecutableType && methodNode.isPublic() && !methodNode.isStatic()) && !methodNode.isAbstract() || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                    if(methodNode.declaringClass != ClassHelper.OBJECT_TYPE) {
+
+                        defineBeanDefinition(concreteClass)
+                        Map<String, Object> paramsToType = [:]
+                        Map<String, Object> qualifierTypes = [:]
+                        Map<String, List<Object>> genericTypeMap = [:]
+                        populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
+
+                        beanWriter.visitExecutableMethod(
+                                resolveTypeReference(concreteClass),
+                                resolveTypeReference(methodNode.returnType),
+                                methodNode.name,
+                                paramsToType,
+                                qualifierTypes,
+                                genericTypeMap)
                     }
                 }
             }
@@ -483,7 +499,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     SourceUnit su = sourceUnit
                     classNode.getInnerClasses().each { InnerClassNode inner->
                         if(Modifier.isStatic(inner.getModifiers()) && Modifier.isPublic(inner.getModifiers()) && inner.getDeclaredConstructors().size() == 0) {
-
                             def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
                             AnnotationNode parentAnn = AstAnnotationUtils.findAnnotation(classNode, ConfigurationProperties)
                             String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()

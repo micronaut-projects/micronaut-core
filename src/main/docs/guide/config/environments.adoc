@@ -1,0 +1,10 @@
+The application environment is modelled by the link:{api}/org/particleframework/context/env/Environment.html[Environment] interface, which allows specifying a unique environment name when creating an link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+
+
+.Initializing the Environment
+[source,groovy]
+----
+ApplicationContext applicationContext = new DefaultApplicationContext("test")
+                                                .start()
+----
+

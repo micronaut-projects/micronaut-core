@@ -37,4 +37,13 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      */
     @Override
     ApplicationContext stop();
+
+    @Override
+    default ApplicationContext registerSingleton(Object singleton) {
+        Class type = singleton.getClass();
+        return registerSingleton(type, singleton);
+    }
+
+    @Override
+    <T> ApplicationContext registerSingleton(Class<T> type, T singleton);
 }

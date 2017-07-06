@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
@@ -37,7 +38,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
-        this.method.setAccessible(true);
+        if (requiresReflection) {
+            this.method.setAccessible(true);
+        }
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
             if(index < parameterAnnotations.length) {
@@ -57,7 +60,9 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.requiresReflection = requiresReflection;
-        this.method.setAccessible(true);
+        if(requiresReflection) {
+            this.method.setAccessible(true);
+        }
         Annotation[] annotations = field.getAnnotations();
         this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
             if(index == 0) {
@@ -84,7 +89,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public BeanDefinition getDeclaringComponent() {
+    public BeanDefinition getDeclaringBean() {
         return this.declaringComponent;
     }
 
@@ -121,6 +126,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
         } catch (Throwable e) {
             throw new BeanInstantiationException("Cannot inject arguments for method ["+method+"] using arguments ["+ Arrays.asList(args)+"]:" + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public Annotation findAnnotation(Class stereotype) {
+        return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotations());
     }
 
     @Override

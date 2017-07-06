@@ -1,0 +1,11 @@
+Additional link:{api}/org/particleframework/context/env/PropertySource.html[PropertySource] instances can be added to the environment prior to initializing the link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+
+.Initializing an ApplicationContext
+[source,groovy]
+----
+  ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment
+                        .addPackage(getClass().getPackage())
+                        .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
+        applicationContext.start()
+----

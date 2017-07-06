@@ -1,0 +1,27 @@
+Like Spring Boot and Grails, you can inject configuration values into beans with Particle using the link:{api}/org/particleframework/context/annotation/Value.html[Value] annotation.
+
+For example:
+
+.@Value Example
+[source,groovy]
+----
+include::{testsdir}/config/value/EngineImpl.groovy[tags=imports, indent=0]
+
+include::{testsdir}/config/value/EngineImpl.groovy[tags=class, indent=0]
+----
+
+<1> The `@Value` annotation accepts a string that is the name of a property to be used as the source for the value. A default value can be optionally supplied after the colon.
+<2> The injected value can then be used within code.
+
+Unlike the aforementioned frameworks, Particle will use ASM to generate reflection free bytecode to optimize startup time and injection performance. The resulting generating code for the above example looks like:
+
+.Example Generated @Value Method
+[source,java]
+----
+protected Object injectBean(BeanResolutionContext resContext, BeanContext beanContext, Object object) {
+    EngineImpl bean = (EngineImpl)object;
+    bean.cylinders = ((Integer)this.getValueForField(resContext, beanContext, 0)).intValue();
+    return bean;
+}
+----
+

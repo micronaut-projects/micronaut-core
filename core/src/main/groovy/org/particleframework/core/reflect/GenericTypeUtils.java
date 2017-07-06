@@ -34,9 +34,9 @@ public class GenericTypeUtils {
         return null;
     }
 
-    private static Class resolveSingleTypeArgument(Type genericInterface) {
-        if(genericInterface instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) genericInterface;
+    public static Class resolveSingleTypeArgument(Type genericType) {
+        if(genericType instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             if(actualTypeArguments.length == 1) {
                 return (Class) actualTypeArguments[0];
@@ -44,6 +44,31 @@ public class GenericTypeUtils {
         }
         return null;
     }
+
+    /**
+     * Resolves the type arguments for a generic type
+     *
+     * @param genericType The generic type
+     * @return The type arguments
+     */
+    public static Class[] resolveTypeArguments(Type genericType) {
+        Class[] typeArguments = null;
+        if(genericType instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) genericType;
+            Type[] actualTypeArguments = pt.getActualTypeArguments();
+            if(actualTypeArguments != null) {
+                typeArguments = new Class[actualTypeArguments.length];
+                for (int i = 0; i < actualTypeArguments.length; i++) {
+                    Type actualTypeArgument = actualTypeArguments[i];
+                    if(actualTypeArgument instanceof Class) {
+                        typeArguments[i] = (Class)actualTypeArgument;
+                    }
+                }
+            }
+        }
+        return typeArguments;
+    }
+
 
     public static Class resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
