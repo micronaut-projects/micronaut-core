@@ -13,10 +13,14 @@ import java.util.Optional;
 public interface PropertyResolver {
 
     /**
-     * Resolve the given property for the given name
+     * <p>Resolve the given property for the given name, type and generic type arguments.</p>
+     *
+     * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
+     *
      *
      * @param name The name
      * @param requiredType The required type
+     * @param typeArguments The generic type arguments.
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists
      */
