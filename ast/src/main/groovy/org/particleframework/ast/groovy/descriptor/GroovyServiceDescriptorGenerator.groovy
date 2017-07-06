@@ -7,6 +7,7 @@ import org.codehaus.groovy.control.io.FileReaderSource
 import org.codehaus.groovy.control.io.ReaderSource
 import org.codehaus.groovy.control.io.URLReaderSource
 import org.particleframework.ast.groovy.utils.AstMessageUtils
+import org.particleframework.core.io.service.ServiceDescriptorGenerator
 
 /**
  * Helper class for generating service descriptors stored in META-INF/services
@@ -15,7 +16,7 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
  * @since 1.0
  */
 @CompileStatic
-class ServiceDescriptorGenerator {
+class GroovyServiceDescriptorGenerator {
 
     /**
      * Generates a service descriptor
@@ -29,37 +30,19 @@ class ServiceDescriptorGenerator {
             ReaderSource readerSource = sourceUnit.getSource()
             // Don't generate for runtime compiled scripts
             if (readerSource instanceof FileReaderSource || readerSource instanceof URLReaderSource) {
-
                 File targetDirectory = sourceUnit.configuration.targetDirectory
-                if (targetDirectory == null) {
-                    targetDirectory = new File("build/resources/main")
-                }
-
-
-                String className = classNode.name
-                try {
-                    generate(targetDirectory, className, serviceType)
-                } catch (Throwable e) {
-                    AstMessageUtils.warning(sourceUnit, classNode, "Error generating service loader descriptor for class [${className}]: $e.message")
+                if (targetDirectory != null) {
+                    String className = classNode.name
+                    try {
+                        new ServiceDescriptorGenerator().generate(targetDirectory, className, serviceType)
+                    } catch (Throwable e) {
+                        AstMessageUtils.warning(sourceUnit, classNode, "Error generating service loader descriptor for class [${className}]: $e.message")
+                    }
                 }
             }
         }
     }
 
-    void generate(File targetDirectory, String className, Class serviceType) {
-        File servicesDir = new File(targetDirectory, "META-INF/services")
-        servicesDir.mkdirs()
 
-        def descriptor = new File(servicesDir, serviceType.name)
-        if (descriptor.exists()) {
-            String ls = System.getProperty('line.separator')
-            String contents = descriptor.text
-            def entries = contents.split('\\n')
-            if (!entries.contains(className)) {
-                descriptor.append("${ls}${className}")
-            }
-        } else {
-            descriptor.text = className
-        }
-    }
+
 }

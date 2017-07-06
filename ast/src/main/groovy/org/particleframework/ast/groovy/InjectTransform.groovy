@@ -12,7 +12,7 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
-import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator
+import org.particleframework.ast.groovy.descriptor.GroovyServiceDescriptorGenerator
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
@@ -82,7 +82,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(configurationName != null) {
 
                         try {
-                            ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
+                            GroovyServiceDescriptorGenerator generator = new GroovyServiceDescriptorGenerator()
                             File targetDirectory = source.configuration.targetDirectory
                             if (targetDirectory != null) {
                                 generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
@@ -106,7 +106,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
         }
 
-        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
+        GroovyServiceDescriptorGenerator generator = new GroovyServiceDescriptorGenerator()
         for (entry in beanDefinitionWriters) {
             BeanDefinitionWriter beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
