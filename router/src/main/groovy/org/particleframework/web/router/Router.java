@@ -38,6 +38,14 @@ public interface Router {
     Stream<RouteMatch> find(HttpMethod httpMethod, CharSequence uri);
 
     /**
+     * Finds the first possible route for the given HTTP method and URI
+     *
+     * @param httpMethod The HTTP method
+     * @param uri The URI
+     * @return The route match
+     */
+    Optional<RouteMatch> route(HttpMethod httpMethod, CharSequence uri);
+    /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
      *
      * @param uri The URI

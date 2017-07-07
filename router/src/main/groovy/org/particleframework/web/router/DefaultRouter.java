@@ -88,6 +88,11 @@ public class DefaultRouter implements Router {
     }
 
     @Override
+    public Optional<RouteMatch> route(HttpMethod httpMethod, CharSequence uri) {
+        return findFirst(httpMethod, uri);
+    }
+
+    @Override
     public Optional<RouteMatch> GET(CharSequence uri) {
         return findFirst(HttpMethod.GET, uri);
     }

@@ -17,6 +17,8 @@ package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.runtime.ParticleApplication
+import org.particleframework.stereotype.Controller
+import org.particleframework.web.router.annotation.Get
 import spock.lang.Specification
 
 /**
@@ -25,28 +27,25 @@ import spock.lang.Specification
  */
 class NettyHttpServerSpec extends Specification {
 
-    void "test simple Netty HTTP server"() {
-        when:
-        NettyHttpServer server = new NettyHttpServer()
-        server.start()
-
-        then:
-        new URL("http://localhost:8080").getText() == "hello world"
-        server.port  == 8080
-
-        cleanup:
-        server.stop()
-    }
 
     void "test Particle server running"() {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
 
         then:
-        new URL("http://localhost:8080").getText() == "hello world"
+        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
 
         cleanup:
-        applicationContext.stop()
+        applicationContext?.stop()
     }
 
+
+    @Controller
+    static class PersonController {
+
+        @Get('/{name}')
+        String name(String name) {
+            "Person Named $name"
+        }
+    }
 }

@@ -15,6 +15,8 @@
  */
 package org.particleframework.http.server.netty
 
+import groovy.transform.CompileStatic
+import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Bean
 import org.particleframework.context.annotation.Factory
 import org.particleframework.http.server.HttpServerConfiguration
@@ -25,10 +27,19 @@ import org.particleframework.http.server.HttpServerConfiguration
  */
 // TODO: Remove once Java annotation support ready
 @Factory
+@CompileStatic
 class NettyHttpServerFactory {
 
+    private final HttpServerConfiguration configuration
+    private final ApplicationContext applicationContext
+
+    NettyHttpServerFactory(HttpServerConfiguration configuration, ApplicationContext applicationContext) {
+        this.configuration = configuration
+        this.applicationContext = applicationContext
+    }
+
     @Bean
-    NettyHttpServer nettyHttpServer(HttpServerConfiguration serverConfiguration) {
-        return new NettyHttpServer(serverConfiguration)
+    NettyHttpServer nettyHttpServer() {
+        return new NettyHttpServer(configuration, applicationContext)
     }
 }
