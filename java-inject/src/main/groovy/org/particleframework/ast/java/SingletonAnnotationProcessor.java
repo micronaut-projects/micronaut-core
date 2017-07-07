@@ -55,49 +55,39 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                     } else {
                         try {
                             note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
-                            TypeElement typeElement = getTypeElementFor(element);
-                            PackageElement packageElement = getPackageElementFor(element);
-                            String beanClassName = typeElement.getSimpleName().toString();
+                            TypeElement typeElement = typeElementFor(element);
+                            PackageElement packageElement = elementUtils.getPackageOf(element);
+
+                            String beanClassName = classNameFor(packageElement, typeElement);
                             String packageName = packageElement.getQualifiedName().toString();
                             String fullyQualifiedBeanClassName = typeElement.getQualifiedName().toString();
                             String generatedDefinitionClassName = packageName + ".$" + beanClassName + "Definition";
-//                            addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
+                            addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
 
-//                            if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
-//                                beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
+                            if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
+                                beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
 
                                 switch (elementKind) {
                                 case CLASS:
-                                    beanClassName = "JavaSingleton";
-                                    packageName = "org.particleframework.inject.method";
-                                    fullyQualifiedBeanClassName = "org.particleframework.inject.method.JavaSingleton";
-                                    generatedDefinitionClassName = "org.particleframework.inject.method.$JavaSingletonDefinition";
-                                    addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
-                                    if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
-                                        beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
-                                        String classBeanDefinitionName = generateSingletonBeanClass(element, packageName, beanClassName);
-                                        BeanDefinitionClassWriter classBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, classBeanDefinitionName);
-                                        addServiceProvider(element, BeanDefinitionClass.class, classBeanClassWriter.getBeanDefinitionClassName());
-                                    }
+                                    String classBeanDefinitionName = generateSingletonBeanClass(element, packageName, beanClassName);
+                                    BeanDefinitionClassWriter classBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, classBeanDefinitionName);
+                                    addServiceProvider(element, BeanDefinitionClass.class, classBeanClassWriter.getBeanDefinitionClassName());
                                     break;
                                 case METHOD:
-                                    generatedDefinitionClassName = "org.particleframework.inject.method.$JavaClassDefinition";
-                                    beanClassName = "JavaClass";
-                                    fullyQualifiedBeanClassName = "org.particleframework.inject.method.JavaClass";
-                                    packageName = "org.particleframework.inject.method";
-                                    addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
-
-                                    if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
-                                        beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
-                                        String methodBeanDefinitionName = generateInjectBeanClass(element, packageName, beanClassName);
-                                        BeanDefinitionClassWriter methodBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, methodBeanDefinitionName);
-                                        addServiceProvider(element, BeanDefinitionClass.class, methodBeanClassWriter.getBeanDefinitionClassName());
-                                    }
+                                    String methodBeanDefinitionName = generateMethodInjectionBeanClass(element, packageName, beanClassName);
+                                    BeanDefinitionClassWriter methodBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, methodBeanDefinitionName);
+                                    addServiceProvider(element, BeanDefinitionClass.class, methodBeanClassWriter.getBeanDefinitionClassName());
                                     break;
-//                                }
+                                case FIELD:
+                                    String fieldBeanDefinitionName = generateFieldInjectionBeanClass(element, packageName, beanClassName);
+                                    BeanDefinitionClassWriter fieldBeanClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, fieldBeanDefinitionName);
+                                    addServiceProvider(element, BeanDefinitionClass.class, fieldBeanClassWriter.getBeanDefinitionClassName());
+                                    break;
+                                }
                             }
                         } catch (IOException ioe) {
                             error("Unexpected error: %s", ioe.getMessage());
+                            // FIXME something is wrong, probably want to fail fast
                             ioe.printStackTrace();
                         }
                     }});
@@ -108,18 +98,18 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return true;
     }
 
-    private PackageElement getPackageElementFor(Element element) {
-        while (ElementKind.PACKAGE != element.getKind() ) {
-            element = element.getEnclosingElement();
-        }
-        return (PackageElement) element;
-    }
-
-    private TypeElement getTypeElementFor(Element element) {
+    private TypeElement typeElementFor(Element element) {
         while (ElementKind.CLASS != element.getKind() ) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
+    }
+
+    // if it's an inner class org.oci.A.B, we want A.B
+    // FIXME deal with static nested classes
+    private String classNameFor(PackageElement packageElement, TypeElement typeElement) {
+        String qualifiedName = elementUtils.getBinaryName(typeElement).toString();
+        return qualifiedName.replaceFirst(packageElement.getQualifiedName().toString() + "\\.","");
     }
 
     // really want a multimap for this...Guava?
@@ -147,7 +137,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return beanDefinitionWriter.getBeanDefinitionName();
     }
 
-    private String generateInjectBeanClass(Element element, String packageName, String beanClassName) throws IOException {
+    private String generateMethodInjectionBeanClass(Element element, String packageName, String beanClassName) throws IOException {
         assert (ElementKind.METHOD == element.getKind()) : "element kind must be METHOD";
 
         BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
@@ -166,6 +156,28 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             methodArgs.put(argName, typeElement.toString());
         }
         beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs);
+        beanDefinitionWriter.visitBeanDefinitionEnd();
+
+        String classFileName = beanDefinitionWriter.getBeanDefinitionName();
+        JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
+        note("CREATING NEW CLASS FILE %s for @Inject", classFileName);
+        try (OutputStream outputStream = javaFileObject.openOutputStream()) {
+            beanDefinitionWriter.writeTo(outputStream);
+        }
+
+        return beanDefinitionWriter.getBeanDefinitionName();
+    }
+
+    private String generateFieldInjectionBeanClass(Element element, String packageName, String beanClassName) throws IOException {
+        assert (ElementKind.FIELD == element.getKind()) : "element kind must be FIELD";
+
+        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
+        beanDefinitionWriter.visitBeanDefinitionConstructor();
+
+        Name fieldName = element.getSimpleName();
+        TypeMirror fieldType = element.asType();
+
+        beanDefinitionWriter.visitFieldInjectionPoint(false, fieldType.toString(), fieldName.toString());
         beanDefinitionWriter.visitBeanDefinitionEnd();
 
         String classFileName = beanDefinitionWriter.getBeanDefinitionName();
@@ -198,10 +210,10 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         File targetDirectory = new File(buildPath);
         serviceProviders.forEach((serviceDescriptor, providers) -> {
             providers.forEach(provider -> {
-                // This try/catch is temporary...
                 try {
                     generator.generate(targetDirectory, provider, serviceDescriptor);
                 } catch (IOException e) {
+                    error("Failed to write provide %s to service descriptor file %s", provider, serviceDescriptor);
                     e.printStackTrace();
                 }
             });
