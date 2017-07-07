@@ -720,7 +720,16 @@ public interface RouteBuilder {
         default String resolveUri(Class<?> type) {
             Controller annotation = type.getAnnotation(Controller.class);
             String uri = annotation != null ? annotation.value() : null;
-            return uri != null && uri.length() > 0 ? uri : '/' + TypeConvention.CONTROLLER.asPropertyName(type);
+            if(uri != null) {
+                int len = uri.length();
+                if(len == 1 && uri.charAt(0) == '/' ) {
+                    return "";
+                }
+                if(len > 0) {
+                    return uri;
+                }
+            }
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
 
         /**

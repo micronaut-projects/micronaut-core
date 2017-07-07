@@ -39,7 +39,9 @@ class UriMatchTemplateSpec extends Specification {
 
         where:
         template      | uri                  | nested                | matches | variables
+        "/"           | "/authors/2"         | '/authors{/authorId}' | true    | [authorId: '2']
         "/books{/id}" | "/books/1/authors/2" | '/authors{/authorId}' | true    | [id: '1', authorId: '2']
+        ""            | "/authors/2"         | '/authors{/authorId}' | true    | [authorId: '2']
 
     }
 
@@ -56,6 +58,9 @@ class UriMatchTemplateSpec extends Specification {
 
         where:
         template                         | uri                   | matches | variables
+        ""                               | ""                    | true    | [:]
+        "/"                              | "/"                   | true    | [:]
+        "/"                              | ""                    | true    | [:]
         "/books{/id}/authors{/authorId}" | "/books/1/authors/2"  | true    | [id: '1', authorId: '2']
         "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.xml'  | true    | [path: '/foo/bar', ext: 'xml']
         "/books{/path:.*}{.ext:xml}"     | '/books/foo/bar.json' | false   | null

@@ -36,8 +36,31 @@ class GormConfigSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
-                        .addPackage(getClass().getPackage())
-                        .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
+                .addPackage(getClass().getPackage())
+                .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
+        applicationContext.start()
+
+        when:
+        TransactionService transactionService = applicationContext.getBean(TransactionService)
+        int count = transactionService.withTransaction {
+            Book.count
+        }
+
+        then:
+        applicationContext.containsBean(PlatformTransactionManager)
+        applicationContext.containsBean(DataSource)
+        count == 0
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "test gorm config configures gorm again"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment
+                .addPackage(getClass().getPackage())
+                .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
         applicationContext.start()
 
         when:

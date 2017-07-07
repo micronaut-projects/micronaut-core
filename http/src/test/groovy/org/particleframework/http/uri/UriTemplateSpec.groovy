@@ -55,6 +55,8 @@ class UriTemplateSpec extends Specification {
 
         where:
         template              | arguments                                          | result
+        ''                    | [:]                                                 | ''
+        '/'                   | [:]                                                 | '/'
         '{var}'               | [var: 'value']                                     | 'value' // Section 2.4.1 - Prefix Values
         '{var:20}'            | [var: 'value']                                     | 'value'
         '{var:3}'             | [var: 'value']                                     | 'val'

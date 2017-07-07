@@ -176,8 +176,11 @@ public class UriTemplate {
     }
 
     private boolean shouldPrependSlash(String templateString, int len) {
-        return this.templateString.charAt(this.templateString.length()-1) != '/' &&
-                templateString.charAt(0) != '/' && !(len > 1 && templateString.charAt(0) == '{' && templateString.charAt(1) == '/');
+        String parentString = this.templateString;
+        int parentLen = parentString.length();
+        return (parentLen > 0 && parentString.charAt(parentLen -1) != '/') &&
+                templateString.charAt(0) != '/' &&
+                !(len > 1 && templateString.charAt(0) == '{' && templateString.charAt(1) == '/');
     }
 
     /**
