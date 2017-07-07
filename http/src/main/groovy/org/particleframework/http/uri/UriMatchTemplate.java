@@ -32,6 +32,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     protected List<String> variableList;
     private final Pattern matchPattern;
     private final String[] variables;
+    private final boolean isRoot;
 
     /**
      * Construct a new URI template for the given template
@@ -52,6 +53,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
         this.matchPattern = Pattern.compile(pattern.toString());
         this.variables = variableList.toArray(new String[variableList.size()]);
+        String tmpl = templateString.toString();
+        int len = tmpl.length();
+        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
         // cleanup / reduce memory consumption
         this.pattern = null;
         this.variableList = null;
@@ -61,6 +65,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         super(templateString.toString(), segments);
         this.matchPattern = matchPattern;
         this.variables = variables;
+        String tmpl = templateString.toString();
+        int len = tmpl.length();
+        this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
     }
 
     /**
@@ -71,6 +78,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      */
     @Override
     public Optional<UriMatchInfo> match(String uri) {
+        if(uri == null) throw new IllegalArgumentException("Argument 'uri' cannot be null");
+        int len = uri.length();
+        if(isRoot && (len == 0 || (len == 1 &&uri.charAt(0) == '/'))) {
+            return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap()));
+        }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.length == 0) {
@@ -98,7 +110,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
-        Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
+        Pattern newPattern = Pattern.compile(isRoot ? pattern.toString() : this.matchPattern.toString() + pattern.toString());
         List<String> newList = new ArrayList<>();
         newList.addAll(Arrays.asList(variables));
         newList.addAll(variableList);

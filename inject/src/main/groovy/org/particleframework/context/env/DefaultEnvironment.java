@@ -8,6 +8,7 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.service.SoftServiceLoader;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -28,6 +29,7 @@ public class DefaultEnvironment implements Environment {
     private final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
+    private final Map<Class, SoftServiceLoader> serviceMap = new ConcurrentHashMap<>();
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
         this(name,classLoader, new DefaultConversionService());
@@ -71,7 +73,9 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment addPackage(String pkg) {
-        this.packages.add(pkg);
+        if(!this.packages.contains(pkg)) {
+            this.packages.add(pkg);
+        }
         return this;
     }
 
@@ -110,20 +114,64 @@ public class DefaultEnvironment implements Environment {
         return Optional.empty();
     }
 
-    protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries) {
-        // special handling for maps for resolving sub keys
-        String prefix = name + '.';
-        return entries.entrySet().stream()
-                .filter(map -> map.getKey().startsWith(prefix))
-                .collect(Collectors.toMap(entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));
-    }
-
     @Override
     public Environment start() {
         for (PropertySource propertySource : propertySources) {
             processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
         }
         return this;
+    }
+
+    @Override
+    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        conversionService.addConverter(sourceType, targetType, typeConverter);
+        return this;
+    }
+
+    @Override
+    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
+        return conversionService.convert(object, targetType, typeArguments);
+    }
+
+    @Override
+    public Environment stop() {
+        return this;
+    }
+
+    @Override
+    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
+        SoftServiceLoader<T> services =  serviceMap
+                                            .computeIfAbsent(type, (serviceType)-> SoftServiceLoader.load(serviceType, getClassLoader(), condition) );
+        Iterator<SoftServiceLoader.Service<T>> iterator = services.iterator();
+        return () -> new Iterator<T>() {
+            SoftServiceLoader.Service<T> nextService = null;
+            @Override
+            public boolean hasNext() {
+                if(nextService != null) return true;
+                while(iterator.hasNext() && (nextService == null || !nextService.isPresent())) {
+                    nextService = iterator.next();
+                }
+                return nextService != null;
+            }
+
+            @Override
+            public T next() {
+                if(!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                SoftServiceLoader.Service<T> next = this.nextService;
+                nextService = null;
+                return next.load();
+            }
+        };
+    }
+
+    protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries) {
+        // special handling for maps for resolving sub keys
+        String prefix = name + '.';
+        return entries.entrySet().stream()
+                .filter(map -> map.getKey().startsWith(prefix))
+                .collect(Collectors.toMap(entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));
     }
 
     protected void processPropertySource(PropertySource properties, boolean upperCaseUnderscoreSeperated) {
@@ -159,49 +207,6 @@ public class DefaultEnvironment implements Environment {
             }
         }
         return entries;
-    }
-
-    @Override
-    public Environment stop() {
-        return this;
-    }
-
-    @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
-        return conversionService.convert(object, targetType, typeArguments);
-    }
-
-    @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
-    }
-
-    @Override
-    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
-        SoftServiceLoader<T> services = SoftServiceLoader.load(type, getClassLoader(), condition);
-        Iterator<SoftServiceLoader.Service<T>> iterator = services.iterator();
-        return () -> new Iterator<T>() {
-            SoftServiceLoader.Service<T> nextService = null;
-            @Override
-            public boolean hasNext() {
-                if(nextService != null) return true;
-                while(iterator.hasNext() && (nextService == null || !nextService.isPresent())) {
-                    nextService = iterator.next();
-                }
-                return nextService != null;
-            }
-
-            @Override
-            public T next() {
-                if(!hasNext()) {
-                    throw new NoSuchElementException();
-                }
-                SoftServiceLoader.Service<T> next = this.nextService;
-                nextService = null;
-                return next.load();
-            }
-        };
     }
 
 }

@@ -16,12 +16,15 @@
 package org.particleframework.context.router
 
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.http.HttpMethod
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.Router
 import org.particleframework.web.router.annotation.Get
+import org.particleframework.web.router.annotation.Post
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import static org.particleframework.http.HttpMethod.GET
+import static org.particleframework.http.HttpMethod.POST
 
 /**
  * @author Graeme Rocher
@@ -32,17 +35,32 @@ class AnnotationRouteBuilderSpec extends Specification {
     @Unroll
     void "Test annotation matches #route for arguments #arguments"() {
         given:
-        Router router = new DefaultApplicationContext("test").start().getBean(Router)
+        Router router = new DefaultApplicationContext("test")
+                .start()
+                .getBean(Router)
 
         expect:
         router."$method"(route).isPresent()
         router."$method"(route).get().invoke(arguments as Object[]) == result
 
         where:
-        method         | route                  | arguments      | result
-        HttpMethod.GET | '/person/name'         | ["Flintstone"] | "Fred Flintstone"
-        HttpMethod.GET | '/person/show/1'       | []             | "Person 1"
-        HttpMethod.GET | '/person/1/friend/Joe' | []             | "Person 1 Friend Joe"
+        method | route                   | arguments      | result
+        GET    | '/person/name'          | ["Flintstone"] | "Fred Flintstone"
+        POST   | '/person/message/World' | []             | "Hello World"
+        GET    | '/'                     | []             | "welcome"
+        GET    | ''                      | []             | "welcome"
+        GET    | '/person/show/1'        | []             | "Person 1"
+        GET    | '/person/1/friend/Joe'  | []             | "Person 1 Friend Joe"
+
+
+    }
+
+    @Controller('/')
+    static class ApplicationController {
+        @Get('/')
+        String index() {
+            'welcome'
+        }
     }
 
     @Controller
@@ -61,6 +79,11 @@ class AnnotationRouteBuilderSpec extends Specification {
         @Get('{/id}/friend{/name}')
         String friend(Long id, String name) {
             return "Person $id Friend $name"
+        }
+
+        @Post('/message{/text}')
+        String message(String text) {
+            "Hello $text"
         }
     }
 }

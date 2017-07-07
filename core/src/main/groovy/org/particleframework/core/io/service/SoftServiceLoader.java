@@ -29,7 +29,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading classes</p>
+ * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of META-INF/services classes</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -80,6 +80,10 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     /**
      * Creates a new {@link SoftServiceLoader} using the given type and class loader
      *
+     * @param service The service type
+     * @param loader The class loader to use
+     * @param condition A {@link Predicate} to use to conditionally load the service. The predicate is passed the service class name
+     *
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
@@ -112,7 +116,9 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
                     return loaded.next();
                 }
                 else if(unloadedServices.hasNext()) {
-                    return unloadedServices.next();
+                    Service<S> nextService = unloadedServices.next();
+                    loadedServices.put(nextService.getName(), nextService);
+                    return nextService;
                 }
                 // should not happen
                 throw new Error("Bug in iterator");
@@ -197,6 +203,11 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
         }
     }
 
+    /**
+     * A service that may or may not be present on the classpath
+     *
+     * @param <T> The service type
+     */
     public interface Service<T> {
 
         /**

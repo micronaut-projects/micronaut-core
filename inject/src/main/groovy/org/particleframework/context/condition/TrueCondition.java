@@ -6,7 +6,7 @@ package org.particleframework.context.condition;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class TrueCondition implements Condition {
+public class TrueCondition implements Condition<ConditionContext> {
     @Override
     public boolean matches(ConditionContext context) {
         return true;

@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation that can be applied to method to signify the method receives a {@link org.particleframework.http.HttpMethod#GET}
+ * Annotation that can be applied to method to signify the method receives a {@link org.particleframework.http.HttpMethod#PUT}
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -32,9 +32,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
 @Action
-public @interface Get {
+public @interface Put {
     /**
-     * @return The URI of the GET route if not specified inferred from the method name and arguments
+     * @return The URI of the PUT route if not specified inferred from the method name and arguments
      */
     String value() default "";
+
 }

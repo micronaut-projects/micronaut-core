@@ -18,7 +18,7 @@ import java.util.Optional;
  * An abstract {@link Condition} implementation that is based on the presence
  * of {@link Requires} annotation
  */
-public class RequiresCondition implements Condition {
+public class RequiresCondition implements Condition<ConditionContext> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RequiresCondition.class);
     private final Requires[] requiresAnnotations;
