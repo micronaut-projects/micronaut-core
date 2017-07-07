@@ -177,7 +177,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Name fieldName = element.getSimpleName();
         TypeMirror fieldType = element.asType();
 
-        beanDefinitionWriter.visitFieldInjectionPoint(false, fieldType.toString(), fieldName.toString());
+        beanDefinitionWriter.visitFieldInjectionPoint(true, fieldType.toString(), fieldName.toString());
         beanDefinitionWriter.visitBeanDefinitionEnd();
 
         String classFileName = beanDefinitionWriter.getBeanDefinitionName();
