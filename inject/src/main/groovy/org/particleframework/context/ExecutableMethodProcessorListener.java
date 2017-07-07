@@ -30,7 +30,7 @@ import java.util.Map;
 
 /**
  * <p>A {@link BeanCreatedEventListener} that will monitor the creation of {@link ExecutableMethodProcessor} instances
- * and call {@link ExecutableMethodProcessor#process(ApplicationContext, ExecutableMethod)} for each available {@link ExecutableMethod}</p>
+ * and call {@link ExecutableMethodProcessor#process(ExecutableMethod)} for each available {@link ExecutableMethod}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -52,7 +52,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
                 if (targetAnnotation == null) {
                     for (List<ExecutableMethod> executableMethods : methodsByAnnotation.values()) {
                         for (ExecutableMethod executableMethod : executableMethods) {
-                            processor.process((ApplicationContext) beanContext, executableMethod);
+                            processor.process(executableMethod);
                         }
                     }
                 } else {
@@ -63,7 +63,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
                             .forEach((key) -> {
                                         List<ExecutableMethod> executableMethods = methodsByAnnotation.get(key);
                                         for (ExecutableMethod executableMethod : executableMethods) {
-                                            processor.process((ApplicationContext) beanContext, executableMethod);
+                                            processor.process(executableMethod);
                                         }
                                     }
                             );

@@ -113,7 +113,7 @@ public class AnnotationRouteBuilder extends DefaultRouteBuilder implements Execu
     }
 
     @Override
-    public void process(ApplicationContext applicationContext, ExecutableMethod method) {
+    public void process(ExecutableMethod method) {
         Annotation annotation = method.findAnnotation(Action.class);
         if(annotation != null) {
             Class<? extends Annotation> annotationClass = annotation.annotationType();
