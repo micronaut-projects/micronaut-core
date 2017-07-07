@@ -3,7 +3,7 @@ package org.particleframework.ast.java;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
-import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
+import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.inject.writer.BeanDefinitionClassWriter;
@@ -197,7 +197,14 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
         File targetDirectory = new File(buildPath);
         serviceProviders.forEach((serviceDescriptor, providers) -> {
-            providers.forEach(provider -> generator.generate(targetDirectory, provider, serviceDescriptor));
+            providers.forEach(provider -> {
+                // This try/catch is temporary...
+                try {
+                    generator.generate(targetDirectory, provider, serviceDescriptor);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
         });
     }
 

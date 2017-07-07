@@ -1,6 +1,6 @@
 package org.particleframework.ast.java;
 
-import org.particleframework.ast.groovy.descriptor.ServiceDescriptorGenerator;
+import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.inject.writer.BeanDefinitionClassWriter;
@@ -102,7 +102,7 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
         return beanClassWriter;
     }
 
-    private void generateBeanDefinitionClassServiceDescriptor(File targetDirectory, BeanDefinitionClassWriter beanClassWriter) {
+    private void generateBeanDefinitionClassServiceDescriptor(File targetDirectory, BeanDefinitionClassWriter beanClassWriter) throws IOException {
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
         if (targetDirectory != null) {
             generator.generate(targetDirectory, beanClassWriter.getBeanDefinitionClassName(), BeanDefinitionClass.class);
@@ -119,7 +119,7 @@ public class SpikeAnnotationProcessor extends AbstractProcessor {
         return beanDefinitionWriter.getBeanDefinitionName();
     }
 
-    private void generateBeanDefinitionServiceDescriptor(File targetDirectory, String generatedDefinitionClassName) {
+    private void generateBeanDefinitionServiceDescriptor(File targetDirectory, String generatedDefinitionClassName) throws IOException {
         new ServiceDescriptorGenerator().generate(targetDirectory, generatedDefinitionClassName, BeanDefinition.class);
     }
 
