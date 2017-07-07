@@ -1,5 +1,6 @@
 dependencies {
     compile project(":runtime")
     compile project(":router")
+    compileOnly project(":ast")
     compile "io.netty:netty-codec-http:$nettyVersion"
 }

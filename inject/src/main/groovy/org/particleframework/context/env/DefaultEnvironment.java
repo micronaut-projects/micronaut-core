@@ -73,7 +73,9 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment addPackage(String pkg) {
-        this.packages.add(pkg);
+        if(!this.packages.contains(pkg)) {
+            this.packages.add(pkg);
+        }
         return this;
     }
 
