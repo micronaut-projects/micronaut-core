@@ -16,8 +16,11 @@
 package org.particleframework.core.naming.conventions;
 
 import java.util.Locale;
+import java.util.Optional;
 
 /**
+ * <p>Represents the built in </p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -26,22 +29,22 @@ public enum MethodConvention {
     /**
      * The index method of controllers
      */
-    INDEX,
+    INDEX("GET"),
 
     /**
      * The show method of controllers
      */
-    SHOW,
+    SHOW("GET"),
 
     /**
      * The show method of controllers
      */
-    SAVE,
+    SAVE("POST"),
 
     /**
      * The default update method of controllers
      */
-    UPDATE,
+    UPDATE("PUT"),
 
     /**
      * The default delete method of controllers
@@ -59,12 +62,44 @@ public enum MethodConvention {
     HEAD;
 
     private final String lowerCase;
+    private final String httpMethod;
 
-    MethodConvention() {
+    MethodConvention(String httpMethod) {
+        this.httpMethod = httpMethod;
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
-    public String lowerCaseName() {
+    MethodConvention() {
+        this.httpMethod = name();
+        this.lowerCase = name().toLowerCase(Locale.ENGLISH);
+    }
+
+    /**
+     * The HTTP method name for this convention
+     */
+    public String httpMethod() {
+        return httpMethod;
+    }
+
+    /**
+     * @return The method name for this convention
+     */
+    public String methodName() {
         return this.lowerCase;
     }
+
+    /**
+     * Obtain the method convention for the given method
+     *
+     * @param name The method name
+     * @return An optional of the method convention
+     */
+    public static Optional<MethodConvention> forMethod(String name) {
+        try {
+            return Optional.of(valueOf(name.toUpperCase(Locale.ENGLISH)));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
 }

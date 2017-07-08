@@ -91,13 +91,26 @@ public class NettyHttpServer implements EmbeddedServer {
                                 }));
 
                                 if(!routeMatch.isPresent()) {
-                                    DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+                                    // TODO: Here we need to add routing for 404 handlers
+                                    DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
                                     ctx.channel().writeAndFlush(httpResponse)
                                             .addListener(ChannelFutureListener.CLOSE);
                                 }
 
                             }
+
+                            @Override
+                            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+
+                                // TODO: Here we need to add routing to error handlers
+                                DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                                ctx.channel().writeAndFlush(httpResponse)
+                                        .addListener(ChannelFutureListener.CLOSE);
+
+                            }
                         });
+
+
                     }
                 })
                 // TODO: handle random port binding

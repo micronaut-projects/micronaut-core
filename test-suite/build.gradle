@@ -1,0 +1,8 @@
+dependencies {
+    testCompile project(":runtime-netty")
+    testCompile project(":configurations/hibernate-gorm")
+    testCompile project(":ast")
+    testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
+    testRuntime 'com.h2database:h2:1.4.196'
+
+}

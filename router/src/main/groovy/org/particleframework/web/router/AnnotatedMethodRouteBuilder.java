@@ -31,12 +31,12 @@ import java.util.function.BiConsumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class AnnotationRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Action> {
+public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Action> {
 
     private final Map<Class, BiConsumer<Annotation,ExecutableMethod>> httpMethodsHandlers = new LinkedHashMap<>();
 
 
-    public AnnotationRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
+    public AnnotatedMethodRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
         super(beanContext, uriNamingStrategy);
         httpMethodsHandlers.put(Get.class, (Annotation ann, ExecutableMethod method)->
                 GET(resolveUri(((Get)ann).value(),
