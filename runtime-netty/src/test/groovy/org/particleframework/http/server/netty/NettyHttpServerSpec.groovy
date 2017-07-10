@@ -39,6 +39,17 @@ class NettyHttpServerSpec extends Specification {
         applicationContext?.stop()
     }
 
+    void "test Particle server running again"() {
+        when:
+        ApplicationContext applicationContext = ParticleApplication.run()
+
+        then:
+        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
 
     @Controller
     static class PersonController {

@@ -101,12 +101,16 @@ public class DefaultBeanContext implements BeanContext {
 
         objects.forEach(beanRegistration -> {
             BeanDefinition def = beanRegistration.beanDefinition;
+            Object bean = beanRegistration.bean;
             if (def instanceof DisposableBeanDefinition) {
                 try {
-                    ((DisposableBeanDefinition) def).dispose(this, beanRegistration.bean);
+                    ((DisposableBeanDefinition) def).dispose(this, bean);
                 } catch (Throwable e) {
                     LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
                 }
+            }
+            else if(bean instanceof LifeCycle) {
+                ((LifeCycle) bean).stop();
             }
         });
 

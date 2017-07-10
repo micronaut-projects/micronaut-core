@@ -31,6 +31,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.jar.JarFile;
@@ -83,60 +84,67 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         if (pkg == null) {
             return Stream.empty();
         } else {
+            List<Class> classes = doScan(annotation, pkg);
+            return classes.stream();
+        }
+    }
+
+    protected List<Class> doScan(String annotation, String pkg) {
+        try {
             String packagePath = pkg.replace('.', '/').concat("/");
-
-            try {
-                List<Class> classes = new ArrayList<>();
-                Enumeration<URL> resources = classLoader.getResources(packagePath);
-                while (resources.hasMoreElements()) {
-                    URL url = resources.nextElement();
-                    String protocol = url.getProtocol();
-                    if ("file".equals(protocol)) {
-                        try {
-                            File file = new File(url.toURI());
-                            traverseFile(annotation, classes, file);
-                        } catch (URISyntaxException e) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
-                            }
+            List<Class> classes = new ArrayList<>();
+            Enumeration<URL> resources = classLoader.getResources(packagePath);
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                String protocol = url.getProtocol();
+                if ("file".equals(protocol)) {
+                    try {
+                        File file = new File(url.toURI());
+                        traverseFile(annotation, classes, file);
+                    } catch (URISyntaxException e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
                         }
-                    } else if (includeJars && Stream.of("jar", "zip", "war").anyMatch(it -> it.equals(protocol))) {
-                        URLConnection con = url.openConnection();
-                        if (con instanceof JarURLConnection) {
-                            JarURLConnection jarCon = (JarURLConnection) con;
-                            JarFile jarFile = jarCon.getJarFile();
-                            jarFile.stream()
-                                    .filter(entry -> {
-                                        String name = entry.getName();
-                                        return name.startsWith(packagePath) && name.endsWith(ClassUtils.CLASS_EXTENSION) && name.indexOf('$') == -1;
-                                    })
-                                    .forEach(entry -> {
-                                        try (InputStream inputStream = jarFile.getInputStream(entry)) {
-                                            scanInputStream(annotation, inputStream, classes);
-                                        } catch (IOException e) {
-                                            if (LOG.isDebugEnabled()) {
-                                                LOG.debug("Ignoring JAR entry [" + entry.getName() + "] due to I/O error: " + e.getMessage(), e);
-                                            }
-                                        } catch (ClassNotFoundException e) {
-                                            if (LOG.isDebugEnabled()) {
-                                                LOG.debug("Ignoring JAR entry [" + entry.getName() + "]. Class not found: " + e.getMessage(), e);
-                                            }
-                                        }
-                                    });
-                        }
-                        else {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Ignoring JAR URI entry [" + url + "]. No JarURLConnection found.");
-                            }
-                            // TODO: future support for servlet containers
-                        }
-
                     }
+                } else if (includeJars && Stream.of("jar", "zip", "war").anyMatch(it -> it.equals(protocol))) {
+                    URLConnection con = url.openConnection();
+                    if (con instanceof JarURLConnection) {
+                        JarURLConnection jarCon = (JarURLConnection) con;
+                        JarFile jarFile = jarCon.getJarFile();
+                        jarFile.stream()
+                                .filter(entry -> {
+                                    String name = entry.getName();
+                                    return name.startsWith(packagePath) && name.endsWith(ClassUtils.CLASS_EXTENSION) && name.indexOf('$') == -1;
+                                })
+                                .forEach(entry -> {
+                                    try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                                        scanInputStream(annotation, inputStream, classes);
+                                    } catch (IOException e) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Ignoring JAR entry [" + entry.getName() + "] due to I/O error: " + e.getMessage(), e);
+                                        }
+                                    } catch (ClassNotFoundException e) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Ignoring JAR entry [" + entry.getName() + "]. Class not found: " + e.getMessage(), e);
+                                        }
+                                    }
+                                });
+                    }
+                    else {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Ignoring JAR URI entry [" + url + "]. No JarURLConnection found.");
+                        }
+                        // TODO: future support for servlet containers
+                    }
+
                 }
-                return classes.stream();
-            } catch (IOException e) {
-                return Stream.empty();
             }
+            return classes;
+        } catch (IOException e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Ignoring I/O Exception scanning package: " + pkg, e);
+            }
+            return Collections.emptyList();
         }
     }
 

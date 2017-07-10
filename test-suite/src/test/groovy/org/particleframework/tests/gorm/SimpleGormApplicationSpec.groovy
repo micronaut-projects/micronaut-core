@@ -44,6 +44,18 @@ class SimpleGormApplicationSpec extends Specification {
         applicationContext?.stop()
     }
 
+    void "test Particle server running again"() {
+        when:
+        System.setProperty(Settings.SETTING_DB_CREATE, "create-drop")
+        ApplicationContext applicationContext = ParticleApplication.run(PersonController)
+
+        then:
+        new URL("http://localhost:8080/people").getText(readTimeout:3000) == "People: []"
+
+        cleanup:
+        System.setProperty(Settings.SETTING_DB_CREATE, "")
+        applicationContext?.stop()
+    }
 
 
 }

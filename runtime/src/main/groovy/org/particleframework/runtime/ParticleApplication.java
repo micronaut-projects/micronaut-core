@@ -48,6 +48,8 @@ public class ParticleApplication {
         // TODO: Deduce default environment
         ApplicationContext applicationContext = new DefaultApplicationContext("test");
 
+
+        // TODO: Deduce main class to scan etc.
         // Add packages to scan
         Environment environment = applicationContext.getEnvironment();
         for(Class cls : classes) {

@@ -21,6 +21,8 @@ import org.particleframework.context.annotation.Bean
 import org.particleframework.context.annotation.Factory
 import org.particleframework.http.server.HttpServerConfiguration
 
+import javax.inject.Singleton
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -39,6 +41,7 @@ class NettyHttpServerFactory {
     }
 
     @Bean
+    @Singleton
     NettyHttpServer nettyHttpServer() {
         return new NettyHttpServer(configuration, applicationContext)
     }

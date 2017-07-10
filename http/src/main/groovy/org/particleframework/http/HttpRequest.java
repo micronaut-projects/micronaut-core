@@ -54,5 +54,5 @@ public interface HttpRequest {
      * @param name The name of the header
      * @return all of the views
      */
-    Collection<String> getHeaders(String name);
+    Collection<String> getHeaderValues(String name);
 }

@@ -81,6 +81,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                     // TODO: here we need a way to make the encoding of the result flexible
                                     // also support for GSON views etc.
 
+                                    // TODO: Also need to handle exceptions that emerge from invoke()
+
                                     DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse (HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
                                     httpResponse.content().writeCharSequence(
                                             result.toString(),
