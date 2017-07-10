@@ -16,6 +16,7 @@
 package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
@@ -50,6 +51,17 @@ class NettyHttpServerSpec extends Specification {
         applicationContext?.stop()
     }
 
+    void "test Particle server on different port"() {
+        when:
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+
+        then:
+        new URL("http://localhost:$newPort/person/Fred").getText() == "Person Named Fred"
+
+        cleanup:
+        applicationContext?.stop()
+    }
 
     @Controller
     static class PersonController {

@@ -31,4 +31,13 @@ public @interface ConfigurationProperties {
      * @return The prefix to use to resolve the properties
      */
     String value();
+
+    /**
+     * <p>If the properties of this configuration can also be resolved from the CLI a prefix can be specified.</p>
+     *
+     * <p>For example given a prefix value {code server-} and a property called {code port}, Particle will attempt to resolve the value of --server-port when specified on the command line</p>
+     *
+     * @return The CLI prefix of the configuration. If a blank string is used then no prefix is appended
+     */
+    String[] cliPrefix() default {};
 }

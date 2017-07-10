@@ -1,12 +1,14 @@
 package org.particleframework.context.env;
 
+import org.particleframework.core.order.Ordered;
+
 /**
  * A PropertySource is a location to resolve property values from. The property keys are are available via the {@link #iterator()} method.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface PropertySource extends Iterable<String> {
+public interface PropertySource extends Iterable<String>, Ordered {
     /**
      * Get a property value of the given key
      *

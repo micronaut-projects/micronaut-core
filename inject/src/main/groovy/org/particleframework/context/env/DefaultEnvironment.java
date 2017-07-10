@@ -8,6 +8,7 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
+import org.particleframework.core.order.OrderUtil;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -45,7 +46,7 @@ public class DefaultEnvironment implements Environment {
     }
 
     public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {
-        this.name = name;
+        this.name = name == null ? "default" : name;
         this.conversionService = conversionService;
         this.classLoader = classLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -126,6 +127,8 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment start() {
+        ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
+        OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
             processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
         }
