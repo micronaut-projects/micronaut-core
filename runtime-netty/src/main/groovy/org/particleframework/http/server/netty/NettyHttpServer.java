@@ -23,7 +23,7 @@ import io.netty.handler.codec.http.*;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.server.EmbeddedServer;
+import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 
@@ -61,22 +61,23 @@ public class NettyHttpServer implements EmbeddedServer {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
+                        Optional<Router> routerBean = applicationContext != null ? applicationContext.findBean(Router.class) : Optional.empty();
+
                         pipeline.addLast(new HttpServerCodec());
                         pipeline.addLast(new SimpleChannelInboundHandler<HttpRequest>() {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
-                                Optional<Router> routerBean = applicationContext != null ? applicationContext.findBean(Router.class) : Optional.empty();
 
                                 Optional<RouteMatch> routeMatch = routerBean.flatMap((router)->
                                         router.route(HttpMethod.valueOf(msg.method().name()), msg.uri())
                                 );
 
-                                routeMatch.ifPresent((rm -> {
+                                routeMatch.ifPresent((route -> {
                                     // TODO: here we need to analyze the binding requirements and if
                                     // the body is required then add an additional handler to the pipeline
                                     // right now only URL parameters are supported
 
-                                    Object result = rm.invoke();
+                                    Object result = route.invoke();
 
                                     // TODO: here we need a way to make the encoding of the result flexible
                                     // also support for GSON views etc.
@@ -100,6 +101,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                 }
 
                             }
+
 
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {

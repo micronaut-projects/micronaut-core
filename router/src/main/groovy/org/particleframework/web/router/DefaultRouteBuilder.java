@@ -28,6 +28,7 @@ import org.particleframework.inject.Argument;
 import org.particleframework.inject.ExecutableHandle;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots
@@ -44,6 +45,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
     };
+    private static final Object NO_VALUE = new Object();
 
     private final ApplicationContext beanContext;
     private final UriNamingStrategy uriNamingStrategy;
@@ -260,6 +262,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     class DefaultRouteMatch implements RouteMatch {
+
         private final UriMatchInfo matchInfo;
         private final ExecutableHandle executableMethod;
 
@@ -315,6 +318,40 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public Object execute(Map argumentValues) {
+            Argument[] targetArguments = executableMethod.getArguments();
+            if(targetArguments.length == 0) {
+                return executableMethod.invoke();
+            }
+            else {
+                ConversionService conversionService = beanContext.getConversionService();
+                Map<String, Object> uriVariables = getVariables();
+                List argumentList = new ArrayList();
+                for (Argument argument : targetArguments) {
+                    String name = argument.getName();
+                    Object value = NO_VALUE;
+                    if(uriVariables.containsKey(name)) {
+                        value = uriVariables.get(name);
+                    }
+                    else if(argumentValues.containsKey(name)) {
+                        value = argumentValues.get(name);
+                    }
+
+                    if(value == NO_VALUE) {
+                        throw new IllegalArgumentException("Required argument ["+argument+"] not specified");
+                    }
+                    else {
+                        Object finalValue = value;
+                        Optional<?> result = conversionService.convert(finalValue, argument.getType());
+                        argumentList.add( result.orElseThrow(()-> new IllegalArgumentException("Unable to convert value ["+ finalValue +"] for argument: " + argument)));
+                    }
+                }
+
+                return executableMethod.invoke(argumentList.toArray());
+            }
+        }
+
+        @Override
         public String getUri() {
             return matchInfo.getUri();
         }
@@ -322,6 +359,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Map<String, Object> getVariables() {
             return matchInfo.getVariables();
+        }
+
+        @Override
+        public Collection<Argument> getRequiredArguments() {
+            return Arrays.stream(getArguments())
+                         .filter((arg)-> !matchInfo.getVariables().containsKey(arg.getName()) )
+                         .collect(Collectors.toList());
         }
     }
 

@@ -107,6 +107,20 @@ public enum HttpStatus implements CharSequence {
     }
 
     /**
+     * @return The reason text
+     */
+    public String getReason() {
+        return reason;
+    }
+
+    /**
+     * @return The code
+     */
+    public int getCode() {
+        return code;
+    }
+
+    /**
      * The status for the given code
      *
      * @param code The code

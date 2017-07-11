@@ -21,7 +21,7 @@ import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.naming.NameUtils;
-import org.particleframework.server.EmbeddedServer;
+import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

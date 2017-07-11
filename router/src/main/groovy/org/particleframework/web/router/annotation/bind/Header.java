@@ -13,21 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.server;
+package org.particleframework.web.router.annotation.bind;
 
-import org.particleframework.context.LifeCycle;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>An EmbeddedServer is a general abstraction to manage the lifecycle of any server implementation within
- * a running Particle application</p>
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
-
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER})
+@Bindable
+public @interface Header {
     /**
-     * @return The port exposed by the server
+     * @return The name of the header, otherwise it is inferred from the parameter name
      */
-    int getPort();
+    String value() default "";
 }

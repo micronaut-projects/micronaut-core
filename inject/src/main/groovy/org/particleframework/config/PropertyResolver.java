@@ -1,5 +1,7 @@
 package org.particleframework.config;
 
+import org.particleframework.core.convert.ValueResolver;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -10,7 +12,18 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface PropertyResolver {
+public interface PropertyResolver extends ValueResolver {
+
+
+    @Override
+    default <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        return getProperty(name.toString(), requiredType);
+    }
+
+    @Override
+    default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
+        return getProperty(name.toString(), requiredType, defaultValue);
+    }
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>

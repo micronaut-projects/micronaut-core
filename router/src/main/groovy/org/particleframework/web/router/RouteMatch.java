@@ -16,7 +16,13 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.uri.UriMatchInfo;
+import org.particleframework.inject.Argument;
 import org.particleframework.inject.ExecutableHandle;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.Callable;
 
 /**
  * A {@link Route} that is executable
@@ -24,5 +30,37 @@ import org.particleframework.inject.ExecutableHandle;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends ExecutableHandle<R>, UriMatchInfo {
+public interface RouteMatch<R> extends ExecutableHandle<R>, UriMatchInfo, Callable<R> {
+
+    /**
+     * <p>Returns the required arguments for this RouteMatch</p>
+     *
+     * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments excluding those that have been subtracted from the URI variables</p>
+     *
+     * @return The required arguments in order to invoke this route
+     */
+    Collection<Argument> getRequiredArguments();
+
+    /**
+     * Execute the route with the given values. The passed map should contain values for every argument returned by {@link #getRequiredArguments()}
+     *
+     * @param argumentValues The argument values
+     * @return The result
+     */
+    R execute(Map<String, Object> argumentValues);
+
+
+    /**
+     * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}
+     *
+     * @return The result
+     */
+    default R execute() {
+        return execute(Collections.emptyMap());
+    }
+
+    @Override
+    default R call() throws Exception {
+        return execute();
+    }
 }

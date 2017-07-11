@@ -2,7 +2,9 @@ package org.particleframework.http;
 
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Collection;
+import java.util.Locale;
 
 /**
  * <p>Common interface for HTTP request implementations</p>
@@ -10,11 +12,7 @@ import java.util.Collection;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpRequest {
-    /**
-     * @return The context path
-     */
-    String getContextPath();
+public interface HttpRequest<T> extends HttpMessage<T> {
 
     /**
      * @return The request method
@@ -26,33 +24,31 @@ public interface HttpRequest {
      */
     URI getUri();
 
-    /**
-     * @return The request content type
-     */
-    MediaType getContentType();
+    @Override
+    default Locale getLocale() {
+        return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
+                .map(Locale::new)
+                .orElse(null);
+    }
+
     /**
      * @return The request character encoding
      */
-    Charset getCharacterEncoding();
+    default Charset getCharacterEncoding() {
+        MediaType contentType = getContentType();
+        String charset = contentType.getParameters().get("charset");
+        try {
+            if(charset != null) {
+                return Charset.forName(charset);
+            }
+            else {
+                return getHeaders().findFirst(HttpHeaders.ACCEPT_CHARSET)
+                            .map(Charset::forName)
+                            .orElse(null);
+            }
+        } catch (UnsupportedCharsetException e) {
+            return null;
+        }
+    }
 
-    /**
-     * @return The header for the request
-     */
-    Collection<String> getHeaderNames();
-
-    /**
-     * Obtains the value of a header
-     *
-     * @param name The name of the header
-     * @return The value of the header
-     */
-    String getHeader(CharSequence name);
-
-    /**
-     * Obtains all the values for the give header
-     *
-     * @param name The name of the header
-     * @return all of the views
-     */
-    Collection<String> getHeaderValues(String name);
 }
