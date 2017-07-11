@@ -24,6 +24,8 @@ import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpHeaders;
 
 /**
+ * Delegates to Netty's {@link DefaultFullHttpResponse}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -55,7 +57,6 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
     public HttpResponse setCharacterEncoding(CharSequence encoding) {
         throw new UnsupportedOperationException("TODO");
     }
-
 
     @Override
     public HttpResponse setStatus(HttpStatus status, CharSequence message) {

@@ -72,11 +72,13 @@ class ExecutableSpec extends Specification {
         method.invoke(args as Object[]) == result
 
         where:
-        methodName           | argTypes       | args             | result
-        "show"               | [Long]         | [1L]             | "1 - The Stand"
-        "showArray"          | [Long[].class] | [[1L] as Long[]] | "1 - The Stand"
-        "showPrimitive"      | [long.class]   | [1L as long]     | "1 - The Stand"
-        "showPrimitiveArray" | [long[].class] | [[1L] as long[]] | "1 - The Stand"
+        methodName            | argTypes         | args             | result
+        "show"                | [Long]           | [1L]             | "1 - The Stand"
+        "showArray"           | [Long[].class]   | [[1L] as Long[]] | "1 - The Stand"
+        "showPrimitive"       | [long.class]     | [1L as long]     | "1 - The Stand"
+        "showPrimitiveArray"  | [long[].class]   | [[1L] as long[]] | "1 - The Stand"
+        "showVoidReturn"      | [Iterable.class] | [['test']]       | null
+        "showPrimitiveReturn" | [int[].class]    | [[1] as int[]]   | 1
     }
 }
 
@@ -108,4 +110,13 @@ class BookController {
         return "${id[0]} - The Stand"
     }
 
+    @Executable
+    void showVoidReturn(List<? extends String> jobNames) {
+        jobNames.add("test")
+    }
+
+    @Executable
+    int showPrimitiveReturn(int[] values) {
+        return values[0]
+    }
 }

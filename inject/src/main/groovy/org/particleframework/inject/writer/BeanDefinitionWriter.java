@@ -375,7 +375,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     /**
      * Visits a no-args constructor used to create the bean definition.
      */
-    public void visitBeanDefinitionConstructor() {
+    public void  visitBeanDefinitionConstructor() {
         if (constructorVisitor == null) {
             // first build the constructor
             visitBeanDefinitionConstructorInternal(Collections.emptyMap(), null, null);
@@ -869,8 +869,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         invokeMethod.visitMethodInsn(INVOKEVIRTUAL,
                 declaringTypeObject.getInternalName(), methodName,
                 methodDescriptor, false);
+
+        if(returnTypeObject.equals(Type.VOID_TYPE)) {
+            invokeMethod.visitInsn(ACONST_NULL);
+        }
+        else {
+            pushBoxPrimitiveIfNecessary(returnType, invokeMethod);
+        }
         invokeMethod.visitInsn(ARETURN);
+
         invokeMethod.visitMaxs(defaultMaxStack, 1);
+        invokeMethod.visitEnd();
         methodExecutors.put(methodExecutorClassName, classWriter);
 
         constructorVisitor.visitVarInsn(ALOAD, 0);

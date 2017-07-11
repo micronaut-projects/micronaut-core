@@ -24,6 +24,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
+import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -84,6 +85,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                     // here we need to analyze the binding requirements and if
                                     // the body is required then add an additional handler to the pipeline
                                     // right now only URL parameters are supported
+
+                                    ReturnType returnType = route.getReturnType();
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
                                     Object result;
                                     if(requiredArguments.isEmpty()) {

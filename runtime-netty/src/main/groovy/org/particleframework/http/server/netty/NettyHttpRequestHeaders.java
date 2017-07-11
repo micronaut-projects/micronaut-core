@@ -24,6 +24,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
+ * Delegates to Netty's {@link io.netty.handler.codec.http.HttpHeaders}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
