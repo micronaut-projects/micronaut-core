@@ -19,6 +19,7 @@ import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.DefaultApplicationContext;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.MediaType;
 import org.particleframework.web.router.DefaultRouteBuilder;
 import org.particleframework.web.router.DefaultRouter;
 import org.particleframework.web.router.Route;
@@ -88,6 +89,9 @@ public class RouteBuilderTests {
 
         @Inject
         void someRoutes(BookController controller, AuthorController authorController) {
+            GET("/conditional{/message}", controller, "hello", String.class)
+                    .where((request)-> request.getContentType().equals(MediaType.JSON));
+
             GET("/message{/message}", controller, "hello", String.class).accept(JSON);
             GET("/books{/id}", controller, "show").nest(() ->
                     GET("/authors", controller)

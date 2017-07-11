@@ -15,14 +15,18 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A {@link Route} that is executable
@@ -30,7 +34,7 @@ import java.util.concurrent.Callable;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, Callable<R> {
+public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, Callable<R>, Predicate<HttpRequest> {
 
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
@@ -39,7 +43,12 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
      *
      * @return The required arguments in order to invoke this route
      */
-    Collection<Argument> getRequiredArguments();
+    default Collection<Argument> getRequiredArguments() {
+        Map<String, Object> matchVariables = getVariables();
+        return Arrays.stream(getArguments())
+                .filter((arg) -> !matchVariables.containsKey(arg.getName()))
+                .collect(Collectors.toList());
+    }
 
     /**
      * Execute the route with the given values. The passed map should contain values for every argument returned by {@link #getRequiredArguments()}

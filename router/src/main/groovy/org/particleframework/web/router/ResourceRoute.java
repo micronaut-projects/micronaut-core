@@ -26,8 +26,20 @@ import org.particleframework.http.MediaType;
  */
 public interface ResourceRoute  {
 
+    /**
+     * Accept the given media type
+     *
+     * @param mediaType The media type
+     * @return This route
+     */
     ResourceRoute accept(MediaType mediaType);
 
+    /**
+     * Nest more routes within this {@link ResourceRoute}
+     *
+     * @param nested The nested routes
+     * @return This resource route
+     */
     ResourceRoute nest(Runnable nested);
 
     /**

@@ -23,10 +23,14 @@ import io.netty.handler.codec.http.*;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.inject.Argument;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -68,16 +72,36 @@ public class NettyHttpServer implements EmbeddedServer {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
 
+                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, applicationContext.getEnvironment());
+
                                 Optional<RouteMatch> routeMatch = routerBean.flatMap((router)->
-                                        router.route(HttpMethod.valueOf(msg.method().name()), msg.uri())
+                                        router.find(HttpMethod.valueOf(msg.method().name()), msg.uri())
+                                              .filter((match)-> match.test(nettyHttpRequest))
+                                              .findFirst()
                                 );
 
                                 routeMatch.ifPresent((route -> {
-                                    // TODO: here we need to analyze the binding requirements and if
+                                    // here we need to analyze the binding requirements and if
                                     // the body is required then add an additional handler to the pipeline
                                     // right now only URL parameters are supported
+                                    Collection<Argument> requiredArguments = route.getRequiredArguments();
+                                    Object result;
+                                    if(requiredArguments.isEmpty()) {
+                                        result = route.execute();
+                                    }
+                                    else {
 
-                                    Object result = route.invoke();
+                                        Map<String,Object> arguments = new LinkedHashMap<>();
+                                        for (Argument argument : requiredArguments) {
+                                            String name = argument.getName();
+                                            Class type = argument.getType();
+
+
+                                        }
+                                        result = route.execute(arguments);
+                                    }
+
+
 
                                     // TODO: here we need a way to make the encoding of the result flexible
                                     // also support for GSON views etc.
