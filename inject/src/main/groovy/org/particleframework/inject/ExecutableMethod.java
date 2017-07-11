@@ -30,6 +30,10 @@ import java.util.Set;
 public interface ExecutableMethod<T, R> extends Executable<T,R> {
 
     /**
+     * @return Return the return type
+     */
+    ReturnType<R> getReturnType();
+    /**
      * @return The bean that declares this injection point
      */
     Class getDeclaringType();

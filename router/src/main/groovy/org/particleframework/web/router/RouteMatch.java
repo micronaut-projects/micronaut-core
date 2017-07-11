@@ -17,7 +17,7 @@ package org.particleframework.web.router;
 
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ExecutableHandle;
+import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -30,7 +30,7 @@ import java.util.concurrent.Callable;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends ExecutableHandle<R>, UriMatchInfo, Callable<R> {
+public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, Callable<R> {
 
     /**
      * <p>Returns the required arguments for this RouteMatch</p>

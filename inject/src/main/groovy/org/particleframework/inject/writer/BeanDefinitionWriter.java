@@ -776,6 +776,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      */
     public void visitExecutableMethod(Object declaringType,
                                       Object returnType,
+                                      List<Object> returnTypeGenericTypes,
                                       String methodName,
                                       Map<String, Object> argumentTypes,
                                       Map<String, Object> qualifierTypes,
@@ -804,31 +805,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         // load 'this'
         generatorAdapter.loadThis();
 
+        // 1st argument Class.getMethod(..)
         pushGetMethodFromTypeCall(executorMethodConstructor, declaringTypeObject, methodName, argumentTypeClasses);
 
+        // 2nd argument the return types
+        pushNewArrayOfTypes(executorMethodConstructor, returnTypeGenericTypes);
 
         if(hasArgs) {
-            // 2nd Argument: Create a call to createMap from an argument types
+            // 3rd Argument: Create a call to createMap from an argument types
             pushCreateMapCall(executorMethodConstructor, argumentTypes);
 
-            // 3rd Argument: Create a call to createMap from qualifier types
+            // 4th Argument: Create a call to createMap from qualifier types
             if (qualifierTypes != null) {
                 pushCreateMapCall(executorMethodConstructor, qualifierTypes);
             } else {
                 executorMethodConstructor.visitInsn(ACONST_NULL);
             }
 
-            // 4th Argument: Create a call to createMap from generic types
+            // 5th Argument: Create a call to createMap from generic types
             if (genericTypes != null) {
                 pushCreateGenericsMapCall(executorMethodConstructor, genericTypes);
             } else {
                 executorMethodConstructor.visitInsn(ACONST_NULL);
             }
             // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Map.class, Map.class, Map.class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class, Map.class, Map.class, Map.class);
         }
         else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class);
         }
         generatorAdapter.visitInsn(RETURN);
         generatorAdapter.visitMaxs(defaultMaxStack, 1);
@@ -1592,16 +1596,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     private void pushNewListOfTypes(MethodVisitor methodVisitor, List<Object> types) {
+        pushNewArrayOfTypes(methodVisitor, types);
+        // invoke the Arrays.asList() method
+        methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arrays.class), "asList", Type.getMethodDescriptor(CREATE_LIST_METHOD), false);
+    }
+
+    private void pushNewArrayOfTypes(MethodVisitor methodVisitor, List<Object> types) {
         int genericTypeCount = types.size();
 
-        pushNewArray(methodVisitor, Object.class, genericTypeCount);
+        pushNewArray(methodVisitor, Class.class, genericTypeCount);
         for (int j = 0; j < genericTypeCount; j++) {
             pushStoreTypeInArray(methodVisitor, j, genericTypeCount, types.get(j));
         }
-
-
-        // invoke the Arrays.asList() method
-        methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arrays.class), "asList", Type.getMethodDescriptor(CREATE_LIST_METHOD), false);
     }
 
     private void pushGetConstructorForType(MethodVisitor methodVisitor, Type beanType, Collection<Object> argumentClassNames) {

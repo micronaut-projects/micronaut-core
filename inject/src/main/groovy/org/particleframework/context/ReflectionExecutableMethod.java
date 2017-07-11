@@ -21,6 +21,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
@@ -67,6 +68,26 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     @Override
     public Set<? extends Annotation> getExecutableAnnotations() {
         return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, method.getAnnotations());
+    }
+
+    @Override
+    public ReturnType<R> getReturnType() {
+        return new ReturnType<R>() {
+            @Override
+            public Class<R> getType() {
+                return (Class<R>) method.getReturnType();
+            }
+
+            @Override
+            public List<Class> getGenericTypes() {
+                return Arrays.asList(GenericTypeUtils.resolveTypeArguments(method.getGenericReturnType()));
+            }
+
+            @Override
+            public <A extends Annotation> A getAnnotation(Class<A> type) {
+                return method.getAnnotatedReturnType().getAnnotation(type);
+            }
+        };
     }
 
     @Override

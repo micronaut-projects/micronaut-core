@@ -17,6 +17,8 @@ package org.particleframework.web.router;
 
 
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.inject.ReturnType;
 import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.TypeConvention;
@@ -169,9 +171,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     protected Route buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class...parameterTypes) {
-        Optional<ExecutableHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
 
-        ExecutableHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -196,21 +198,21 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final MediaType mediaType;
         private final UriMatchTemplate uriMatchTemplate;
         private final List<DefaultRoute> nestedRoutes = new ArrayList<>();
-        private final ExecutableHandle targetMethod;
+        private final MethodExecutionHandle targetMethod;
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, ExecutableHandle targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, ExecutableHandle targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
             this(httpMethod, new UriMatchTemplate(uriTemplate), mediaType, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, ExecutableHandle targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
         }
 
-        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, ExecutableHandle targetMethod) {
+        DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.mediaType = mediaType;
@@ -264,9 +266,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     class DefaultRouteMatch implements RouteMatch {
 
         private final UriMatchInfo matchInfo;
-        private final ExecutableHandle executableMethod;
+        private final MethodExecutionHandle executableMethod;
 
-        public DefaultRouteMatch(UriMatchInfo matchInfo, ExecutableHandle executableMethod) {
+        public DefaultRouteMatch(UriMatchInfo matchInfo, MethodExecutionHandle executableMethod) {
             this.matchInfo = matchInfo;
             this.executableMethod = executableMethod;
         }
@@ -366,6 +368,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return Arrays.stream(getArguments())
                          .filter((arg)-> !matchInfo.getVariables().containsKey(arg.getName()) )
                          .collect(Collectors.toList());
+        }
+
+        @Override
+        public ReturnType getReturnType() {
+            return executableMethod.getReturnType();
         }
     }
 

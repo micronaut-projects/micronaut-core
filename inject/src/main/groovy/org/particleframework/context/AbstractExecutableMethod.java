@@ -21,6 +21,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
@@ -41,12 +42,15 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final Argument[] arguments;
     private final Class declaringType;
     private final Annotation[] annotations;
+    private final ReturnType returnType;
 
     protected AbstractExecutableMethod(Method method,
+                                       Class[] genericReturnTypes,
                                        Map<String, Class> arguments,
                                        Map<String, Annotation> qualifiers,
                                        Map<String, List<Class>> genericTypes) {
         this.methodName = method.getName();
+        this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
@@ -58,8 +62,13 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
         });
     }
 
-    protected AbstractExecutableMethod(Method method) {
-        this(method, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
+        this(method, genericReturnTypes, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Override
+    public ReturnType getReturnType() {
+        return returnType;
     }
 
     @Override
@@ -119,4 +128,29 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     }
 
     protected abstract Object invokeInternal(Object instance, Object[] arguments);
+
+    class ReturnTypeImpl implements ReturnType {
+        private final Method method;
+        private final List<Class> genericTypes;
+
+        public ReturnTypeImpl(Method method, Class... genericTypes) {
+            this.method = method;
+            this.genericTypes = Arrays.asList(genericTypes);
+        }
+
+        @Override
+        public Class getType() {
+            return method.getReturnType();
+        }
+
+        @Override
+        public List<Class> getGenericTypes() {
+            return genericTypes;
+        }
+
+        @Override
+        public Annotation getAnnotation(Class type) {
+            return method.getAnnotatedReturnType().getAnnotation(type);
+        }
+    }
 }
