@@ -1,8 +1,12 @@
 package org.particleframework.http;
 
+import org.particleframework.http.cookie.Cookies;
+
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Collection;
+import java.util.Locale;
 
 /**
  * <p>Common interface for HTTP request implementations</p>
@@ -10,49 +14,56 @@ import java.util.Collection;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpRequest {
-    /**
-     * @return The context path
-     */
-    String getContextPath();
+public interface HttpRequest<T> extends HttpMessage<T> {
 
+    /**
+     * @return The {@link Cookies} instance
+     */
+    Cookies getCookies();
+    /**
+     * @return The HTTP parameters contained with the URI query string
+     */
+    HttpParameters getParameters();
     /**
      * @return The request method
      */
     HttpMethod getMethod();
 
     /**
-     * @return The request URI
+     * @return The full request URI
      */
     URI getUri();
 
     /**
-     * @return The request content type
+     * @return Get the
      */
-    MediaType getContentType();
+    URI getPath();
+
+    @Override
+    default Locale getLocale() {
+        return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
+                .map(Locale::new)
+                .orElse(null);
+    }
+
     /**
      * @return The request character encoding
      */
-    Charset getCharacterEncoding();
+    default Charset getCharacterEncoding() {
+        MediaType contentType = getContentType();
+        String charset = contentType != null ? contentType.getParameters().get(MediaType.CHARSET_PARAMETER) : null;
+        try {
+            if(charset != null) {
+                return Charset.forName(charset);
+            }
+            else {
+                return getHeaders().findFirst(HttpHeaders.ACCEPT_CHARSET)
+                            .map(Charset::forName)
+                            .orElse(null);
+            }
+        } catch (UnsupportedCharsetException e) {
+            return null;
+        }
+    }
 
-    /**
-     * @return The header for the request
-     */
-    Collection<String> getHeaderNames();
-
-    /**
-     * Obtains the value of a header
-     *
-     * @param name The name of the header
-     * @return The value of the header
-     */
-    String getHeader(CharSequence name);
-
-    /**
-     * Obtains all the values for the give header
-     *
-     * @param name The name of the header
-     * @return all of the views
-     */
-    Collection<String> getHeaders(String name);
 }

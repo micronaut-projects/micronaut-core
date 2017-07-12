@@ -16,9 +16,11 @@
 package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
+import org.particleframework.web.router.annotation.Put
 import spock.lang.Specification
 
 /**
@@ -39,6 +41,28 @@ class NettyHttpServerSpec extends Specification {
         applicationContext?.stop()
     }
 
+    void "test Particle server running again"() {
+        when:
+        ApplicationContext applicationContext = ParticleApplication.run()
+
+        then:
+        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
+    void "test Particle server on different port"() {
+        when:
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+
+        then:
+        new URL("http://localhost:$newPort/person/Fred").getText() == "Person Named Fred"
+
+        cleanup:
+        applicationContext?.stop()
+    }
 
     @Controller
     static class PersonController {
@@ -46,6 +70,11 @@ class NettyHttpServerSpec extends Specification {
         @Get('/{name}')
         String name(String name) {
             "Person Named $name"
+        }
+
+        @Put('/job/{name}')
+        void doWork(String name) {
+            println 'doing work'
         }
     }
 }

@@ -294,6 +294,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(methodNode.declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
+                        List<Object> returnTypeGenerics = resolveGenericTypes(methodNode.returnType)
+
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]
                         Map<String, List<Object>> genericTypeMap = [:]
@@ -302,6 +304,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         beanWriter.visitExecutableMethod(
                                 resolveTypeReference(concreteClass),
                                 resolveTypeReference(methodNode.returnType),
+                                returnTypeGenerics,
                                 methodNode.name,
                                 paramsToType,
                                 qualifierTypes,
@@ -310,6 +313,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
 
+        }
+
+        protected List<Object> resolveGenericTypes(ClassNode type) {
+            List<Object> generics = []
+            for(gt in type.genericsTypes) {
+                if(!gt.isPlaceholder()) {
+                    generics.add(resolveTypeReference(gt.type))
+                }
+                else if(gt.isWildcard()) {
+                    ClassNode[] upperBounds = gt.upperBounds
+                    if(upperBounds != null && upperBounds.length == 1) {
+                        generics.add(resolveTypeReference(upperBounds[0]))
+                    }
+                }
+            }
+            return generics
         }
 
         protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {

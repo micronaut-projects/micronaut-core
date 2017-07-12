@@ -5,13 +5,18 @@ import org.particleframework.config.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
+import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
+import org.particleframework.core.order.OrderUtil;
 
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>The default implementation of the {@link Environment} interface. Configures a named environment.</p>
@@ -30,6 +35,7 @@ public class DefaultEnvironment implements Environment {
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final Map<Class, SoftServiceLoader> serviceMap = new ConcurrentHashMap<>();
+    private final ClassPathAnnotationScanner annotationScanner;
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
         this(name,classLoader, new DefaultConversionService());
@@ -40,10 +46,10 @@ public class DefaultEnvironment implements Environment {
     }
 
     public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {
-        this.name = name;
+        this.name = name == null ? "default" : name;
         this.conversionService = conversionService;
         this.classLoader = classLoader;
-
+        this.annotationScanner = createAnnotationScanner(classLoader);
 
         ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
         for (PropertySourceLoader loader : propertySources) {
@@ -58,6 +64,11 @@ public class DefaultEnvironment implements Environment {
                 return true;
             }
         });
+    }
+
+    @Override
+    public Stream<Class> scan(Class<? extends Annotation> annotation) {
+        return annotationScanner.scan(annotation, getPackages());
     }
 
     @Override
@@ -116,6 +127,8 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment start() {
+        ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
+        OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
             processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
         }
@@ -188,6 +201,16 @@ public class DefaultEnvironment implements Environment {
                 }
             }
         }
+    }
+
+    /**
+     * Creates the default annotation scanner
+     *
+     * @param classLoader The class loader
+     * @return The scanner
+     */
+    protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
+        return new CachingClassPathAnnotationScanner(classLoader);
     }
 
     protected Map<String,Object> resolveEntriesForKey(String name, boolean allowCreate) {

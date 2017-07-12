@@ -4,6 +4,7 @@ import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableHandle;
+import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -210,7 +211,7 @@ public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <R> Optional<ExecutableHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class...arguments);
+    <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class...arguments);
 
     /**
      * Obtain a {@link BeanDefinition} for the given type

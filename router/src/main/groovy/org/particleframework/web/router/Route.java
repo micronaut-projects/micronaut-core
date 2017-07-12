@@ -16,13 +16,20 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatcher;
 
 import java.net.URI;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
+ * Represents a Route definition constructed by a {@link RouteBuilder}
+ *
+ * @see RouteBuilder
+ * @see ResourceRoute
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -54,11 +61,32 @@ public interface Route extends UriMatcher {
      */
     Route nest(Runnable nested);
 
+    /**
+     * Match this {@link Route} only if the given predicate is true
+     *
+     * @param condition The condition which accepts a {@link HttpRequest}
+     * @return This route
+     */
+    Route where(Predicate<HttpRequest> condition);
+
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     *
+     * @param uri The URI The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
     @Override
     default Optional<RouteMatch> match(URI uri) {
         return match(uri.toString());
     }
 
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     *
+     * @param uri The URI The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
     @Override
     Optional<RouteMatch> match(String uri);
+
 }

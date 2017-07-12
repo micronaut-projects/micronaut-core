@@ -31,7 +31,7 @@ public class OrderUtil {
      *
      * @param list The list to sort
      */
-    public static void sort(List list) {
+    public static void sort(List<? extends Ordered> list) {
         list.sort((o1, o2) -> {
             int order1 = getOrder(o1);
             int order2 = getOrder(o2);
@@ -43,7 +43,7 @@ public class OrderUtil {
      *
      * @param objects The array to sort
      */
-    public static void sort(Object...objects) {
+    public static void sort(Ordered...objects) {
         Arrays.sort(objects,(o1, o2) -> {
             int order1 = getOrder(o1);
             int order2 = getOrder(o2);
@@ -51,10 +51,7 @@ public class OrderUtil {
         });
     }
 
-    private static int getOrder(Object o) {
-        if(o instanceof Ordered) {
-            return ((Ordered) o).getOrder();
-        }
-        return Ordered.LOWEST_PRECEDENCE;
+    private static int getOrder(Ordered o) {
+        return o.getOrder();
     }
 }

@@ -15,8 +15,18 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.uri.UriMatchInfo;
-import org.particleframework.inject.ExecutableHandle;
+import org.particleframework.inject.Argument;
+import org.particleframework.inject.MethodExecutionHandle;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A {@link Route} that is executable
@@ -24,5 +34,42 @@ import org.particleframework.inject.ExecutableHandle;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends ExecutableHandle<R>, UriMatchInfo {
+public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, Callable<R>, Predicate<HttpRequest> {
+
+    /**
+     * <p>Returns the required arguments for this RouteMatch</p>
+     *
+     * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments excluding those that have been subtracted from the URI variables</p>
+     *
+     * @return The required arguments in order to invoke this route
+     */
+    default Collection<Argument> getRequiredArguments() {
+        Map<String, Object> matchVariables = getVariables();
+        return Arrays.stream(getArguments())
+                .filter((arg) -> !matchVariables.containsKey(arg.getName()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Execute the route with the given values. The passed map should contain values for every argument returned by {@link #getRequiredArguments()}
+     *
+     * @param argumentValues The argument values
+     * @return The result
+     */
+    R execute(Map<String, Object> argumentValues);
+
+
+    /**
+     * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}
+     *
+     * @return The result
+     */
+    default R execute() {
+        return execute(Collections.emptyMap());
+    }
+
+    @Override
+    default R call() throws Exception {
+        return execute();
+    }
 }

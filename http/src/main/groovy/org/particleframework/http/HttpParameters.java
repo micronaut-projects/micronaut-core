@@ -13,21 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.server;
+package org.particleframework.http;
 
-import org.particleframework.context.LifeCycle;
+import org.particleframework.core.convert.ConvertibleMultiValues;
 
 /**
- * <p>An EmbeddedServer is a general abstraction to manage the lifecycle of any server implementation within
- * a running Particle application</p>
+ * Represents HTTP query parameters parsed from the {@link HttpRequest#getUri()}
  *
+ * @see HttpRequest
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
-
-    /**
-     * @return The port exposed by the server
-     */
-    int getPort();
+public interface HttpParameters extends ConvertibleMultiValues<String> {
 }

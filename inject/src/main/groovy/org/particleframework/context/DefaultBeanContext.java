@@ -101,12 +101,16 @@ public class DefaultBeanContext implements BeanContext {
 
         objects.forEach(beanRegistration -> {
             BeanDefinition def = beanRegistration.beanDefinition;
+            Object bean = beanRegistration.bean;
             if (def instanceof DisposableBeanDefinition) {
                 try {
-                    ((DisposableBeanDefinition) def).dispose(this, beanRegistration.bean);
+                    ((DisposableBeanDefinition) def).dispose(this, bean);
                 } catch (Throwable e) {
                     LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
                 }
+            }
+            else if(bean instanceof LifeCycle) {
+                ((LifeCycle) bean).stop();
             }
         });
 
@@ -119,14 +123,14 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public <R> Optional<ExecutableHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
+    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
         Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
         if(foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
             Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
             if(foundMethod.isPresent()) {
 
-                Optional<ExecutableHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
+                Optional<MethodExecutionHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
                         new BeanExecutionHandle<>(this, beanType, executableMethod)
                 );
                 return executionHandle;
@@ -765,7 +769,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static final class BeanExecutionHandle<T, R> implements ExecutableHandle<R> {
+    private static final class BeanExecutionHandle<T, R> implements MethodExecutionHandle<R> {
         private final BeanContext beanContext;
         private final Class<T> beanType;
         private final ExecutableMethod<T, R> method;
@@ -794,6 +798,11 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public String toString() {
             return method.toString();
+        }
+
+        @Override
+        public ReturnType<R> getReturnType() {
+            return method.getReturnType();
         }
     }
     private static final class BeanRegistration<T> {

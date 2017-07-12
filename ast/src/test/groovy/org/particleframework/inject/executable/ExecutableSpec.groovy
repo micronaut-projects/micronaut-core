@@ -21,6 +21,7 @@ import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.ExecutableHandle
 import org.particleframework.inject.ExecutableMethod
+import org.particleframework.inject.MethodExecutionHandle
 import org.particleframework.inject.annotation.Executable
 import org.particleframework.stereotype.Controller
 import spock.lang.Specification
@@ -39,16 +40,17 @@ class ExecutableSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
 
         when:
-        Optional<ExecutableHandle> method = applicationContext.findExecutionHandle(BookController, "show", Long)
+        Optional<MethodExecutionHandle> method = applicationContext.findExecutionHandle(BookController, "show", Long)
         ExecutableMethod executableMethod = applicationContext.findBeanDefinition(BookController).get().findMethod("show", Long).get()
 
         then:
         method.isPresent()
 
         when:
-        ExecutableHandle executionHandle = method.get()
+        MethodExecutionHandle executionHandle = method.get()
 
         then:
+        executionHandle.returnType.type == String
         executionHandle.invoke(1L) == "1 - The Stand"
         executableMethod.getClass().getSuperclass() == AbstractExecutableMethod
 
@@ -70,11 +72,13 @@ class ExecutableSpec extends Specification {
         method.invoke(args as Object[]) == result
 
         where:
-        methodName           | argTypes       | args             | result
-        "show"               | [Long]         | [1L]             | "1 - The Stand"
-        "showArray"          | [Long[].class] | [[1L] as Long[]] | "1 - The Stand"
-        "showPrimitive"      | [long.class]   | [1L as long]     | "1 - The Stand"
-        "showPrimitiveArray" | [long[].class] | [[1L] as long[]] | "1 - The Stand"
+        methodName            | argTypes         | args             | result
+        "show"                | [Long]           | [1L]             | "1 - The Stand"
+        "showArray"           | [Long[].class]   | [[1L] as Long[]] | "1 - The Stand"
+        "showPrimitive"       | [long.class]     | [1L as long]     | "1 - The Stand"
+        "showPrimitiveArray"  | [long[].class]   | [[1L] as long[]] | "1 - The Stand"
+        "showVoidReturn"      | [Iterable.class] | [['test']]       | null
+        "showPrimitiveReturn" | [int[].class]    | [[1] as int[]]   | 1
     }
 }
 
@@ -106,4 +110,13 @@ class BookController {
         return "${id[0]} - The Stand"
     }
 
+    @Executable
+    void showVoidReturn(List<? extends String> jobNames) {
+        jobNames.add("test")
+    }
+
+    @Executable
+    int showPrimitiveReturn(int[] values) {
+        return values[0]
+    }
 }

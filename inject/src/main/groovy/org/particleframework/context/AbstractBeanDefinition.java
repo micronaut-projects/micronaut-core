@@ -26,6 +26,7 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -541,13 +542,24 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     return context.createBean(argumentType);
                 } else {
                     String valString = resolveValueString(argument.getName(), valAnn);
-                    Optional value = resolveValue((ApplicationContext) context, argumentType, valString, argument.getGenericTypes());
+                    ApplicationContext applicationContext = (ApplicationContext) context;
+                    Optional value = resolveValue(applicationContext, argumentType, valString, argument.getGenericTypes());
                     if (!value.isPresent() && argumentType == Optional.class) {
                         return value;
                     } else {
                         return value.orElseGet(() -> {
                             if (valAnn == null && isConfigurationProperties) {
-                                return defaultValue;
+                                String cliOption = resolveCliOption(argument.getName());
+                                if(cliOption != null) {
+                                    return resolveValue(applicationContext,
+                                            argumentType,
+                                            cliOption,
+                                            argument.getGenericTypes())
+                                            .orElse(defaultValue);
+                                }
+                                else {
+                                    return defaultValue;
+                                }
                             } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
                                 throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
                             } else {
@@ -564,12 +576,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         }
     }
 
-    private boolean isInnerConfiguration(Class argumentType) {
-        return isConfigurationProperties &&
-                argumentType.getName().indexOf('$') > -1 &&
-                Arrays.asList(getType().getClasses()).contains(argumentType) &&
-                Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
-    }
+
 
 
     /**
@@ -1013,6 +1020,25 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             valString = val.value();
         }
         return valString;
+    }
+
+    private String resolveCliOption(String name) {
+        Class type = getType();
+        ConfigurationProperties configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
+        if(configurationProperties != null ) {
+            String[] prefix = configurationProperties.cliPrefix();
+            if(prefix.length == 1) {
+                return prefix[0] + name;
+            }
+        }
+        return null;
+    }
+
+    private boolean isInnerConfiguration(Class argumentType) {
+        return isConfigurationProperties &&
+                argumentType.getName().indexOf('$') > -1 &&
+                Arrays.asList(getType().getClasses()).contains(argumentType) &&
+                Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
     private String resolvePrefix() {

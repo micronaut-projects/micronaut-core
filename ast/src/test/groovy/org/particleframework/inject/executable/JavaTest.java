@@ -24,4 +24,8 @@ public class JavaTest {
     public String test(Object object, Object...args) {
         return ((BookController)object).show((Long)args[0]);
     }
+
+    public void testVoid(Object object, Object...args) {
+        ((BookController)object).show((Long)args[0]);
+    }
 }

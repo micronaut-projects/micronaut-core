@@ -49,9 +49,9 @@ class GroovyRouteBuilderSpec extends Specification {
 
         where:
         uri                 | method            | isPresent | routeBean      | result
+        '/bo'               | HttpMethod.GET    | false     | MyRoutes       | null
         '/book'             | HttpMethod.GET    | true      | MyRoutes       | ['book1']
         '/book/hello/World' | HttpMethod.POST   | true      | MyRoutes       | "Hello World"
-        '/bo'               | HttpMethod.GET    | false     | MyRoutes       | null
         '/book'             | HttpMethod.POST   | true      | MyRoutes       | "saved"
         '/book/1'           | HttpMethod.GET    | true      | MyRoutes       | "book 1"
         '/book/1/author'    | HttpMethod.GET    | true      | MyRoutes       | ['author']

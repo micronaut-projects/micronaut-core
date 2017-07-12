@@ -30,7 +30,8 @@ public enum HttpMethod implements CharSequence {
     PATCH,
     DELETE,
     HEAD,
-    CONNECT;
+    CONNECT,
+    TRACE;
 
     @Override
     public int length() {

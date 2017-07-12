@@ -25,6 +25,7 @@ package org.particleframework.inject;
  * @since 1.0
  */
 public interface ExecutableHandle<R> {
+
     /**
      * @return The declaring type
      */

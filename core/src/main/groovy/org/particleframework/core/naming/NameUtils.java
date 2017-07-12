@@ -18,6 +18,8 @@ package org.particleframework.core.naming;
 import org.codehaus.groovy.runtime.MetaClassHelper;
 
 import java.beans.Introspector;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * <p>Naming convention utilities</p>
@@ -79,7 +81,7 @@ public class NameUtils {
 
 
     /**
-     * Converts camel case to hyphenated
+     * Converts camel case to hyphenated, lowercase form
      *
      * @param name The name
      * @return The hyphenated string
@@ -92,7 +94,10 @@ public class NameUtils {
         char last = '0';
         for (char c : chars) {
 
-            if(Character.isLowerCase(c)) {
+            if(Character.isLowerCase(c) || !Character.isLetter(c)) {
+                if(c == '.') {
+                    first =false;
+                }
                 newName.append(c);
             }
             else {
@@ -101,7 +106,7 @@ public class NameUtils {
                     first = false;
                     newName.append(lowerCaseChar);
                 }
-                else if(Character.isUpperCase(last)) {
+                else if(Character.isUpperCase(last) || last == '.') {
                     newName.append(lowerCaseChar);
                 }
                 else {
@@ -112,5 +117,31 @@ public class NameUtils {
         }
 
         return newName.toString();
+    }
+
+    /**
+     * Converts hyphenated, lower-case form to camel-case form
+     *
+     * @param name The hyphenated string
+     * @return The camel case form
+     *
+     */
+    public static String dehyphenate(String name) {
+        return Arrays.stream(name.split("-"))
+              .map((str)->{
+                    if(str.length() > 0 && Character.isLetter(str.charAt(0))) {
+                        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+                    }
+                    return str;
+              })
+              .collect(Collectors.joining(""));
+    }
+
+    public static String getPackageName(String className) {
+        int i = className.lastIndexOf('.');
+        if(i >-1) {
+            return className.substring(0, i);
+        }
+        return "";
     }
 }

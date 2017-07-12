@@ -47,7 +47,17 @@ class RouterFactory {
 
     @Singleton
     @Bean
-    AnnotationRouteBuilder annotationRouteBuilder(ApplicationContext applicationContext, UriNamingStrategy uriNamingStrategy) {
-        return new AnnotationRouteBuilder(applicationContext, uriNamingStrategy)
+    AnnotatedMethodRouteBuilder annotationRouteBuilder(
+            ApplicationContext applicationContext,
+            UriNamingStrategy uriNamingStrategy) {
+        return new AnnotatedMethodRouteBuilder(applicationContext, uriNamingStrategy)
+    }
+
+    @Singleton
+    @Bean
+    AnnotatedControllerDefaultRouteBuilder annotatedControllerDefaultRouteBuilder(
+            ApplicationContext applicationContext,
+            UriNamingStrategy uriNamingStrategy) {
+        return new AnnotatedControllerDefaultRouteBuilder(applicationContext, uriNamingStrategy)
     }
 }

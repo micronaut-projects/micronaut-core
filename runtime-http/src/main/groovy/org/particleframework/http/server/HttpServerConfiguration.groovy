@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties('particle.server')
+@ConfigurationProperties(value = 'particle.server', cliPrefix = "")
 @CompileStatic
 class HttpServerConfiguration {
     /**

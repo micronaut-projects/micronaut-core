@@ -23,6 +23,16 @@ import java.util.stream.Stream;
 public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader, ServiceLocator {
 
     /**
+     * The test environment
+     */
+    String TEST = "test";
+
+    /**
+     * The development environment
+     */
+    String DEVELOPMENT = "dev";
+
+    /**
      * @return The name of the environment
      */
     String getName();

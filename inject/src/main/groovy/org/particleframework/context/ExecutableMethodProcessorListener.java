@@ -19,14 +19,13 @@ import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>A {@link BeanCreatedEventListener} that will monitor the creation of {@link ExecutableMethodProcessor} instances
@@ -59,7 +58,9 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
                     methodsByAnnotation
                             .keySet()
                             .stream()
-                            .filter((type) -> AnnotationUtil.findAnnotationWithStereoType(type, targetAnnotation) != null)
+                            .filter((type) ->
+                                    type == targetAnnotation || AnnotationUtil.findAnnotationWithStereoType(type, targetAnnotation) != null
+                            )
                             .forEach((key) -> {
                                         List<ExecutableMethod> executableMethods = methodsByAnnotation.get(key);
                                         for (ExecutableMethod executableMethod : executableMethods) {
@@ -91,14 +92,29 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         Iterable<ExecutableMethod> executableMethods = applicationContext.findServices(ExecutableMethod.class);
         Map<Class<? extends Annotation>, List<ExecutableMethod>> result = new LinkedHashMap<>();
         for (ExecutableMethod executableMethod : executableMethods) {
-            Iterable<? extends Annotation> annotations = executableMethod.getExecutableAnnotations();
-            for (Annotation annotation : annotations) {
-                Class<? extends Annotation> key = annotation.annotationType();
-                List<ExecutableMethod> methodList = result.computeIfAbsent(key, k -> new ArrayList<>());
-                methodList.add(executableMethod);
-                result.put(key, methodList);
+            Set<? extends Annotation> annotations = executableMethod.getExecutableAnnotations();
+
+            if(annotations.isEmpty()) {
+                Class declaringType = executableMethod.getDeclaringType();
+                Annotation executableType = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
+                if(executableType != null) {
+                    registerExecutableMethod(result, executableType, executableMethod);
+                }
+            }
+            else {
+
+                for (Annotation annotation : annotations) {
+                    registerExecutableMethod(result, annotation, executableMethod);
+                }
             }
         }
         return result;
+    }
+
+    private void registerExecutableMethod(Map<Class<? extends Annotation>, List<ExecutableMethod>> result, Annotation annotation, ExecutableMethod executableMethod) {
+        Class<? extends Annotation> key = annotation.annotationType();
+        List<ExecutableMethod> methodList = result.computeIfAbsent(key, k -> new ArrayList<>());
+        methodList.add(executableMethod);
+        result.put(key, methodList);
     }
 }
