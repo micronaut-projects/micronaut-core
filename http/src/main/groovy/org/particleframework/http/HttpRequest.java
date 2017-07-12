@@ -1,5 +1,7 @@
 package org.particleframework.http;
 
+import org.particleframework.http.cookie.Cookies;
+
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
@@ -15,14 +17,27 @@ import java.util.Locale;
 public interface HttpRequest<T> extends HttpMessage<T> {
 
     /**
+     * @return The {@link Cookies} instance
+     */
+    Cookies getCookies();
+    /**
+     * @return The HTTP parameters contained with the URI query string
+     */
+    HttpParameters getParameters();
+    /**
      * @return The request method
      */
     HttpMethod getMethod();
 
     /**
-     * @return The request URI
+     * @return The full request URI
      */
     URI getUri();
+
+    /**
+     * @return Get the
+     */
+    URI getPath();
 
     @Override
     default Locale getLocale() {
@@ -36,7 +51,7 @@ public interface HttpRequest<T> extends HttpMessage<T> {
      */
     default Charset getCharacterEncoding() {
         MediaType contentType = getContentType();
-        String charset = contentType.getParameters().get("charset");
+        String charset = contentType != null ? contentType.getParameters().get(MediaType.CHARSET_PARAMETER) : null;
         try {
             if(charset != null) {
                 return Charset.forName(charset);

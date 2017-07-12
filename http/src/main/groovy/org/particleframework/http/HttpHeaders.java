@@ -16,13 +16,12 @@
 package org.particleframework.http;
 
 
-import org.particleframework.core.convert.ValueResolver;
+import org.particleframework.core.convert.ConvertibleMultiValues;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.function.BiConsumer;
+import java.util.Optional;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
@@ -31,7 +30,7 @@ import java.util.function.BiConsumer;
  *
  * @since 1.0
  */
-public interface HttpHeaders extends ValueResolver, Iterable<Map.Entry<String, Collection<String>>> {
+public interface HttpHeaders extends ConvertibleMultiValues<String> {
     /**
      * {@code "Accept"}
      */
@@ -325,86 +324,6 @@ public interface HttpHeaders extends ValueResolver, Iterable<Map.Entry<String, C
      */
     CharSequence WWW_AUTHENTICATE = "WWW-Authenticate";
 
-
-    /**
-     * Get all the values for the given header name
-     *
-     * @param name The header name
-     * @return All the values
-     */
-    List<String> getAll(CharSequence name);
-
-    /**
-     * Find a header and convert it to the given type
-     *
-     * @param name The name of the header
-     * @param requiredType The required type
-     * @param <T> The generic type
-     * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
-     */
-    default <T> Optional<T> findFirst(CharSequence name, Class<T> requiredType) {
-        return get(name, requiredType);
-    }
-
-    /**
-     * @return The header names
-     */
-    Set<String> getHeaderNames();
-    /**
-     * Performs the given action for each header. Note that in the case
-     * where multiple values exist for the same header then the consumer will be invoked
-     * multiple times for the same key
-     *
-     * @param action The action to be performed for each entry
-     * @throws NullPointerException if the specified action is null
-     * @since 1.0
-     */
-    default void forEach(BiConsumer<String, String> action) {
-        Objects.requireNonNull(action, "Consumer cannot be null");
-
-        Collection<String> headerNames = getHeaderNames();
-        for (String headerName : headerNames) {
-            Collection<String> values = getAll(headerName);
-            for (String value : values) {
-                action.accept(headerName, value);
-            }
-        }
-    }
-
-    @Override
-    default Iterator<Map.Entry<String, Collection<String>>> iterator() {
-        Iterator<String> headerNames = getHeaderNames().iterator();
-        return new Iterator<Map.Entry<String, Collection<String>>>() {
-            @Override
-            public boolean hasNext() {
-                return headerNames.hasNext();
-            }
-
-            @Override
-            public Map.Entry<String, Collection<String>> next() {
-                if(!hasNext()) throw new NoSuchElementException();
-
-                String name = headerNames.next();
-                return new Map.Entry<String, Collection<String>>() {
-                    @Override
-                    public String getKey() {
-                        return name;
-                    }
-
-                    @Override
-                    public Collection<String> getValue() {
-                        return getAll(name);
-                    }
-
-                    @Override
-                    public Collection<String> setValue(Collection<String> value) {
-                        throw new UnsupportedOperationException("Headers not mutable");
-                    }
-                };
-            }
-        };
-    }
-
     /**
      * Obtain the date header
      *
@@ -419,16 +338,6 @@ public interface HttpHeaders extends ValueResolver, Iterable<Map.Entry<String, C
         } catch (DateTimeParseException e) {
             return Optional.empty();
         }
-    }
-
-    /**
-     * Finds a header
-     *
-     * @param name The header name
-     * @return True if it does
-     */
-    default boolean contains(CharSequence name) {
-        return findFirst(name).isPresent();
     }
 
     /**
@@ -461,15 +370,6 @@ public interface HttpHeaders extends ValueResolver, Iterable<Map.Entry<String, C
         return get(name, Integer.class);
     }
 
-    /**
-     * Get the first value of the given header
-     *
-     * @param name The header name
-     * @return The first value or null if it is present
-     */
-    default String getFirst(CharSequence name) {
-        return findFirst(name).orElse(null);
-    }
 
     /**
      * Get the first value of the given header
@@ -478,8 +378,7 @@ public interface HttpHeaders extends ValueResolver, Iterable<Map.Entry<String, C
      * @return The first value or null if it is present
      */
     default Optional<String> findFirst(CharSequence name) {
-        String value = getFirst(name);
-        return value != null ? Optional.of(value) : Optional.empty();
+        return getFirst(name, String.class);
     }
 
 }

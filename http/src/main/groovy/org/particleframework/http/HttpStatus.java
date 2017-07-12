@@ -19,6 +19,7 @@ package org.particleframework.http;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Represents HTTP status codes. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
@@ -102,6 +103,7 @@ public enum HttpStatus implements CharSequence {
 
 
     HttpStatus(int code, String reason) {
+        Objects.requireNonNull(reason, "Argument 'reason' cannot be null");
         this.code = code;
         this.reason = reason;
     }
@@ -129,7 +131,7 @@ public enum HttpStatus implements CharSequence {
     public static HttpStatus valueOf(int code) {
         HttpStatus status = BY_CODE.get(code);
         if(status == null) {
-            throw new IllegalArgumentException("Invalid HTTP status code $code");
+            throw new IllegalArgumentException("Invalid HTTP status code: " + code);
         }
         return status;
     }

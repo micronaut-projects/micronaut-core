@@ -129,7 +129,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected abstract Object invokeInternal(Object instance, Object[] arguments);
 
-    class ReturnTypeImpl implements ReturnType {
+    class ReturnTypeImpl implements ReturnType<Object> {
         private final Method method;
         private final List<Class> genericTypes;
 
@@ -139,8 +139,8 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
         }
 
         @Override
-        public Class getType() {
-            return method.getReturnType();
+        public Class<Object> getType() {
+            return (Class<Object>) method.getReturnType();
         }
 
         @Override
@@ -149,8 +149,23 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
         }
 
         @Override
-        public Annotation getAnnotation(Class type) {
-            return method.getAnnotatedReturnType().getAnnotation(type);
+        public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
+            return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotatedReturnType().getAnnotations());
+        }
+
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return method.getAnnotatedReturnType().getAnnotation(annotationClass);
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return method.getAnnotatedReturnType().getAnnotations();
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return method.getAnnotatedReturnType().getDeclaredAnnotations();
         }
     }
 }

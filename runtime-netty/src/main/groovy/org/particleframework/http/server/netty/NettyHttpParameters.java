@@ -16,55 +16,57 @@
 package org.particleframework.http.server.netty;
 
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.http.HttpHeaders;
-import org.particleframework.http.MutableHttpHeaders;
+import org.particleframework.http.HttpParameters;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
- * Delegates to Netty's {@link io.netty.handler.codec.http.HttpHeaders}
+ * Implementation of {@link HttpParameters} for Netty
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyHttpRequestHeaders implements MutableHttpHeaders {
-    final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
-    final ConversionService conversionService;
+public class NettyHttpParameters implements HttpParameters {
+    private final Map<String, List<String>> parameters;
+    private final ConversionService conversionService;
 
-    NettyHttpRequestHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
-        this.nettyHeaders = nettyHeaders;
+    public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
+        this.parameters = parameters;
         this.conversionService = conversionService;
     }
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        String value = nettyHeaders.get(name);
-        if (value != null) {
+        List<String> values = getAll(name);
+        if(!values.isEmpty()) {
+            String value = values.get(0);
             return conversionService.convert(value, requiredType);
         }
         return Optional.empty();
     }
 
     @Override
-    public List<String> getAll(CharSequence name) {
-        return nettyHeaders.getAll(name);
+    public Set<String> getNames() {
+        return Collections.unmodifiableSet(parameters.keySet());
     }
 
     @Override
-    public Set<String> getNames() {
-        return nettyHeaders.names();
+    public List<String> getAll(CharSequence name) {
+        List<String> value = parameters.get(name.toString());
+        if(value != null) {
+            return Collections.unmodifiableList(value);
+        }
+        else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
     public String get(CharSequence name) {
-        return nettyHeaders.get(name);
-    }
-
-    @Override
-    public MutableHttpHeaders add(CharSequence header, CharSequence value) {
-        nettyHeaders.add(header, value);
-        return this;
+        List<String> all = getAll(name);
+        if(all.isEmpty()) {
+            return null;
+        }
+        return all.get(0);
     }
 }

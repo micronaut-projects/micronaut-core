@@ -15,12 +15,19 @@
  */
 package org.particleframework.http.server.netty;
 
+import io.netty.handler.codec.http.QueryStringDecoder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpParameters;
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.server.netty.cookies.NettyCookies;
+import org.particleframework.inject.ExecutableMethod;
 
+import java.lang.annotation.Annotation;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.*;
 
 /**
@@ -35,7 +42,9 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
     private final HttpMethod httpMethod;
     private final URI uri;
     private final NettyHttpRequestHeaders headers;
-
+    private NettyHttpParameters httpParameters;
+    private NettyCookies nettyCookies;
+    private URI path;
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
@@ -43,8 +52,37 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
 
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
-        this.uri = URI.create(nettyRequest.uri());
+        String fullUri = nettyRequest.uri();
+        this.uri = URI.create(fullUri);
         this.headers = new NettyHttpRequestHeaders(nettyRequest.headers(), conversionService);
+    }
+
+    @Override
+    public Cookies getCookies() {
+        NettyCookies cookies = this.nettyCookies;
+        if (cookies == null) {
+            synchronized (this) { // double check
+                cookies = this.nettyCookies;
+                if (cookies == null) {
+                    this.nettyCookies = cookies = new NettyCookies(headers.nettyHeaders, headers.conversionService);
+                }
+            }
+        }
+        return cookies;
+    }
+
+    @Override
+    public HttpParameters getParameters() {
+        NettyHttpParameters httpParameters = this.httpParameters;
+        if (httpParameters == null) {
+            synchronized (this) { // double check
+                httpParameters = this.httpParameters;
+                if (httpParameters == null) {
+                    this.httpParameters = httpParameters = decodeParameters(nettyRequest.uri());
+                }
+            }
+        }
+        return httpParameters;
     }
 
     @Override
@@ -57,6 +95,19 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
         return this.uri;
     }
 
+    @Override
+    public URI getPath() {
+        URI path = this.path;
+        if (path == null) {
+            synchronized (this) { // double check
+                path = this.path;
+                if (path == null) {
+                    this.path = path = decodePath(nettyRequest.uri());
+                }
+            }
+        }
+        return path;
+    }
 
     @Override
     public HttpHeaders getHeaders() {
@@ -67,6 +118,22 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
     public B getBody() {
         // TODO: body handling
         return null;
+    }
+
+
+    private URI decodePath(String uri) {
+        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+        return URI.create(queryStringDecoder.path());
+    }
+
+    private NettyHttpParameters decodeParameters(String uri) {
+        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), headers.conversionService);
+    }
+
+    private QueryStringDecoder createDecoder(String uri) {
+        Charset charset = getCharacterEncoding();
+        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
 }

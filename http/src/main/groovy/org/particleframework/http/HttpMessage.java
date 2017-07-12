@@ -49,7 +49,7 @@ public interface HttpMessage<B> {
     }
 
     /**
-     * The request content type
+     * The request or response content type
      * @return The content type
      */
     default MediaType getContentType() {

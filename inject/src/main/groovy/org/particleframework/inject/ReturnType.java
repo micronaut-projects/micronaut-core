@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.List;
 
 /**
@@ -8,7 +9,7 @@ import java.util.List;
  *
  * @param <T> The concrete type
  */
-public interface ReturnType<T> {
+public interface ReturnType<T> extends AnnotatedElement{
     /**
      * @return The type of the argument
      */
@@ -19,12 +20,13 @@ public interface ReturnType<T> {
      */
     List<Class> getGenericTypes();
 
+
     /**
      * Obtain an annotation for the given type
      *
-     * @param type The annotation type
+     * @param stereotype The annotation stereotype
      * @param <A> The annotation concrete type
      * @return The annotation or null
      */
-    <A extends Annotation> A getAnnotation(Class<A> type);
+    <A extends Annotation> A findAnnotation(Class<A> stereotype);
 }

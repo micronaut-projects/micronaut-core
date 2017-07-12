@@ -82,11 +82,11 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType VND_ERROR = new MediaType("application/vnd.error+json");
 
-    private static final String QUALITY_RATING = "1.0";
-    private static final String CHARSET_PARAMETER = "charset";
+    public static final String CHARSET_PARAMETER = "charset";
+    public static final String Q_PARAMETER = "q";
+    public static final String V_PARAMETER = "v";
     private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
-    private static final String Q_PARAMETER = "q";
-    private static final String V_PARAMETER = "v";
+    private static final String QUALITY_RATING = "1.0";
 
     protected final String name;
     protected final String subtype;

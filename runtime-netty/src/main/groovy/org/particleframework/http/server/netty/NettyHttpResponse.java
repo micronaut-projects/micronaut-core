@@ -16,12 +16,16 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpHeaders;
+import org.particleframework.http.cookie.Cookie;
+import org.particleframework.http.server.netty.cookies.NettyCookies;
 
 /**
  * Delegates to Netty's {@link DefaultFullHttpResponse}
@@ -49,6 +53,24 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
     }
 
     @Override
+    public HttpStatus getStatus() {
+        return HttpStatus.valueOf(nettyResponse.status().code());
+    }
+
+    @Override
+    public HttpResponse addCookie(Cookie cookie) {
+        if(cookie instanceof NettyCookies.NettyCookie) {
+            NettyCookies.NettyCookie nettyCookie = (NettyCookies.NettyCookie) cookie;
+            String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+            headers.add(HttpHeaderNames.SET_COOKIE, value);
+        }
+        else {
+            throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        }
+        return this;
+    }
+
+    @Override
     public B getBody() {
         throw new UnsupportedOperationException("TODO");
     }
@@ -60,6 +82,7 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public HttpResponse setStatus(HttpStatus status, CharSequence message) {
+        message = message == null ? status.getReason() : message;
         nettyResponse.setStatus(new HttpResponseStatus(status.getCode(), message.toString()));
         return this;
     }

@@ -1,6 +1,8 @@
 package org.particleframework.http;
 
 
+import org.particleframework.http.cookie.Cookie;
+
 import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.Map;
@@ -17,6 +19,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     @Override
     MutableHttpHeaders getHeaders();
+
+    /**
+     * @return The current status
+     */
+    HttpStatus getStatus();
+    /**
+     * Adds the specified cookie to the response.  This method can be called
+     * multiple times to set more than one cookie.
+     *
+     * @param cookie the Cookie to return to the client
+     *
+     */
+    HttpResponse addCookie(Cookie cookie);
 
     /**
      * Sets the response encoding

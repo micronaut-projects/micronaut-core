@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.Argument;
 
@@ -15,7 +16,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class DefaultArgument implements Argument {
+class DefaultArgument<T> implements Argument<T> {
     private final Class type;
     private final String name;
     private final Annotation qualifier;
@@ -84,10 +85,15 @@ class DefaultArgument implements Argument {
     }
 
     @Override
-    public Annotation getAnnotation(Class type) {
+    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
+        return AnnotationUtil.findAnnotationWithStereoType(stereotype, annotations);
+    }
+
+    @Override
+    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
         for (Annotation annotation : annotations) {
-            if(type.isInstance(annotation)) {
-                return annotation;
+            if(annotation.annotationType().equals(annotationClass)) {
+                return (A) annotation;
             }
         }
         return null;
@@ -121,6 +127,16 @@ class DefaultArgument implements Argument {
         result = 31 * result + name.hashCode();
         result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
         return result;
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return annotations;
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return annotations;
     }
 
     interface AnnotationResolver {

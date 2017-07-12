@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.io.service;
 
+import org.particleframework.core.cli.Option;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.InstantiationUtils;
 
@@ -91,6 +92,17 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
                                                 Predicate<String> condition)
     {
         return new SoftServiceLoader<>(service, loader, condition);
+    }
+
+    /**
+     * @return Return the first such instance
+     */
+    public Optional<Service<S>> first() {
+        Iterator<Service<S>> i = iterator();
+        if(i.hasNext()) {
+            return Optional.of(i.next());
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -196,7 +208,13 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
 
                 @Override
                 public S load() {
-                    return loadedClass.map(aClass -> InstantiationUtils.instantiate((Class<S>) aClass))
+                    return loadedClass.map(aClass -> {
+                        try {
+                            return InstantiationUtils.instantiate((Class<S>) aClass);
+                        } catch (Throwable e) {
+                            throw new ServiceConfigurationError("Error loading service ["+aClass.getName()+"]: " + e.getMessage(), e);
+                        }
+                    })
                                       .orElseThrow(()-> new ServiceConfigurationError("Call to load() when class '"+nextName+"' is not present"));
                 }
             };

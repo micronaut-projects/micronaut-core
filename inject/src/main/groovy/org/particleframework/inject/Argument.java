@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 
 /**
  * Represents an argument to a method or constructor
@@ -8,7 +9,7 @@ import java.lang.annotation.Annotation;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> {
+public interface Argument<T> extends AnnotatedElement {
     /**
      * @return The name of the argument
      */
@@ -32,9 +33,9 @@ public interface Argument<T> {
     /**
      * Obtain an annotation for the given type
      *
-     * @param type The annotation type
+     * @param stereotype The annotation stereotype
      * @param <A> The annotation concrete type
      * @return The annotation or null
      */
-    <A extends Annotation> A getAnnotation(Class<A> type);
+    <A extends Annotation> A findAnnotation(Class<A> stereotype);
 }
