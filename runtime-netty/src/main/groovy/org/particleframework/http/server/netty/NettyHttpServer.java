@@ -22,6 +22,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
@@ -59,6 +61,7 @@ public class NettyHttpServer implements EmbeddedServer {
         NioEventLoopGroup workerGroup = new NioEventLoopGroup();
         NioEventLoopGroup parentGroup = new NioEventLoopGroup();
         ServerBootstrap serverBootstrap = new ServerBootstrap();
+        boolean hasApplicationContext = applicationContext != null;
         // TODO: allow configuration of channel options
         ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
@@ -66,7 +69,9 @@ public class NettyHttpServer implements EmbeddedServer {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
-                        Optional<Router> routerBean = applicationContext != null ? applicationContext.findBean(Router.class) : Optional.empty();
+
+                        Optional<Router> routerBean = hasApplicationContext ? applicationContext.findBean(Router.class) : Optional.empty();
+                        Optional<RequestBinderRegistry> binderRegistry  = hasApplicationContext ? applicationContext.findBean(RequestBinderRegistry.class) : Optional.empty();
 
                         pipeline.addLast(new HttpServerCodec());
                         pipeline.addLast(new SimpleChannelInboundHandler<HttpRequest>() {
@@ -76,12 +81,14 @@ public class NettyHttpServer implements EmbeddedServer {
                                 NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, applicationContext.getEnvironment());
 
                                 Optional<RouteMatch> routeMatch = routerBean.flatMap((router)->
-                                        router.find(HttpMethod.valueOf(msg.method().name()), msg.uri())
+                                        router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
                                               .filter((match)-> match.test(nettyHttpRequest))
                                               .findFirst()
                                 );
 
                                 routeMatch.ifPresent((route -> {
+                                    // TODO: check the media type vs the route and return 415 if invalid
+
                                     // TODO: here we need to analyze the binding requirements and if
                                     // the body is required then add an additional handler to the pipeline
                                     // right now only URL parameters are supported
@@ -96,10 +103,23 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                         Map<String,Object> arguments = new LinkedHashMap<>();
                                         for (Argument argument : requiredArguments) {
-                                            String name = argument.getName();
-                                            Class type = argument.getType();
+                                            if(binderRegistry.isPresent()) {
+                                                Optional<ArgumentBinder> argumentBinder = binderRegistry.get().findArgumentBinder(argument, nettyHttpRequest);                  if(argumentBinder.isPresent()) {
+                                                    Optional bindingResult = argumentBinder.get()
+                                                            .bind(argument, nettyHttpRequest);
+                                                    if(bindingResult.isPresent()) {
+                                                        arguments.put(argument.getName(), bindingResult.get());
+                                                        continue;
+                                                    }
+                                                }
+                                            }
 
 
+                                            // if we arrived here the request is not processable
+                                            DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
+                                            ctx.channel().writeAndFlush(httpResponse)
+                                                    .addListener(ChannelFutureListener.CLOSE);
+                                            return;
                                         }
                                         result = route.execute(arguments);
                                     }
@@ -121,6 +141,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                 }));
 
                                 if(!routeMatch.isPresent()) {
+                                    // TODO: check if any other routes exist for URI and return 405 if they do
+
                                     // TODO: Here we need to add routing for 404 handlers
                                     DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
                                     ctx.channel().writeAndFlush(httpResponse)

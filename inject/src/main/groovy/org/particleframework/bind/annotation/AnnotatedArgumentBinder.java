@@ -13,28 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding;
+package org.particleframework.bind.annotation;
 
-import org.particleframework.inject.Argument;
+import org.particleframework.bind.ArgumentBinder;
 
-import java.util.Optional;
+import java.lang.annotation.Annotation;
 
 /**
- * An interface capable of binding the value of an {@link Argument} to a source
+ * An {@link ArgumentBinder} whose lookup is driven by an annotation definition
  *
- * @param <T> The argument type
- * @param <S> The source type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ArgumentBinder<T, S> {
+public interface AnnotatedArgumentBinder<A extends Annotation, T, S> extends ArgumentBinder<T, S> {
 
     /**
-     * Bind the given argument from the given source
-     *
-     * @param argument The argument
-     * @param source The source
-     * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
+     * @return The annotation type
      */
-    Optional<T> bind(Argument<T> argument, S source);
+    Class<A> annotationType();
+
 }

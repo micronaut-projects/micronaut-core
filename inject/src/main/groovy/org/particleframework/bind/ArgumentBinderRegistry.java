@@ -13,29 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation.bind;
+package org.particleframework.bind;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import org.particleframework.inject.Argument;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.util.Optional;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from a specific part
- * of a "multipart/form-data" request.
+ * A registry of {@link ArgumentBinder} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface Part {
+public interface ArgumentBinderRegistry<S> {
+
+
     /**
-     * @return The name of the part, otherwise it is inferred from the parameter name
+     * Locate an {@link ArgumentBinder} for the given argument and source type
+     *
+     * @param argument The argument
+     * @param source The source
+     * @param <T> The argument type
+     * @return An {@link Optional} of {@link ArgumentBinder}
      */
-    String value() default "";
+    <T> Optional<ArgumentBinder<T,S>> findArgumentBinder(Argument<T> argument, S source);
 }

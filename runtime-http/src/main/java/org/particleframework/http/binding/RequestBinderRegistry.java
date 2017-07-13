@@ -13,24 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation.bind;
+package org.particleframework.http.binding;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import org.particleframework.bind.ArgumentBinderRegistry;
+import org.particleframework.http.HttpRequest;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from the HTTP body
+ * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface Body {
+public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest> {
 }

@@ -35,7 +35,7 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -46,7 +46,7 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -58,7 +58,19 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
 
         then:
-        new URL("http://localhost:$newPort/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:$newPort/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
+    void "test bind method argument from request parameter"() {
+        when:
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+
+        then:
+        new URL("http://localhost:$newPort/person/another/job?id=10").getText(readTimeout:3000) == "JOB ID 10"
 
         cleanup:
         applicationContext?.stop()
@@ -75,6 +87,11 @@ class NettyHttpServerSpec extends Specification {
         @Put('/job/{name}')
         void doWork(String name) {
             println 'doing work'
+        }
+
+        @Get('/another/job')
+        String doMoreWork(int id) {
+            "JOB ID $id"
         }
     }
 }
