@@ -16,6 +16,7 @@
 package org.particleframework.http.binding.binders.request;
 
 import org.particleframework.bind.annotation.AbstractAnnotatedArgumentBinder;
+import org.particleframework.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
@@ -31,7 +32,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Cookie, T, HttpRequest> {
+public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Cookie, T, HttpRequest> implements AnnotatedRequestArgumentBinder<Cookie, T> {
     public CookieAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }

@@ -76,6 +76,20 @@ class NettyHttpServerSpec extends Specification {
         applicationContext?.stop()
     }
 
+    void "test bind method argument from request parameter when parameter missing"() {
+        when:"A required request parameter is missing"
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+        new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:3000)
+
+        then:"A 404 is returned"
+        thrown(FileNotFoundException)
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
+
     @Controller
     static class PersonController {
 

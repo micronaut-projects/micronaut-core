@@ -24,6 +24,7 @@ import org.particleframework.inject.Argument;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.TypeVariable;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -45,7 +46,15 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         Object value = resolveValue(argument, values, argumentType, annotationValue);
 
         if(value == null) {
-            return Optional.empty();
+            String fallbackName = getFallbackFormat(argument);
+            if(!annotationValue.equals(fallbackName)) {
+
+                annotationValue = fallbackName;
+                value = resolveValue(argument, values, argumentType, annotationValue);
+                if(value == null) {
+                    return Optional.empty();
+                }
+            }
         }
 
         Class[] genericTypes = argument.getGenericTypes();
@@ -63,25 +72,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        Optional<T> result = doConvert(value, argumentType, typeParameterMap);
-        if(result.isPresent()) {
-            return result;
-        }
-        else {
-            String fallbackName = getFallbackFormat(argument);
-            if(!annotationValue.equals(fallbackName)) {
-
-                annotationValue = fallbackName;
-                value = resolveValue(argument, values, argumentType, annotationValue);
-                if(value == null) {
-                    return Optional.empty();
-                }
-                return doConvert(value, argumentType, typeParameterMap);
-            }
-            else {
-                return result;
-            }
-        }
+        return doConvert(value, argumentType, typeParameterMap);
     }
 
     private Object resolveValue(Argument<T> argument, ConvertibleValues<?> values, Class<T> argumentType, String annotationValue) {
@@ -91,7 +82,12 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         Object value = values.get(annotationValue, Object.class).orElse(null);
         if(values instanceof ConvertibleMultiValues && isManyObjects(argumentType)) {
             ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
-            value = multiValues.getAll(annotationValue);
+            List<?> all = multiValues.getAll(annotationValue);
+            if(all != null && all.isEmpty()) {
+                return null;
+            }
+            value = all;
+
         }
         else if(Map.class.isAssignableFrom(argumentType)) {
             value = values;

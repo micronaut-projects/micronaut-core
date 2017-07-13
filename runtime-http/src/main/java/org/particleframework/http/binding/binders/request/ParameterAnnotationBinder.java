@@ -19,6 +19,7 @@ import org.particleframework.bind.annotation.AbstractAnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.binding.annotation.Cookie;
 import org.particleframework.http.binding.annotation.Parameter;
 import org.particleframework.inject.Argument;
 
@@ -28,7 +29,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Parameter, T, HttpRequest> {
+public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Parameter, T, HttpRequest> implements AnnotatedRequestArgumentBinder<Parameter, T> {
     public ParameterAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }

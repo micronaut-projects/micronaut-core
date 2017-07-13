@@ -22,6 +22,10 @@ import java.lang.annotation.Annotation;
 /**
  * An {@link ArgumentBinder} whose lookup is driven by an annotation definition
  *
+ * @param <A> The annotation type
+ * @param <T> The argument type
+ * @param <S> The binding source type
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
