@@ -42,6 +42,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     default Locale getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
                 .map((text)-> {
+                    int len = text.length();
+                    if(len == 0 || (len == 1 && text.charAt(0) == '*')) {
+                        return Locale.getDefault().toLanguageTag();
+                    }
                     if(text.indexOf(';')>-1) {
                         text = text.split(";")[0];
                     }
