@@ -13,27 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding
+package org.particleframework.bind.annotation;
 
-import groovy.transform.CompileStatic
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Factory
-import org.particleframework.core.convert.ConversionService
-import org.particleframework.http.binding.binders.request.RequestArgumentBinder
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
 
-import javax.inject.Singleton
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * Annotation used to describe the format in the case where the format of an {@link org.particleframework.inject.Argument} to bound
+ * needs to be altered. Commonly use to alter the formatting of {@link java.time.ZonedDateTime} instances.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-@CompileStatic
-class RequestBinderRegistryFactory {
+@Documented
+@Retention(RUNTIME)
+public @interface Format {
 
-    @Singleton
-    @Bean
-    RequestBinderRegistry requestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
-        return new DefaultRequestBinderRegistry(conversionService, binders)
-    }
+    String value();
 }

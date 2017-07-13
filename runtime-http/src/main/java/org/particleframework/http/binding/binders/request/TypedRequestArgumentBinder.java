@@ -13,27 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding
+package org.particleframework.http.binding.binders.request;
 
-import groovy.transform.CompileStatic
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Factory
-import org.particleframework.core.convert.ConversionService
-import org.particleframework.http.binding.binders.request.RequestArgumentBinder
-
-import javax.inject.Singleton
+import org.particleframework.bind.TypeArgumentBinder;
+import org.particleframework.http.HttpRequest;
 
 /**
+ * A {@link TypeArgumentBinder} that binds from an {@link HttpRequest}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-@CompileStatic
-class RequestBinderRegistryFactory {
-
-    @Singleton
-    @Bean
-    RequestBinderRegistry requestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
-        return new DefaultRequestBinderRegistry(conversionService, binders)
-    }
+public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest> {
 }

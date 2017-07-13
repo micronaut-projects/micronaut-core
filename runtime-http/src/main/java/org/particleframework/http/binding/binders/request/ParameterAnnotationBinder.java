@@ -19,7 +19,6 @@ import org.particleframework.bind.annotation.AbstractAnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.binding.annotation.Cookie;
 import org.particleframework.http.binding.annotation.Parameter;
 import org.particleframework.inject.Argument;
 
@@ -44,6 +43,6 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         String parameterName = annotation == null ? argument.getName() : annotation.value();
-        return doBind(argument, parameters, parameterName);
+        return doBind(argument, parameters, parameterName, source.getLocale());
     }
 }

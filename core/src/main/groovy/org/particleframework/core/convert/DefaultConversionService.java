@@ -16,6 +16,11 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,13 +41,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         registerDefaultConverters();
     }
 
-    @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType) {
-        return convert(object, targetType, Collections.emptyMap());
-    }
 
     @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
+    public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
         if (object == null) {
             return Optional.empty();
         }
@@ -54,15 +55,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         targetType = ReflectionUtils.getWrapperType(targetType);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
-        if (typeConverter != null) {
-            return typeConverter.convert(object, targetType);
-        } else {
+        if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType);
-            if (typeConverter != null) {
-                return typeConverter.convert(object, targetType, typeArguments);
+            if (typeConverter == null) {
+                return Optional.empty();
             }
         }
-        return Optional.empty();
+        return typeConverter.convert(object, targetType, context);
     }
 
     @Override
@@ -74,8 +73,60 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     protected void registerDefaultConverters() {
+
+        // CharSequence -> ZonedDateTime
+        addConverter(
+                CharSequence.class,
+                ZonedDateTime.class,
+                (object, targetType, context) -> {
+                    try {
+                        DateTimeFormatter formatter = context.getFormat()
+                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        ZonedDateTime result = ZonedDateTime.parse(object, formatter);
+                        return Optional.of(result);
+                    } catch (DateTimeParseException e) {
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        // CharSequence -> LocalDataTime
+        addConverter(
+                CharSequence.class,
+                LocalDateTime.class,
+                (object, targetType, context) -> {
+                    try {
+                        DateTimeFormatter formatter = context.getFormat()
+                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        LocalDateTime result = LocalDateTime.parse(object, formatter);
+                        return Optional.of(result);
+                    } catch (DateTimeParseException e) {
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        // CharSequence -> LocalDate
+        addConverter(
+                CharSequence.class,
+                LocalDate.class,
+                (object, targetType, context) -> {
+                    try {
+                        DateTimeFormatter formatter = context.getFormat()
+                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        LocalDate result = LocalDate.parse(object, formatter);
+                        return Optional.of(result);
+                    } catch (DateTimeParseException e) {
+                        return Optional.empty();
+                    }
+                }
+        );
+
         // String -> Integer
-        addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {
             try {
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
@@ -85,7 +136,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Number
-        addConverter(CharSequence.class, Number.class, (CharSequence object, Class<Number> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Number.class, (CharSequence object, Class<Number> targetType, ConversionContext context) -> {
             try {
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
@@ -95,7 +146,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Long
-        addConverter(CharSequence.class, Long.class, (CharSequence object, Class<Long> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Long.class, (CharSequence object, Class<Long> targetType, ConversionContext context) -> {
             try {
                 Long converted = Long.valueOf(object.toString());
                 return Optional.of(converted);
@@ -105,7 +156,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Short
-        addConverter(CharSequence.class, Short.class, (CharSequence object, Class<Short> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Short.class, (CharSequence object, Class<Short> targetType, ConversionContext context) -> {
             try {
                 Short converted = Short.valueOf(object.toString());
                 return Optional.of(converted);
@@ -115,7 +166,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> BigDecimal
-        addConverter(CharSequence.class, BigDecimal.class, (CharSequence object, Class<BigDecimal> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, BigDecimal.class, (CharSequence object, Class<BigDecimal> targetType, ConversionContext context) -> {
             try {
                 BigDecimal converted = new BigDecimal(object.toString());
                 return Optional.of(converted);
@@ -125,7 +176,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Boolean
-        addConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, ConversionContext context) -> {
             String booleanString = object.toString().toLowerCase(Locale.ENGLISH);
             switch (booleanString) {
                 case "yes":
@@ -139,7 +190,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> URL
-        addConverter(CharSequence.class, URL.class, (CharSequence object, Class<URL> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, URL.class, (CharSequence object, Class<URL> targetType, ConversionContext context) -> {
             try {
                 return Optional.of(new URL(object.toString()));
             } catch (MalformedURLException e) {
@@ -148,7 +199,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> URI
-        addConverter(CharSequence.class, URI.class, (CharSequence object, Class<URI> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, URI.class, (CharSequence object, Class<URI> targetType, ConversionContext context) -> {
             try {
                 return Optional.of(new URI(object.toString()));
             } catch (URISyntaxException e) {
@@ -157,7 +208,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> UUID
-        addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
             try {
                 return Optional.of(UUID.fromString(object.toString()));
             } catch (IllegalArgumentException e) {
@@ -166,7 +217,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Currency
-        addConverter(CharSequence.class, Currency.class, (CharSequence object, Class<Currency> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Currency.class, (CharSequence object, Class<Currency> targetType, ConversionContext context) -> {
             try {
                 return Optional.of(Currency.getInstance(object.toString()));
             } catch (IllegalArgumentException e) {
@@ -176,10 +227,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
 
         // String -> TimeZone
-        addConverter(CharSequence.class, TimeZone.class, (CharSequence object, Class<TimeZone> targetType, Map<String, Class> typeArguments) -> Optional.of(TimeZone.getTimeZone(object.toString())));
+        addConverter(CharSequence.class, TimeZone.class, (CharSequence object, Class<TimeZone> targetType, ConversionContext context) -> Optional.of(TimeZone.getTimeZone(object.toString())));
 
         // String -> Charset
-        addConverter(CharSequence.class, Charset.class, (CharSequence object, Class<Charset> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Charset.class, (CharSequence object, Class<Charset> targetType, ConversionContext context) -> {
             try {
                 return Optional.of(Charset.forName(object.toString()));
             } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
@@ -188,7 +239,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Character
-        addConverter(CharSequence.class, Character.class, (CharSequence object, Class<Character> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Character.class, (CharSequence object, Class<Character> targetType, ConversionContext context) -> {
             String str = object.toString();
             if (str.length() == 1) {
                 return Optional.of(str.charAt(0));
@@ -198,7 +249,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Array
-        addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, ConversionContext context) -> {
             String str = object.toString();
             String[] strings = str.split(",");
             Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
@@ -214,7 +265,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Enum
-        addConverter(CharSequence.class, Enum.class, (CharSequence object, Class<Enum> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Enum.class, (CharSequence object, Class<Enum> targetType, ConversionContext context) -> {
             try {
                 Enum val = Enum.valueOf(targetType, object.toString());
                 return Optional.of(val);
@@ -229,10 +280,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // Object -> String
-        addConverter(Object.class, String.class, (Object object, Class<String> targetType, Map<String, Class> typeArguments) -> Optional.of(object.toString()));
+        addConverter(Object.class, String.class, (Object object, Class<String> targetType, ConversionContext context) -> Optional.of(object.toString()));
 
         // Number -> Number
-        addConverter(Number.class, Number.class, (Number object, Class<Number> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(Number.class, Number.class, (Number object, Class<Number> targetType, ConversionContext context) -> {
             Class targetNumberType = ReflectionUtils.getWrapperType(targetType);
             if (targetNumberType.isInstance(object)) {
                 return Optional.of(object);
@@ -261,10 +312,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> List/Iterable
-        addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, Map<String, Class> typeArguments) -> {
+        addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, ConversionContext context) -> {
             TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
-            Class targetComponentType = typeArguments.get(name);
+            Class targetComponentType = context.getTypeVariables().get(name);
             if(targetComponentType == null) {
                 targetComponentType = Object.class;
             }
@@ -280,10 +331,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(list);
         });
 
-        addConverter(Object.class, Optional.class, (object, targetType, typeArguments) -> {
+        addConverter(Object.class, Optional.class, (object, targetType, context) -> {
             TypeVariable<Class<Optional>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
-            Class targetComponentType = typeArguments.get(name);
+            Class targetComponentType = context.getTypeVariables().get(name);
             if(targetComponentType == null) targetComponentType = Object.class;
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             Optional converted = convert(object, targetComponentType);
@@ -296,10 +347,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // Iterable -> Iterable (inner type conversion)
-        addConverter(Iterable.class, Iterable.class, (object, targetType, typeArguments) -> {
-            TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
-            String name = typeVariable.getName();
-            Class targetComponentType = typeArguments.get(name);
+        addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
+            Class targetComponentType = resolveComponentTypeForIterable(targetType, context);
             if(targetType.isInstance(object)) {
                 if(targetComponentType == null) {
                     return Optional.of(object);
@@ -326,7 +375,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // Map -> Map (inner type conversion)
-        addConverter(Map.class, Map.class, (object, targetType, typeArguments) -> {
+        addConverter(Map.class, Map.class, (object, targetType, context) -> {
             TypeVariable<Class<Map>>[] typeParameters = targetType.getTypeParameters();
             Class keyType = String.class;
             Class valueType = Object.class;
@@ -337,11 +386,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             else if(typeParameters.length == 2) {
 
-                keyType = typeArguments.get(typeParameters[0].getName());
+                keyType = context.getTypeVariables().get(typeParameters[0].getName());
                 if(keyType == null) {
                     keyType = String.class;
                 }
-                valueType = typeArguments.get(typeParameters[1].getName());
+                valueType = context.getTypeVariables().get(typeParameters[1].getName());
                 if(valueType == null) {
                     valueType = Object.class;
                 }
@@ -374,6 +423,17 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(newMap);
         });
 
+    }
+
+    private Class resolveComponentTypeForIterable(Class<Iterable> targetType, ConversionContext context) {
+        TypeVariable<Class<Iterable>>[] typeParameters = targetType.getTypeParameters();
+        if(typeParameters != null && typeParameters.length > 0) {
+
+            TypeVariable<Class<Iterable>> typeVariable = typeParameters[0];
+            String name = typeVariable != null ? typeVariable.getName() : null;
+            return name != null ? context.getTypeVariables().get(name) : null;
+        }
+        return null;
     }
 
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType) {
@@ -443,10 +503,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
 
-            ConvertiblePair that = (ConvertiblePair) o;
+            ConvertiblePair pair = (ConvertiblePair) o;
 
-            if (!source.equals(that.source)) return false;
-            return target.equals(that.target);
+            if (!source.equals(pair.source)) return false;
+            return target.equals(pair.target);
         }
 
         @Override

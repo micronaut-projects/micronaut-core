@@ -15,6 +15,7 @@
  */
 package org.particleframework.bind.annotation;
 
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.convert.ConvertibleValues;
@@ -23,10 +24,7 @@ import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.TypeVariable;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -41,10 +39,10 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         this.conversionService = conversionService;
     }
 
-    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue) {
+    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale) {
         Class<T> argumentType = argument.getType();
         Object value = resolveValue(argument, values, argumentType, annotationValue);
-
+        Format formatAnn = argument.findAnnotation(Format.class);
         if(value == null) {
             String fallbackName = getFallbackFormat(argument);
             if(!annotationValue.equals(fallbackName)) {
@@ -72,7 +70,24 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        return doConvert(value, argumentType, typeParameterMap);
+        ConversionContext conversionContext;
+        if(formatAnn != null) {
+            if(typeParameterMap != null) {
+                conversionContext = ConversionContext.of(typeParameterMap, formatAnn.value(), locale);
+            }
+            else{
+                conversionContext = ConversionContext.of(formatAnn.value(), locale);
+            }
+        }
+        else {
+            if(typeParameterMap != null) {
+                conversionContext = ConversionContext.of(typeParameterMap);
+            }
+            else{
+                conversionContext = ConversionContext.DEFAULT;
+            }
+        }
+        return doConvert(value, argumentType, conversionContext);
     }
 
     private Object resolveValue(Argument<T> argument, ConvertibleValues<?> values, Class<T> argumentType, String annotationValue) {
@@ -99,15 +114,14 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         return argumentType.isArray() || Iterable.class.isAssignableFrom(argumentType) || Stream.class.isAssignableFrom(argumentType);
     }
 
-    private Optional<T> doConvert(Object value, Class<T> targetType, Map<String, Class> typeParmeterMap) {
-        Optional<T> result;
-        if(typeParmeterMap != null) {
-            result = conversionService.convert(value, targetType, typeParmeterMap);
+    private Optional<T> doConvert(Object value, Class<T> targetType, ConversionContext context) {
+        Optional<T> result = conversionService.convert(value, targetType, context);
+        if(targetType == Optional.class && result.isPresent() ) {
+            return (Optional<T>)result.get();
         }
         else {
-            result = conversionService.convert(value, targetType);
+            return result;
         }
-        return result;
     }
 
     protected String getFallbackFormat(Argument argument) {

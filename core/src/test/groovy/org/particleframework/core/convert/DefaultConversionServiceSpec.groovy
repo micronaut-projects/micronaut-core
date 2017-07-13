@@ -44,7 +44,7 @@ class DefaultConversionServiceSpec extends Specification {
         ConversionService conversionService = new DefaultConversionService()
 
         expect:
-        conversionService.convert(sourceObject, targetType, typeArguments).get() == result
+        conversionService.convert(sourceObject, targetType, ConversionContext.of(typeArguments)).get() == result
 
         where:
         sourceObject | targetType | typeArguments | result

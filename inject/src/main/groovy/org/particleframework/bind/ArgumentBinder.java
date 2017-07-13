@@ -39,6 +39,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@FunctionalInterface
 public interface ArgumentBinder<T, S> {
 
     /**

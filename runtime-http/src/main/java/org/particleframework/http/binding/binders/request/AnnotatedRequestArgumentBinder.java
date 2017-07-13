@@ -15,14 +15,41 @@
  */
 package org.particleframework.http.binding.binders.request;
 
+import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.http.HttpRequest;
+import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends RequestArgumentBinder<T>, AnnotatedArgumentBinder<A, T, HttpRequest> {
+
+    /**
+     * Create a binder from an annotation type and another binder
+     *
+     * @param annotationType The annotation type
+     * @param binder The binder
+     * @param <SA> The annotation generic type
+     * @param <ST> The argument type
+     * @return The {@link AnnotatedRequestArgumentBinder}
+     */
+    static <SA extends Annotation, ST> AnnotatedRequestArgumentBinder of(Class<SA> annotationType, ArgumentBinder<ST, HttpRequest> binder) {
+        return new AnnotatedRequestArgumentBinder<SA, ST>() {
+
+            @Override
+            public Optional<ST> bind(Argument<ST> argument, HttpRequest source) {
+                return binder.bind(argument, source);
+            }
+
+            @Override
+            public Class<SA> annotationType() {
+                return annotationType;
+            }
+        };
+    }
 }

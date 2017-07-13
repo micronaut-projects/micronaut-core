@@ -104,10 +104,15 @@ public class NettyHttpServer implements EmbeddedServer {
                                         Map<String,Object> arguments = new LinkedHashMap<>();
                                         for (Argument argument : requiredArguments) {
                                             if(binderRegistry.isPresent()) {
-                                                Optional<ArgumentBinder> argumentBinder = binderRegistry.get().findArgumentBinder(argument, nettyHttpRequest);                  if(argumentBinder.isPresent()) {
+                                                Optional<ArgumentBinder> argumentBinder = binderRegistry.get().findArgumentBinder(argument, nettyHttpRequest);
+                                                if(argumentBinder.isPresent()) {
                                                     Optional bindingResult = argumentBinder.get()
                                                             .bind(argument, nettyHttpRequest);
-                                                    if(bindingResult.isPresent()) {
+                                                    if(argument.getType() == Optional.class) {
+                                                        arguments.put(argument.getName(), bindingResult);
+                                                        continue;
+                                                    }
+                                                    else if(bindingResult.isPresent()) {
                                                         arguments.put(argument.getName(), bindingResult.get());
                                                         continue;
                                                     }

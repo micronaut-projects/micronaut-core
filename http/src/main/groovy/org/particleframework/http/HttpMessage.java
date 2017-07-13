@@ -35,7 +35,7 @@ public interface HttpMessage<B> {
     HttpHeaders getHeaders();
 
     /**
-     * @return The HTTP message body
+     * @return The request body
      */
     B getBody();
 

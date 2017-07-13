@@ -44,6 +44,7 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
     private final NettyHttpRequestHeaders headers;
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
+    private Locale locale;
     private URI path;
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
@@ -55,6 +56,20 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
         String fullUri = nettyRequest.uri();
         this.uri = URI.create(fullUri);
         this.headers = new NettyHttpRequestHeaders(nettyRequest.headers(), conversionService);
+    }
+
+    @Override
+    public Locale getLocale() {
+        Locale locale = this.locale;
+        if (locale == null) {
+            synchronized (this) { // double check
+                locale = this.locale;
+                if (locale == null) {
+                    this.locale = locale = HttpRequest.super.getLocale();
+                }
+            }
+        }
+        return locale;
     }
 
     @Override

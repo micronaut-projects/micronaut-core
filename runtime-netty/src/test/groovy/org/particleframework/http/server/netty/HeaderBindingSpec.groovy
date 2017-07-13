@@ -16,11 +16,18 @@
 package org.particleframework.http.server.netty
 
 import okhttp3.Request
+import org.particleframework.bind.annotation.Format
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.MediaType
 import org.particleframework.http.binding.annotation.Header
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
+import spock.lang.Shared
+import spock.lang.Unroll
+
+import java.time.LocalDate
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * @author Graeme Rocher
@@ -28,22 +35,41 @@ import org.particleframework.web.router.annotation.Get
  */
 class HeaderBindingSpec extends AbstractParticleSpec {
 
-    void "test bind HTTP headers"() {
+    @Shared
+    ZonedDateTime timeNow = ZonedDateTime.now()
+
+    @Shared
+    String now = timeNow.format(DateTimeFormatter.RFC_1123_DATE_TIME)
+
+    @Shared
+    String formatted = timeNow.format(DateTimeFormatter.ofPattern('dd/MM/yyy'))
+
+    @Unroll
+    void "test bind HTTP headers for URI #uri"() {
         expect:
+        def request = new Request.Builder()
+                .url("$server$uri")
+
+        for (header in headers) {
+            request = request.header(header.key, header.value)
+        }
         client.newCall(
-                new Request.Builder()
-                        .url("$server$uri")
-                        .header("Content-Type", "application/json")
-                        .build()
+                request.build()
         ).execute().body().string() == result
 
+
+
         where:
-        uri                 | result
-        '/header/multiple'  | "Header: [application/json]"
-        '/header/simple'    | "Header: application/json"
-        '/header/withValue' | "Header: application/json"
-//        '/header/withMediaType' | "Header: application/json" TODO
-//        '/header/all' | "Header: application/json" TODO
+        uri                     | result                       | headers
+        '/header/formattedDate' | "Header: $formatted"         | ['Date': formatted]
+        '/header/optional'      | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/optional'      | "Header: Not-Present"        | [:]
+        '/header/date'          | "Header: $now"               | ['Date': now]
+        '/header/withMediaType' | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/all'           | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/multiple'      | "Header: [application/json]" | ['Content-Type': 'application/json']
+        '/header/simple'        | "Header: application/json"   | ['Content-Type': 'application/json']
+        '/header/withValue'     | "Header: application/json"   | ['Content-Type': 'application/json']
 
     }
 
@@ -53,6 +79,21 @@ class HeaderBindingSpec extends AbstractParticleSpec {
         @Get
         String simple(@Header String contentType) {
             "Header: $contentType"
+        }
+
+        @Get
+        String optional(@Header Optional<MediaType> contentType) {
+            "Header: ${contentType.map({ it.name }).orElse('Not-Present')}"
+        }
+
+        @Get
+        String date(@Header ZonedDateTime date) {
+            "Header: ${date.format(DateTimeFormatter.RFC_1123_DATE_TIME)}"
+        }
+
+        @Get
+        String formattedDate(@Format('dd/MM/yyy') @Header LocalDate date) {
+            "Header: ${date.format(DateTimeFormatter.ofPattern('dd/MM/yyy'))}"
         }
 
         @Get
@@ -66,7 +107,7 @@ class HeaderBindingSpec extends AbstractParticleSpec {
         }
 
         @Get
-        String withValue(@Header MediaType contentType) {
+        String withMediaType(@Header MediaType contentType) {
             "Header: $contentType"
         }
 

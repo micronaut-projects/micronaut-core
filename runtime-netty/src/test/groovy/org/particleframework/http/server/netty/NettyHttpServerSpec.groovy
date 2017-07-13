@@ -17,6 +17,7 @@ package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.binding.annotation.Parameter
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get

@@ -1,7 +1,5 @@
 package org.particleframework.core.convert;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -21,7 +19,7 @@ public interface ConversionService<Impl extends ConversionService> {
      * @return The optional
      */
     default <T> Optional<T> convert(Object object, Class<T> targetType) {
-        return convert(object, targetType, Collections.emptyMap());
+        return convert(object, targetType, ConversionContext.DEFAULT);
     }
 
     /**
@@ -29,11 +27,11 @@ public interface ConversionService<Impl extends ConversionService> {
      *
      * @param object        The object to convert
      * @param targetType    The target type
-     * @param typeArguments The type arguments in the case where the target type accepts generic arguments such as collections etc.
+     * @param context       The conversion context
      * @param <T>           The generic type
      * @return The optional
      */
-    <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments);
+    <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context);
 
     /**
      * Adds a type converter

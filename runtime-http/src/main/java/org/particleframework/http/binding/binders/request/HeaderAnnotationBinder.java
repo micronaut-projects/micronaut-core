@@ -21,7 +21,6 @@ import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.binding.annotation.Cookie;
 import org.particleframework.http.binding.annotation.Header;
 import org.particleframework.inject.Argument;
 
@@ -45,7 +44,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         Header annotation = argument.getAnnotation(Header.class);
         String parameterName = annotation.value();
-        return doBind(argument, parameters, parameterName);
+        return doBind(argument, parameters, parameterName, source.getLocale());
     }
 
     @Override

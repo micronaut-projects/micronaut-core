@@ -5,7 +5,6 @@ import org.particleframework.http.cookie.Cookies;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.Collection;
 import java.util.Locale;
 
 /**
@@ -14,7 +13,7 @@ import java.util.Locale;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpRequest<T> extends HttpMessage<T> {
+public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
      * @return The {@link Cookies} instance
@@ -42,8 +41,17 @@ public interface HttpRequest<T> extends HttpMessage<T> {
     @Override
     default Locale getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-                .map(Locale::new)
-                .orElse(null);
+                .map((text)-> {
+                    if(text.indexOf(';')>-1) {
+                        text = text.split(";")[0];
+                    }
+                    if(text.indexOf(',')>-1) {
+                        text = text.split(",")[0];
+                    }
+                    return text;
+                })
+                .map(Locale::forLanguageTag)
+                .orElse(Locale.getDefault());
     }
 
     /**
