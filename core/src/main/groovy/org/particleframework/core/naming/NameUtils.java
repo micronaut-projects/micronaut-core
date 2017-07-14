@@ -88,35 +88,71 @@ public class NameUtils {
      *
      */
     public static String hyphenate(String name) {
-        StringBuilder newName = new StringBuilder();
-        char[] chars = name.toCharArray();
-        boolean first = true;
-        char last = '0';
-        for (char c : chars) {
+        return hyphenate(name, true);
+    }
 
-            if(Character.isLowerCase(c) || !Character.isLetter(c)) {
-                if(c == '.') {
-                    first =false;
-                }
-                newName.append(c);
-            }
-            else {
-                char lowerCaseChar = Character.toLowerCase(c);
+    /**
+     * Converts camel case to hyphenated, lowercase form
+     *
+     * @param name The name
+     * @return The hyphenated string
+     *
+     */
+    public static String hyphenate(String name, boolean lowerCase) {
+        if(!lowerCase) {
+            StringBuilder newName = new StringBuilder();
+            boolean first = true;
+            char last = '0';
+            for (char c : name.toCharArray()) {
                 if(first) {
+                    newName.append(c);
                     first = false;
-                    newName.append(lowerCaseChar);
-                }
-                else if(Character.isUpperCase(last) || last == '.') {
-                    newName.append(lowerCaseChar);
                 }
                 else {
-                    newName.append('-').append(lowerCaseChar);
+                    if( Character.isUpperCase(c) && !Character.isUpperCase(last)) {
+                        newName.append('-').append(c);
+                    }
+                    else {
+                        if(c == '.') first = true;
+                        newName.append(c);
+                    }
                 }
+                last = c;
             }
-            last = c;
+            return newName.toString();
         }
+        else {
 
-        return newName.toString();
+            StringBuilder newName = new StringBuilder();
+            char[] chars = name.toCharArray();
+            boolean first = true;
+            char last = '0';
+            for (char c : chars) {
+
+                if(Character.isLowerCase(c) || !Character.isLetter(c)) {
+                    if(c == '.') {
+                        first =false;
+                    }
+                    newName.append(c);
+                }
+                else {
+                    char lowerCaseChar = Character.toLowerCase(c);
+                    if(first) {
+                        first = false;
+                        newName.append(lowerCaseChar);
+                    }
+                    else if(Character.isUpperCase(last) || last == '.') {
+                        newName.append(lowerCaseChar);
+                    }
+                    else {
+                        newName.append('-').append(lowerCaseChar);
+                    }
+                }
+                last = c;
+            }
+
+            return newName.toString();
+        }
     }
 
     /**

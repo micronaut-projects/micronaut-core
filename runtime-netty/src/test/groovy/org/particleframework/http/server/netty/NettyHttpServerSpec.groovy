@@ -17,6 +17,7 @@ package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.binding.annotation.Parameter
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
@@ -35,7 +36,7 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -46,7 +47,7 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -58,11 +59,37 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
 
         then:
-        new URL("http://localhost:$newPort/person/Fred").getText() == "Person Named Fred"
+        new URL("http://localhost:$newPort/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
     }
+
+    void "test bind method argument from request parameter"() {
+        when:
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+
+        then:
+        new URL("http://localhost:$newPort/person/another/job?id=10").getText(readTimeout:3000) == "JOB ID 10"
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
+    void "test bind method argument from request parameter when parameter missing"() {
+        when:"A required request parameter is missing"
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+        new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:3000)
+
+        then:"A 404 is returned"
+        thrown(FileNotFoundException)
+
+        cleanup:
+        applicationContext?.stop()
+    }
+
 
     @Controller
     static class PersonController {
@@ -75,6 +102,11 @@ class NettyHttpServerSpec extends Specification {
         @Put('/job/{name}')
         void doWork(String name) {
             println 'doing work'
+        }
+
+        @Get('/another/job')
+        String doMoreWork(int id) {
+            "JOB ID $id"
         }
     }
 }

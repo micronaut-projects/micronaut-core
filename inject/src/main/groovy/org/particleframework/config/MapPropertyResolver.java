@@ -1,5 +1,6 @@
 package org.particleframework.config;
 
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 
@@ -29,6 +30,6 @@ public class MapPropertyResolver implements PropertyResolver {
     @Override
     public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
         Object value = map.get(name);
-        return conversionService.convert(value, requiredType, typeArguments);
+        return conversionService.convert(value, requiredType, ConversionContext.of(typeArguments));
     }
 }

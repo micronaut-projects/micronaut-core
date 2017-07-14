@@ -17,6 +17,7 @@ package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
 
+import java.net.URI;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -27,6 +28,17 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface Router {
+
+    /**
+     * Finds all of the possible routes for the given HTTP method and URI
+     *
+     * @param httpMethod The HTTP method
+     * @param uri The URI
+     * @return A {@link Stream} of possible {@link Route} instances.
+     */
+    default Stream<RouteMatch> find(HttpMethod httpMethod, URI uri) {
+        return find(httpMethod, uri.toString());
+    }
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI

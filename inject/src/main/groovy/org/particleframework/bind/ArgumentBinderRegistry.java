@@ -13,28 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding;
+package org.particleframework.bind;
 
 import org.particleframework.inject.Argument;
 
 import java.util.Optional;
 
 /**
- * An interface capable of binding the value of an {@link Argument} to a source
+ * A registry of {@link ArgumentBinder} instances
  *
- * @param <T> The argument type
- * @param <S> The source type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ArgumentBinder<T, S> {
+public interface ArgumentBinderRegistry<S> {
+
 
     /**
-     * Bind the given argument from the given source
+     * Locate an {@link ArgumentBinder} for the given argument and source type
      *
      * @param argument The argument
      * @param source The source
-     * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
+     * @param <T> The argument type
+     * @return An {@link Optional} of {@link ArgumentBinder}
      */
-    Optional<T> bind(Argument<T> argument, S source);
+    <T> Optional<ArgumentBinder<T,S>> findArgumentBinder(Argument<T> argument, S source);
 }

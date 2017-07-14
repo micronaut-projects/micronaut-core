@@ -2,6 +2,7 @@ package org.particleframework.context.env;
 
 import org.particleframework.config.MapPropertyResolver;
 import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
@@ -110,11 +111,11 @@ public class DefaultEnvironment implements Environment {
             if(entries != null) {
                 Object value = entries.get(name);
                 if(value != null) {
-                    return conversionService.convert(value, requiredType, typeArguments);
+                    return conversionService.convert(value, requiredType, ConversionContext.of(typeArguments));
                 }
                 else if(Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return conversionService.convert(subMap, requiredType, typeArguments);
+                    return conversionService.convert(subMap, requiredType, ConversionContext.of(typeArguments));
                 }
                 else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
@@ -136,14 +137,14 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
+        return conversionService.convert(object, targetType, context);
     }
 
     @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType, Map<String, Class> typeArguments) {
-        return conversionService.convert(object, targetType, typeArguments);
+    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        conversionService.addConverter(sourceType, targetType, typeConverter);
+        return this;
     }
 
     @Override

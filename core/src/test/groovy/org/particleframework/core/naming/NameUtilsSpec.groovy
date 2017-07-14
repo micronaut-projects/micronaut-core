@@ -36,6 +36,28 @@ class NameUtilsSpec extends Specification {
         "FooBBar"           | 'foo-bbar'
     }
 
+    void "test hyphenate no lower case"() {
+        expect:
+        NameUtils.hyphenate(value, false) == result
+
+        where:
+        value               | result
+        "com.fooBar.FooBar" | "com.foo-Bar.Foo-Bar"
+        "FooBar"            | "Foo-Bar"
+        "com.bar.FooBar"    | "com.bar.Foo-Bar"
+        "Foo"               | 'Foo'
+        "FooBBar"           | 'Foo-BBar'
+    }
+
+    void "test hyphenate no lower case capitalize"() {
+        expect:
+        NameUtils.capitalize(NameUtils.hyphenate(value, false)) == result
+
+        where:
+        value         | result
+        "contentType" | "Content-Type"
+    }
+
     void "test dehyphenate"() {
         expect:
         NameUtils.dehyphenate(value) == result

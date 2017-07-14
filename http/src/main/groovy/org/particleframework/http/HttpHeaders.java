@@ -34,295 +34,295 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     /**
      * {@code "Accept"}
      */
-    CharSequence ACCEPT = "Accept";
+    String ACCEPT = "Accept";
     /**
      * {@code "Accept-Charset"}
      */
-    CharSequence ACCEPT_CHARSET = "Accept-Charset";
+    String ACCEPT_CHARSET = "Accept-Charset";
     /**
      * {@code "Accept-Encoding"}
      */
-    CharSequence ACCEPT_ENCODING = "Accept-Encoding";
+    String ACCEPT_ENCODING = "Accept-Encoding";
     /**
      * {@code "Accept-Language"}
      */
-    CharSequence ACCEPT_LANGUAGE = "Accept-Language";
+    String ACCEPT_LANGUAGE = "Accept-Language";
     /**
      * {@code "Accept-Ranges"}
      */
-    CharSequence ACCEPT_RANGES = "Accept-Ranges";
+    String ACCEPT_RANGES = "Accept-Ranges";
     /**
      * {@code "Accept-Patch"}
      */
-    CharSequence ACCEPT_PATCH = "Accept-Patch";
+    String ACCEPT_PATCH = "Accept-Patch";
     /**
      * {@code "Access-Control-Allow-Credentials"}
      */
-    CharSequence ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
+    String ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
     /**
      * {@code "Access-Control-Allow-Headers"}
      */
-    CharSequence ACCESS_CONTROL_ALLOW_HEADERS = "Access-Control-Allow-Headers";
+    String ACCESS_CONTROL_ALLOW_HEADERS = "Access-Control-Allow-Headers";
     /**
      * {@code "Access-Control-Allow-Methods"}
      */
-    CharSequence ACCESS_CONTROL_ALLOW_METHODS = "Access-Control-Allow-Methods";
+    String ACCESS_CONTROL_ALLOW_METHODS = "Access-Control-Allow-Methods";
     /**
      * {@code "Access-Control-Allow-Origin"}
      */
-    CharSequence ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
+    String ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
     /**
      * {@code "Access-Control-Expose-Headers"}
      */
-    CharSequence ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
+    String ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";
     /**
      * {@code "Access-Control-Max-Age"}
      */
-    CharSequence ACCESS_CONTROL_MAX_AGE = "Access-Control-Max-Age";
+    String ACCESS_CONTROL_MAX_AGE = "Access-Control-Max-Age";
     /**
      * {@code "Access-Control-Request-Headers"}
      */
-    CharSequence ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+    String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
     /**
      * {@code "Access-Control-Request-Method"}
      */
-    CharSequence ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+    String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
     /**
      * {@code "Age"}
      */
-    CharSequence AGE = "Age";
+    String AGE = "Age";
     /**
      * {@code "Allow"}
      */
-    CharSequence ALLOW = "Allow";
+    String ALLOW = "Allow";
     /**
      * {@code "Authorization"}
      */
-    CharSequence AUTHORIZATION = "Authorization";
+    String AUTHORIZATION = "Authorization";
     /**
      * {@code "Cache-Control"}
      */
-    CharSequence CACHE_CONTROL = "Cache-Control";
+    String CACHE_CONTROL = "Cache-Control";
     /**
      * {@code "Connection"}
      */
-    CharSequence CONNECTION = "Connection";
+    String CONNECTION = "Connection";
     /**
      * {@code "Content-Base"}
      */
-    CharSequence CONTENT_BASE = "Content-Base";
+    String CONTENT_BASE = "Content-Base";
     /**
      * {@code "Content-Encoding"}
      */
-    CharSequence CONTENT_ENCODING = "Content-Encoding";
+    String CONTENT_ENCODING = "Content-Encoding";
     /**
      * {@code "Content-Language"}
      */
-    CharSequence CONTENT_LANGUAGE = "Content-Language";
+    String CONTENT_LANGUAGE = "Content-Language";
     /**
      * {@code "Content-Length"}
      */
-    CharSequence CONTENT_LENGTH = "Content-Length";
+    String CONTENT_LENGTH = "Content-Length";
     /**
      * {@code "Content-Location"}
      */
-    CharSequence CONTENT_LOCATION = "Content-Location";
+    String CONTENT_LOCATION = "Content-Location";
     /**
      * {@code "Content-Transfer-Encoding"}
      */
-    CharSequence CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding";
+    String CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding";
     /**
      * {@code "Content-MD5"}
      */
-    CharSequence CONTENT_MD5 = "Content-MD5";
+    String CONTENT_MD5 = "Content-MD5";
     /**
      * {@code "Content-Range"}
      */
-    CharSequence CONTENT_RANGE = "Content-Range";
+    String CONTENT_RANGE = "Content-Range";
     /**
      * {@code "Content-Type"}
      */
-    CharSequence CONTENT_TYPE = "Content-Type";
+    String CONTENT_TYPE = "Content-Type";
     /**
      * {@code "Cookie"}
      */
-    CharSequence COOKIE = "Cookie";
+    String COOKIE = "Cookie";
     /**
      * {@code "Date"}
      */
-    CharSequence DATE = "Date";
+    String DATE = "Date";
     /**
      * {@code "ETag"}
      */
-    CharSequence ETAG = "ETag";
+    String ETAG = "ETag";
     /**
      * {@code "Expect"}
      */
-    CharSequence EXPECT = "Expect";
+    String EXPECT = "Expect";
     /**
      * {@code "Expires"}
      */
-    CharSequence EXPIRES = "Expires";
+    String EXPIRES = "Expires";
     /**
      * {@code "From"}
      */
-    CharSequence FROM = "From";
+    String FROM = "From";
     /**
      * {@code "Host"}
      */
-    CharSequence HOST = "Host";
+    String HOST = "Host";
     /**
      * {@code "If-Match"}
      */
-    CharSequence IF_MATCH = "If-Match";
+    String IF_MATCH = "If-Match";
     /**
      * {@code "If-Modified-Since"}
      */
-    CharSequence IF_MODIFIED_SINCE = "If-Modified-Since";
+    String IF_MODIFIED_SINCE = "If-Modified-Since";
     /**
      * {@code "If-None-Match"}
      */
-    CharSequence IF_NONE_MATCH = "If-None-Match";
+    String IF_NONE_MATCH = "If-None-Match";
     /**
      * {@code "If-Range"}
      */
-    CharSequence IF_RANGE = "If-Range";
+    String IF_RANGE = "If-Range";
     /**
      * {@code "If-Unmodified-Since"}
      */
-    CharSequence IF_UNMODIFIED_SINCE = "If-Unmodified-Since";
+    String IF_UNMODIFIED_SINCE = "If-Unmodified-Since";
     /**
      * {@code "Last-Modified"}
      */
-    CharSequence LAST_MODIFIED = "Last-Modified";
+    String LAST_MODIFIED = "Last-Modified";
     /**
      * {@code "Location"}
      */
-    CharSequence LOCATION = "Location";
+    String LOCATION = "Location";
     /**
      * {@code "Max-Forwards"}
      */
-    CharSequence MAX_FORWARDS = "Max-Forwards";
+    String MAX_FORWARDS = "Max-Forwards";
     /**
      * {@code "Origin"}
      */
-    CharSequence ORIGIN = "Origin";
+    String ORIGIN = "Origin";
     /**
      * {@code "Pragma"}
      */
-    CharSequence PRAGMA = "Pragma";
+    String PRAGMA = "Pragma";
     /**
      * {@code "Proxy-Authenticate"}
      */
-    CharSequence PROXY_AUTHENTICATE = "Proxy-Authenticate";
+    String PROXY_AUTHENTICATE = "Proxy-Authenticate";
     /**
      * {@code "Proxy-Authorization"}
      */
-    CharSequence PROXY_AUTHORIZATION = "Proxy-Authorization";
+    String PROXY_AUTHORIZATION = "Proxy-Authorization";
     /**
      * {@code "Range"}
      */
-    CharSequence RANGE = "Range";
+    String RANGE = "Range";
     /**
      * {@code "Referer"}
      */
-    CharSequence REFERER = "Referer";
+    String REFERER = "Referer";
     /**
      * {@code "Retry-After"}
      */
-    CharSequence RETRY_AFTER = "Retry-After";
+    String RETRY_AFTER = "Retry-After";
     /**
      * {@code "Sec-WebSocket-Key1"}
      */
-    CharSequence SEC_WEBSOCKET_KEY1 = "Sec-WebSocket-Key1";
+    String SEC_WEBSOCKET_KEY1 = "Sec-WebSocket-Key1";
     /**
      * {@code "Sec-WebSocket-Key2"}
      */
-    CharSequence SEC_WEBSOCKET_KEY2 = "Sec-WebSocket-Key2";
+    String SEC_WEBSOCKET_KEY2 = "Sec-WebSocket-Key2";
     /**
      * {@code "Sec-WebSocket-Location"}
      */
-    CharSequence SEC_WEBSOCKET_LOCATION = "Sec-WebSocket-Location";
+    String SEC_WEBSOCKET_LOCATION = "Sec-WebSocket-Location";
     /**
      * {@code "Sec-WebSocket-Origin"}
      */
-    CharSequence SEC_WEBSOCKET_ORIGIN = "Sec-WebSocket-Origin";
+    String SEC_WEBSOCKET_ORIGIN = "Sec-WebSocket-Origin";
     /**
      * {@code "Sec-WebSocket-Protocol"}
      */
-    CharSequence SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
+    String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
     /**
      * {@code "Sec-WebSocket-Version"}
      */
-    CharSequence SEC_WEBSOCKET_VERSION = "Sec-WebSocket-Version";
+    String SEC_WEBSOCKET_VERSION = "Sec-WebSocket-Version";
     /**
      * {@code "Sec-WebSocket-Key"}
      */
-    CharSequence SEC_WEBSOCKET_KEY = "Sec-WebSocket-Key";
+    String SEC_WEBSOCKET_KEY = "Sec-WebSocket-Key";
     /**
      * {@code "Sec-WebSocket-Accept"}
      */
-    CharSequence SEC_WEBSOCKET_ACCEPT = "Sec-WebSocket-Accept";
+    String SEC_WEBSOCKET_ACCEPT = "Sec-WebSocket-Accept";
     /**
      * {@code "Server"}
      */
-    CharSequence SERVER = "Server";
+    String SERVER = "Server";
     /**
      * {@code "Set-Cookie"}
      */
-    CharSequence SET_COOKIE = "Set-Cookie";
+    String SET_COOKIE = "Set-Cookie";
     /**
      * {@code "Set-Cookie2"}
      */
-    CharSequence SET_COOKIE2 = "Set-Cookie2";
+    String SET_COOKIE2 = "Set-Cookie2";
     /**
      * {@code "TE"}
      */
-    CharSequence TE = "TE";
+    String TE = "TE";
     /**
      * {@code "Trailer"}
      */
-    CharSequence TRAILER = "Trailer";
+    String TRAILER = "Trailer";
     /**
      * {@code "Transfer-Encoding"}
      */
-    CharSequence TRANSFER_ENCODING = "Transfer-Encoding";
+    String TRANSFER_ENCODING = "Transfer-Encoding";
     /**
      * {@code "Upgrade"}
      */
-    CharSequence UPGRADE = "Upgrade";
+    String UPGRADE = "Upgrade";
     /**
      * {@code "User-Agent"}
      */
-    CharSequence USER_AGENT = "User-Agent";
+    String USER_AGENT = "User-Agent";
     /**
      * {@code "Vary"}
      */
-    CharSequence VARY = "Vary";
+    String VARY = "Vary";
     /**
      * {@code "Via"}
      */
-    CharSequence VIA = "Via";
+    String VIA = "Via";
     /**
      * {@code "Warning"}
      */
-    CharSequence WARNING = "Warning";
+    String WARNING = "Warning";
     /**
      * {@code "WebSocket-Location"}
      */
-    CharSequence WEBSOCKET_LOCATION = "WebSocket-Location";
+    String WEBSOCKET_LOCATION = "WebSocket-Location";
     /**
      * {@code "WebSocket-Origin"}
      */
-    CharSequence WEBSOCKET_ORIGIN = "WebSocket-Origin";
+    String WEBSOCKET_ORIGIN = "WebSocket-Origin";
     /**
      * {@code "WebSocket-Protocol"}
      */
-    CharSequence WEBSOCKET_PROTOCOL = "WebSocket-Protocol";
+    String WEBSOCKET_PROTOCOL = "WebSocket-Protocol";
     /**
      * {@code "WWW-Authenticate"}
      */
-    CharSequence WWW_AUTHENTICATE = "WWW-Authenticate";
+    String WWW_AUTHENTICATE = "WWW-Authenticate";
 
     /**
      * Obtain the date header

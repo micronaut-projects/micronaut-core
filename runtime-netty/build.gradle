@@ -2,6 +2,8 @@ dependencies {
     compile project(":runtime-http")
     compile project(":router")
     compileOnly project(":ast")
-    testCompile project(":ast")
     compile "io.netty:netty-codec-http:$nettyVersion"
+
+    testCompile project(":ast")
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }

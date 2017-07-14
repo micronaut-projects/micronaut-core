@@ -69,4 +69,29 @@ class NettyHttpRequestSpec extends Specification {
         method | uri        | headers                                                               | content | names
         GET    | '/foo/bar' | [(HttpHeaders.COOKIE): 'yummy_cookie=choco; tasty_cookie=strawberry'] | null    | ['yummy_cookie', 'tasty_cookie']
     }
+
+    void "test netty http locale with accept-language"() {
+        given:
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)
+        for (header in headers) {
+            nettyRequest.headers().add(header.key.toString(), header.value)
+        }
+
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, new DefaultConversionService())
+        String fullURI = request.uri.toString()
+        String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
+
+        expect:
+        fullURI == uri
+        request.path.toString() == expectedPath
+        request.method == HttpMethod."$method"
+        request.locale.toString() == locale
+
+        where:
+        method | uri        | headers                                                                         | content | locale
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'de-CH']                                        | null    | 'de_CH'
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'en-US,en;q=0.5']                               | null    | 'en_US'
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5'] | null    | 'fr_CH'
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): '*']                                            | null    | Locale.default.toString()
+    }
 }

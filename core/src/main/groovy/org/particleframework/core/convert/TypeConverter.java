@@ -22,16 +22,18 @@ public interface TypeConverter<S, T> {
      * @return The converted type or empty if the conversion is not possible
      */
     default Optional<T> convert(S object, Class<T> targetType) {
-        return convert(object, targetType, Collections.emptyMap());
+        return convert(object, targetType, ConversionContext.DEFAULT);
     }
 
     /**
-     * Converts from the given source object type to the target type
+     * Converts from the given source object type to the target type. Implementers should take care to return {@link Optional#empty()}
+     * in case the object is not convertible by catching any necessary exceptions and failing gracefully.
      *
      * @param object     The object type
      * @param targetType The target type being converted to
+     *
      * @return The converted type or empty if the conversion is not possible
      */
-    Optional<T> convert(S object, Class<T> targetType, Map<String, Class> typeArguments);
+    Optional<T> convert(S object, Class<T> targetType, ConversionContext context);
 }
 

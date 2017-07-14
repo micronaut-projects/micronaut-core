@@ -13,28 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation.bind;
+package org.particleframework.http.binding
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import groovy.transform.CompileStatic
+import org.particleframework.context.annotation.Bean
+import org.particleframework.context.annotation.Factory
+import org.particleframework.core.convert.ConversionService
+import org.particleframework.http.binding.binders.request.RequestArgumentBinder
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import javax.inject.Singleton
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface Header {
-    /**
-     * @return The name of the header, otherwise it is inferred from the parameter name
-     */
-    String value() default "";
+@Factory
+@CompileStatic
+class RequestBinderRegistryFactory {
+
+    @Singleton
+    @Bean
+    RequestBinderRegistry requestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
+        return new DefaultRequestBinderRegistry(conversionService, binders)
+    }
 }

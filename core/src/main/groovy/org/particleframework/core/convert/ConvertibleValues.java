@@ -28,6 +28,11 @@ import java.util.function.BiConsumer;
  */
 public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<String, V>> {
     /**
+     * @return The names of the values
+     */
+    Set<String> getNames();
+
+    /**
      * @return The concrete type of the value
      */
     default Class<V> getValueType() {
@@ -44,11 +49,6 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
     default boolean contains(CharSequence name) {
         return get(name, Object.class).isPresent();
     }
-
-    /**
-     * @return The names of the values
-     */
-    Set<String> getNames();
 
     /**
      * Performs the given action for each value. Note that in the case
