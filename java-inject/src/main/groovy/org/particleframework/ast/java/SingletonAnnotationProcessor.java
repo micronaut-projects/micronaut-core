@@ -32,73 +32,108 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class SingletonAnnotationProcessor extends AbstractProcessor {
 
-    public static final String META_INF_SERVICES_DIR = "META-INF/services/";
     private Messager messager;
     private Filer filer;
     private Elements elementUtils;
     private Types typeUtils;
 
-    private Map<Class, Set<String>> serviceProviders = new HashMap<>();
-    private Set<String> beanDefinitionClassNames = new HashSet<>();
+    private Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionwriters = new LinkedHashMap<>();
 
     private String buildPath;
-
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.processingOver()) {
-            generateBeanDefinitionServiceDescriptors();
+            generateClassesAndServiceDescriptors();
         } else {
             annotations.stream().forEach(annotation -> {
                 note("starting annotation processing for @%s", annotation.getQualifiedName());
-                roundEnv.getElementsAnnotatedWith(annotation).stream().forEach(element -> {
+                Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
+                elements.stream().forEach(element -> {
                     ElementKind elementKind = element.getKind();
                     if ("Singleton".equals(annotation.getQualifiedName()) && elementKind != ElementKind.CLASS) {
                         error(element, "@Singleton is only applicable to class, but found it applied to @%s",
                             elementKind);
                     } else {
-                        try {
                             note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
                             TypeElement typeElement = typeElementFor(element);
-                            PackageElement packageElement = elementUtils.getPackageOf(element);
-
-                            String beanClassName = classNameFor(packageElement, typeElement);
-                            String packageName = packageElement.getQualifiedName().toString();
                             String fullyQualifiedBeanClassName = typeElement.getQualifiedName().toString();
-                            String generatedDefinitionClassName = packageName + ".$" + beanClassName + "Definition";
-                            addServiceProvider(element, BeanDefinition.class, generatedDefinitionClassName);
 
-                            if (!beanDefinitionClassNames.contains(fullyQualifiedBeanClassName)) {
-                                beanDefinitionClassNames.add(fullyQualifiedBeanClassName);
-                                BeanDefinitionWriter beanDefinitionWriter = null;
-                                switch (elementKind) {
-                                    case CLASS:
-                                        beanDefinitionWriter = generateSingletonBeanClass(element, packageName, beanClassName);
-                                        break;
-                                    case METHOD:
-                                        beanDefinitionWriter = generateMethodInjectionBeanClass(element, packageName, beanClassName);
-                                        break;
-                                    case FIELD:
-                                        beanDefinitionWriter = generateFieldInjectionBeanClass(element, packageName, beanClassName);
-                                        break;
-                                }
-                                if (beanDefinitionWriter != null) {
-                                    String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
-                                    BeanDefinitionClassWriter beanDefinitionClassWriter = generateBeanDefinitionClass(element, fullyQualifiedBeanClassName, beanDefinitionName);
-                                    addServiceProvider(element, BeanDefinitionClass.class, beanDefinitionClassWriter.getBeanDefinitionClassName());
-                                }
+                            BeanDefinitionWriterElementWrapper wrapper = beanDefinitionwriters.get(fullyQualifiedBeanClassName);
+                            if (wrapper == null) {
+                                wrapper = new BeanDefinitionWriterElementWrapper();
+                                wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(annotation, element);
+                                wrapper.annotationElements = new LinkedHashSet<>();
+                                beanDefinitionwriters.put(fullyQualifiedBeanClassName, wrapper);
                             }
-                        } catch (IOException ioe) {
-                            error("Unexpected error: %s", ioe.getMessage());
-                            // FIXME something is wrong, probably want to fail fast
-                            ioe.printStackTrace();
-                        }
+                            wrapper.annotationElements.add(element);
                     }});
                 }
             );
         }
-
         return true;
+    }
+
+    private void generateClassesAndServiceDescriptors() {
+        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
+        File targetDirectory = new File(buildPath);
+        this.beanDefinitionwriters.values().forEach(wrapper -> {
+            BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
+            // TODO determine the ctor stuff
+            writer.visitBeanDefinitionConstructor();
+            wrapper.annotationElements.forEach(element -> {
+                try {
+                    switch (element.getKind()) {
+                        case CLASS:
+                                generateSingletonBeanClass(wrapper.beanDefinitionWriter, element);
+                            break;
+                        case METHOD:
+                            generateMethodInjectionBeanClass(wrapper.beanDefinitionWriter, element);
+                            break;
+                        case FIELD:
+                            generateFieldInjectionBeanClass(wrapper.beanDefinitionWriter, element);
+                            break;
+                    }
+                } catch (IOException e) {
+                    error("Unexpected error: %s", e.getMessage());
+                    // FIXME something is wrong, probably want to fail fast
+                    e.printStackTrace();
+                }
+            });
+
+            try {
+                writer.visitBeanDefinitionEnd();
+                JavaFileObject javaFileObject = filer.createClassFile(writer.getBeanDefinitionName(),
+                    wrapper.annotationElements.toArray(new Element[wrapper.annotationElements.size()]));
+                try (OutputStream outputStream = javaFileObject.openOutputStream()) {
+                    writer.writeTo(outputStream);
+                }
+
+                String beanDefinitionName = wrapper.beanDefinitionWriter.getBeanDefinitionName();
+                String beanTypeName = wrapper.beanDefinitionWriter.getBeanTypeName();
+                BeanDefinitionClassWriter beanDefinitionClassWriter = generateBeanDefinitionClass(
+                    wrapper.annotationElements, wrapper.beanDefinitionWriter.getBeanDefinitionName(), beanDefinitionName);
+
+                generator.generate(targetDirectory, wrapper.beanDefinitionWriter.getBeanDefinitionName(),BeanDefinition.class);
+                generator.generate(targetDirectory, beanDefinitionClassWriter.getBeanDefinitionClassName(),BeanDefinitionClass.class);
+            } catch (IOException ioe) {
+                error("Unexpected error: %s", ioe.getMessage());
+                // FIXME something is wrong, probably want to fail fast
+                ioe.printStackTrace();
+
+            }
+
+        });
+    }
+
+    private BeanDefinitionWriter createBeanDefinitionWriterFor(TypeElement annotation, Element element) {
+        TypeElement typeElement = typeElementFor(element);
+        PackageElement packageElement = elementUtils.getPackageOf(element);
+        String beanClassName = classNameFor(packageElement, typeElement);
+        String packageName = packageElement.getQualifiedName().toString();
+        boolean isSingleton = "Singleton".equals(annotation.getSimpleName().toString()) && element.getKind() == ElementKind.CLASS;
+        String scope = null; // TODO determine scope?
+        return new BeanDefinitionWriter(packageName, beanClassName, scope, isSingleton);
     }
 
     private TypeElement typeElementFor(Element element) {
@@ -115,36 +150,12 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return qualifiedName.replaceFirst(packageElement.getQualifiedName().toString() + "\\.","");
     }
 
-    // really want a multimap for this...Guava?
-    private void addServiceProvider(Element element, Class descriptor, String generatedDefinitionClassName) {
-        Set<String> serviceProviderClassNames = serviceProviders.get(descriptor);
-        note(element, "Adding service provider %s to %s", generatedDefinitionClassName, descriptor.getName());
-        if (serviceProviderClassNames == null) {
-            serviceProviderClassNames = new HashSet<>();
-            serviceProviders.put(descriptor, serviceProviderClassNames);
-        }
-        serviceProviderClassNames.add(generatedDefinitionClassName);
+    private void generateSingletonBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+
     }
 
-    private BeanDefinitionWriter generateSingletonBeanClass(Element element, String packageName, String beanClassName) throws IOException {
-        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
-        beanDefinitionWriter.visitBeanDefinitionConstructor();
-
-        beanDefinitionWriter.visitBeanDefinitionEnd();
-
-        JavaFileObject javaFileObject = filer.createClassFile(beanDefinitionWriter.getBeanDefinitionName(), element);
-        try (OutputStream outputStream = javaFileObject.openOutputStream()) {
-            beanDefinitionWriter.writeTo(outputStream);
-        }
-
-        return beanDefinitionWriter;
-    }
-
-    private BeanDefinitionWriter generateMethodInjectionBeanClass(Element element, String packageName, String beanClassName) throws IOException {
+    private void generateMethodInjectionBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
         assert (ElementKind.METHOD == element.getKind()) : "element kind must be METHOD";
-
-        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
-        beanDefinitionWriter.visitBeanDefinitionConstructor();
 
         Name methodName = element.getSimpleName();
         ExecutableType execType = (ExecutableType) element.asType();
@@ -160,7 +171,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 TypeMirror componentType = arrayType.getComponentType();
                 String argName = argNameFromType(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
-                genericTypes.put(argName, Arrays.asList(componentType.toString()));
+                genericTypes.put(argName, Collections.singletonList(componentType.toString()));
                 beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs, null, genericTypes);
             } else {
                 TypeElement typeElement = elementUtils.getTypeElement(typeMirror.toString());
@@ -170,16 +181,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs);
             }
         }
-        beanDefinitionWriter.visitBeanDefinitionEnd();
-
-        String classFileName = beanDefinitionWriter.getBeanDefinitionName();
-        JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
-        note("CREATING NEW CLASS FILE %s for @Inject", classFileName);
-        try (OutputStream outputStream = javaFileObject.openOutputStream()) {
-            beanDefinitionWriter.writeTo(outputStream);
-        }
-
-        return beanDefinitionWriter;
     }
 
     private String argNameFromType(String type, int suffix) {
@@ -191,56 +192,28 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return argName + suffix;
     }
 
-    private BeanDefinitionWriter generateFieldInjectionBeanClass(Element element, String packageName, String beanClassName) throws IOException {
+    private void generateFieldInjectionBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
         assert (ElementKind.FIELD == element.getKind()) : "element kind must be FIELD";
-
-        BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(packageName, beanClassName, null, true);
-        beanDefinitionWriter.visitBeanDefinitionConstructor();
 
         Name fieldName = element.getSimpleName();
         TypeMirror fieldType = element.asType();
 
         beanDefinitionWriter.visitFieldInjectionPoint(true, fieldType.toString(), fieldName.toString());
-        beanDefinitionWriter.visitBeanDefinitionEnd();
-
-        String classFileName = beanDefinitionWriter.getBeanDefinitionName();
-        JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
-        note("CREATING NEW CLASS FILE %s for @Inject", classFileName);
-        try (OutputStream outputStream = javaFileObject.openOutputStream()) {
-            beanDefinitionWriter.writeTo(outputStream);
-        }
-
-        return beanDefinitionWriter;
     }
 
     private BeanDefinitionClassWriter generateBeanDefinitionClass(
-        Element element,
+        Set<Element> elements,
         String fullyQualifiedBeanClassName,
         String beanDefinitionName) throws IOException
     {
         BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(fullyQualifiedBeanClassName, beanDefinitionName);
         String classFileName = beanClassWriter.getBeanDefinitionQualifiedClassName();
         note("CREATING NEW CLASS FILE %s for @Singleton", classFileName);
-        JavaFileObject javaFileObject = filer.createClassFile(classFileName, element);
+        JavaFileObject javaFileObject = filer.createClassFile(classFileName, elements.toArray(new Element[elements.size()]));
         try (OutputStream out = javaFileObject.openOutputStream()) {
             beanClassWriter.writeTo(out);
         }
         return beanClassWriter;
-    }
-
-    private void generateBeanDefinitionServiceDescriptors() {
-        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
-        File targetDirectory = new File(buildPath);
-        serviceProviders.forEach((serviceDescriptor, providers) -> {
-            providers.forEach(provider -> {
-                try {
-                    generator.generate(targetDirectory, provider, serviceDescriptor);
-                } catch (IOException e) {
-                    error("Failed to write provide %s to service descriptor file %s", provider, serviceDescriptor);
-                    e.printStackTrace();
-                }
-            });
-        });
     }
 
     @Override
@@ -270,4 +243,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private void note(String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
     }
+}
+
+class BeanDefinitionWriterElementWrapper {
+    Set<Element> annotationElements;
+    BeanDefinitionWriter beanDefinitionWriter;
 }
