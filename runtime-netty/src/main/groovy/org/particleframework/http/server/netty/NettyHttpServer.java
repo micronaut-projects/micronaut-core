@@ -31,6 +31,7 @@ import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 
+import javax.inject.Inject;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,17 +43,17 @@ import java.util.Optional;
  */
 public class NettyHttpServer implements EmbeddedServer {
     private volatile Channel serverChannel;
-    private final HttpServerConfiguration serverConfiguration;
-    private final ApplicationContext applicationContext;
+    private HttpServerConfiguration serverConfiguration;
+    private ApplicationContext applicationContext;
 
-    public NettyHttpServer(HttpServerConfiguration serverConfiguration, ApplicationContext applicationContext) {
+    @Inject
+    public void setServerConfiguration(HttpServerConfiguration serverConfiguration) {
         this.serverConfiguration = serverConfiguration;
-        this.applicationContext = applicationContext;
     }
 
-    public NettyHttpServer() {
-        this.serverConfiguration = new HttpServerConfiguration();
-        this.applicationContext = null;
+    @Inject
+    public void setApplicationContext(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
     }
 
     @Override
