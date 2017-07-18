@@ -15,14 +15,11 @@
  */
 package org.particleframework.http.server.greenlightning;
 
-import com.ociweb.gl.api.*;
-import com.ociweb.pronghorn.network.config.HTTPContentTypeDefaults;
+import com.ociweb.gl.api.Builder;
+import com.ociweb.gl.api.GreenApp;
+import com.ociweb.gl.api.GreenRuntime;
+import com.ociweb.gl.api.RestListener;
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.HttpMethod;
-import org.particleframework.web.router.RouteMatch;
-import org.particleframework.web.router.Router;
-
-import java.util.Optional;
 
 
 public class ParticleGreenLightningApp implements GreenApp {
@@ -45,50 +42,12 @@ public class ParticleGreenLightningApp implements GreenApp {
     }
 
     public void declareBehavior(final GreenRuntime runtime) {
-        final RestListener adder = new TemporarySpikeServer(runtime, applicationContext);
+        final RestListener adder = new GreenLightningParticleDispatcher(runtime, applicationContext);
         runtime.addRestListener(adder).includeRoutes(ROUTE_ID);
         this.runtime = runtime;
     }
 
     public void stop() {
         runtime.shutdownRuntime();
-    }
-}
-
-// There is nothing best-practice about this... just a spike as a starting point.
-class TemporarySpikeServer implements RestListener {
-
-    protected final GreenCommandChannel greenCommandChannel;
-    protected final ApplicationContext applicationContext;
-
-    public TemporarySpikeServer(final GreenRuntime runtime, final ApplicationContext applicationContext) {
-        greenCommandChannel = runtime.newCommandChannel(NET_RESPONDER);
-        this.applicationContext = applicationContext;
-    }
-
-    @Override
-    public boolean restRequest(final HTTPRequestReader request) {
-        final Appendable routePath = new StringBuilder("/");
-        request.getText("path".getBytes(), routePath);
-
-        final Optional<Router> routerBean = applicationContext.findBean(Router.class);
-
-        final Optional<RouteMatch> routeMatch = routerBean.flatMap((router) -> {
-                    return router.find(HttpMethod.GET, routePath.toString())
-//                            .filter((match) -> match.test( ?? ))
-                            .findFirst();
-                }
-        );
-
-        routeMatch.ifPresent((RouteMatch route) -> {
-            final Object result = route.execute();
-            final NetWritable responseWritable = writer -> writer.writeUTF8Text(result.toString());
-            greenCommandChannel.publishHTTPResponse(request, 200,
-                    request.getRequestContext() | HTTPFieldReader.END_OF_RESPONSE,
-                    HTTPContentTypeDefaults.TXT,
-                    responseWritable);
-        });
-
-        return true;
     }
 }
