@@ -82,11 +82,11 @@ class TemporarySpikeServer implements RestListener {
 
         routeMatch.ifPresent((RouteMatch route) -> {
             final Object result = route.execute();
-            final NetWritable writableB = writer -> writer.writeUTF8Text(result.toString());
+            final NetWritable responseWritable = writer -> writer.writeUTF8Text(result.toString());
             greenCommandChannel.publishHTTPResponse(request, 200,
                     request.getRequestContext() | HTTPFieldReader.END_OF_RESPONSE,
                     HTTPContentTypeDefaults.TXT,
-                    writableB);
+                    responseWritable);
         });
 
         return true;
