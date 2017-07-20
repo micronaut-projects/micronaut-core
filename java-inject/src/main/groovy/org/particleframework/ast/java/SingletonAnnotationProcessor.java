@@ -12,10 +12,7 @@ import org.particleframework.inject.writer.BeanDefinitionWriter;
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.ExecutableType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -24,6 +21,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
+
+import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.type.TypeKind.*;
 
 @SupportedAnnotationTypes({
     "javax.inject.Singleton",
@@ -37,7 +37,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private Elements elementUtils;
     private Types typeUtils;
 
-    private Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionwriters = new LinkedHashMap<>();
+    private Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionwriters = new TreeMap<>();
 
     private String buildPath;
 
@@ -51,7 +51,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
                 elements.stream().forEach(element -> {
                     ElementKind elementKind = element.getKind();
-                    if ("Singleton".equals(annotation.getQualifiedName()) && elementKind != ElementKind.CLASS) {
+                    if ("Singleton".equals(annotation.getQualifiedName()) && elementKind != CLASS) {
                         error(element, "@Singleton is only applicable to class, but found it applied to @%s",
                             elementKind);
                     } else {
@@ -67,6 +67,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                                 beanDefinitionwriters.put(fullyQualifiedBeanClassName, wrapper);
                             }
                             wrapper.annotationElements.add(element);
+                            if (element.getKind() == CONSTRUCTOR) {
+                                wrapper.hasDefinedCtor = true;
+                            }
                     }});
                 }
             );
@@ -79,19 +82,24 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         File targetDirectory = new File(buildPath);
         this.beanDefinitionwriters.values().forEach(wrapper -> {
             BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
-            // TODO determine the ctor stuff
-            writer.visitBeanDefinitionConstructor();
+            if (!wrapper.hasDefinedCtor) {
+                // if there are no defined ctors, then generate default
+                writer.visitBeanDefinitionConstructor();
+            }
             wrapper.annotationElements.forEach(element -> {
                 try {
                     switch (element.getKind()) {
                         case CLASS:
-                                generateSingletonBeanClass(wrapper.beanDefinitionWriter, element);
+                            visitSingletonFor(wrapper.beanDefinitionWriter, element);
                             break;
                         case METHOD:
-                            generateMethodInjectionBeanClass(wrapper.beanDefinitionWriter, element);
+                            visitMethodInjectionFor(wrapper.beanDefinitionWriter, element);
+                            break;
+                        case CONSTRUCTOR:
+                            visitConstructorInjectionFor(wrapper.beanDefinitionWriter, element);
                             break;
                         case FIELD:
-                            generateFieldInjectionBeanClass(wrapper.beanDefinitionWriter, element);
+                            visitFieldInjectionFor(wrapper.beanDefinitionWriter, element);
                             break;
                     }
                 } catch (IOException e) {
@@ -120,7 +128,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 error("Unexpected error: %s", ioe.getMessage());
                 // FIXME something is wrong, probably want to fail fast
                 ioe.printStackTrace();
-
             }
 
         });
@@ -131,13 +138,13 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         PackageElement packageElement = elementUtils.getPackageOf(element);
         String beanClassName = classNameFor(packageElement, typeElement);
         String packageName = packageElement.getQualifiedName().toString();
-        boolean isSingleton = "Singleton".equals(annotation.getSimpleName().toString()) && element.getKind() == ElementKind.CLASS;
-        String scope = null; // TODO determine scope?
+        boolean isSingleton = "Singleton".equals(annotation.getSimpleName().toString()) && element.getKind() == CLASS;
+        String scope = "Singleton".equals(annotation.getSimpleName().toString()) ? "javax.inject.Singleton" : null; // TODO determine scope?
         return new BeanDefinitionWriter(packageName, beanClassName, scope, isSingleton);
     }
 
     private TypeElement typeElementFor(Element element) {
-        while (ElementKind.CLASS != element.getKind() ) {
+        while (CLASS != element.getKind() ) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
@@ -150,40 +157,68 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return qualifiedName.replaceFirst(packageElement.getQualifiedName().toString() + "\\.","");
     }
 
-    private void generateSingletonBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+    private void visitSingletonFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
 
     }
 
-    private void generateMethodInjectionBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
-        assert (ElementKind.METHOD == element.getKind()) : "element kind must be METHOD";
+    private void visitConstructorInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+        ElementKind elementKind = element.getKind();
+        assert (CONSTRUCTOR == elementKind) : "element kind must be CONSTRUCTOR";
+        Map<String,Object> methodArgs = new LinkedHashMap<>();
+        Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
+
+        visitInjectionFor(beanDefinitionWriter, element, methodArgs, genericTypes);
+        beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, null, genericTypes);
+    }
+
+    private void visitMethodInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+        ElementKind elementKind = element.getKind();
+        assert (METHOD == elementKind) : "element kind must be METHOD";
+        Map<String,Object> methodArgs = new LinkedHashMap<>();
+        Map<String,List<Object>> genericTypes = new LinkedHashMap<>();;
+
+        visitInjectionFor(beanDefinitionWriter, element, methodArgs, genericTypes);
+        beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
+    }
+
+
+    private void visitInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element,
+                                   Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) throws IOException {
+
+        ElementKind elementKind = element.getKind();
 
         Name methodName = element.getSimpleName();
         ExecutableType execType = (ExecutableType) element.asType();
-        Map<String,Object> methodArgs = new LinkedHashMap<>();
 
         List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
         for (int i = 0; i < parameterTypes.size(); i++) {
+
             TypeMirror typeMirror = parameterTypes.get(i);
-            if (typeMirror.getKind() == TypeKind.ARRAY) {
-                // TODO handle array injection
-                Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
-                ArrayType arrayType = (ArrayType)typeMirror; // FIXME is there an API way of getting this without a cast?
+            TypeKind kind = typeMirror.getKind();
+
+            if (kind == ARRAY) {
+                ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
                 TypeMirror componentType = arrayType.getComponentType();
-                String argName = argNameFromType(componentType.toString(), i);
+                String argName = argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
-                beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs, null, genericTypes);
-            } else {
+//            } else if (kind == TypeKind.DECLARED) {
+//                DeclaredType declaredType = (DeclaredType) typeMirror;
+//                TypeMirror enclosingType = declaredType.getEnclosingType();
+//                List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
+//                String foo = null;
+            } else if (kind == DECLARED) {
                 TypeElement typeElement = elementUtils.getTypeElement(typeMirror.toString());
                 assert (typeElement != null) : "typeElement cannot be null";
-                String argName = argNameFromType(typeElement.getSimpleName().toString(), i);
+                String argName = argNameFrom(typeElement.getSimpleName().toString(), i);
                 methodArgs.put(argName, typeElement.toString());
-                beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, methodName.toString(), methodArgs);
+            } else {
+                error(element, "Unexpected element kind %s for %s", kind, element);
             }
         }
     }
 
-    private String argNameFromType(String type, int suffix) {
+    private String argNameFrom(String type, int suffix) {
         String classname = type.replaceFirst("((.*)\\.)?([^\\.]*)", "$3");
         String argName = classname.substring(0,1).toLowerCase();
         if (classname.length() > 1) {
@@ -192,8 +227,8 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return argName + suffix;
     }
 
-    private void generateFieldInjectionBeanClass(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
-        assert (ElementKind.FIELD == element.getKind()) : "element kind must be FIELD";
+    private void visitFieldInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+        assert (FIELD == element.getKind()) : "element kind must be FIELD";
 
         Name fieldName = element.getSimpleName();
         TypeMirror fieldType = element.asType();
@@ -248,4 +283,5 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 class BeanDefinitionWriterElementWrapper {
     Set<Element> annotationElements;
     BeanDefinitionWriter beanDefinitionWriter;
+    boolean hasDefinedCtor;
 }

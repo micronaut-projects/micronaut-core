@@ -20,9 +20,8 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.HttpMethod;
 import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
@@ -43,16 +42,15 @@ import java.util.Optional;
  */
 public class NettyHttpServer implements EmbeddedServer {
     private volatile Channel serverChannel;
-    private HttpServerConfiguration serverConfiguration;
-    private ApplicationContext applicationContext;
+    private final HttpServerConfiguration serverConfiguration;
+    private final ApplicationContext applicationContext;
 
     @Inject
-    public void setServerConfiguration(HttpServerConfiguration serverConfiguration) {
+    public NettyHttpServer(
+        HttpServerConfiguration serverConfiguration,
+        ApplicationContext applicationContext
+    ) {
         this.serverConfiguration = serverConfiguration;
-    }
-
-    @Inject
-    public void setApplicationContext(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
     }
 

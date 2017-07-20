@@ -18,7 +18,7 @@ class JavaConcurrentSingleAccessSpec extends Specification {
         Collection beans = new ConcurrentLinkedQueue<>()
         30.times {
             threads << Thread.start {
-                JavaB b = context.getBean(JavaB)
+                ConcurrentB b = context.getBean(ConcurrentB)
                 beans.add( b )
             }
         }
