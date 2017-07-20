@@ -120,7 +120,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 String beanDefinitionName = wrapper.beanDefinitionWriter.getBeanDefinitionName();
                 String beanTypeName = wrapper.beanDefinitionWriter.getBeanTypeName();
                 BeanDefinitionClassWriter beanDefinitionClassWriter = generateBeanDefinitionClass(
-                    wrapper.annotationElements, wrapper.beanDefinitionWriter.getBeanDefinitionName(), beanDefinitionName);
+                    wrapper.annotationElements, beanTypeName, beanDefinitionName);
 
                 generator.generate(targetDirectory, wrapper.beanDefinitionWriter.getBeanDefinitionName(),BeanDefinition.class);
                 generator.generate(targetDirectory, beanDefinitionClassWriter.getBeanDefinitionClassName(),BeanDefinitionClass.class);

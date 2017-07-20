@@ -17,5 +17,6 @@ class JavaSetterArrayInjectionSpec extends Specification {
         b.all != null
         b.all.size() == 2
         b.all.contains(context.getBean(JavaAImpl))
+        b.all.contains(context.getBean(JavaAnotherImpl))
     }
 }
