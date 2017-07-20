@@ -24,17 +24,16 @@ import javax.inject.Inject;
 
 public class GreenLightningHttpServer implements EmbeddedServer {
 
-    private HttpServerConfiguration serverConfiguration;
-    private ApplicationContext applicationContext;
+    private final HttpServerConfiguration serverConfiguration;
+    private final ApplicationContext applicationContext;
     private ParticleGreenLightningApp app;
 
     @Inject
-    public void setServerConfiguration(HttpServerConfiguration serverConfiguration) {
+    public GreenLightningHttpServer(
+        HttpServerConfiguration serverConfiguration,
+        ApplicationContext applicationContext
+    ) {
         this.serverConfiguration = serverConfiguration;
-    }
-
-    @Inject
-    public void setApplicationContext(final ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
     }
 
