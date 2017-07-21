@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
 import static javax.lang.model.type.TypeKind.*;
@@ -129,7 +130,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 // FIXME something is wrong, probably want to fail fast
                 ioe.printStackTrace();
             }
-
         });
     }
 
@@ -167,7 +167,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Map<String,Object> methodArgs = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitInjectionFor(beanDefinitionWriter, element, methodArgs, genericTypes);
+        visitInjectionFor(element, methodArgs, genericTypes);
         beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, null, genericTypes);
     }
 
@@ -177,12 +177,12 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Map<String,Object> methodArgs = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();;
 
-        visitInjectionFor(beanDefinitionWriter, element, methodArgs, genericTypes);
+        visitInjectionFor(element, methodArgs, genericTypes);
+        // FIXME test for requires reflection
         beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
     }
 
-
-    private void visitInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element,
+    private void visitInjectionFor(Element element,
                                    Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) throws IOException {
 
         ElementKind elementKind = element.getKind();
@@ -202,16 +202,17 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 String argName = argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
-//            } else if (kind == TypeKind.DECLARED) {
-//                DeclaredType declaredType = (DeclaredType) typeMirror;
-//                TypeMirror enclosingType = declaredType.getEnclosingType();
-//                List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
-//                String foo = null;
             } else if (kind == DECLARED) {
-                TypeElement typeElement = elementUtils.getTypeElement(typeMirror.toString());
+                DeclaredType declaredType = (DeclaredType) typeMirror;
+
+                TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
                 assert (typeElement != null) : "typeElement cannot be null";
                 String argName = argNameFrom(typeElement.getSimpleName().toString(), i);
                 methodArgs.put(argName, typeElement.toString());
+                List<Object> params = declaredType.getTypeArguments().stream()
+                    .map(TypeMirror::toString)
+                    .collect(Collectors.toList());
+                genericTypes.put(argName, params);
             } else {
                 error(element, "Unexpected element kind %s for %s", kind, element);
             }

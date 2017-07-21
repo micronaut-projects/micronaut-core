@@ -38,11 +38,18 @@ class SetterWithOptionalSpec extends Specification {
     }
 
     static class B {
-        @Inject
         Optional<A> a
+        Optional<C> c
 
         @Inject
-        Optional<C> c
+        void setA(Optional<A> a) {
+            this.a = a
+        }
+
+        @Inject
+        void setC(Optional<C> c) {
+            this.c = c
+        }
 
         A getA() {
             return this.a.get()
