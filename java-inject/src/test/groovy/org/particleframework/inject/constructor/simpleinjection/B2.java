@@ -1,4 +1,4 @@
-package org.particleframework.inject.constructor;
+package org.particleframework.inject.constructor.simpleinjection;
 
 import javax.inject.Inject;
 

@@ -1,4 +1,4 @@
-package org.particleframework.inject.constructor
+package org.particleframework.inject.constructor.multipleinjection
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
@@ -12,7 +12,7 @@ class ConstructorMultipleInjectionSpec extends Specification {
         context.start()
 
         when:"A bean is obtained that has a constructor with @Inject and multiple arguments"
-        BWithAC b =  context.getBean(BWithAC)
+        B b =  context.getBean(B)
 
         then:"The implementation is injected"
         b.a != null

@@ -1,13 +1,13 @@
-package org.particleframework.inject.constructor;
+package org.particleframework.inject.constructor.multipleinjection;
 
 import javax.inject.Inject;
 
-public class BWithAC {
+public class B {
     private A a;
     private C c;
 
     @Inject
-    public BWithAC(A a, C c) {
+    public B(A a, C c) {
         this.a = a;
         this.c = c;
     }

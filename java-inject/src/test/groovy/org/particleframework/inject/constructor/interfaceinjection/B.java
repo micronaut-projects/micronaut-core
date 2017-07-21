@@ -1,4 +1,5 @@
-package org.particleframework.inject.constructor;
+package org.particleframework.inject.constructor.interfaceinjection;
+
 
 import javax.inject.Inject;
 
