@@ -47,12 +47,12 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         if (roundEnv.processingOver()) {
             generateClassesAndServiceDescriptors();
         } else {
-            annotations.stream().forEach(annotation -> {
+            annotations.forEach(annotation -> {
                 note("starting annotation processing for @%s", annotation.getQualifiedName());
                 Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
-                elements.stream().forEach(element -> {
+                elements.forEach(element -> {
                     ElementKind elementKind = element.getKind();
-                    if ("Singleton".equals(annotation.getQualifiedName()) && elementKind != CLASS) {
+                    if ("Singleton".equals(annotation.getQualifiedName().toString()) && elementKind != CLASS) {
                         error(element, "@Singleton is only applicable to class, but found it applied to @%s",
                             elementKind);
                     } else {
@@ -161,6 +161,34 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 
     }
 
+    private void visitFieldInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
+        assert (FIELD == element.getKind()) : "element kind must be FIELD";
+
+        Name fieldName = element.getSimpleName();
+        TypeMirror type = element.asType();
+
+        // Is this a SMELL??? is it the right way to do it? It works so far
+        // probably since arrays do not use type erasure...
+        String fieldType;
+        if (type.getKind() == ARRAY) {
+            fieldType = type.toString();
+        } else {
+            TypeElement fieldElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
+            fieldType = fieldElement.getQualifiedName().toString();
+        }
+        // FIXME test for requires reflection (private qualifier is just one aspect)
+        Set<Modifier> modifiers = element.getModifiers();
+        boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
+
+        TypeElement classElement = typeElementFor(element);
+        beanDefinitionWriter.visitFieldInjectionPoint(
+            classElement.getQualifiedName().toString(),
+            null,
+            requiresReflection,
+            fieldType,
+            fieldName.toString());
+    }
+
     private void visitConstructorInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
         ElementKind elementKind = element.getKind();
         assert (CONSTRUCTOR == elementKind) : "element kind must be CONSTRUCTOR";
@@ -175,19 +203,18 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         ElementKind elementKind = element.getKind();
         assert (METHOD == elementKind) : "element kind must be METHOD";
         Map<String,Object> methodArgs = new LinkedHashMap<>();
-        Map<String,List<Object>> genericTypes = new LinkedHashMap<>();;
+        Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
         visitInjectionFor(element, methodArgs, genericTypes);
         // FIXME test for requires reflection
-        beanDefinitionWriter.visitMethodInjectionPoint(false, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
+        Set<Modifier> modifiers = element.getModifiers();
+        boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
+        beanDefinitionWriter.visitMethodInjectionPoint(requiresReflection, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
     }
 
     private void visitInjectionFor(Element element,
                                    Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) throws IOException {
 
-        ElementKind elementKind = element.getKind();
-
-        Name methodName = element.getSimpleName();
         ExecutableType execType = (ExecutableType) element.asType();
 
         List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
@@ -226,15 +253,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             argName += classname.substring(1);
         }
         return argName + suffix;
-    }
-
-    private void visitFieldInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
-        assert (FIELD == element.getKind()) : "element kind must be FIELD";
-
-        Name fieldName = element.getSimpleName();
-        TypeMirror fieldType = element.asType();
-
-        beanDefinitionWriter.visitFieldInjectionPoint(true, fieldType.toString(), fieldName.toString());
     }
 
     private BeanDefinitionClassWriter generateBeanDefinitionClass(
