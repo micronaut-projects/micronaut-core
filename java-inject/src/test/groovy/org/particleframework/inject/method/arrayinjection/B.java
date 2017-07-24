@@ -1,18 +1,18 @@
-package org.particleframework.inject.method;
+package org.particleframework.inject.method.arrayinjection;
 
 import javax.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
 
-public class JavaB {
-    private List<JavaA> all;
+public class B {
+    private List<A> all;
 
     @Inject
-    void setJavaA(JavaA[] a) {
+    void setA(A[] a) {
         this.all = Arrays.asList(a);
     }
 
-    List<JavaA> getAll() {
+    List<A> getAll() {
         return this.all;
     }
 }

@@ -1,10 +1,10 @@
-package org.particleframework.inject.field
+package org.particleframework.inject.field.simpleinjection
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
 
-class JavaFieldInjectionSpec extends Specification {
+class FieldInjectionSpec extends Specification {
 
     void "test injection via field with interface"() {
         given:
@@ -12,10 +12,10 @@ class JavaFieldInjectionSpec extends Specification {
         context.start()
 
         when:"Alpha bean is obtained that has a field with @Inject"
-        JavaClass jc =  context.getBean(JavaClass)
+        B b =  context.getBean(B)
 
         then:"The implementation is injected"
-        jc.javaInterface != null
+        b.a != null
     }
 }
 

@@ -1,10 +1,10 @@
-package org.particleframework.inject.method
+package org.particleframework.inject.method.simpleinjection
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
 
-class JavaSetterInjectionSpec extends Specification {
+class SetterInjectionSpec extends Specification {
 
     void "test injection via setter with interface"() {
         given:
@@ -12,10 +12,12 @@ class JavaSetterInjectionSpec extends Specification {
         context.start()
 
         when:"Alpha bean is obtained that has a setter with @Inject"
-        JavaClass jc =  context.getBean(JavaClass)
+        B b =  context.getBean(B)
 
         then:"The implementation is injected"
-        jc.javaInterface != null
+        b.a != null
+        b.getA().equals(context.getBean(AImpl))
+
     }
 }
 

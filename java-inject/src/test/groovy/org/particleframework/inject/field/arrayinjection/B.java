@@ -1,14 +1,14 @@
-package org.particleframework.inject.field;
+package org.particleframework.inject.field.arrayinjection;
 
 import javax.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
 
-public class JavaB {
+public class B {
     @Inject
-    private JavaA[] all;
+    private A[] all;
 
-    List<JavaA> getAll() {
+    List<A> getAll() {
         return Arrays.asList(this.all);
     }
 }
