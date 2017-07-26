@@ -24,7 +24,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
-import static javax.lang.model.type.TypeKind.*;
+import static javax.lang.model.type.TypeKind.ARRAY;
+import static javax.lang.model.type.TypeKind.DECLARED;
 
 @SupportedAnnotationTypes({
     "javax.inject.Singleton",
@@ -84,10 +85,42 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         this.beanDefinitionwriters.values().forEach(wrapper -> {
             BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
             if (!wrapper.hasDefinedCtor) {
-                // if there are no defined ctors, then generate default
-                writer.visitBeanDefinitionConstructor();
+                String className = writer.getBeanTypeName();
+                List<? extends Element> publicConstructors = findAllPublicConstructors(className);
+
+                Element ctorElement;
+                if (publicConstructors.size() == 0) {
+                    error("Class %s must have at least one public constructor in order to be a candidate for dependency injection", className);
+                } else {
+                    if (publicConstructors.size() > 1) {
+                        // FIXME: see InjectTransform 503
+                        // constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
+                        // need to do this as well?
+
+                        ctorElement = publicConstructors.get(0);
+                    } else {
+                        ctorElement = publicConstructors.get(0);
+                    }
+                    wrapper.annotationElements.add(ctorElement);
+                }
             }
-            wrapper.annotationElements.forEach(element -> {
+
+            // see BeanDefinitionWriter:1087 and InjectTransform.defineBeanDefinition
+            // there needs to be a constructorVisitor before field injection occurs
+            wrapper.annotationElements.stream()
+                .filter(element -> element.getKind() == CONSTRUCTOR)
+                .forEach(element -> {
+                    try {
+                        visitConstructorInjectionFor(wrapper.beanDefinitionWriter, element);
+                    } catch (IOException e) {
+                        error("Unexpected error: %s", e.getMessage());
+                        // FIXME something is wrong, probably want to fail fast
+                        e.printStackTrace();
+                    }
+            });
+            wrapper.annotationElements.stream()
+                .filter(element -> element.getKind() != CONSTRUCTOR)
+                .forEach(element -> {
                 try {
                     switch (element.getKind()) {
                         case CLASS:
@@ -95,9 +128,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                             break;
                         case METHOD:
                             visitMethodInjectionFor(wrapper.beanDefinitionWriter, element);
-                            break;
-                        case CONSTRUCTOR:
-                            visitConstructorInjectionFor(wrapper.beanDefinitionWriter, element);
                             break;
                         case FIELD:
                             visitFieldInjectionFor(wrapper.beanDefinitionWriter, element);
@@ -148,6 +178,14 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
+    }
+
+    private List<? extends Element> findAllPublicConstructors(String className) {
+        TypeElement typeElement = elementUtils.getTypeElement(className);
+        List<? extends Element> elements = elementUtils.getAllMembers(typeElement).stream()
+            .filter(element -> element.getKind() == ElementKind.CONSTRUCTOR && element.getModifiers().contains(Modifier.PUBLIC))
+            .collect(Collectors.toList());
+        return elements;
     }
 
     // if it's an inner class org.oci.A.B, we want A.B
@@ -239,7 +277,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 List<Object> params = declaredType.getTypeArguments().stream()
                     .map(TypeMirror::toString)
                     .collect(Collectors.toList());
-                genericTypes.put(argName, params);
+                if (!params.isEmpty()) {
+                    genericTypes.put(argName, params);
+                }
             } else {
                 error(element, "Unexpected element kind %s for %s", kind, element);
             }
