@@ -3,6 +3,7 @@ package org.particleframework.ast.java;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
+import org.particleframework.context.annotation.Context;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
@@ -10,6 +11,8 @@ import org.particleframework.inject.writer.BeanDefinitionClassWriter;
 import org.particleframework.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.*;
+import javax.inject.Scope;
+import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -28,6 +31,7 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.DECLARED;
 
 @SupportedAnnotationTypes({
+    "org.particleframework.context.annotation.Context",
     "javax.inject.Singleton",
     "javax.inject.Inject"
 })
@@ -38,9 +42,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private Filer filer;
     private Elements elementUtils;
     private Types typeUtils;
+    private AnnotationUtils annotationUtils;
 
     private Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionwriters = new TreeMap<>();
-
     private String buildPath;
 
     @Override
@@ -58,14 +62,15 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                             elementKind);
                     } else {
                             note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
-                            TypeElement typeElement = typeElementFor(element);
-                            String fullyQualifiedBeanClassName = typeElement.getQualifiedName().toString();
+                            TypeElement classTypeElement = classElementFor(element);
+                            String fullyQualifiedBeanClassName = classTypeElement.getQualifiedName().toString();
 
                             BeanDefinitionWriterElementWrapper wrapper = beanDefinitionwriters.get(fullyQualifiedBeanClassName);
                             if (wrapper == null) {
                                 wrapper = new BeanDefinitionWriterElementWrapper();
                                 wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(annotation, element);
                                 wrapper.annotationElements = new LinkedHashSet<>();
+                                wrapper.classAnnotations = elementUtils.getAllAnnotationMirrors(classTypeElement);
                                 beanDefinitionwriters.put(fullyQualifiedBeanClassName, wrapper);
                             }
                             wrapper.annotationElements.add(element);
@@ -86,7 +91,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
             if (!wrapper.hasDefinedCtor) {
                 String className = writer.getBeanTypeName();
-                List<? extends Element> publicConstructors = findAllPublicConstructors(className);
+                List<? extends Element> publicConstructors = findPublicConstructors(className);
 
                 Element ctorElement;
                 if (publicConstructors.size() == 0) {
@@ -97,6 +102,8 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                         // constructorNode = publicConstructors.find() { it.getAnnotations(makeCached(Inject)) }
                         // need to do this as well?
 
+                        // I think I can use elementUtils.getAllAnnotationMirrors
+                        // and find the ctor that matches one
                         ctorElement = publicConstructors.get(0);
                     } else {
                         ctorElement = publicConstructors.get(0);
@@ -150,7 +157,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 
                 String beanDefinitionName = wrapper.beanDefinitionWriter.getBeanDefinitionName();
                 String beanTypeName = wrapper.beanDefinitionWriter.getBeanTypeName();
-                BeanDefinitionClassWriter beanDefinitionClassWriter = generateBeanDefinitionClass(
+                BeanDefinitionClassWriter beanDefinitionClassWriter = createBeanDefinitionClassWriterFor(
                     wrapper.annotationElements, beanTypeName, beanDefinitionName);
 
                 generator.generate(targetDirectory, wrapper.beanDefinitionWriter.getBeanDefinitionName(),BeanDefinition.class);
@@ -164,23 +171,29 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     }
 
     private BeanDefinitionWriter createBeanDefinitionWriterFor(TypeElement annotation, Element element) {
-        TypeElement typeElement = typeElementFor(element);
+        TypeElement typeElement = classElementFor(element);
         PackageElement packageElement = elementUtils.getPackageOf(element);
         String beanClassName = classNameFor(packageElement, typeElement);
         String packageName = packageElement.getQualifiedName().toString();
-        boolean isSingleton = "Singleton".equals(annotation.getSimpleName().toString()) && element.getKind() == CLASS;
-        String scope = "Singleton".equals(annotation.getSimpleName().toString()) ? "javax.inject.Singleton" : null; // TODO determine scope?
+        boolean isSingleton = annotationUtils.hasStereotype(
+            typeElement, Collections.singletonList(Singleton.class.getName()));
+        AnnotationMirror scopeAnn = annotationUtils.findAnnotationWithStereotype(
+            typeElement, Scope.class.getName());
+        String scope = null;
+        if (scopeAnn != null) {
+            scope = scopeAnn.getAnnotationType().toString();
+        }
         return new BeanDefinitionWriter(packageName, beanClassName, scope, isSingleton);
     }
 
-    private TypeElement typeElementFor(Element element) {
+    private TypeElement classElementFor(Element element) {
         while (CLASS != element.getKind() ) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
     }
 
-    private List<? extends Element> findAllPublicConstructors(String className) {
+    private List<? extends Element> findPublicConstructors(String className) {
         TypeElement typeElement = elementUtils.getTypeElement(className);
         List<? extends Element> elements = elementUtils.getAllMembers(typeElement).stream()
             .filter(element -> element.getKind() == ElementKind.CONSTRUCTOR && element.getModifiers().contains(Modifier.PUBLIC))
@@ -218,7 +231,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Set<Modifier> modifiers = element.getModifiers();
         boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
 
-        TypeElement classElement = typeElementFor(element);
+        TypeElement classElement = classElementFor(element);
         beanDefinitionWriter.visitFieldInjectionPoint(
             classElement.getQualifiedName().toString(),
             null,
@@ -295,13 +308,15 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         return argName + suffix;
     }
 
-    private BeanDefinitionClassWriter generateBeanDefinitionClass(
+    private BeanDefinitionClassWriter createBeanDefinitionClassWriterFor(
         Set<Element> elements,
         String fullyQualifiedBeanClassName,
         String beanDefinitionName) throws IOException
     {
         BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(fullyQualifiedBeanClassName, beanDefinitionName);
         String classFileName = beanClassWriter.getBeanDefinitionQualifiedClassName();
+        Element classElement = elementUtils.getTypeElement(fullyQualifiedBeanClassName);
+        beanClassWriter.setContextScope(annotationUtils.hasStereotype(classElement, Context.class.getName()));
         note("CREATING NEW CLASS FILE %s for @Singleton", classFileName);
         JavaFileObject javaFileObject = filer.createClassFile(classFileName, elements.toArray(new Element[elements.size()]));
         try (OutputStream out = javaFileObject.openOutputStream()) {
@@ -317,6 +332,8 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         this.filer = processingEnv.getFiler();
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
+        this.annotationUtils = new AnnotationUtils(elementUtils);
+
         Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
         this.buildPath = javacOptions.get(Option.D);
         Map<String, String> options = processingEnv.getOptions();
@@ -343,4 +360,6 @@ class BeanDefinitionWriterElementWrapper {
     Set<Element> annotationElements;
     BeanDefinitionWriter beanDefinitionWriter;
     boolean hasDefinedCtor;
+    TypeElement scope;
+    List<? extends AnnotationMirror> classAnnotations;
 }
