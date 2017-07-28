@@ -7,19 +7,19 @@ import javax.lang.model.util.Elements;
 import java.util.Arrays;
 import java.util.List;
 
-public class AnnotationUtils {
+class AnnotationUtils {
 
     private final Elements elementUtils;
 
-    public AnnotationUtils(Elements elementUtils) {
+    AnnotationUtils(Elements elementUtils) {
         this.elementUtils = elementUtils;
     }
 
-    public boolean hasStereotype(Element classElement, String... stereotypes) {
+    boolean hasStereotype(Element classElement, String... stereotypes) {
         return hasStereotype(classElement, Arrays.asList(stereotypes));
     }
 
-    public boolean hasStereotype(Element classElement, List<String> stereotypes) {
+    boolean hasStereotype(Element classElement, List<String> stereotypes) {
         List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(classElement);
         for (AnnotationMirror ann: annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
@@ -35,7 +35,7 @@ public class AnnotationUtils {
         return false;
     }
 
-    public AnnotationMirror findAnnotationWithStereotype(Element classElement, String stereotype) {
+    AnnotationMirror findAnnotationWithStereotype(Element classElement, String stereotype) {
         List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(classElement);
         for (AnnotationMirror ann: annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
