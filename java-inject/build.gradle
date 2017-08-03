@@ -3,6 +3,8 @@
 //}
 dependencies {
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
+    testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     compile project(":inject")
     testCompile "junit:junit:4.7"
 }

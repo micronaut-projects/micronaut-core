@@ -3,7 +3,9 @@ package org.particleframework.ast.java;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.util.Options;
+import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.Context;
+import org.particleframework.context.annotation.Value;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
@@ -11,12 +13,14 @@ import org.particleframework.inject.writer.BeanDefinitionClassWriter;
 import org.particleframework.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.processing.*;
+import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
+import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -28,14 +32,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
-import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.DECLARED;
 
 @SupportedAnnotationTypes({
+    "org.particleframework.config.ConfigurationProperties",
     "org.particleframework.context.annotation.Context",
+    "javax.inject.Inject",
     "javax.inject.Singleton",
-    "javax.inject.Inject"
+    "org.particleframework.context.annotation.Value"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class SingletonAnnotationProcessor extends AbstractProcessor {
@@ -46,6 +51,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private Types typeUtils;
     private AnnotationUtils annotationUtils;
     private GenericUtils genericUtils;
+    private ModelUtils modelUtils;
 
     private final Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionWriters = new TreeMap<>();
     private String buildPath;
@@ -65,7 +71,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                             elementKind);
                     } else {
                             note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
-                            TypeElement classTypeElement = classElementFor(element);
+                            TypeElement classTypeElement = modelUtils.classElementFor(element);
                             String fullyQualifiedBeanClassName = classTypeElement.getQualifiedName().toString();
 
                             BeanDefinitionWriterElementWrapper wrapper = beanDefinitionWriters.get(fullyQualifiedBeanClassName);
@@ -73,6 +79,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                                 wrapper = new BeanDefinitionWriterElementWrapper();
                                 wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(element);
                                 wrapper.annotationElements = new LinkedHashSet<>();
+                                wrapper.configurationFieldElements = new LinkedHashSet<>();
                                 beanDefinitionWriters.put(fullyQualifiedBeanClassName, wrapper);
                             }
                             wrapper.annotationElements.add(element);
@@ -91,9 +98,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         File targetDirectory = new File(buildPath);
         this.beanDefinitionWriters.values().forEach(wrapper -> {
             BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
+            String className = writer.getBeanTypeName();
             if (!wrapper.hasDefinedCtor) {
-                String className = writer.getBeanTypeName();
-                List<? extends Element> publicConstructors = findPublicConstructors(className);
+                List<? extends Element> publicConstructors = modelUtils.findPublicConstructors(className);
 
                 Element ctorElement;
                 if (publicConstructors.size() == 0) {
@@ -114,32 +121,49 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 }
             }
 
+            // add non-annotated fields for class annotated with ConfigurationProperties
+            // FIXME add check for static as per InjectTransform
+            TypeElement typeElement = elementUtils.getTypeElement(className);
+            if (isConfigurationProperties(typeElement)) {
+                List<? extends Element> members = elementUtils.getAllMembers(typeElement);
+                List<VariableElement> fieldElements = ElementFilter.fieldsIn(members)
+                    .stream()
+                    .filter(e -> !(isValue(e) && isInject(e)))
+                    .collect(Collectors.toList());
+
+                wrapper.configurationFieldElements.addAll(fieldElements);
+//                wrapper.annotationElements.addAll(fieldElements);
+            }
+
             // see BeanDefinitionWriter:1087 and InjectTransform.defineBeanDefinition
             // there needs to be a constructorVisitor before field injection occurs
-            wrapper.annotationElements.stream()
-                .filter(element -> element.getKind() == CONSTRUCTOR)
-                .forEach(element -> {
+            ElementFilter.constructorsIn(wrapper.annotationElements)
+                .forEach(constructor -> {
                     try {
-                        visitConstructorInjectionFor(wrapper.beanDefinitionWriter, element);
+                        visitConstructorInjectionFor(writer, constructor);
                     } catch (IOException e) {
                         error("Unexpected error: %s", e.getMessage());
                         // FIXME something is wrong, probably want to fail fast
                         e.printStackTrace();
                     }
             });
+
+            // everything else
+            // maybe split this up and do classes, fields, methods, etc in order like
+            // above with ElementFilter
             wrapper.annotationElements.stream()
                 .filter(element -> element.getKind() != CONSTRUCTOR)
                 .forEach(element -> {
                 try {
                     switch (element.getKind()) {
                         case CLASS:
-                            visitSingletonFor(wrapper.beanDefinitionWriter, element);
+                            visitSingletonFor(writer, element);
                             break;
                         case METHOD:
-                            visitMethodInjectionFor(wrapper.beanDefinitionWriter, element);
+                            visitMethodInjectionFor(writer, element);
                             break;
                         case FIELD:
-                            visitFieldInjectionFor(wrapper.beanDefinitionWriter, element);
+                            visitFieldInjectionFor(writer, element);
                             break;
                     }
                 } catch (IOException e) {
@@ -147,6 +171,13 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                     // FIXME something is wrong, probably want to fail fast
                     e.printStackTrace();
                 }
+            });
+
+            wrapper.configurationFieldElements.forEach(configField -> {
+//                visitFieldInjectionFor(wrapper.beanDefinitionWriter, element);
+//                visitSetterInjectionFor(wrapper.beanDefinitionWriter, element);
+                modelUtils.findSetterMethodFor(configField)
+                    .ifPresent(method -> visitSetterInjectionFor(writer, configField, method));
             });
 
             try {
@@ -173,9 +204,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     }
 
     private BeanDefinitionWriter createBeanDefinitionWriterFor(Element element) {
-        TypeElement typeElement = classElementFor(element);
+        TypeElement typeElement = modelUtils.classElementFor(element);
         PackageElement packageElement = elementUtils.getPackageOf(element);
-        String beanClassName = classNameFor(packageElement, typeElement);
+        String beanClassName = unqualifiedClassnameFor(typeElement,packageElement);
         String packageName = packageElement.getQualifiedName().toString();
         boolean isSingleton = annotationUtils.hasStereotype(
             typeElement, Collections.singletonList(Singleton.class.getName()));
@@ -203,37 +234,31 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         }
     }
 
-    private TypeElement classElementFor(Element element) {
-        while (CLASS != element.getKind() ) {
-            element = element.getEnclosingElement();
-        }
-        return (TypeElement) element;
-    }
-
-    private List<? extends Element> findPublicConstructors(String className) {
-        TypeElement typeElement = elementUtils.getTypeElement(className);
-        return elementUtils.getAllMembers(typeElement).stream()
-            .filter(element ->
-                element.getKind() == CONSTRUCTOR && element.getModifiers().contains(PUBLIC))
-            .collect(Collectors.toList());
-    }
 
     // if it's an inner class org.oci.A.B, we want A.B
     // FIXME deal with static nested classes
-    private String classNameFor(PackageElement packageElement, TypeElement typeElement) {
+    private String unqualifiedClassnameFor(TypeElement typeElement, PackageElement packageElement) {
         String qualifiedName = elementUtils.getBinaryName(typeElement).toString();
         return qualifiedName.replaceFirst(packageElement.getQualifiedName().toString() + "\\.","");
     }
 
-    private void visitSingletonFor(BeanDefinitionWriter beanDefinitionWriter, Element element) {
+    private void visitSingletonFor(BeanDefinitionWriter beanDefinitionWriter, Element
+        element) {
 
     }
 
     private void visitFieldInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) {
         assert (FIELD == element.getKind()) : "element kind must be FIELD";
 
+        if (!beanDefinitionWriter.isValidated() && annotationUtils.hasStereotype(element, "javax.validation.Constraint")) {
+            beanDefinitionWriter.setValidated(true);
+        }
+
         Name fieldName = element.getSimpleName();
         TypeMirror type = element.asType();
+        if (type.getKind().isPrimitive()) {
+            type = typeUtils.boxedClass((PrimitiveType)type).asType();
+        }
 
         // Is this a SMELL??? is it the right way to do it? It works so far
         // probably since arrays do not use type erasure...
@@ -244,17 +269,66 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             TypeElement fieldElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
             fieldType = fieldElement.getQualifiedName().toString();
         }
-        // FIXME test for requires reflection (private qualifier is just one aspect)
-        Set<Modifier> modifiers = element.getModifiers();
-        boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
+        boolean requiresReflection = modelUtils.requiresReflection(element);
+        boolean isValue = isValue(element);
 
-        TypeElement classElement = classElementFor(element);
-        beanDefinitionWriter.visitFieldInjectionPoint(
+        // FIXME handle Qualifier resolution
+        // FIXME handle declaringClass.isResolved() from InjectTransofrm logic
+
+        TypeElement classElement = modelUtils.classElementFor(element);
+
+        if (isValue) {
+            beanDefinitionWriter.visitFieldValue(
+                classElement.getQualifiedName().toString(),
+                null,
+                requiresReflection,
+                fieldType,
+                fieldName.toString(),
+                isConfigurationProperties(element)
+                );
+        } else {
+            beanDefinitionWriter.visitFieldInjectionPoint(
+                classElement.getQualifiedName().toString(),
+                null,
+                requiresReflection,
+                fieldType,
+                fieldName.toString());
+        }
+    }
+
+    public void visitSetterInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element field, Element method) {
+        ElementKind fieldKind = field.getKind();
+        ElementKind methodKind = method.getKind();
+        assert (FIELD == fieldKind) : "field kind must be FIELD";
+        assert (METHOD == methodKind) : "method kind must be METHOD";
+        TypeElement classElement = modelUtils.classElementFor(method);
+        Object qualifier = null;
+        Object fieldType;
+        List<Object> genericTypes = null;
+        TypeKind fieldTypeKind = field.asType().getKind();
+        if (fieldTypeKind == ARRAY || fieldTypeKind.isPrimitive()) {
+            fieldType = field.asType().toString();
+        } else {
+            TypeElement fieldElement = elementUtils.getTypeElement(typeUtils.erasure(field.asType()).toString());
+            fieldType = fieldElement.getQualifiedName().toString();
+            genericTypes = ((DeclaredType)field.asType()).getTypeArguments().stream()
+                .map(TypeMirror::toString)
+                .collect(Collectors.toList());
+        }
+
+        if (field.asType().getKind().isPrimitive()) {
+            fieldType = modelUtils.classOfPrimitiveFor(fieldType.toString());
+        }
+
+        beanDefinitionWriter.visitSetterValue(
             classElement.getQualifiedName().toString(),
-            null,
-            requiresReflection,
-            fieldType,
-            fieldName.toString());
+            qualifier, // null
+            modelUtils.requiresReflection(method),
+            fieldType, // int
+            field.getSimpleName().toString(), //defaultPort
+            method.getSimpleName().toString(),
+            genericTypes,
+            true);
     }
 
     private void visitConstructorInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
@@ -275,8 +349,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 
         visitInjectionFor(element, methodArgs, genericTypes);
         // FIXME test for requires reflection
-        Set<Modifier> modifiers = element.getModifiers();
-        boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
+        boolean requiresReflection = modelUtils.requiresReflection(element);
         beanDefinitionWriter.visitMethodInjectionPoint(requiresReflection, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
     }
 
@@ -288,16 +361,18 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
         for (int i = 0; i < parameterTypes.size(); i++) {
 
-            TypeMirror typeMirror = parameterTypes.get(i);
+            // if param is a primitive, get its wrapper type
+            TypeMirror typeMirror = modelUtils.wrapperForPrimitiveType(parameterTypes.get(i));
             TypeKind kind = typeMirror.getKind();
 
             if (kind == ARRAY) {
                 ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
-                TypeMirror componentType = arrayType.getComponentType();
+                TypeMirror componentType = modelUtils.wrapperForPrimitiveType(arrayType.getComponentType());
                 String argName = argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
             } else if (kind == DECLARED) {
+
                 DeclaredType declaredType = (DeclaredType) typeMirror;
 
                 TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
@@ -314,6 +389,20 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 error(element, "Unexpected element kind %s for %s", kind, element);
             }
         }
+    }
+
+    private boolean isValue(Element element) {
+        boolean isValue = annotationUtils.hasStereotype(element, Value.class);
+        return !isInject(element) && isValue || isConfigurationProperties(element);
+    }
+
+    private boolean isInject(Element element) {
+        return annotationUtils.hasStereotype(element, Inject.class);
+    }
+
+    private boolean isConfigurationProperties(Element element) {
+        TypeElement typeElement = modelUtils.classElementFor(element);
+        return annotationUtils.hasStereotype(typeElement, ConfigurationProperties.class);
     }
 
     private String argNameFrom(String type, int suffix) {
@@ -333,7 +422,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(fullyQualifiedBeanClassName, beanDefinitionName);
         String classFileName = beanClassWriter.getBeanDefinitionQualifiedClassName();
         Element classElement = elementUtils.getTypeElement(fullyQualifiedBeanClassName);
-        beanClassWriter.setContextScope(annotationUtils.hasStereotype(classElement, Context.class.getName()));
+        beanClassWriter.setContextScope(annotationUtils.hasStereotype(classElement, Context.class));
         note("CREATING NEW CLASS FILE %s for @Singleton", classFileName);
         JavaFileObject javaFileObject = filer.createClassFile(classFileName, elements.toArray(new Element[elements.size()]));
         try (OutputStream out = javaFileObject.openOutputStream()) {
@@ -351,6 +440,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         this.typeUtils = processingEnv.getTypeUtils();
         this.annotationUtils = new AnnotationUtils(elementUtils);
         this.genericUtils = new GenericUtils(elementUtils,typeUtils);
+        this.modelUtils = new ModelUtils(elementUtils,typeUtils);
 
         Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
         this.buildPath = javacOptions.get(Option.D);
@@ -372,10 +462,13 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private void note(String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
     }
+
+
 }
 
 class BeanDefinitionWriterElementWrapper {
     Set<Element> annotationElements;
+    Set<Element> configurationFieldElements;
     BeanDefinitionWriter beanDefinitionWriter;
     boolean hasDefinedCtor;
 }

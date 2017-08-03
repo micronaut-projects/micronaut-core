@@ -3,9 +3,7 @@ package org.particleframework.inject.constructor.factoryinjection
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
-/**
- * Created by graemerocher on 12/05/2017.
- */
+
 class ConstructorFactorySpec extends Specification {
 
     void "test injection with constructor supplied by a provider"() {

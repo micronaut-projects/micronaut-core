@@ -4,6 +4,7 @@ import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.util.Elements;
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
 
@@ -13,6 +14,10 @@ class AnnotationUtils {
 
     AnnotationUtils(Elements elementUtils) {
         this.elementUtils = elementUtils;
+    }
+
+    boolean hasStereotype(Element classElement, Class<? extends Annotation> stereotype) {
+        return hasStereotype(classElement, stereotype.getName());
     }
 
     boolean hasStereotype(Element classElement, String... stereotypes) {
