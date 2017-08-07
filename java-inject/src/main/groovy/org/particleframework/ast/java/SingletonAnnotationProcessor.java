@@ -320,6 +320,10 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             fieldType = modelUtils.classOfPrimitiveFor(fieldType.toString());
         }
 
+        if (!beanDefinitionWriter.isValidated() && annotationUtils.hasStereotype(field, "javax.validation.Constraint")) {
+            beanDefinitionWriter.setValidated(true);
+        }
+
         beanDefinitionWriter.visitSetterValue(
             classElement.getQualifiedName().toString(),
             qualifier, // null
@@ -462,8 +466,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     private void note(String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
     }
-
-
 }
 
 class BeanDefinitionWriterElementWrapper {

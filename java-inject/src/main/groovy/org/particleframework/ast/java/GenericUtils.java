@@ -18,11 +18,31 @@ class GenericUtils {
         this.typeUtils = typeUtils;
     }
 
+    /**
+     * Finds the generic type for the given interface for the given class element
+     *
+     *
+     * For example, for <code>class AProvider implements Provider<A></code>
+     *   element = AProvider
+     *   interfaceName = interface javax.inject.Provider
+     *   return A
+     *
+     * @param element The class element
+     * @param interfaceName The interface
+     * @return The generic type or null
+     */
     TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
         List<? extends TypeMirror> typeMirrors = interfaceGenericTypesFor(element, interfaceName);
         return typeMirrors.isEmpty() ? null : typeMirrors.get(0);
     }
 
+    /**
+     * Finds the generic types for the given interface for the given class element
+     *
+     * @param element The class element
+     * @param interfaceName The interface
+     * @return The generic types or an empty list
+     */
     List<? extends TypeMirror> interfaceGenericTypesFor(TypeElement element, String interfaceName) {
         for (TypeMirror tm: element.getInterfaces()) {
             DeclaredType declaredType = (DeclaredType) tm;
