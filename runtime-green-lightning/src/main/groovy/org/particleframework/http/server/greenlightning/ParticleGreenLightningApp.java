@@ -23,7 +23,6 @@ import org.particleframework.context.ApplicationContext;
 
 
 public class ParticleGreenLightningApp implements GreenApp {
-    protected int ROUTE_ID;
     protected final ApplicationContext applicationContext;
     protected final int port;
     protected final String host;
@@ -38,12 +37,11 @@ public class ParticleGreenLightningApp implements GreenApp {
     @Override
     public void declareConfiguration(final Builder builder) {
         builder.enableServer(false, false, host, port);
-        ROUTE_ID = builder.registerRoute("/${path}");
     }
 
     public void declareBehavior(final GreenRuntime runtime) {
         final RestListener adder = new GreenLightningParticleDispatcher(runtime, applicationContext);
-        runtime.addRestListener(adder).includeRoutes(ROUTE_ID);
+        runtime.addRestListener(adder).includeAllRoutes();
         this.runtime = runtime;
     }
 
