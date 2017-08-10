@@ -37,7 +37,7 @@ class GreenLightningParticleDispatcher implements RestListener {
     @Override
     public boolean restRequest(final HTTPRequestReader request) {
         final Appendable routePath = new StringBuilder();
-        request.getText("path".getBytes(), routePath);
+        request.getRoutePath(routePath);
 
         final Optional<Router> routerBean = applicationContext.findBean(Router.class);
 
