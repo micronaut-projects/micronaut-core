@@ -40,6 +40,10 @@ class AnnotationUtils {
         return false;
     }
 
+    AnnotationMirror findAnnotationWithStereotype(Element classElement, Class<? extends Annotation> stereotype) {
+        return findAnnotationWithStereotype(classElement, stereotype.getName());
+    }
+
     AnnotationMirror findAnnotationWithStereotype(Element classElement, String stereotype) {
         List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(classElement);
         for (AnnotationMirror ann: annotationMirrors) {

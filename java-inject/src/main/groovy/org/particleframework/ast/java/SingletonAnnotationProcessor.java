@@ -77,6 +77,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                             BeanDefinitionWriterElementWrapper wrapper = beanDefinitionWriters.get(fullyQualifiedBeanClassName);
                             if (wrapper == null) {
                                 wrapper = new BeanDefinitionWriterElementWrapper();
+                                wrapper.fullyQualifiedBeanClassName = fullyQualifiedBeanClassName;
                                 wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(element);
                                 wrapper.annotationElements = new LinkedHashSet<>();
                                 wrapper.configurationFieldElements = new LinkedHashSet<>();
@@ -132,7 +133,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                     .collect(Collectors.toList());
 
                 wrapper.configurationFieldElements.addAll(fieldElements);
-//                wrapper.annotationElements.addAll(fieldElements);
             }
 
             // see BeanDefinitionWriter:1087 and InjectTransform.defineBeanDefinition
@@ -174,8 +174,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
             });
 
             wrapper.configurationFieldElements.forEach(configField -> {
-//                visitFieldInjectionFor(wrapper.beanDefinitionWriter, element);
-//                visitSetterInjectionFor(wrapper.beanDefinitionWriter, element);
                 modelUtils.findSetterMethodFor(configField)
                     .ifPresent(method -> visitSetterInjectionFor(writer, configField, method));
             });
@@ -234,7 +232,6 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         }
     }
 
-
     // if it's an inner class org.oci.A.B, we want A.B
     // FIXME deal with static nested classes
     private String unqualifiedClassnameFor(TypeElement typeElement, PackageElement packageElement) {
@@ -256,19 +253,21 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 
         Name fieldName = element.getSimpleName();
         TypeMirror type = element.asType();
-        if (type.getKind().isPrimitive()) {
-            type = typeUtils.boxedClass((PrimitiveType)type).asType();
-        }
 
         // Is this a SMELL??? is it the right way to do it? It works so far
         // probably since arrays do not use type erasure...
-        String fieldType;
-        if (type.getKind() == ARRAY) {
+        TypeKind kind = type.getKind();
+        Object fieldType = null;
+        if (kind == ARRAY) {
             fieldType = type.toString();
-        } else {
+        } else if (kind == DECLARED){
             TypeElement fieldElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
             fieldType = fieldElement.getQualifiedName().toString();
+        } else if (kind.isPrimitive()) {
+            fieldType = modelUtils.classOfPrimitiveFor(type.toString());
         }
+        assert (fieldType != null) : "fieldTYpe cannot be null";
+
         boolean requiresReflection = modelUtils.requiresReflection(element);
         boolean isValue = isValue(element);
 
@@ -341,7 +340,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Map<String,Object> methodArgs = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitInjectionFor(element, methodArgs, genericTypes);
+        visitParametersFor(element, methodArgs, genericTypes);
         beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, null, genericTypes);
     }
 
@@ -351,37 +350,36 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         Map<String,Object> methodArgs = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitInjectionFor(element, methodArgs, genericTypes);
+        visitParametersFor(element, methodArgs, genericTypes);
         // FIXME test for requires reflection
         boolean requiresReflection = modelUtils.requiresReflection(element);
         beanDefinitionWriter.visitMethodInjectionPoint(requiresReflection, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
     }
 
-    private void visitInjectionFor(Element element,
-                                   Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) {
+    private void visitParametersFor(Element element,
+                                    Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) {
 
         ExecutableType execType = (ExecutableType) element.asType();
 
         List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
         for (int i = 0; i < parameterTypes.size(); i++) {
 
-            // if param is a primitive, get its wrapper type
-            TypeMirror typeMirror = modelUtils.wrapperForPrimitiveType(parameterTypes.get(i));
+            TypeMirror typeMirror = parameterTypes.get(i);
             TypeKind kind = typeMirror.getKind();
 
             if (kind == ARRAY) {
                 ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
-                TypeMirror componentType = modelUtils.wrapperForPrimitiveType(arrayType.getComponentType());
+                TypeMirror componentType = arrayType.getComponentType();
                 String argName = argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
             } else if (kind == DECLARED) {
-
                 DeclaredType declaredType = (DeclaredType) typeMirror;
 
                 TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
                 assert (typeElement != null) : "typeElement cannot be null";
                 String argName = argNameFrom(typeElement.getSimpleName().toString(), i);
+
                 methodArgs.put(argName, typeElement.toString());
                 List<Object> params = declaredType.getTypeArguments().stream()
                     .map(TypeMirror::toString)
@@ -389,8 +387,13 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                 if (!params.isEmpty()) {
                     genericTypes.put(argName, params);
                 }
+            } else if (kind.isPrimitive()) {
+                String typeName = typeMirror.toString();
+                Object argType = modelUtils.classOfPrimitiveFor(typeName);
+                String argName = argNameFrom(typeName, i);
+                methodArgs.put(argName, argType);
             } else {
-                error(element, "Unexpected element kind %s for %s", kind, element);
+                error(element, "ERROR: Unexpected element kind %s for %s", kind, element);
             }
         }
     }
@@ -442,9 +445,9 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         this.filer = processingEnv.getFiler();
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
+        this.modelUtils = new ModelUtils(elementUtils,typeUtils);
         this.annotationUtils = new AnnotationUtils(elementUtils);
         this.genericUtils = new GenericUtils(elementUtils,typeUtils);
-        this.modelUtils = new ModelUtils(elementUtils,typeUtils);
 
         Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
         this.buildPath = javacOptions.get(Option.D);
@@ -469,6 +472,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
 }
 
 class BeanDefinitionWriterElementWrapper {
+    String fullyQualifiedBeanClassName;
     Set<Element> annotationElements;
     Set<Element> configurationFieldElements;
     BeanDefinitionWriter beanDefinitionWriter;
