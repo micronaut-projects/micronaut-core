@@ -1,5 +1,5 @@
 repositories {
-    maven { url 'https://repository-pronghorn.forge.cloudbees.com/snapshot'}
+    maven { url 'https://repository-pronghorn.forge.cloudbees.com/release' }
 }
 
 dependencies {
