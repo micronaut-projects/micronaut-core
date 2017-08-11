@@ -12,6 +12,8 @@ import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.inject.writer.BeanDefinitionClassWriter;
 import org.particleframework.inject.writer.BeanDefinitionWriter;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.annotation.processing.*;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -39,6 +41,8 @@ import static javax.lang.model.type.TypeKind.DECLARED;
     "org.particleframework.config.ConfigurationProperties",
     "org.particleframework.context.annotation.Context",
     "javax.inject.Inject",
+    "javax.annotation.PostConstruct",
+    "javax.annotation.PreDestroy",
     "javax.inject.Singleton",
     "org.particleframework.context.annotation.Value"
 })
@@ -344,16 +348,50 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
         beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, null, genericTypes);
     }
 
-    private void visitMethodInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element element) throws IOException {
-        ElementKind elementKind = element.getKind();
+    private void visitMethodInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element method) throws IOException {
+        ElementKind elementKind = method.getKind();
         assert (METHOD == elementKind) : "element kind must be METHOD";
+
+        TypeElement classElement = modelUtils.classElementFor(method);
+
         Map<String,Object> methodArgs = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitParametersFor(element, methodArgs, genericTypes);
+        visitParametersFor(method, methodArgs, genericTypes);
         // FIXME test for requires reflection
-        boolean requiresReflection = modelUtils.requiresReflection(element);
-        beanDefinitionWriter.visitMethodInjectionPoint(requiresReflection, Void.TYPE, element.getSimpleName().toString(), methodArgs, null, genericTypes);
+        boolean requiresReflection = modelUtils.requiresReflection(method);
+
+        // FIXME resolve return type (might not be Void.TYPE)
+        if (annotationUtils.hasStereotype(method, PostConstruct.class)) {
+            beanDefinitionWriter.visitPostConstructMethod(
+                classElement.getQualifiedName().toString(),
+                requiresReflection,
+                Void.TYPE,
+                method.getSimpleName().toString(),
+                methodArgs,
+                null,
+                genericTypes);
+
+        } else if (annotationUtils.hasStereotype(method, PreDestroy.class)) {
+            beanDefinitionWriter.visitPreDestroyMethod(
+                classElement.getQualifiedName().toString(),
+                requiresReflection,
+                Void.TYPE,
+                method.getSimpleName().toString(),
+                methodArgs,
+                null,
+                genericTypes);
+
+        } else {
+            beanDefinitionWriter.visitMethodInjectionPoint(
+                classElement.getQualifiedName().toString(),
+                requiresReflection,
+                Void.TYPE,
+                method.getSimpleName().toString(),
+                methodArgs,
+                null,
+                genericTypes);
+        }
     }
 
     private void visitParametersFor(Element element,
