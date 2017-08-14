@@ -56,3 +56,24 @@ subprojects {
 }
 
 apply from:"${commonBuild}/common-docs.gradle"
+
+// IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
+// [see https://youtrack.jetbrains.com/issue/IDEA-175172]
+// the problem here is the gradle build uses <module-dir>/build/classes/main
+// while IDEA uses <module-dir>/out/production/..
+// As a result, compiling ast or java-inject module and using the IDEA test runner fails because the
+// generated bean classes for injection are in <module-dir>/build, not <module-dir>/out
+allprojects {
+    apply plugin: 'idea'
+    idea {
+        module {
+            outputDir file('build/classes/main')
+            testOutputDir file('build/classes/test')
+        }
+    }
+    if(project.convention.findPlugin(JavaPluginConvention)) {
+        // Change the output directory for the main and test source sets back to the old path
+        sourceSets.main.output.classesDir = new File(buildDir, "classes/main")
+        sourceSets.test.output.classesDir = new File(buildDir, "classes/test")
+    }
+}

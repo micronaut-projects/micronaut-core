@@ -3,4 +3,5 @@
 .idea/
 build/
 classes/
+out/
 *.db
