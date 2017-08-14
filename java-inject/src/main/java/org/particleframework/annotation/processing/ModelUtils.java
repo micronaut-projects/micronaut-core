@@ -1,4 +1,4 @@
-package org.particleframework.ast.java;
+package org.particleframework.annotation.processing;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
