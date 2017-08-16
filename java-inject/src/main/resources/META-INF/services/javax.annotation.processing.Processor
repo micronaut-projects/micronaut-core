@@ -1,1 +1,2 @@
 org.particleframework.annotation.processing.DependencyInjectionAnnotationProcessor
+org.particleframework.annotation.processing.PackageConfigurationAnnotationProcessor
