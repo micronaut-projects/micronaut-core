@@ -1,4 +1,4 @@
-package org.particleframework.ast.java;
+package org.particleframework.annotation.processing;
 
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.processing.JavacProcessingEnvironment;
@@ -25,7 +25,6 @@ import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
@@ -47,7 +46,7 @@ import static javax.lang.model.type.TypeKind.DECLARED;
     "org.particleframework.context.annotation.Value"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class SingletonAnnotationProcessor extends AbstractProcessor {
+public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
 
     private Messager messager;
     private Filer filer;
@@ -74,7 +73,7 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
                         error(element, "@Singleton is only applicable to class, but found it applied to @%s",
                             elementKind);
                     } else {
-                            note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
+//                            note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
                             TypeElement classTypeElement = modelUtils.classElementFor(element);
                             String fullyQualifiedBeanClassName = classTypeElement.getQualifiedName().toString();
 
@@ -494,18 +493,18 @@ public class SingletonAnnotationProcessor extends AbstractProcessor {
     }
 
     private void error(Element e, String msg, Object... args) {
-        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args), e);
+//        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args), e);
     }
     private void error(String msg, Object... args) {
-        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args));
+//        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args));
     }
 
     private void note(Element e, String msg, Object... args) {
-        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args), e);
+//        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args), e);
     }
 
     private void note(String msg, Object... args) {
-        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
+//        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
     }
 }
 

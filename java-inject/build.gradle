@@ -1,6 +1,7 @@
 //configurations.all {
 //    it.exclude(group:"org.slf4j",module:"jcl-over-slf4j")
 //}
+
 dependencies {
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:1.1.0.Final'
@@ -9,4 +10,14 @@ dependencies {
     compile project(":inject")
     testCompile "junit:junit:4.7"
 }
+
+// Want to know if I still have @Ignore tests so I don't forget to address them
+test {
+    afterTest { descriptor, result ->
+        if (result.resultType == TestResult.ResultType.SKIPPED) {
+            println "WARNING: ${descriptor.className}.${descriptor.name} was skipped"
+        }
+    }
+}
+
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
