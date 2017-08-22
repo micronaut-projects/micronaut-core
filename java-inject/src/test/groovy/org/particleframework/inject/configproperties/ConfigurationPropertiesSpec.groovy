@@ -3,11 +3,11 @@ package org.particleframework.inject.configproperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import spock.lang.Ignore
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
 
-//    @Ignore("WIP")
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -16,7 +16,6 @@ class ConfigurationPropertiesSpec extends Specification {
             'foo.bar.anotherPort':'9090',
             'foo.bar.intList':"1,2,3",
             'foo.bar.stringList':"1,2",
-//            'foo.bar.inner.enabled':'true',
             'foo.bar.flags.one':'1',
             'foo.bar.flags.two':'2',
             'foo.bar.urlList':"http://test.com, http://test2.com",
@@ -43,6 +42,21 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultPort == 9999
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
-//        config.inner.enabled
+    }
+
+    @Ignore("WIP")
+    void "test configuration inner class properties binding"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+            'foo.bar.inner.enabled':'true',
+        ))
+
+        applicationContext.start()
+
+        MyConfig config = applicationContext.getBean(MyConfig)
+
+        expect:
+        config.inner.enabled
     }
 }
