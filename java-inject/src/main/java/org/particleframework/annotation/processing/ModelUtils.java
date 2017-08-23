@@ -65,16 +65,6 @@ class ModelUtils {
         return "set" + name;
     }
 
-    String argNameFrom(String type, int suffix) {
-        String className = type.replaceFirst("((.*)\\.)?([^\\.]*)", "$3");
-        String argName = className.substring(0,1).toLowerCase();
-        if (className.length() > 1) {
-            argName += className.substring(1);
-        }
-        return argName + suffix;
-    }
-
-
     List<? extends Element> findPublicConstructors(String className) {
         TypeElement typeElement = elementUtils.getTypeElement(className);
         return elementUtils.getAllMembers(typeElement).stream()

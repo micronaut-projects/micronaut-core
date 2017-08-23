@@ -15,10 +15,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.inject.Scope;
-import javax.inject.Singleton;
+import javax.inject.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -37,6 +34,7 @@ import static javax.lang.model.type.TypeKind.DECLARED;
     "javax.annotation.PostConstruct",
     "javax.annotation.PreDestroy",
     "javax.inject.Inject",
+    "javax.inject.Qualifier",
     "javax.inject.Singleton",
     "org.particleframework.config.ConfigurationProperties",
     "org.particleframework.context.annotation.Bean",
@@ -66,32 +64,30 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
             annotations.forEach(annotation -> {
                 note("starting annotation processing for @%s", annotation.getQualifiedName());
                 Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
-                elements.forEach(element -> {
+                elements.stream()
+                    // filtering Qualifier annotation definitions, which are not processed
+                    .filter(o -> o.getKind() != ElementKind.ANNOTATION_TYPE)
+                    .forEach(element -> {
                     ElementKind elementKind = element.getKind();
-                    if ("Singleton".equals(annotation.getQualifiedName().toString()) && elementKind != CLASS) {
-                        error(element, "@Singleton is only applicable to class, but found it applied to @%s",
-                            elementKind);
-                    } else {
 //                            note(element, "Found @%s for class in %s", annotation.getSimpleName(), element);
-                            TypeElement classTypeElement = modelUtils.classElementFor(element);
-                            String fullyQualifiedBeanClassName = classTypeElement.getQualifiedName().toString();
+                    TypeElement classTypeElement = modelUtils.classElementFor(element);
+                    String fullyQualifiedBeanClassName = classTypeElement.getQualifiedName().toString();
 
-                            BeanDefinitionWriterElementWrapper wrapper = beanDefinitionWriters.get(fullyQualifiedBeanClassName);
-                            if (wrapper == null) {
-                                wrapper = new BeanDefinitionWriterElementWrapper();
-                                wrapper.fullyQualifiedBeanClassName = fullyQualifiedBeanClassName;
-                                wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(element);
-                                wrapper.annotationElements = new LinkedHashSet<>();
-                                wrapper.configurationFieldElements = new LinkedHashSet<>();
-                                beanDefinitionWriters.put(fullyQualifiedBeanClassName, wrapper);
-                            }
-                            wrapper.annotationElements.add(element);
-                            if (element.getKind() == CONSTRUCTOR) {
-                                wrapper.hasDefinedCtor = true;
-                            }
-                    }});
-                }
-            );
+                    BeanDefinitionWriterElementWrapper wrapper = beanDefinitionWriters.get(fullyQualifiedBeanClassName);
+                    if (wrapper == null) {
+                        wrapper = new BeanDefinitionWriterElementWrapper();
+                        wrapper.fullyQualifiedBeanClassName = fullyQualifiedBeanClassName;
+                        wrapper.beanDefinitionWriter = createBeanDefinitionWriterFor(element);
+                        wrapper.annotationElements = new LinkedHashSet<>();
+                        wrapper.configurationFieldElements = new LinkedHashSet<>();
+                        beanDefinitionWriters.put(fullyQualifiedBeanClassName, wrapper);
+                    }
+                    wrapper.annotationElements.add(element);
+                    if (element.getKind() == CONSTRUCTOR) {
+                        wrapper.hasDefinedCtor = true;
+                    }
+                });
+            });
         }
         return true;
     }
@@ -244,6 +240,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         if (!beanDefinitionWriter.isValidated() && annotationUtils.hasStereotype(element, "javax.validation.Constraint")) {
             beanDefinitionWriter.setValidated(true);
         }
+        Object qualifier = annotationUtils.resolveQualifier(element);
 
         Name fieldName = element.getSimpleName();
         TypeMirror type = element.asType();
@@ -273,7 +270,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         if (isValue) {
             beanDefinitionWriter.visitFieldValue(
                 classElement.getQualifiedName().toString(),
-                null,
+                qualifier,
                 requiresReflection,
                 fieldType,
                 fieldName.toString(),
@@ -282,7 +279,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(
                 classElement.getQualifiedName().toString(),
-                null,
+                qualifier,
                 requiresReflection,
                 fieldType,
                 fieldName.toString());
@@ -295,7 +292,8 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         assert (FIELD == fieldKind) : "field kind must be FIELD";
         assert (METHOD == methodKind) : "method kind must be METHOD";
         TypeElement classElement = modelUtils.classElementFor(method);
-        Object qualifier = null;
+        Object qualifier = annotationUtils.resolveQualifier(field);
+
         Object fieldType;
         List<Object> genericTypes = null;
         TypeKind fieldTypeKind = field.asType().getKind();
@@ -319,10 +317,10 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
 
         beanDefinitionWriter.visitSetterValue(
             classElement.getQualifiedName().toString(),
-            qualifier, // null
+            qualifier,
             modelUtils.requiresReflection(method),
-            fieldType, // int
-            field.getSimpleName().toString(), //defaultPort
+            fieldType,
+            field.getSimpleName().toString(),
             method.getSimpleName().toString(),
             genericTypes,
             true);
@@ -332,10 +330,11 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         ElementKind elementKind = element.getKind();
         assert (CONSTRUCTOR == elementKind) : "element kind must be CONSTRUCTOR";
         Map<String,Object> methodArgs = new LinkedHashMap<>();
+        Map<String,Object> qualifiers = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitParametersFor(element, methodArgs, genericTypes);
-        beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, null, genericTypes);
+        visitParametersFor((ExecutableElement)element, methodArgs, qualifiers, genericTypes);
+        beanDefinitionWriter.visitBeanDefinitionConstructor(methodArgs, qualifiers, genericTypes);
     }
 
     private void visitMethodInjectionFor(BeanDefinitionWriter beanDefinitionWriter, Element method) throws IOException {
@@ -345,9 +344,10 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
         TypeElement classElement = modelUtils.classElementFor(method);
 
         Map<String,Object> methodArgs = new LinkedHashMap<>();
+        Map<String,Object> qualifiers = new LinkedHashMap<>();
         Map<String,List<Object>> genericTypes = new LinkedHashMap<>();
 
-        visitParametersFor(method, methodArgs, genericTypes);
+        visitParametersFor((ExecutableElement)method, methodArgs, qualifiers, genericTypes);
         // FIXME test for requires reflection
         boolean requiresReflection = modelUtils.requiresReflection(method);
 
@@ -359,7 +359,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
                 Void.TYPE,
                 method.getSimpleName().toString(),
                 methodArgs,
-                null,
+                qualifiers,
                 genericTypes);
 
         } else if (annotationUtils.hasStereotype(method, PreDestroy.class)) {
@@ -369,7 +369,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
                 Void.TYPE,
                 method.getSimpleName().toString(),
                 methodArgs,
-                null,
+                qualifiers,
                 genericTypes);
 
         } else {
@@ -379,26 +379,27 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
                 Void.TYPE,
                 method.getSimpleName().toString(),
                 methodArgs,
-                null,
+                qualifiers,
                 genericTypes);
         }
     }
 
-    private void visitParametersFor(Element element,
-                                    Map<String,Object> methodArgs, Map<String,List<Object>> genericTypes) {
+    private void visitParametersFor(ExecutableElement executableElement,
+                                    Map<String,Object> methodArgs, Map<String,Object> qualifiers, Map<String,List<Object>> genericTypes) {
 
-        ExecutableType execType = (ExecutableType) element.asType();
-
-        List<? extends TypeMirror> parameterTypes = execType.getParameterTypes();
-        for (int i = 0; i < parameterTypes.size(); i++) {
-
-            TypeMirror typeMirror = parameterTypes.get(i);
+        executableElement.getParameters().forEach(varElem -> {
+            TypeMirror typeMirror = varElem.asType();
             TypeKind kind = typeMirror.getKind();
+            String argName = varElem.getSimpleName().toString();
+
+            Object qualifier = annotationUtils.resolveQualifier(varElem);
+            if (qualifier != null) {
+                qualifiers.put(argName, qualifier);
+            }
 
             if (kind == ARRAY) {
                 ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
                 TypeMirror componentType = arrayType.getComponentType();
-                String argName = modelUtils.argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
             } else if (kind == DECLARED) {
@@ -406,7 +407,6 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
 
                 TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
                 assert (typeElement != null) : "typeElement cannot be null";
-                String argName = modelUtils.argNameFrom(typeElement.getSimpleName().toString(), i);
 
                 methodArgs.put(argName, typeElement.toString());
                 List<Object> params = declaredType.getTypeArguments().stream()
@@ -418,12 +418,11 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
             } else if (kind.isPrimitive()) {
                 String typeName = typeMirror.toString();
                 Object argType = modelUtils.classOfPrimitiveFor(typeName);
-                String argName = modelUtils.argNameFrom(typeName, i);
                 methodArgs.put(argName, argType);
             } else {
-                error(element, "ERROR: Unexpected element kind %s for %s", kind, element);
+                error(executableElement, "Unexpected kind %s for param %s of element %s", kind, typeMirror, executableElement);
             }
-        }
+        });
     }
 
     private boolean isValue(Element element) {

@@ -1,5 +1,6 @@
 package org.particleframework.annotation.processing;
 
+import javax.inject.Qualifier;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
@@ -57,5 +58,10 @@ class AnnotationUtils {
             }
         }
         return null;
+    }
+
+    Object resolveQualifier(Element element) {
+        AnnotationMirror qualifier = findAnnotationWithStereotype(element, Qualifier.class);
+        return qualifier == null ? null : qualifier.getAnnotationType().toString();
     }
 }
