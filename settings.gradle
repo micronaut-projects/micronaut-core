@@ -15,7 +15,5 @@ include "runtime-netty"
 include "test-suite"
 
 // configurations
-file('configurations').eachDir {
-    include it.path
-    project(":${it.path}").name = it.name
-}
+include "configurations/hibernate-validator"
+include "configurations/hibernate-gorm"
