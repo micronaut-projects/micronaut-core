@@ -21,7 +21,7 @@ version project.projectVersion
 
 ext {
     // commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/master"
-    commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/1a6b9e24fd2ec49e321ab983994f850663adcc6d/"
+    commonBuild = "https://raw.githubusercontent.com/grails/grails-common-build/3cad4c93ac433e1ae887c71835c94436086bb0ad/"
 }
 
 subprojects {
@@ -53,6 +53,12 @@ subprojects {
         }
     }
 
+    tasks.withType(Test) {
+        testLogging {
+            showStandardStreams = true
+            exceptionFormat = 'full'
+        }
+    }
 }
 
 apply from:"${commonBuild}/common-docs.gradle"
