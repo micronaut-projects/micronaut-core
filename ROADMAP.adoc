@@ -1,0 +1,92 @@
+# Particle Requirements
+
+## Minimum Feature Set
+
+The following features are considered bar minimum for launching Particle.
+
+### Core Features
+
+#### AOP API
+
+We need a compile time equivalent for AOP such that one can define an annotation (for example `@Secured`) that when applied to method is intercepted and allows decorative behaviour.
+
+Proposed API:
+
+[source,java]
+----
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.METHOD})
+@Around(SecuredImplementer)
+public @interface Secured {
+}
+
+public class SecuredImplementer implements AroundAdvice {
+
+    @Override
+    Object around(Invocation invocation) {
+        return invocation.proceed()
+    }
+}
+----
+
+Other than the above two classes there should be no other configuration required with all necessary code generated at compile time both for setting up the advice and when `@Secured` is used on a method in an application class.
+
+Possible limitations to consider will be that the AOP advice will need to be compiled before application code.
+
+#### Configuration
+
+### HTTP Server
+
+#### Interceptor / HandlerChain Concept
+
+The HTTP server must have a way to intercept HTTP request and apply logic before controller action execution
+
+#### HTTPS Support
+
+HTTPS must be supported
+
+#### Content Negotiation
+
+Content negotiation must be supported
+
+#### Non-Blocking Request Body
+
+It should be possible to parse and retrieve the Body of a request in non-blocking manner.
+
+#### Compile Time Data Binding
+
+Data binding classes should be generated at compile time to avoid reflection when performing data binding
+
+#### Support for Server Sent Events
+
+It must be possible to stream Server Sent Events to an HTTP client
+
+#### Multi Part Support
+
+Multi Part requests and file uploads must be supported
+
+#### WebSocket Support
+
+WebSocket Support must be implemented
+
+### HTTP Client
+
+#### Generate Client Implementation from Interface
+
+It should be possible to generate a client implementation at compile time from a given interface
+
+#### Service Discovery
+
+A service discovery API is needed that is pluggable with different implementations and integrates with the client.
+
+#### Client Side Load Balancing
+
+In the case where multiple services of the same name exist client side load balancing should be activated automatically and transparently to the user
+
+#### Distributed Tracing
+
+Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.)
+
+
+

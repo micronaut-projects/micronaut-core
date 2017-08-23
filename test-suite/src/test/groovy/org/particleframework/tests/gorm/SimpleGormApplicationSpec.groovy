@@ -19,6 +19,7 @@ import grails.gorm.annotation.Entity
 import grails.gorm.transactions.Transactional
 import org.grails.orm.hibernate.cfg.Settings
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
@@ -34,10 +35,11 @@ class SimpleGormApplicationSpec extends Specification {
     void "test Particle server running"() {
         when:
         System.setProperty(Settings.SETTING_DB_CREATE, "create-drop")
-        ApplicationContext applicationContext = ParticleApplication.run(PersonController)
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run([PersonController] as Class[],'-port',newPort.toString())
 
         then:
-        new URL("http://localhost:8080/people").getText(readTimeout:3000) == "People: []"
+        new URL("http://localhost:$newPort/people").getText(readTimeout:3000) == "People: []"
 
         cleanup:
         System.setProperty(Settings.SETTING_DB_CREATE, "")
@@ -47,10 +49,12 @@ class SimpleGormApplicationSpec extends Specification {
     void "test Particle server running again"() {
         when:
         System.setProperty(Settings.SETTING_DB_CREATE, "create-drop")
-        ApplicationContext applicationContext = ParticleApplication.run(PersonController)
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run([PersonController] as Class[],'-port',newPort.toString())
+
 
         then:
-        new URL("http://localhost:8080/people").getText(readTimeout:3000) == "People: []"
+        new URL("http://localhost:$newPort/people").getText(readTimeout:3000) == "People: []"
 
         cleanup:
         System.setProperty(Settings.SETTING_DB_CREATE, "")

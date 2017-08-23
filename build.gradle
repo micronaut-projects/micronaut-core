@@ -53,6 +53,12 @@ subprojects {
         }
     }
 
+    tasks.withType(Test) {
+        testLogging {
+            showStandardStreams = true
+            exceptionFormat = 'full'
+        }
+    }
 }
 
 apply from:"${commonBuild}/common-docs.gradle"

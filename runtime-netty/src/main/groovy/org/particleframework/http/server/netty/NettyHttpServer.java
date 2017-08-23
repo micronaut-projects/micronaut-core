@@ -96,10 +96,11 @@ public class NettyHttpServer implements EmbeddedServer {
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
                                     Object result;
                                     if(requiredArguments.isEmpty()) {
+                                        // no required arguments so just execute
                                         result = route.execute();
                                     }
                                     else {
-
+                                        // Begin try fulfilling the argument requirements
                                         Map<String,Object> arguments = new LinkedHashMap<>();
                                         for (Argument argument : requiredArguments) {
                                             if(binderRegistry.isPresent()) {
