@@ -15,7 +15,7 @@ dependencies {
 test {
     afterTest { descriptor, result ->
         if (result.resultType == TestResult.ResultType.SKIPPED) {
-            println "WARNING: ${descriptor.className}.${descriptor.name} was skipped"
+            logger.warn("${descriptor.className}.${descriptor.name} was skipped")
         }
     }
 }

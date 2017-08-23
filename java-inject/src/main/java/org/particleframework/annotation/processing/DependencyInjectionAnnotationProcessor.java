@@ -1,8 +1,5 @@
 package org.particleframework.annotation.processing;
 
-import com.sun.tools.javac.main.Option;
-import com.sun.tools.javac.processing.JavacProcessingEnvironment;
-import com.sun.tools.javac.util.Options;
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.Context;
 import org.particleframework.context.annotation.Value;
@@ -14,7 +11,10 @@ import org.particleframework.inject.writer.BeanDefinitionWriter;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.annotation.processing.*;
+import javax.annotation.processing.ProcessingEnvironment;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
@@ -23,10 +23,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.JavaFileObject;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -37,30 +34,32 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.DECLARED;
 
 @SupportedAnnotationTypes({
-    "org.particleframework.config.ConfigurationProperties",
-    "org.particleframework.context.annotation.Context",
-    "javax.inject.Inject",
     "javax.annotation.PostConstruct",
     "javax.annotation.PreDestroy",
+    "javax.inject.Inject",
     "javax.inject.Singleton",
-    "org.particleframework.context.annotation.Value"
+    "org.particleframework.config.ConfigurationProperties",
+    "org.particleframework.context.annotation.Bean",
+    "org.particleframework.context.annotation.Context",
+    "org.particleframework.context.annotation.Factory",
+    "org.particleframework.context.annotation.Replaces",
+    "org.particleframework.context.annotation.Value",
+    "org.particleframework.inject.qualifiers.primary.Primary"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
-
-    private Messager messager;
-    private Filer filer;
-    private Elements elementUtils;
-    private Types typeUtils;
-    private AnnotationUtils annotationUtils;
-    private GenericUtils genericUtils;
-    private ModelUtils modelUtils;
+public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnotationProcessor {
 
     private final Map<String, BeanDefinitionWriterElementWrapper> beanDefinitionWriters = new TreeMap<>();
-    private String buildPath;
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+    }
+
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+//        Set<? extends Element> rootElements = roundEnv.getRootElements();
         if (roundEnv.processingOver()) {
             generateClassesAndServiceDescriptors();
         } else {
@@ -99,7 +98,6 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
 
     private void generateClassesAndServiceDescriptors() {
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator();
-        File targetDirectory = new File(buildPath);
         this.beanDefinitionWriters.values().forEach(wrapper -> {
             BeanDefinitionWriter writer = wrapper.beanDefinitionWriter;
             String className = writer.getBeanTypeName();
@@ -207,7 +205,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
     private BeanDefinitionWriter createBeanDefinitionWriterFor(Element element) {
         TypeElement typeElement = modelUtils.classElementFor(element);
         PackageElement packageElement = elementUtils.getPackageOf(element);
-        String beanClassName = unqualifiedClassnameFor(typeElement,packageElement);
+        String beanClassName = typeElement.getSimpleName().toString();
         String packageName = packageElement.getQualifiedName().toString();
         boolean isSingleton = annotationUtils.hasStereotype(
             typeElement, Collections.singletonList(Singleton.class.getName()));
@@ -233,13 +231,6 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
                 scope,
                 isSingleton);
         }
-    }
-
-    // if it's an inner class org.oci.A.B, we want A.B
-    // FIXME deal with static nested classes
-    private String unqualifiedClassnameFor(TypeElement typeElement, PackageElement packageElement) {
-        String qualifiedName = elementUtils.getBinaryName(typeElement).toString();
-        return qualifiedName.replaceFirst(packageElement.getQualifiedName().toString() + "\\.","");
     }
 
     private void visitSingletonFor(BeanDefinitionWriter beanDefinitionWriter, Element
@@ -407,7 +398,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
             if (kind == ARRAY) {
                 ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
                 TypeMirror componentType = arrayType.getComponentType();
-                String argName = argNameFrom(componentType.toString(), i);
+                String argName = modelUtils.argNameFrom(componentType.toString(), i);
                 methodArgs.put(argName, arrayType.toString());
                 genericTypes.put(argName, Collections.singletonList(componentType.toString()));
             } else if (kind == DECLARED) {
@@ -415,7 +406,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
 
                 TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
                 assert (typeElement != null) : "typeElement cannot be null";
-                String argName = argNameFrom(typeElement.getSimpleName().toString(), i);
+                String argName = modelUtils.argNameFrom(typeElement.getSimpleName().toString(), i);
 
                 methodArgs.put(argName, typeElement.toString());
                 List<Object> params = declaredType.getTypeArguments().stream()
@@ -427,7 +418,7 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
             } else if (kind.isPrimitive()) {
                 String typeName = typeMirror.toString();
                 Object argType = modelUtils.classOfPrimitiveFor(typeName);
-                String argName = argNameFrom(typeName, i);
+                String argName = modelUtils.argNameFrom(typeName, i);
                 methodArgs.put(argName, argType);
             } else {
                 error(element, "ERROR: Unexpected element kind %s for %s", kind, element);
@@ -449,14 +440,6 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
         return annotationUtils.hasStereotype(typeElement, ConfigurationProperties.class);
     }
 
-    private String argNameFrom(String type, int suffix) {
-        String className = type.replaceFirst("((.*)\\.)?([^\\.]*)", "$3");
-        String argName = className.substring(0,1).toLowerCase();
-        if (className.length() > 1) {
-            argName += className.substring(1);
-        }
-        return argName + suffix;
-    }
 
     private BeanDefinitionClassWriter createBeanDefinitionClassWriterFor(
         Set<Element> elements,
@@ -464,48 +447,17 @@ public class DependencyInjectionAnnotationProcessor extends AbstractProcessor {
         String beanDefinitionName) throws IOException
     {
         BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(fullyQualifiedBeanClassName, beanDefinitionName);
-        String classFileName = beanClassWriter.getBeanDefinitionQualifiedClassName();
+        String classname = beanClassWriter.getBeanDefinitionQualifiedClassName();
         Element classElement = elementUtils.getTypeElement(fullyQualifiedBeanClassName);
         beanClassWriter.setContextScope(annotationUtils.hasStereotype(classElement, Context.class));
-        note("CREATING NEW CLASS FILE %s for @Singleton", classFileName);
-        JavaFileObject javaFileObject = filer.createClassFile(classFileName, elements.toArray(new Element[elements.size()]));
+        note("CREATING NEW CLASS FILE %s for @Singleton", classname);
+        JavaFileObject javaFileObject = filer.createClassFile(classname, elements.toArray(new Element[elements.size()]));
         try (OutputStream out = javaFileObject.openOutputStream()) {
             beanClassWriter.writeTo(out);
         }
         return beanClassWriter;
     }
 
-    @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
-        super.init(processingEnv);
-        this.messager = processingEnv.getMessager();
-        this.filer = processingEnv.getFiler();
-        this.elementUtils = processingEnv.getElementUtils();
-        this.typeUtils = processingEnv.getTypeUtils();
-        this.modelUtils = new ModelUtils(elementUtils,typeUtils);
-        this.annotationUtils = new AnnotationUtils(elementUtils);
-        this.genericUtils = new GenericUtils(elementUtils,typeUtils);
-
-        Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
-        this.buildPath = javacOptions.get(Option.D);
-        Map<String, String> options = processingEnv.getOptions();
-        note("Options passed to annotation processor are %s", options);
-    }
-
-    private void error(Element e, String msg, Object... args) {
-//        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args), e);
-    }
-    private void error(String msg, Object... args) {
-//        messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args));
-    }
-
-    private void note(Element e, String msg, Object... args) {
-//        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args), e);
-    }
-
-    private void note(String msg, Object... args) {
-//        messager.printMessage(Diagnostic.Kind.NOTE, String.format(msg, args));
-    }
 }
 
 class BeanDefinitionWriterElementWrapper {

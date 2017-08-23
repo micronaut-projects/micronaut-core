@@ -1,8 +1,8 @@
 dependencies {
     testCompile project(":runtime-netty")
-    testCompile project(":configurations/hibernate-gorm")
+    testCompile project(":hibernate-gorm")
     testCompile project(":ast")
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
-
+    testCompile "org.grails:grails-datastore-gorm-hibernate5:6.1.4.RELEASE"
 }

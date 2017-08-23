@@ -7,7 +7,7 @@ import org.particleframework.context.AbstractBeanConfiguration;
 import org.particleframework.core.annotation.Internal;
 
 import java.io.File;
-import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Writes configuration classes for configuration packages using ASM
@@ -40,10 +40,31 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
      * Writes the configuration class for a {@link org.particleframework.context.annotation.Configuration}
      *
      * @param targetDir   The target directory for compilation
-     * @return The generated class name
      */
     public void writeTo(File targetDir) {
+        try {
+            ClassWriter classWriter = generateClassBytes();
+            writeClassToDisk(targetDir, classWriter, configurationClassName);
+        } catch (Throwable e) {
+            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
+        }
+    }
 
+    /**
+     * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object
+     *
+     * @param outputStream the output stream pointing to the target class file
+     */
+    public void writeTo(OutputStream outputStream) {
+        try {
+            ClassWriter classWriter = generateClassBytes();
+            writeClassToDisk(outputStream, classWriter);
+        } catch (Throwable e) {
+            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
+        }
+    }
+
+    private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         try {
@@ -71,12 +92,10 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
             // MAXLOCALS = 1
             cv.visitMaxs(2, 1);
 
-            writeClassToDisk(targetDir, classWriter, configurationClassName);
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Particle version?: " + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
         }
-    }
 
+        return classWriter;
+    }
 }

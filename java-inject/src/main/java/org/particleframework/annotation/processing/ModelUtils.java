@@ -1,17 +1,9 @@
 package org.particleframework.annotation.processing;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.ElementFilter;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
+import javax.lang.model.util.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.CLASS;
@@ -73,11 +65,29 @@ class ModelUtils {
         return "set" + name;
     }
 
+    String argNameFrom(String type, int suffix) {
+        String className = type.replaceFirst("((.*)\\.)?([^\\.]*)", "$3");
+        String argName = className.substring(0,1).toLowerCase();
+        if (className.length() > 1) {
+            argName += className.substring(1);
+        }
+        return argName + suffix;
+    }
+
+
     List<? extends Element> findPublicConstructors(String className) {
         TypeElement typeElement = elementUtils.getTypeElement(className);
         return elementUtils.getAllMembers(typeElement).stream()
             .filter(element ->
                 element.getKind() == CONSTRUCTOR && element.getModifiers().contains(PUBLIC))
+            .collect(Collectors.toList());
+    }
+
+    List<ExecutableElement> findPublicConstructors(TypeElement classElement) {
+        List<ExecutableElement> ctors =
+            ElementFilter.constructorsIn(classElement.getEnclosedElements());
+        return ctors.stream()
+            .filter(ctor -> ctor.getModifiers().contains(PUBLIC))
             .collect(Collectors.toList());
     }
 
@@ -120,5 +130,25 @@ class ModelUtils {
             default:
                 return Void.TYPE;
         }
+    }
+
+    public TypeElement superClassFor(TypeElement element) {
+        TypeMirror superclass = element.getSuperclass();
+        if (superclass.getKind() == TypeKind.NONE) {
+            return null;
+        }
+        DeclaredType kind = (DeclaredType) superclass;
+        return (TypeElement) kind.asElement();
+    }
+
+    public List<TypeElement> superClassesFor(TypeElement classElement) {
+        List<TypeElement> superClasses = new ArrayList<>();
+        TypeElement superclass = superClassFor(classElement);
+                while (superclass != null) {
+            superClasses.add(superclass);
+            superclass = superClassFor(superclass);
+        }
+                Collections.reverse(superClasses);
+        return superClasses;
     }
 }
