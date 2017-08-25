@@ -36,16 +36,20 @@ class ParameterBindingSpec extends AbstractParticleSpec {
 
 
         where:
-        uri                           | result                | httpStatus
-        '/parameter/index?max=20'     | "Parameter Value: 20" | HttpStatus.OK
-        '/parameter/simple?max=20'    | "Parameter Value: 20" | HttpStatus.OK
-        '/parameter/simple'           | null                  | HttpStatus.NOT_FOUND
-        '/parameter/named'            | null                  | HttpStatus.NOT_FOUND
-        '/parameter/named?maximum=20' | "Parameter Value: 20" | HttpStatus.OK
-        '/parameter/optional'         | "Parameter Value: 10" | HttpStatus.OK
-        '/parameter/optional?max=20'  | "Parameter Value: 20" | HttpStatus.OK
-        '/parameter/all'              | "Parameter Value: 10" | HttpStatus.OK
-        '/parameter/all?max=20'       | "Parameter Value: 20" | HttpStatus.OK
+        uri                                             | result                      | httpStatus
+        '/parameter/index?max=20'                       | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/simple'                             | null                        | HttpStatus.NOT_FOUND
+        '/parameter/named'                              | null                        | HttpStatus.NOT_FOUND
+        '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
+        '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
+        '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
+        '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]"  | HttpStatus.OK
+        '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+//       TODO: '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
     }
 
     @Controller
@@ -74,6 +78,27 @@ class ParameterBindingSpec extends AbstractParticleSpec {
         @Get
         String all(HttpParameters parameters) {
             "Parameter Value: ${parameters.get('max', Integer, 10)}"
+        }
+
+        @Get
+        String map(Map<String, Integer> values) {
+            "Parameter Value: ${values.max} ${values.offset}"
+        }
+
+        @Get
+        String list(List<Integer> values) {
+            assert values.every() { it instanceof Integer }
+            "Parameter Value: ${values.inspect()}"
+        }
+
+        @Get
+        String optionalList(Optional<List<Integer>> values) {
+            if (values.isPresent()) {
+                assert values.get().every() { it instanceof Integer }
+                "Parameter Value: ${values.get()}"
+            } else {
+                "Parameter Value: none"
+            }
         }
     }
 }
