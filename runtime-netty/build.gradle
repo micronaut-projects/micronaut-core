@@ -2,7 +2,7 @@ dependencies {
     compile project(":runtime-http")
     compile project(":router")
     compileOnly project(":ast")
-    compile project(":java-inject")
+    compileOnly project(":java-inject")
     compile "io.netty:netty-codec-http:$nettyVersion"
 
     testCompile project(":ast")
