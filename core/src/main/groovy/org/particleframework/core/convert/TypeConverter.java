@@ -3,6 +3,7 @@ package org.particleframework.core.convert;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A type converter for converting from one type to another. Implementations should be stateless and thread safe.
@@ -35,5 +36,9 @@ public interface TypeConverter<S, T> {
      * @return The converted type or empty if the conversion is not possible
      */
     Optional<T> convert(S object, Class<T> targetType, ConversionContext context);
+
+    static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
+        return (object, targetType1, context) -> Optional.of(converter.apply(object));
+    }
 }
 

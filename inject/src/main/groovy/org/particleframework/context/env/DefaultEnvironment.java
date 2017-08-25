@@ -15,6 +15,7 @@ import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -143,6 +144,12 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        conversionService.addConverter(sourceType, targetType, typeConverter);
+        return this;
+    }
+
+    @Override
+    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;
     }

@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * The default conversion service. Handles basic type conversion operations.
@@ -67,6 +68,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     @Override
     public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
+        typeConverters.put(pair, typeConverter);
+        converterCache.put(pair, typeConverter);
+        return this;
+    }
+
+    @Override
+    public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
+        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
+        TypeConverter<S,T> typeConverter = TypeConverter.of(sourceType, targetType, function);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
         return this;
