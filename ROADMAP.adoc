@@ -34,7 +34,9 @@ Other than the above two classes there should be no other configuration required
 
 Possible limitations to consider will be that the AOP advice will need to be compiled before application code.
 
-#### Configuration
+#### Configuration Sharing
+
+Need a mechanism for configuration discovery and sharing across the federation
 
 ### HTTP Server
 
