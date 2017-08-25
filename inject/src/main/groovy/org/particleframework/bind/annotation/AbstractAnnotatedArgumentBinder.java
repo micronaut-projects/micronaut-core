@@ -28,6 +28,8 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
+ * An abstract {@link AnnotatedArgumentBinder} implementation
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

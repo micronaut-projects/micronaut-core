@@ -21,12 +21,14 @@ import org.particleframework.core.convert.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.binding.annotation.Cookie;
+import org.particleframework.http.binding.annotation.Header;
 import org.particleframework.inject.Argument;
 
 import java.util.Optional;
 
 /**
- * Binds a value from a {@link org.particleframework.http.cookie.Cookie}
+ * An {@link org.particleframework.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Cookie} annotation
+ * to trigger binding from an HTTP {@link org.particleframework.http.cookie.Cookie}
  *
  * @author Graeme Rocher
  * @since 1.0

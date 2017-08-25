@@ -72,4 +72,9 @@ class AnnotationQualifier<T> implements Qualifier<T> {
     public int hashCode() {
         return qualifier.hashCode();
     }
+
+    @Override
+    public String toString() {
+        return '@' + qualifier.annotationType().getSimpleName();
+    }
 }

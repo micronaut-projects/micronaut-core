@@ -44,6 +44,11 @@ class NameQualifier<T> implements Qualifier<T> {
     }
 
     @Override
+    public String toString() {
+        return "@Named('"+name+"')";
+    }
+
+    @Override
     public int hashCode() {
         return name.hashCode();
     }
