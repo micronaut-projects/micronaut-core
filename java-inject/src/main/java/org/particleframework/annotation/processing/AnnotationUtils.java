@@ -2,12 +2,16 @@ package org.particleframework.annotation.processing;
 
 import javax.inject.Qualifier;
 import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 class AnnotationUtils {
 
@@ -63,5 +67,22 @@ class AnnotationUtils {
     Object resolveQualifier(Element element) {
         AnnotationMirror qualifier = findAnnotationWithStereotype(element, Qualifier.class);
         return qualifier == null ? null : qualifier.getAnnotationType().toString();
+    }
+
+    // TODO this needs a test
+    Optional<String> getAnnotationElementValue(String elementValue, AnnotationMirror annMirror) {
+        Map<? extends ExecutableElement, ? extends AnnotationValue> annValues = annMirror.getElementValues();
+        if (annValues.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<? extends ExecutableElement> executableElement = annMirror.getElementValues().keySet().stream()
+            .filter(execElem -> execElem.toString().equals(elementValue))
+            .findFirst();
+
+        return Optional.ofNullable(
+            executableElement.isPresent()
+                ? annMirror.getElementValues().get(executableElement.get()).getValue().toString()
+                : null
+        );
     }
 }

@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.type.TypeKind.VOID;
 
 class ModelUtils {
     private final Elements elementUtils;
@@ -30,7 +31,7 @@ class ModelUtils {
         String name = field.getSimpleName().toString();
         name = name.replaceFirst("^(is).+", "");
         String setterName = setterNameFor(name);
-        // FIXME refine this to disocver one of possible overlaoded methods with correct signature (i.e. single arg of field type)
+        // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
@@ -140,5 +141,35 @@ class ModelUtils {
         }
                 Collections.reverse(superClasses);
         return superClasses;
+    }
+
+    public Object resolveTypeReference(TypeElement typeElement) {
+        TypeMirror type = typeElement.asType();
+        if (type.getKind().isPrimitive()) {
+            return classOfPrimitiveFor(type.toString());
+        }
+        return typeElement.getQualifiedName().toString();
+    }
+
+    public Object resolveTypeReference(TypeMirror type) {
+        Object result = Void.TYPE;
+        if (type.getKind().isPrimitive()) {
+            result = classOfPrimitiveFor(type.toString());
+        } else if (type.getKind() != VOID) {
+            Element element = typeUtils.asElement(type);
+            TypeElement typeElement = classElementFor(element);
+            result = typeElement.getQualifiedName().toString();
+        }
+        return result;
+    }
+
+    public boolean isPackagePrivate(Element element) {
+        Set<Modifier> modifiers = element.getModifiers();
+        return !(modifiers.contains(PUBLIC) || modifiers.contains(PROTECTED) || modifiers.contains(PRIVATE));
+    }
+
+    public boolean isPrivate(Element element) {
+        Set<Modifier> modifiers = element.getModifiers();
+        return modifiers.contains(PRIVATE);
     }
 }

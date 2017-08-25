@@ -200,33 +200,26 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
 
     private BeanDefinitionWriter createBeanDefinitionWriterFor(Element element) {
         TypeElement typeElement = modelUtils.classElementFor(element);
-        PackageElement packageElement = elementUtils.getPackageOf(element);
+        PackageElement packageElement = elementUtils.getPackageOf(typeElement);
         String beanClassName = typeElement.getSimpleName().toString();
         String packageName = packageElement.getQualifiedName().toString();
         boolean isSingleton = annotationUtils.hasStereotype(
             typeElement, Collections.singletonList(Singleton.class.getName()));
         AnnotationMirror scopeAnn = annotationUtils.findAnnotationWithStereotype(
             typeElement, Scope.class.getName());
-        String scope = null;
-        if (scopeAnn != null) {
-            scope = scopeAnn.getAnnotationType().toString();
-        }
+
         TypeMirror providerTypeParam = genericUtils.interfaceGenericTypeFor(
             typeElement, Provider.class.getName());
-        if (providerTypeParam != null) {
-            return new BeanDefinitionWriter(
-                packageName,
-                beanClassName,
-                providerTypeParam.toString(),
-                scope,
-                isSingleton);
-        } else {
-            return new BeanDefinitionWriter(
-                packageName,
-                beanClassName,
-                scope,
-                isSingleton);
-        }
+        return new BeanDefinitionWriter(
+            packageName,
+            beanClassName,
+            providerTypeParam == null
+                ? typeElement.getQualifiedName().toString()
+                : providerTypeParam.toString(),
+            scopeAnn == null
+                ? null
+                : scopeAnn.getAnnotationType().toString(),
+            isSingleton);
     }
 
     private void visitSingletonFor(BeanDefinitionWriter beanDefinitionWriter, Element
