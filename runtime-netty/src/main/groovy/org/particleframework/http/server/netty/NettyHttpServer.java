@@ -31,6 +31,7 @@ import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,6 +41,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class NettyHttpServer implements EmbeddedServer {
     private volatile Channel serverChannel;
     private final HttpServerConfiguration serverConfiguration;
