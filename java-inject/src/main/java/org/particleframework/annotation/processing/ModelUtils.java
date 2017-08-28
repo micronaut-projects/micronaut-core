@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
 
 class ModelUtils {
@@ -86,7 +87,7 @@ class ModelUtils {
     // e.g. see InjectTransform requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
     boolean requiresReflection(Element element) {
         Set<Modifier> modifiers = element.getModifiers();
-        boolean requiresReflection = modifiers.contains(Modifier.PRIVATE);
+        boolean requiresReflection = isPrivate(element);
         return requiresReflection;
     }
 
@@ -155,9 +156,10 @@ class ModelUtils {
         Object result = Void.TYPE;
         if (type.getKind().isPrimitive()) {
             result = classOfPrimitiveFor(type.toString());
+        } else if (type.getKind() == ARRAY) {
+            result = type.toString();
         } else if (type.getKind() != VOID) {
-            Element element = typeUtils.asElement(type);
-            TypeElement typeElement = classElementFor(element);
+            TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
             result = typeElement.getQualifiedName().toString();
         }
         return result;
@@ -165,11 +167,20 @@ class ModelUtils {
 
     public boolean isPackagePrivate(Element element) {
         Set<Modifier> modifiers = element.getModifiers();
-        return !(modifiers.contains(PUBLIC) || modifiers.contains(PROTECTED) || modifiers.contains(PRIVATE));
+        return !(modifiers.contains(PUBLIC)
+            || modifiers.contains(PROTECTED)
+            || modifiers.contains(PRIVATE));
     }
 
     public boolean isPrivate(Element element) {
-        Set<Modifier> modifiers = element.getModifiers();
-        return modifiers.contains(PRIVATE);
+        return element.getModifiers().contains(PRIVATE);
+    }
+
+    public boolean isAbstract(Element element) {
+        return element.getModifiers().contains(ABSTRACT);
+    }
+
+    public boolean isStatic(Element element) {
+        return element.getModifiers().contains(STATIC);
     }
 }

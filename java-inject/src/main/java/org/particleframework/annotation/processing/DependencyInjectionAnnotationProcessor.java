@@ -299,7 +299,6 @@ public class DependencyInjectionAnnotationProcessor extends AbstractInjectAnnota
                 .map(TypeMirror::toString)
                 .collect(Collectors.toList());
         }
-
         if (field.asType().getKind().isPrimitive()) {
             fieldType = modelUtils.classOfPrimitiveFor(fieldType.toString());
         }
