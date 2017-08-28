@@ -19,6 +19,8 @@ import org.particleframework.core.reflect.GenericTypeUtils;
 
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * An interface for classes that represent a map-like structure of values that can be converted
@@ -27,6 +29,7 @@ import java.util.function.BiConsumer;
  * @since 1.0
  */
 public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<String, V>> {
+
     /**
      * @return The names of the values
      */
@@ -67,6 +70,24 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
             Optional<V> vOptional = this.get(headerName, getValueType());
             vOptional.ifPresent(v -> action.accept(headerName, v));
         }
+    }
+
+    /**
+     * Returns a submap for all the keys with the given prefix
+     *
+     * @param prefix The prefix
+     * @return The submap
+     */
+    default Map<String, V> subMap(String prefix, Class<V> valueType) {
+        // special handling for maps for resolving sub keys
+        return (Map<String, V>)get(prefix, Map.class).orElseGet(() ->{
+                    String finalPrefix = prefix + '.';
+                    return getNames().stream()
+                            .filter(name-> name.startsWith(finalPrefix))
+                            .collect(Collectors.toMap((name)->name.substring(finalPrefix.length()), (name) -> get(name, valueType, null)));
+
+                }
+        );
     }
 
     @Override

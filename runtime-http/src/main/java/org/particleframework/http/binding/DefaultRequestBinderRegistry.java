@@ -99,8 +99,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     protected void registerDefaultConverters(ConversionService<?> conversionService) {
         conversionService.addConverter(
                 CharSequence.class,
-                MediaType.class,
-                (TypeConverter<CharSequence, MediaType>) (object, targetType, context) -> Optional.of(new MediaType(object.toString())));
+                MediaType.class,(object, targetType, context) -> Optional.of(new MediaType(object.toString())));
 
     }
 

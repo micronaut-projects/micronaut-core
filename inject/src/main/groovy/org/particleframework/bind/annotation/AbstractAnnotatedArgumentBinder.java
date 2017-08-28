@@ -28,6 +28,8 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
+ * An abstract {@link AnnotatedArgumentBinder} implementation
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -95,17 +97,29 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             annotationValue = argument.getName();
         }
         Object value = values.get(annotationValue, Object.class).orElse(null);
-        if(values instanceof ConvertibleMultiValues && isManyObjects(argumentType)) {
+        boolean isConvertibleValues = values instanceof ConvertibleMultiValues;
+        if(isConvertibleValues && isManyObjects(argumentType)) {
             ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
             List<?> all = multiValues.getAll(annotationValue);
-            if(all != null && all.isEmpty()) {
+            boolean hasMultiValues = all != null;
+            if(hasMultiValues && all.isEmpty()) {
                 return null;
             }
-            value = all;
+            if(hasMultiValues && all.size()>1) {
+                value = all;
+            }
 
         }
         else if(Map.class.isAssignableFrom(argumentType)) {
-            value = values;
+            if(isConvertibleValues) {
+                ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
+                Class[] genericTypes = argument.getGenericTypes();
+                Class valueType = genericTypes != null && genericTypes.length == 2 ? genericTypes[1] : Object.class;
+                value = multiValues.subMap(annotationValue, valueType);
+            }
+            else if(Arrays.asList("parameters", "params").contains(annotationValue)) {
+                value = values;
+            }
         }
         return value;
     }

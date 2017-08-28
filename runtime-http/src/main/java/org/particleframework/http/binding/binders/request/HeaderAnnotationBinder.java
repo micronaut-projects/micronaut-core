@@ -22,12 +22,15 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.binding.annotation.Header;
+import org.particleframework.http.binding.annotation.Parameter;
 import org.particleframework.inject.Argument;
 
 import java.util.Optional;
 
 /**
- * Binds an HTTP Header to an argument
+ * An {@link org.particleframework.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header} annotation
+ * to trigger binding from an HTTP header
+ *
  *
  * @see HttpHeaders
  * @author Graeme Rocher

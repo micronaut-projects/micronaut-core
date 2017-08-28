@@ -805,6 +805,7 @@ public class DefaultBeanContext implements BeanContext {
             return method.getReturnType();
         }
     }
+
     private static final class BeanRegistration<T> {
         private final BeanDefinition<T> beanDefinition;
         private T bean;
@@ -812,6 +813,11 @@ public class DefaultBeanContext implements BeanContext {
         BeanRegistration(BeanDefinition<T> beanDefinition, T bean) {
             this.beanDefinition = beanDefinition;
             this.bean = bean;
+        }
+
+        @Override
+        public String toString() {
+            return "BeanRegistration: " + bean;
         }
     }
 
@@ -822,6 +828,11 @@ public class DefaultBeanContext implements BeanContext {
         BeanKey(Class beanType, Qualifier qualifier) {
             this.beanType = beanType;
             this.qualifier = qualifier;
+        }
+
+        @Override
+        public String toString() {
+            return (qualifier != null ? qualifier.toString() + " " : "") + beanType.getName();
         }
 
         @Override

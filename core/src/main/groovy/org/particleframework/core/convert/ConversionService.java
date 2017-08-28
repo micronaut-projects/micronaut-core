@@ -1,6 +1,7 @@
 package org.particleframework.core.convert;
 
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A service for allowing conversion from one type to another
@@ -42,4 +43,14 @@ public interface ConversionService<Impl extends ConversionService> {
      * @return This conversion service
      */
     <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
+
+    /**
+     * Adds a type converter
+     *
+     * @param sourceType    The source type
+     * @param targetType    The target type
+     * @param typeConverter The type converter
+     * @return This conversion service
+     */
+    <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter);
 }

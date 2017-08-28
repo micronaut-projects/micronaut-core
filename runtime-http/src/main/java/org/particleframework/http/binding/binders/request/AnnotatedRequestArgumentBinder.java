@@ -24,6 +24,12 @@ import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
+ * An interface for classes that bind an {@link Argument} from an {@link HttpRequest} driven by an annotation
+ *
+ * @see CookieAnnotationBinder
+ * @see ParameterAnnotationBinder
+ * @see HeaderAnnotationBinder
+ * 
  * @author Graeme Rocher
  * @since 1.0
  */

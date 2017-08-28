@@ -25,6 +25,9 @@ import org.particleframework.inject.Argument;
 import java.util.Optional;
 
 /**
+ * An {@link org.particleframework.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Parameter}
+ * to trigger binding from an HTTP request parameter
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
