@@ -17,11 +17,10 @@ package org.particleframework.inject.factory.beanwithfactory
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class BeanInitializingWithFactorySpec extends Specification {
-    @Ignore
+
     void "test bean initializing event listener"() {
         given:
         BeanContext context = new DefaultBeanContext().start()
