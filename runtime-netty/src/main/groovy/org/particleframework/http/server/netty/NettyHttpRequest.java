@@ -15,6 +15,9 @@
  */
 package org.particleframework.http.server.netty;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpHeaders;
@@ -36,7 +39,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettyHttpRequest<B> implements HttpRequest<B> {
+public class NettyHttpRequest implements HttpRequest<ByteBuf> {
 
     private final io.netty.handler.codec.http.HttpRequest nettyRequest;
     private final HttpMethod httpMethod;
@@ -46,6 +49,9 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
     private NettyCookies nettyCookies;
     private Locale locale;
     private URI path;
+    private List<ByteBuf> receivedContent  = new ArrayList<>();
+    private long receivedLength = 0;
+    private ByteBuf body;
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
@@ -56,6 +62,23 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
         String fullUri = nettyRequest.uri();
         this.uri = URI.create(fullUri);
         this.headers = new NettyHttpRequestHeaders(nettyRequest.headers(), conversionService);
+    }
+
+    void addContent(HttpContent httpContent) {
+        ByteBuf byteBuf = httpContent
+                            .content()
+                            .touch();
+        int contentBytes = byteBuf.readableBytes();
+        if (contentBytes == 0) {
+            byteBuf.release();
+        } else {
+            receivedContent.add(byteBuf);
+            receivedLength += contentBytes;
+        }
+    }
+
+    public ByteBuf[] getReceivedContent() {
+        return receivedContent.toArray(new ByteBuf[receivedContent.size()]);
     }
 
     @Override
@@ -130,11 +153,23 @@ public class NettyHttpRequest<B> implements HttpRequest<B> {
     }
 
     @Override
-    public B getBody() {
-        // TODO: body handling
-        return null;
+    public ByteBuf getBody() {
+        ByteBuf body = this.body;
+        if(body == null) {
+            this.body = body = Unpooled.unmodifiableBuffer(getReceivedContent());
+        }
+        return body;
     }
 
+    /**
+     * Release and cleanup resources
+     */
+    public void release() {
+        receivedContent.forEach(ByteBuf::release);
+        if(this.body != null) {
+            this.body.release();
+        }
+    }
 
     private URI decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);

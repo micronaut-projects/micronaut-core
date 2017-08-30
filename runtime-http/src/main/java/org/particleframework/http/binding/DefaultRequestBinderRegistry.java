@@ -18,13 +18,14 @@ package org.particleframework.http.binding;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.bind.annotation.Bindable;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpParameters;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.binding.annotation.Body;
 import org.particleframework.http.binding.binders.request.*;
+import org.particleframework.http.binding.binders.request.body.JsonStringBodyBinder;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.inject.Argument;
@@ -53,7 +54,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         for (RequestArgumentBinder binder : binders) {
             if(binder instanceof AnnotatedRequestArgumentBinder) {
                 AnnotatedRequestArgumentBinder<?,?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
-                byAnnotation.put(annotatedRequestArgumentBinder.annotationType(), annotatedRequestArgumentBinder);
+                byAnnotation.put(annotatedRequestArgumentBinder.getAnnotationType(), annotatedRequestArgumentBinder);
             }
             else if(binder instanceof TypedRequestArgumentBinder) {
                 TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
@@ -104,13 +105,16 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
+        JsonStringBodyBinder bodyBinder = new JsonStringBodyBinder(conversionService);
+        byAnnotation.put(Body.class, bodyBinder);
+
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);
-        byAnnotation.put(cookieAnnotationBinder.annotationType(), cookieAnnotationBinder);
+        byAnnotation.put(cookieAnnotationBinder.getAnnotationType(), cookieAnnotationBinder);
 
         HeaderAnnotationBinder<Object> headerAnnotationBinder = new HeaderAnnotationBinder<>(conversionService);
-        byAnnotation.put(headerAnnotationBinder.annotationType(), headerAnnotationBinder);
+        byAnnotation.put(headerAnnotationBinder.getAnnotationType(), headerAnnotationBinder);
 
         ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
-        byAnnotation.put(parameterAnnotationBinder.annotationType(), parameterAnnotationBinder);
+        byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
     }
 }

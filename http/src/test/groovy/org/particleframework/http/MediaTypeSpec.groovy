@@ -34,14 +34,15 @@ class MediaTypeSpec extends Specification {
         mediaType.parameters == expectedParams
         mediaType.qualityAsNumber == quality
         mediaType.subtype == subtype
+        mediaType.type == type
 
         where:
-        fullName                    | ext  | parameters | expectedName           | expectedExt | expectedParams | quality | subtype
-        "application/hal+xml;q=1.1" | null | null       | "application/hal+xml"  | 'xml'       | [q:"1.1"]      | 1.1     | 'hal+xml'
-        "application/hal+xml;q=1.1" | 'foo'| null       | "application/hal+xml"  | 'foo'       | [q:"1.1"]      | 1.1     | 'hal+xml'
-        "application/hal+json"      | null | null       | "application/hal+json" | 'json'      | [q:"1.0"]      | 1.0     | 'hal+json'
-        "application/hal+xml"       | null | null       | "application/hal+xml"  | 'xml'       | [q:"1.0"]      | 1.0     | 'hal+xml'
-        "application/json"          | null | null       | "application/json"     | 'json'      | [q:"1.0"]      | 1.0     | 'json'
+        fullName                    | ext  | parameters | expectedName           | expectedExt | expectedParams | quality | subtype     |  type
+        "application/hal+xml;q=1.1" | null | null       | "application/hal+xml"  | 'xml'       | [q:"1.1"]      | 1.1     | 'hal+xml'   |  "application"
+        "application/hal+xml;q=1.1" | 'foo'| null       | "application/hal+xml"  | 'foo'       | [q:"1.1"]      | 1.1     | 'hal+xml'   |  "application"
+        "application/hal+json"      | null | null       | "application/hal+json" | 'json'      | [q:"1.0"]      | 1.0     | 'hal+json'  |  "application"
+        "application/hal+xml"       | null | null       | "application/hal+xml"  | 'xml'       | [q:"1.0"]      | 1.0     | 'hal+xml'   |  "application"
+        "application/json"          | null | null       | "application/json"     | 'json'      | [q:"1.0"]      | 1.0     | 'json'      |  "application"
 
     }
 }

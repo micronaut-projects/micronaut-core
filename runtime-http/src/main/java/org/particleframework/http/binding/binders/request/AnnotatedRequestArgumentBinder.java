@@ -53,7 +53,7 @@ public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends
             }
 
             @Override
-            public Class<SA> annotationType() {
+            public Class<SA> getAnnotationType() {
                 return annotationType;
             }
         };

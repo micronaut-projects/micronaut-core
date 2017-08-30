@@ -16,6 +16,7 @@
 package org.particleframework.http.binding.annotation;
 
 import org.particleframework.bind.annotation.Bindable;
+import org.particleframework.http.MediaType;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -35,4 +36,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.PARAMETER})
 @Bindable
 public @interface Body {
+
+    /**
+     * @return A Key or qualifier within the body
+     */
+    String value() default "";
 }

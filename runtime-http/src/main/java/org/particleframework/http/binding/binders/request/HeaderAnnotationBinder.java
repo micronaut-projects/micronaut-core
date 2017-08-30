@@ -51,7 +51,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    public Class<Header> annotationType() {
+    public Class<Header> getAnnotationType() {
         return Header.class;
     }
 

@@ -39,7 +39,7 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
     }
 
     @Override
-    public Class<Cookie> annotationType() {
+    public Class<Cookie> getAnnotationType() {
         return Cookie.class;
     }
 
