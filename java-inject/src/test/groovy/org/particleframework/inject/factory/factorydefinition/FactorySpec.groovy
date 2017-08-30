@@ -17,12 +17,10 @@ package org.particleframework.inject.factory.factorydefinition
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class FactorySpec extends Specification {
 
-    @Ignore
     void "test factory definition"() {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
