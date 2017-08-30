@@ -34,6 +34,6 @@ public interface AnnotatedArgumentBinder<A extends Annotation, T, S> extends Arg
     /**
      * @return The annotation type
      */
-    Class<A> annotationType();
+    Class<A> getAnnotationType();
 
 }

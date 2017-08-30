@@ -37,7 +37,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     }
 
     @Override
-    public Class<Parameter> annotationType() {
+    public Class<Parameter> getAnnotationType() {
         return Parameter.class;
     }
 

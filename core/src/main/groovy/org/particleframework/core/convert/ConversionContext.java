@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.convert;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -57,7 +59,19 @@ public interface ConversionContext {
         return Optional.empty();
     }
 
+    /**
+     * @return The standard charset used in conversion
+     */
+    default Charset getCharset() {
+        return StandardCharsets.UTF_8;
+    };
 
+    /**
+     * Create a simple {@link ConversionContext} for the given generic type variables
+     *
+     * @param typeVariables The type variables
+     * @return The conversion context
+     */
     static ConversionContext of(Map<String, Class> typeVariables) {
         return new ConversionContext() {
             @Override
@@ -67,6 +81,20 @@ public interface ConversionContext {
         };
     }
 
+    /**
+     * Create a simple {@link ConversionContext} for the given charset
+     *
+     * @param charset The charset to use
+     * @return The conversion context
+     */
+    static ConversionContext of(Charset charset) {
+        return new ConversionContext() {
+            @Override
+            public Charset getCharset() {
+                return charset;
+            }
+        };
+    }
     static ConversionContext of(String format, Locale locale) {
         return new ConversionContext() {
             @Override
@@ -99,4 +127,6 @@ public interface ConversionContext {
             }
         };
     }
+
+
 }
