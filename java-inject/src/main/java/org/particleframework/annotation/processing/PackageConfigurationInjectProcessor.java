@@ -1,5 +1,6 @@
 package org.particleframework.annotation.processing;
 
+import org.particleframework.context.annotation.Configuration;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.writer.BeanConfigurationWriter;
@@ -23,7 +24,7 @@ import java.util.Set;
     "org.particleframework.context.annotation.Configuration"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class PackageConfigurationAnnotationProcessor extends AbstractInjectAnnotationProcessor {
+public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private ServiceDescriptorGenerator serviceDescriptorGenerator;
 
@@ -45,11 +46,11 @@ public class PackageConfigurationAnnotationProcessor extends AbstractInjectAnnot
         @Override
         public Object visitPackage(PackageElement packageElement, Object p) {
             Object aPackage = super.visitPackage(packageElement, p);
-            if (annotationUtils.hasStereotype(packageElement, org.particleframework.context.annotation.Configuration.class)) {
+            if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(packageName);
                 String configurationClassName = writer.getConfigurationClassName();
-                note("CREATING NEW CLASS FILE %s for @Configuration in package-info", configurationClassName);
+                note("Creating class file %s for @Configuration in package-info", configurationClassName);
                 try {
                     JavaFileObject javaFileObject =
                         filer.createClassFile(configurationClassName, packageElement);

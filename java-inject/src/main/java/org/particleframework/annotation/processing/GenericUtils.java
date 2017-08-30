@@ -5,8 +5,11 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import static javax.lang.model.type.TypeKind.VOID;
 
 class GenericUtils {
 
@@ -69,5 +72,20 @@ class GenericUtils {
             }
         }
         return Collections.emptyList();
+    }
+
+    // FIXME I don't know if this works correctly.resolveGenericTypes
+    // Needs a test case. See InjectTransform.resolveGenericTypes
+    // It doesn't get covered either.
+    List<Object> resolveGenericTypes(TypeMirror type) {
+        if (type.getKind().isPrimitive() || type.getKind() == VOID) {
+            return Collections.emptyList();
+        }
+        List<Object> generics = new ArrayList<>();
+        ((DeclaredType)type).getTypeArguments().forEach(tm -> {
+            TypeElement element = (TypeElement) typeUtils.asElement(tm);
+            generics.add(element.getQualifiedName());
+        });
+        return generics;
     }
 }

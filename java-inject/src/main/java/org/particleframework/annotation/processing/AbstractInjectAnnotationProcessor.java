@@ -40,11 +40,22 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.targetDirectory = new File(javacOptions.get(Option.D));
     }
 
+    // error will produce a "compile error"
     protected void error(Element e, String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args), e);
     }
+
+    // error will produce a "compile error"
     protected void error(String msg, Object... args) {
         messager.printMessage(Diagnostic.Kind.ERROR, String.format(msg, args));
+    }
+
+    protected void warning(Element e, String msg, Object... args) {
+        messager.printMessage(Diagnostic.Kind.WARNING, String.format(msg, args), e);
+    }
+
+    protected void warning(String msg, Object... args) {
+        messager.printMessage(Diagnostic.Kind.WARNING, String.format(msg, args));
     }
 
     protected void note(Element e, String msg, Object... args) {
