@@ -2,14 +2,13 @@ package org.particleframework.inject.qualifiers.replaces
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
 import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
  */
 class ReplacesSpec extends Specification {
 
-    @Ignore
+//    @Ignore
     void "test that a bean can be marked to replace another bean"() {
         given:
         BeanContext context = new DefaultBeanContext().start()

@@ -2,13 +2,11 @@ package org.particleframework.inject.qualifiers
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Replaces
 import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Singleton
-
 /**
  * Created by graemerocher on 26/05/2017.
  */

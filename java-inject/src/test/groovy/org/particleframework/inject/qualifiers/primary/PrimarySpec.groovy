@@ -2,14 +2,13 @@ package org.particleframework.inject.qualifiers.primary
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
 import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
  */
 class PrimarySpec extends Specification {
 
-    @Ignore
+//    @Ignore
     void "test the @Primary annotation influences bean selection"() {
 
         given:

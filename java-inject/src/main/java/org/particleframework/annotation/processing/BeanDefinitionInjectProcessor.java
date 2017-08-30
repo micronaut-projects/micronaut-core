@@ -1,10 +1,7 @@
 package org.particleframework.annotation.processing;
 
 import org.particleframework.config.ConfigurationProperties;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.Context;
-import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Value;
+import org.particleframework.context.annotation.*;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
@@ -36,10 +33,8 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
-import static javax.lang.model.element.ElementKind.CLASS;
-import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.type.TypeKind.*;
 
 @SupportedAnnotationTypes({
@@ -54,6 +49,7 @@ import static javax.lang.model.type.TypeKind.*;
     "org.particleframework.context.annotation.Factory",
     "org.particleframework.context.annotation.Replaces",
     "org.particleframework.context.annotation.Value",
+    "org.particleframework.inject.annotation.Executable",
     "org.particleframework.inject.qualifiers.primary.Primary"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -107,7 +103,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             new BeanDefinitionClassWriter(beanTypeName, beanDefinitionName);
                         String className = beanDefinitionClassWriter.getBeanDefinitionQualifiedClassName();
                         Element beanClassElement = elementUtils.getTypeElement(beanTypeName);
-                        beanDefinitionClassWriter.setContextScope(annotationUtils.hasStereotype(beanClassElement, Context.class));
+                        beanDefinitionClassWriter.setContextScope(
+                            annotationUtils.hasStereotype(beanClassElement, Context.class));
+                        AnnotationMirror replacesAnn =
+                            annotationUtils.findAnnotationWithStereotype(beanClassElement, Replaces.class);
+                        if (replacesAnn != null) {
+                            annotationUtils.getAnnotationElementValue("value", replacesAnn)
+                                .ifPresent(beanDefinitionClassWriter::setReplaceBeanName);
+                        }
+
                         JavaFileObject beanDefClassFileObject = filer.createClassFile(className);
                         try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
                             beanDefinitionClassWriter.writeTo(out);
@@ -320,7 +324,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         void visitExecutableMethod(ExecutableElement method, Object o) {
             if (this.concreteClass.getSuperclass().getKind() != NONE) {
                 TypeMirror producedType = method.getReturnType();
-                Object returnType = modelUtils.resolveTypeReference(producedType);
                 List<Object> genericTypes = genericUtils.resolveGenericTypes(producedType);
                 ExecutableElementParamInfo params = populateParameterData(method);
 
@@ -328,7 +331,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 writer.visitExecutableMethod(
                     modelUtils.resolveTypeReference(this.concreteClass),
-                    returnType,
+                    modelUtils.resolveTypeReference(producedType),
                     genericTypes,
                     method.getSimpleName().toString(),
                     params.getParameters(),

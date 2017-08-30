@@ -5,16 +5,24 @@ import java.util.List;
 
 public class B {
     @Inject
-    List<A> all;
+    private List<A> all;
 
     @Inject
-    A a;
+    private A a;
 
     public List<A> getAll() {
         return all;
     }
 
+    public void setAll(List<A> all) {
+        this.all = all;
+    }
+
     public A getA() {
         return a;
+    }
+
+    public void setA(A a) {
+        this.a = a;
     }
 }

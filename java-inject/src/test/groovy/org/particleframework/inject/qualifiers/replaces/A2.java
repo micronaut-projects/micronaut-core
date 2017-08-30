@@ -1,7 +1,6 @@
 package org.particleframework.inject.qualifiers.replaces;
 
 import org.particleframework.context.annotation.Replaces;
-import org.particleframework.inject.qualifiers.primary.A;
 
 import javax.inject.Singleton;
 

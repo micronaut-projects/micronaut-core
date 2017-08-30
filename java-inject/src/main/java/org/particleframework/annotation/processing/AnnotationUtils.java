@@ -70,18 +70,18 @@ class AnnotationUtils {
     }
 
     // TODO this needs a test
-    Optional<String> getAnnotationElementValue(String elementValue, AnnotationMirror annMirror) {
+    Optional<String> getAnnotationElementValue(String elementName, AnnotationMirror annMirror) {
         Map<? extends ExecutableElement, ? extends AnnotationValue> annValues = annMirror.getElementValues();
         if (annValues.isEmpty()) {
             return Optional.empty();
         }
-        Optional<? extends ExecutableElement> executableElement = annMirror.getElementValues().keySet().stream()
-            .filter(execElem -> execElem.toString().equals(elementValue))
+        Optional<? extends ExecutableElement> executableElement = annValues.keySet().stream()
+            .filter(execElem -> execElem.getSimpleName().toString().equals(elementName))
             .findFirst();
 
         return Optional.ofNullable(
             executableElement.isPresent()
-                ? annMirror.getElementValues().get(executableElement.get()).getValue().toString()
+                ? annValues.get(executableElement.get()).getValue().toString()
                 : null
         );
     }
