@@ -37,4 +37,14 @@ public class MapPropertySource implements PropertySource {
             }
         };
     }
+
+    /**
+     * Create a new {@link MapPropertySource} from the given map
+     *
+     * @param map The map
+     * @return The map property source
+     */
+    public static MapPropertySource of(Map<String, Object> map) {
+        return new MapPropertySource(map);
+    }
 }

@@ -19,6 +19,7 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -488,10 +489,17 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected void injectBeanFields(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean) {
         for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
             if (fieldInjectionPoint.requiresReflection()) {
-                Object value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
+                boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()) != null;
                 try {
+                    Object value;
+                    if(isInject) {
+                        value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
+                    }
+                    else {
+                        value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
+                    }
                     fieldInjectionPoint.set(bean, value);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
                 }
             }
@@ -861,6 +869,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     @Internal
     protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Object defaultValue) throws Throwable {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        return getValueForField(resolutionContext, context, injectionPoint, defaultValue);
+    }
+
+    @Internal
+    protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint, Object defaultValue) throws Throwable {
         if (context instanceof PropertyResolver) {
             Field field = injectionPoint.getField();
             Value valueAnn = field.getAnnotation(Value.class);

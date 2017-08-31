@@ -435,31 +435,33 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         public Object visitConfigurationProperty(VariableElement field, Object o) {
-            modelUtils.findSetterMethodFor(field).ifPresent(
-                method -> {
-                    boolean isInjected = annotationUtils.hasStereotype(field, Inject.class)
-                        || annotationUtils.hasStereotype(method, Inject.class);
-                    boolean isValue = annotationUtils.hasStereotype(field, Value.class);
-                    if (!(isInjected || isValue)) {
-                        // visitVariable didn't handle it
-                        BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
-                        if (!writer.isValidated() && annotationUtils.hasStereotype(field, "javax.validation.Constraint")) {
-                            writer.setValidated(true);
-                        }
-                        Object qualifierRef = annotationUtils.resolveQualifier(field);
-                        Object fieldType = modelUtils.resolveTypeReference(field.asType());
-                        List<Object> genericTypes;
-                        TypeKind typeKind = field.asType().getKind();
-                        if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
-                            genericTypes = ((DeclaredType)field.asType()).getTypeArguments()
-                                .stream()
-                                .map(TypeMirror::toString)
-                                .collect(Collectors.toList());
-                        } else {
-                            genericTypes = Collections.emptyList();
-                        }
+            Optional<ExecutableElement> setterMethod = modelUtils.findSetterMethodFor(field);
+            boolean isInjected = annotationUtils.hasStereotype(field, Inject.class);
+            boolean isValue = annotationUtils.hasStereotype(field, Value.class);
 
-                        writer.visitSetterValue(
+            boolean isMethodInjected = isInjected || (setterMethod.isPresent() && annotationUtils.hasStereotype(setterMethod.get(), Inject.class));
+            if (!(isMethodInjected || isValue)) {
+                // visitVariable didn't handle it
+                BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
+                if (!writer.isValidated() && annotationUtils.hasStereotype(field, "javax.validation.Constraint")) {
+                    writer.setValidated(true);
+                }
+                Object qualifierRef = annotationUtils.resolveQualifier(field);
+                Object fieldType = modelUtils.resolveTypeReference(field.asType());
+                List<Object> genericTypes;
+                TypeKind typeKind = field.asType().getKind();
+                if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
+                    genericTypes = ((DeclaredType)field.asType()).getTypeArguments()
+                        .stream()
+                        .map(TypeMirror::toString)
+                        .collect(Collectors.toList());
+                } else {
+                    genericTypes = Collections.emptyList();
+                }
+
+                if(setterMethod.isPresent()) {
+                    ExecutableElement method = setterMethod.get();
+                    writer.visitSetterValue(
                             this.concreteClass.getQualifiedName().toString(),
                             qualifierRef,
                             modelUtils.requiresReflection(method),
@@ -468,9 +470,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             method.getSimpleName().toString(),
                             genericTypes,
                             true);
-                    }
                 }
-            );
+                else {
+                    writer.visitFieldValue(
+                            this.concreteClass.getQualifiedName().toString(),
+                            qualifierRef,
+                            field.getModifiers().contains(Modifier.PRIVATE),
+                            fieldType,
+                            field.getSimpleName().toString(),
+                            true);
+                }
+            }
 
             return null;
         }
