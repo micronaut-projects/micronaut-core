@@ -2,6 +2,7 @@ package org.particleframework.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.CollectionUtils;
 
@@ -276,12 +277,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // String -> Enum
         addConverter(CharSequence.class, Enum.class, (CharSequence object, Class<Enum> targetType, ConversionContext context) -> {
+            String stringValue = object.toString();
             try {
-                Enum val = Enum.valueOf(targetType, object.toString());
+                Enum val = Enum.valueOf(targetType, stringValue);
                 return Optional.of(val);
             } catch (IllegalArgumentException e) {
                 try {
-                    Enum val = Enum.valueOf(targetType, object.toString().toUpperCase(Locale.ENGLISH));
+                    Enum val = Enum.valueOf(targetType, NameUtils.underscoreSeparate(stringValue).toUpperCase(Locale.ENGLISH));
                     return Optional.of(val);
                 } catch (Exception e1) {
                     return Optional.empty();

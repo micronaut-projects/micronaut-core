@@ -6,6 +6,7 @@ import org.particleframework.context.annotation.Provided;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.context.event.BeanInitializedEventListener;
 import org.particleframework.context.event.BeanInitializingEvent;
+import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
@@ -500,7 +501,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     }
                     fieldInjectionPoint.set(bean, value);
                 } catch (Throwable e) {
-                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
+                    if(e instanceof BeanContextException) {
+                        throw (BeanContextException)e;
+                    }
+                    else {
+                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
+                    }
                 }
             }
         }
@@ -879,7 +885,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Value valueAnn = field.getAnnotation(Value.class);
             Class<?> fieldType = field.getType();
             String valString = resolveValueString(injectionPoint.getName(), valueAnn);
-            Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArgument(field));
+            Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
             if (!value.isPresent() && fieldType == Optional.class) {
                 return value;
             } else {

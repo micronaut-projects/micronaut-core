@@ -475,7 +475,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     writer.visitFieldValue(
                             this.concreteClass.getQualifiedName().toString(),
                             qualifierRef,
-                            field.getModifiers().contains(Modifier.PRIVATE),
+                            !field.getModifiers().contains(Modifier.PUBLIC),
                             fieldType,
                             field.getSimpleName().toString(),
                             true);

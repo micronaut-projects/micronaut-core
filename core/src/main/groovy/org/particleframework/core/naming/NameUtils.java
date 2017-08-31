@@ -99,6 +99,47 @@ public class NameUtils {
      *
      */
     public static String hyphenate(String name, boolean lowerCase) {
+        char separatorChar = '-';
+        return separateCamelCase(name, lowerCase, separatorChar);
+    }
+
+    /**
+     * Converts hyphenated, lower-case form to camel-case form
+     *
+     * @param name The hyphenated string
+     * @return The camel case form
+     *
+     */
+    public static String dehyphenate(String name) {
+        return Arrays.stream(name.split("-"))
+              .map((str)->{
+                    if(str.length() > 0 && Character.isLetter(str.charAt(0))) {
+                        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+                    }
+                    return str;
+              })
+              .collect(Collectors.joining(""));
+    }
+
+    public static String getPackageName(String className) {
+        int i = className.lastIndexOf('.');
+        if(i >-1) {
+            return className.substring(0, i);
+        }
+        return "";
+    }
+
+    /**
+     * Returns the underscore separated version of the given camel case string
+     *
+     * @param camelCase The camel case name
+     * @return The underscore separated version
+     */
+    public static String underscoreSeparate(String camelCase) {
+        return separateCamelCase(camelCase, false, '_');
+    }
+
+    private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
         if(!lowerCase) {
             StringBuilder newName = new StringBuilder();
             boolean first = true;
@@ -110,7 +151,7 @@ public class NameUtils {
                 }
                 else {
                     if( Character.isUpperCase(c) && !Character.isUpperCase(last)) {
-                        newName.append('-').append(c);
+                        newName.append(separatorChar).append(c);
                     }
                     else {
                         if(c == '.') first = true;
@@ -145,7 +186,7 @@ public class NameUtils {
                         newName.append(lowerCaseChar);
                     }
                     else {
-                        newName.append('-').append(lowerCaseChar);
+                        newName.append(separatorChar).append(lowerCaseChar);
                     }
                 }
                 last = c;
@@ -153,31 +194,5 @@ public class NameUtils {
 
             return newName.toString();
         }
-    }
-
-    /**
-     * Converts hyphenated, lower-case form to camel-case form
-     *
-     * @param name The hyphenated string
-     * @return The camel case form
-     *
-     */
-    public static String dehyphenate(String name) {
-        return Arrays.stream(name.split("-"))
-              .map((str)->{
-                    if(str.length() > 0 && Character.isLetter(str.charAt(0))) {
-                        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
-                    }
-                    return str;
-              })
-              .collect(Collectors.joining(""));
-    }
-
-    public static String getPackageName(String className) {
-        int i = className.lastIndexOf('.');
-        if(i >-1) {
-            return className.substring(0, i);
-        }
-        return "";
     }
 }

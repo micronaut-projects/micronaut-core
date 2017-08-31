@@ -1,6 +1,7 @@
 package org.particleframework.configuration.jackson
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
@@ -33,7 +34,8 @@ class JacksonSetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'jackson.dateFormat':'yyMMdd'
+                'jackson.dateFormat':'yyMMdd',
+                'jackson.serialization.indentOutput':true
         ))
         applicationContext.start()
 
@@ -41,6 +43,7 @@ class JacksonSetupSpec extends Specification {
         applicationContext.containsBean(ObjectMapper.class)
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
+        applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
         applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
 
         cleanup:

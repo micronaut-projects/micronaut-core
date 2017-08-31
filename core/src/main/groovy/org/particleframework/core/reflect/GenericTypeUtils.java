@@ -84,4 +84,25 @@ public class GenericTypeUtils {
         }
         return genericClass;
     }
+
+    public static Class[] resolveGenericTypeArguments(Field field) {
+        Class[] genericClasses = new Class[0];
+        Type genericType = field != null ? field.getGenericType() : null;
+        if (genericType instanceof ParameterizedType) {
+            Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
+            if (typeArguments.length>0) {
+                genericClasses = new Class[typeArguments.length];
+                for (int i = 0; i < typeArguments.length; i++) {
+                    Type typeArgument = typeArguments[i];
+                    if(typeArgument instanceof Class) {
+                        genericClasses[i] = (Class) typeArgument;
+                    }
+                    else {
+                        return new Class[0];
+                    }
+                }
+            }
+        }
+        return genericClasses;
+    }
 }
