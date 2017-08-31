@@ -91,7 +91,7 @@ public enum HttpStatus implements CharSequence {
     VARIANT_ALSO_NEGOTIATES(506, "Variant Also Negotiates"),
     INSUFFICIENT_STORAGE(507, "Insufficient Storage"),
     LOOP_DETECTED(508, "Loop Detected"),
-    BANDWIDTH_LIMIT_EXCEEDE(509, "Bandwidth Limit Exceeded"),
+    BANDWIDTH_LIMIT_EXCEEDED(509, "Bandwidth Limit Exceeded"),
     NOT_EXTENDED(510, "Not Extended"),
     NETWORK_AUTHENTICATION_REQUIRED(511, "Network Authentication Required"),
     CONNECTION_TIMED_OUT(522, "Connection Timed Out");
