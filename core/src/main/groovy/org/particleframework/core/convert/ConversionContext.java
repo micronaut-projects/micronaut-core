@@ -95,6 +95,14 @@ public interface ConversionContext {
             }
         };
     }
+
+    /**
+     * Creates a {@link ConversionContext} for the given format and Locale
+     *
+     * @param format The format
+     * @param locale The locale
+     * @return The conversion context
+     */
     static ConversionContext of(String format, Locale locale) {
         return new ConversionContext() {
             @Override
@@ -109,7 +117,16 @@ public interface ConversionContext {
         };
     }
 
-    static ConversionContext of(Map<String, Class> typeVariables, String format, Locale locale) {
+    /**
+     * Creates a {@link ConversionContext} for the given type variables, format and Locale
+     *
+     * @param format The format
+     * @param locale The locale
+     * @return The conversion context
+     */
+    static ConversionContext of(Map<String, Class> typeVariables,
+                                String format,
+                                Locale locale) {
         return new ConversionContext() {
             @Override
             public Map<String, Class> getTypeVariables() {

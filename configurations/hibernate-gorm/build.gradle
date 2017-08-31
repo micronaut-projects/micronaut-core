@@ -1,5 +1,6 @@
 dependencies {
-    compile project(":ast")
+    compileOnly project(":ast")
+    compile project(":inject")
     compile project(":spring")
     compile "org.grails:grails-datastore-gorm-hibernate5:$gormVersion"
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'

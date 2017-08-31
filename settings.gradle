@@ -17,3 +17,4 @@ include "test-suite"
 // configurations
 include "configurations/hibernate-validator"
 include "configurations/hibernate-gorm"
+include "configurations/jackson"
