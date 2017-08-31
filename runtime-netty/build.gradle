@@ -3,6 +3,8 @@ dependencies {
     compile project(":router")
     compileOnly project(":ast")
     compileOnly project(":java-inject")
+
+    compile 'com.typesafe.netty:netty-reactive-streams-http:2.0.0'
     compile "io.netty:netty-codec-http:$nettyVersion"
 
     testCompile project(":ast")

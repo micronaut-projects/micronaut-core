@@ -15,6 +15,8 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.typesafe.netty.http.HttpStreamsServerHandler;
+import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -36,6 +38,8 @@ import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -94,170 +98,158 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                         Optional<RequestBinderRegistry> binderRegistry = applicationContext.findBean(RequestBinderRegistry.class);
 
                         pipeline.addLast(new HttpServerCodec());
-                        pipeline.addLast(new ChannelInboundHandlerAdapter() {
-
-
+                        pipeline.addLast(new HttpStreamsServerHandler());
+                        pipeline.addLast(new SimpleChannelInboundHandler<HttpRequest>() {
                             @Override
-                            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                            protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
+                                Channel channel = ctx.channel();
 
-                                if (msg instanceof HttpRequest) {
-                                    HttpRequest nettyNativeRequest = (HttpRequest) msg;
-                                    Channel channel = ctx.channel();
+                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, applicationContext.getEnvironment());
+                                NettyHttpRequestContext requestContext = new NettyHttpRequestContext(nettyHttpRequest);
 
-                                    NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(nettyNativeRequest, applicationContext.getEnvironment());
-                                    NettyHttpRequestContext requestContext = new NettyHttpRequestContext(nettyHttpRequest);
+                                // set the request on the channel
+                                channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
 
-                                    // set the request on the channel
-                                    channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
+                                Optional<RouteMatch> routeMatch = routerBean.flatMap((router) ->
+                                        router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
+                                                .filter((match) -> match.test(nettyHttpRequest))
+                                                .findFirst()
+                                );
 
-                                    Optional<RouteMatch> routeMatch = routerBean.flatMap((router) ->
-                                            router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
-                                                    .filter((match) -> match.test(nettyHttpRequest))
-                                                    .findFirst()
-                                    );
+                                routeMatch.ifPresent((route -> {
 
-                                    routeMatch.ifPresent((route -> {
+                                    // TODO: check the media type vs the route and return 415 if invalid
 
-                                        // TODO: check the media type vs the route and return 415 if invalid
+                                    // TODO: here we need to analyze the binding requirements and if
+                                    // the body is required then add an additional handler to the pipeline
+                                    // right now only URL parameters are supported
 
-                                        // TODO: here we need to analyze the binding requirements and if
-                                        // the body is required then add an additional handler to the pipeline
-                                        // right now only URL parameters are supported
+                                    requestContext.setMatchedRoute(route);
 
-                                        requestContext.setMatchedRoute(route);
+                                    ReturnType returnType = route.getReturnType();
+                                    boolean requiresBody = false;
+                                    Collection<Argument> requiredArguments = route.getRequiredArguments();
+                                    Map<String, Object> argumentValues;
 
-                                        ReturnType returnType = route.getReturnType();
-                                        boolean requiresBody = false;
-                                        Collection<Argument> requiredArguments = route.getRequiredArguments();
-                                        Map<String, Object> argumentValues;
+                                    if (requiredArguments.isEmpty()) {
+                                        // no required arguments so just execute
+                                        argumentValues = Collections.emptyMap();
+                                    } else {
+                                        argumentValues = new LinkedHashMap<>();
+                                        // Begin try fulfilling the argument requirements
+                                        for (Argument argument : requiredArguments) {
+                                            if (binderRegistry.isPresent()) {
+                                                Optional<ArgumentBinder> registeredBinder = binderRegistry.get()
+                                                        .findArgumentBinder(argument, nettyHttpRequest);
+                                                if (registeredBinder.isPresent()) {
+                                                    ArgumentBinder argumentBinder = registeredBinder.get();
+                                                    if (argumentBinder instanceof BodyArgumentBinder) {
+                                                        requiresBody = true;
+                                                        BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
+                                                        requestContext.addBodyArgument(argument, bodyArgumentBinder);
+                                                    } else {
 
-                                        if (requiredArguments.isEmpty()) {
-                                            // no required arguments so just execute
-                                            argumentValues = Collections.emptyMap();
-                                        } else {
-                                            argumentValues = new LinkedHashMap<>();
-                                            // Begin try fulfilling the argument requirements
-                                            for (Argument argument : requiredArguments) {
-                                                if (binderRegistry.isPresent()) {
-                                                    Optional<ArgumentBinder> registeredBinder = binderRegistry.get()
-                                                            .findArgumentBinder(argument, nettyHttpRequest);
-                                                    if (registeredBinder.isPresent()) {
-                                                        ArgumentBinder argumentBinder = registeredBinder.get();
-                                                        if (argumentBinder instanceof BodyArgumentBinder) {
-                                                            requiresBody = true;
-                                                            BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
-                                                            requestContext.addBodyArgument(argument, bodyArgumentBinder);
+                                                        Optional bindingResult = argumentBinder
+                                                                .bind(argument, nettyHttpRequest);
+                                                        if (argument.getType() == Optional.class) {
+                                                            argumentValues.put(argument.getName(), bindingResult);
+                                                            continue;
+                                                        } else if (bindingResult.isPresent()) {
+                                                            argumentValues.put(argument.getName(), bindingResult.get());
+                                                            continue;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if (!requiresBody) {
+                                                // if we arrived here the request is not processable
+                                                // TODO: Change to 400: Bad Request
+                                                requestContext
+                                                        .getResponseTransmitter()
+                                                        .sendNotFound(channel);
+                                                return;
+                                            }
+                                        }
+
+                                    }
+
+                                    requestContext.setRouteArguments(argumentValues);
+
+                                    if (!requiresBody) {
+
+                                        // TODO: here we need a way to make the encoding of the result flexible
+                                        // also support for GSON views etc.
+
+                                        // TODO: Also need to handle exceptions that emerge from invoke()
+                                        channel.eventLoop().execute(() -> {
+                                                    Object result = route.execute(argumentValues);
+                                                    Charset charset = serverConfiguration.getDefaultCharset();
+                                                    requestContext.getResponseTransmitter()
+                                                            .sendText(channel, result, charset);
+                                                }
+                                        );
+                                    } else if (msg instanceof StreamedHttpRequest) {
+                                        ((StreamedHttpRequest) msg).subscribe(new Subscriber<HttpContent>() {
+                                            @Override
+                                            public void onSubscribe(Subscription s) {
+                                                s.request(Long.MAX_VALUE - 1);
+                                            }
+
+                                            @Override
+                                            public void onNext(HttpContent httpContent) {
+                                                requestContext.getRequest().addContent(httpContent);
+                                            }
+
+                                            @Override
+                                            public void onError(Throwable t) {
+                                                // TODO: error handling / error handlers
+                                                requestContext.getResponseTransmitter().sendServerError(ctx);
+                                            }
+
+                                            @Override
+                                            public void onComplete() {
+                                                channel.eventLoop().execute(() -> {
+
+                                                    List<NettyHttpRequestContext.UnboundBodyArgument> unboundBodyArguments = requestContext.getUnboundBodyArguments();
+                                                    Map<String, Object> resolvedArguments = requestContext.getRouteArguments();
+
+                                                    for (NettyHttpRequestContext.UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
+                                                        Argument argument = unboundBodyArgument.argument;
+                                                        BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
+                                                        Optional bound = argumentBinder.bind(argument, requestContext.getRequest());
+                                                        if (bound.isPresent()) {
+                                                            resolvedArguments.put(argument.getName(), bound.get());
                                                         } else {
-
-                                                            Optional bindingResult = argumentBinder
-                                                                    .bind(argument, nettyHttpRequest);
-                                                            if (argument.getType() == Optional.class) {
-                                                                argumentValues.put(argument.getName(), bindingResult);
-                                                                continue;
-                                                            } else if (bindingResult.isPresent()) {
-                                                                argumentValues.put(argument.getName(), bindingResult.get());
-                                                                continue;
-                                                            }
+                                                            // TODO: replace with 422
+                                                            requestContext.getResponseTransmitter().sendNotFound(channel);
+                                                            return;
                                                         }
                                                     }
-                                                }
 
-                                                if(!requiresBody) {
-                                                    // if we arrived here the request is not processable
-                                                    try {
-                                                        requestContext.getResponseTransmitter().sendNotFound(channel);
-                                                    } finally {
-                                                        ReferenceCountUtil.release(msg);
-                                                    }
-                                                    return;
-                                                }
-                                            }
-
-                                        }
-
-                                        requestContext.setRouteArguments(argumentValues);
-
-                                        if(!requiresBody) {
-
-                                            // TODO: here we need a way to make the encoding of the result flexible
-                                            // also support for GSON views etc.
-
-                                            // TODO: Also need to handle exceptions that emerge from invoke()
-                                            channel.eventLoop().execute(() -> {
-                                                        Object result = route.execute(argumentValues);
-                                                        try {
-                                                            Charset charset = serverConfiguration.getDefaultCharset();
-                                                            requestContext.getResponseTransmitter()
-                                                                    .sendText(channel, result, charset);
-                                                        } finally {
-                                                            ReferenceCountUtil.release(msg);
-                                                        }
-                                                    }
-                                            );
-                                        }
-                                        else {
-                                            if(HttpUtil.is100ContinueExpected(nettyNativeRequest)) {
-                                                // TODO: handle continue
-                                            }
-                                            else {
-                                                ctx.read();
-                                            }
-                                        }
-
-
-                                    }));
-
-                                    if (!routeMatch.isPresent()) {
-                                        // TODO: check if any other routes exist for URI and return 405 if they do
-
-                                        // TODO: Here we need to add routing for 404 handlers
-                                        requestContext.getResponseTransmitter().sendNotFound(channel);
-                                    }
-                                }
-                                else if(msg instanceof HttpContent) {
-                                    HttpContent content = (HttpContent) msg;
-                                    NettyHttpRequestContext requestContext = ch.attr(REQUEST_CONTEXT_KEY).get();
-                                    boolean isLast = content instanceof LastHttpContent;
-                                    requestContext
-                                            .getRequest()
-                                            .addContent(content);
-                                    if(!isLast) {
-                                        ctx.read();
-                                    }
-                                    else {
-                                        Channel channel = ctx.channel();
-                                        channel.eventLoop().execute(()-> {
-
-                                            List<NettyHttpRequestContext.UnboundBodyArgument> unboundBodyArguments = requestContext.getUnboundBodyArguments();
-                                            Map<String, Object> resolvedArguments = requestContext.getRouteArguments();
-
-                                            for (NettyHttpRequestContext.UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
-                                                Argument argument = unboundBodyArgument.argument;
-                                                BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
-                                                Optional bound = argumentBinder.bind(argument, requestContext.getRequest());
-                                                if(bound.isPresent()) {
-                                                    resolvedArguments.put(argument.getName(), bound.get());
-                                                }
-                                                else {
-                                                    // TODO: replace with 422
-                                                    requestContext.getResponseTransmitter().sendNotFound(channel);
-                                                    return;
-                                                }
-                                            }
-
-                                            RouteMatch route = requestContext.getMatchedRoute();
-                                            Object result = route.execute(resolvedArguments);
-                                            try {
-                                                Charset charset = serverConfiguration.getDefaultCharset();
-                                                requestContext.getResponseTransmitter()
-                                                        .sendText(channel, result, charset);
-                                            } finally {
-                                                ReferenceCountUtil.release(msg);
+                                                    RouteMatch route = requestContext.getMatchedRoute();
+                                                    Object result = route.execute(resolvedArguments);
+                                                    Charset charset = serverConfiguration.getDefaultCharset();
+                                                    requestContext.getResponseTransmitter()
+                                                            .sendText(channel, result, charset);
+                                                });
                                             }
                                         });
-                                    }
-                                }
 
+                                    } else {
+                                        // TODO: should be  400: Bad Request
+                                        requestContext.getResponseTransmitter().sendNotFound(channel);
+                                    }
+
+
+                                }));
+
+                                if (!routeMatch.isPresent()) {
+                                    // TODO: check if any other routes exist for URI and return 405 if they do
+
+                                    // TODO: Here we need to add routing for 404 handlers
+                                    requestContext.getResponseTransmitter().sendNotFound(channel);
+                                }
                             }
 
                             @Override
@@ -303,4 +295,5 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
     public int getPort() {
         return serverConfiguration.getPort();
     }
+
 }

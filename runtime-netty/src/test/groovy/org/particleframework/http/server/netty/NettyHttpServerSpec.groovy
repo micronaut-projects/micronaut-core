@@ -81,7 +81,7 @@ class NettyHttpServerSpec extends Specification {
         when:"A required request parameter is missing"
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
-        new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:3000)
+        new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:10000)
 
         then:"A 404 is returned"
         thrown(FileNotFoundException)

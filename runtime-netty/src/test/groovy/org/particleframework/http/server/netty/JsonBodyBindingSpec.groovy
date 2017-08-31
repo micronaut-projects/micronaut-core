@@ -22,6 +22,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         def json = '{"title:"The Stand"}'
         def request = new Request.Builder()
                 .url("$server/json/string")
+                .header("Content-Length", json.length().toString())
                 .post(RequestBody.create(MediaType.parse("application/json"), json))
 
         then:

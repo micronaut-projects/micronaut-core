@@ -1,7 +1,10 @@
 package org.particleframework.http.server.netty;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -24,7 +27,7 @@ public class NettyHttpResponseTransmitter {
      */
     public void sendNotFound(Channel channel) {
         channel.attr(ParticleNettyHttpServer.REQUEST_CONTEXT_KEY).set(null);
-        DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
+        DefaultHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
         channel.writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
     }
@@ -42,6 +45,23 @@ public class NettyHttpResponseTransmitter {
                 object.toString(),
                 charset);
         channel.writeAndFlush(httpResponse)
+                .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    public void sendContinue(ChannelHandlerContext ctx, Channel channel) {
+        // TODO: error handling
+        DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
+        channel.writeAndFlush(httpResponse)
+                .addListener((future)-> {
+            if(future.isSuccess()) {
+                ctx.read();
+            }
+        });
+    }
+
+    public void sendServerError(ChannelHandlerContext ctx) {
+        DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+        ctx.channel().writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
     }
 }
