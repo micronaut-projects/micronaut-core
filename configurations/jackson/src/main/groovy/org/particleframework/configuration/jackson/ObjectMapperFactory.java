@@ -8,7 +8,6 @@ import org.particleframework.context.annotation.Factory;
 
 import javax.inject.Inject;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -24,18 +23,34 @@ public class ObjectMapperFactory {
     @Inject
     protected Module[] jacksonModules = new Module[0];
 
+    /**
+     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}
+     *
+     * @param jacksonConfiguration The configuration
+     * @param jsonFactory The JSON factory
+     * @return The {@link ObjectMapper}
+     */
     @Bean
-    ObjectMapper objectMapper(Optional<JacksonConfiguration> optionalConfiguration,
+    ObjectMapper objectMapper(Optional<JacksonConfiguration> jacksonConfiguration,
                               Optional<JsonFactory> jsonFactory) {
-        JacksonConfiguration jacksonConfiguration = optionalConfiguration.orElse(new JacksonConfiguration());
 
         ObjectMapper objectMapper = jsonFactory.isPresent() ? new ObjectMapper(jsonFactory.get()) : new ObjectMapper();
 
         objectMapper.registerModules(jacksonModules);
-        String dateFormat = jacksonConfiguration.getDateFormat();
-        if(dateFormat != null) {
-            objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
-        }
+        jacksonConfiguration.ifPresent((configuration)->{
+            String dateFormat = configuration.getDateFormat();
+            if(dateFormat != null) {
+                objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
+            }
+
+            configuration.getSerializationSettings()
+                         .forEach(objectMapper::configure);
+
+            configuration.getDeserializationSettings()
+                         .forEach(objectMapper::configure);
+
+        });
+
         return objectMapper;
     }
 }
