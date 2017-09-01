@@ -13,7 +13,9 @@ import org.particleframework.core.convert.TypeConverter;
 
 import javax.inject.Inject;
 import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.TimeZone;
 
 /**
  * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}
@@ -49,6 +51,14 @@ public class ObjectMapperFactory {
             if(dateFormat != null) {
                 objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
             }
+            Locale locale = configuration.getLocale();
+            if(locale != null) {
+                objectMapper.setLocale(locale);
+            }
+            TimeZone timeZone = configuration.getTimeZone();
+            if(timeZone != null) {
+                objectMapper.setTimeZone(timeZone);
+            }
 
             configuration.getSerializationSettings()
                          .forEach(objectMapper::configure);
@@ -56,7 +66,16 @@ public class ObjectMapperFactory {
             configuration.getDeserializationSettings()
                          .forEach(objectMapper::configure);
 
+            configuration.getMapperSettings()
+                         .forEach(objectMapper::configure);
+
+            configuration.getParserSettings()
+                         .forEach(objectMapper::configure);
+
+            configuration.getGeneratorSettings()
+                         .forEach(objectMapper::configure);
         });
+
 
         return objectMapper;
     }

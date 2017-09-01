@@ -39,8 +39,8 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
      * @return The concrete type of the value
      */
     default Class<V> getValueType() {
-        Class type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
-        return type != null ? type : (Class<V>) Object.class;
+        Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
+        return type.orElse(Object.class);
     }
 
     /**

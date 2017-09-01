@@ -422,8 +422,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, null);
         for (BeanInitializedEventListener listener : initializedEventListeners) {
-            Class targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanInitializedEventListener.class);
-            if (targetType == null || targetType.isInstance(bean)) {
+            Optional<Class> targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanInitializedEventListener.class);
+            if (!targetType.isPresent() || targetType.get().isInstance(bean)) {
                 bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                 if (bean == null) {
                     throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
@@ -1211,12 +1211,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         try {
             Field field = injectionPoint.getField();
             Class<?> fieldType = field.getType();
-            Class genericType = fieldType.isArray() ? fieldType.getComponentType() : GenericTypeUtils.resolveGenericTypeArgument(field);
-            if (genericType == null) {
+            Optional<Class> genericType = fieldType.isArray() ? Optional.of(fieldType.getComponentType()) : GenericTypeUtils.resolveGenericTypeArgument(field);
+            if (!genericType.isPresent()) {
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
             }
             Qualifier qualifier = resolveQualifier(injectionPoint);
-            B bean = (B) beanResolver.resolveBean(genericType, qualifier);
+            B bean = (B) beanResolver.resolveBean(genericType.get(), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
