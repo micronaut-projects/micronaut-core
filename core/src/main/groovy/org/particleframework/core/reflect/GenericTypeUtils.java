@@ -1,10 +1,9 @@
 package org.particleframework.core.reflect;
 
-import org.particleframework.core.convert.TypeConverter;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Optional;
 
 /**
  * Utility methods for dealing with generic types
@@ -14,37 +13,55 @@ import java.lang.reflect.Type;
  */
 public class GenericTypeUtils {
 
-    public static Class resolveSuperGenericTypeArgument(Class type) {
+    /**
+     * Resolves a single generic type argument from the super class of the given type
+     *
+     * @param type The type to resolve from
+     * @return A single Class or null
+     */
+    public static Optional<Class> resolveSuperGenericTypeArgument(Class type) {
         Type genericSuperclass = type.getGenericSuperclass();
         if(genericSuperclass instanceof ParameterizedType) {
             return resolveSingleTypeArgument(genericSuperclass);
         }
-        return null;
+        return Optional.empty();
     }
 
-    public static Class resolveInterfaceTypeArgument(Class type, Class interfaceType) {
+    /**
+     * Resolves a single type argument from the given interface of the given class
+     *
+     * @param type The type to resolve from
+     * @param interfaceType The interface to resolve for
+     * @return The class or null
+     */
+    public static Optional<Class> resolveInterfaceTypeArgument(Class type, Class interfaceType) {
         Type[] genericInterfaces = type.getGenericInterfaces();
         for (Type genericInterface : genericInterfaces) {
             if(genericInterface instanceof ParameterizedType) {
                 ParameterizedType pt = (ParameterizedType) genericInterface;
                 if( pt.getRawType() == interfaceType ) {
-                    Class actualTypeArguments = resolveSingleTypeArgument(genericInterface);
-                    if (actualTypeArguments != null) return actualTypeArguments;
+                    return resolveSingleTypeArgument(genericInterface);
                 }
             }
         }
-        return null;
+        return Optional.empty();
     }
 
-    public static Class resolveSingleTypeArgument(Type genericType) {
+    /**
+     * Resolve a single type from the given generic type
+     *
+     * @param genericType The generic type
+     * @return
+     */
+    public static Optional<Class> resolveSingleTypeArgument(Type genericType) {
         if(genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             if(actualTypeArguments.length == 1) {
-                return (Class) actualTypeArguments[0];
+                return Optional.of((Class) actualTypeArguments[0]);
             }
         }
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -72,7 +89,13 @@ public class GenericTypeUtils {
     }
 
 
-    public static Class resolveGenericTypeArgument(Field field) {
+    /**
+     * Resolves a single generic type argument for the given field
+     *
+     * @param field The field
+     * @return The type argument or null if it non-exists
+     */
+    public static Optional<Class> resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
         Class genericClass = null;
         if (genericType instanceof ParameterizedType) {
@@ -84,9 +107,15 @@ public class GenericTypeUtils {
                 }
             }
         }
-        return genericClass;
+        return genericClass != null ? Optional.of(genericClass) : Optional.empty();
     }
 
+    /**
+     * Resolves all of the type arguments for the given field
+     *
+     * @param field The field
+     * @return The type arguments as a class array
+     */
     public static Class[] resolveGenericTypeArguments(Field field) {
         Class[] genericClasses = new Class[0];
         Type genericType = field != null ? field.getGenericType() : null;
@@ -108,6 +137,14 @@ public class GenericTypeUtils {
         return genericClasses;
     }
 
+
+    /**
+     * Resolve all of the type arguments for the given interface from the given type
+     *
+     * @param type The type to resolve from
+     * @param interfaceType The interface to resolve from
+     * @return The type arguments to the interface
+     */
     public static Class[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
         Type[] genericInterfaces = type.getGenericInterfaces();
         for (Type genericInterface : genericInterfaces) {

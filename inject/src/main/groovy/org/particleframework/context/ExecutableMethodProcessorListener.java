@@ -19,7 +19,6 @@ import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.annotation.Executable;
@@ -47,19 +46,20 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
             Map<Class<? extends Annotation>, List<ExecutableMethod>> methodsByAnnotation = getExecutableMethodsByAnnotation((ApplicationContext) beanContext);
             if(!methodsByAnnotation.isEmpty()) {
 
-                Class targetAnnotation = GenericTypeUtils.resolveInterfaceTypeArgument(processor.getClass(), ExecutableMethodProcessor.class);
-                if (targetAnnotation == null) {
+                Optional<Class> targetAnnotation = GenericTypeUtils.resolveInterfaceTypeArgument(processor.getClass(), ExecutableMethodProcessor.class);
+                if (!targetAnnotation.isPresent()) {
                     for (List<ExecutableMethod> executableMethods : methodsByAnnotation.values()) {
                         for (ExecutableMethod executableMethod : executableMethods) {
                             processor.process(executableMethod);
                         }
                     }
                 } else {
+                    Class annotationType = targetAnnotation.get();
                     methodsByAnnotation
                             .keySet()
                             .stream()
                             .filter((type) ->
-                                    type == targetAnnotation || AnnotationUtil.findAnnotationWithStereoType(type, targetAnnotation) != null
+                                    type == annotationType || AnnotationUtil.findAnnotationWithStereoType(type, annotationType) != null
                             )
                             .forEach((key) -> {
                                         List<ExecutableMethod> executableMethods = methodsByAnnotation.get(key);

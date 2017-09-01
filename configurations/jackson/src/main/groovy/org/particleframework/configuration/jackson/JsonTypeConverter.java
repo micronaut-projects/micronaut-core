@@ -15,10 +15,7 @@
  */
 package org.particleframework.configuration.jackson;
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
+
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,6 +25,12 @@ import org.particleframework.core.convert.TypeConverter;
 
 import java.util.Optional;
 
+/**
+ * A {@link TypeConverter} that leverages Jackson {@link ObjectMapper} to convert from {@link JsonNode} instances to objects
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
 public class JsonTypeConverter implements TypeConverter<JsonNode, Object> {
     private final ObjectMapper objectMapper;
 

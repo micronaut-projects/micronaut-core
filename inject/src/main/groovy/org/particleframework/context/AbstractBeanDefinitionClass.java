@@ -35,12 +35,8 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     @Override
     public Class getBeanType() {
         if(isPresent()) {
-            Class componentType = GenericTypeUtils.resolveSuperGenericTypeArgument(beanDefinition);
-            if(componentType == null) {
-                throw new IllegalStateException("Invalid component definition class ["+ beanDefinition.getName()+"] found on classpath");
-            }
-            return componentType;
-
+            return GenericTypeUtils.resolveSuperGenericTypeArgument(beanDefinition)
+                                   .orElseThrow(()-> new IllegalStateException("Invalid component definition class ["+ beanDefinition.getName()+"] found on classpath"));
         }
         return null;
     }

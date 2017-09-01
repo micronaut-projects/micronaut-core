@@ -105,8 +105,8 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @return The first value or null if it is present
      */
     default V getFirst(CharSequence name) {
-        Class type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleMultiValues.class);
-        Optional<V> value = getFirst(name, type != null ? type : Object.class);
+        Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleMultiValues.class);
+        Optional<V> value = getFirst(name, type.orElse(Object.class));
         return value.orElse(null);
     }
 
