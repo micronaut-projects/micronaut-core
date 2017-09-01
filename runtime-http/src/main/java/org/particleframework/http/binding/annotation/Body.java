@@ -38,7 +38,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Body {
 
     /**
-     * @return A Key or qualifier within the body
+     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
      */
     String value() default "";
 }
