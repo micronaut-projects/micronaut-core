@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -25,23 +26,20 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonProcessor implements Publisher<JsonNode> {
+public class JacksonPublisher implements Publisher<JsonNode> {
 
-    private final JsonFactory jsonFactory;
     private final NonBlockingJsonParser nonBlockingJsonParser;
     private final AtomicReference<JsonNode> jsonNode = new AtomicReference<>();
     private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private final ConcurrentLinkedQueue<Subscription> subscriptions = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<Subscriber<? super JsonNode>> requested = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private String currentFieldName;
 
-    public JacksonProcessor(JsonFactory jsonFactory) throws IOException {
-        this.jsonFactory = jsonFactory;
+    public JacksonPublisher(JsonFactory jsonFactory) throws IOException {
         this.nonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
     }
 
-    public JacksonProcessor() throws IOException {
+    public JacksonPublisher() throws IOException {
         this(new JsonFactory());
     }
 
@@ -55,16 +53,14 @@ public class JacksonProcessor implements Publisher<JsonNode> {
                 public void request(long n) {
                     if (n > 0) {
                         subscriber.onError(thrownError);
-                        subscriptions.remove(this);
                     }
                 }
 
                 @Override
                 public void cancel() {
-                    subscriptions.remove(this);
+                    // no-op
                 }
             };
-            subscriptions.add(subscription);
             subscriber.onSubscribe(subscription);
         }
         else if(jsonNodeObject != null) {
@@ -74,30 +70,26 @@ public class JacksonProcessor implements Publisher<JsonNode> {
                     if (n > 0) {
                         subscriber.onNext(jsonNodeObject);
                         subscriber.onComplete();
-                        subscriptions.remove(this);
                     }
                 }
 
                 @Override
                 public void cancel() {
-                    subscriptions.remove(this);
+                    // no-op
                 }
             };
-            subscriptions.add(subscription);
             subscriber.onSubscribe(subscription);
         }
         else {
 
-            subscriber.onSubscribe(new Subscription() {
+            Subscription subscription = new Subscription() {
                 @Override
                 public void request(long n) {
-                    if(n > 0) {
-                        JsonNode jsonNode = JacksonProcessor.this.jsonNode.get();
-                        if(jsonNode == null) {
+                    if (n > 0) {
+                        JsonNode jsonNode = JacksonPublisher.this.jsonNode.get();
+                        if (jsonNode == null) {
                             requested.add(subscriber);
-                        }
-                        else {
-                            subscriptions.remove(this);
+                        } else {
                             subscriber.onNext(jsonNode);
                             subscriber.onComplete();
                         }
@@ -107,9 +99,9 @@ public class JacksonProcessor implements Publisher<JsonNode> {
                 @Override
                 public void cancel() {
                     requested.remove(subscriber);
-                    subscriptions.remove(this);
                 }
-            });
+            };
+            subscriber.onSubscribe(subscription);
         }
     }
 
@@ -133,7 +125,7 @@ public class JacksonProcessor implements Publisher<JsonNode> {
 
                 JsonToken event;
                 while ((event = nonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
-                    JsonNode root = buildTree(event);
+                    JsonNode root = asJsonNode(event);
                     if (root != null) {
                         byteFeeder.endOfInput();
                         this.jsonNode.set(root);
@@ -142,6 +134,7 @@ public class JacksonProcessor implements Publisher<JsonNode> {
                             subscriber.onComplete();
                         }
                         requested.clear();
+                        break;
                     }
                 }
             }
@@ -157,14 +150,14 @@ public class JacksonProcessor implements Publisher<JsonNode> {
     /**
      * @return The root node when the whole tree is built.
      **/
-    private JsonNode buildTree(JsonToken event) throws IOException {
+    private JsonNode asJsonNode(JsonToken event) throws IOException {
         switch (event) {
             case START_OBJECT:
-                nodeStack.push(createNode(nodeStack.peekLast()));
+                nodeStack.push(node(nodeStack.peekLast()));
                 break;
 
             case START_ARRAY:
-                nodeStack.push(createArray(nodeStack.peekLast()));
+                nodeStack.push(array(nodeStack.peekLast()));
                 break;
 
             case END_OBJECT:
@@ -192,26 +185,49 @@ public class JacksonProcessor implements Publisher<JsonNode> {
                 }
                 break;
 
-//            case VALUE_STRING:
-//                assert !nodeStack.isEmpty();
-//                addString(nodeStack.peekLast(), nonBlockingJsonParser.getValueAsString());
-//                break;
-//
-//            case VALUE_NUMBER_FLOAT:
-//                assert !nodeStack.isEmpty();
-//                addFloat(nodeStack.peekLast(), nonBlockingJsonParser.getFloatValue());
-//                break;
-//
-//            case VALUE_NULL:
-//                assert !nodeStack.isEmpty();
-//                addNull(nodeStack.peekLast());
-//                break;
-//
-//            case VALUE_TRUE:
-//            case VALUE_FALSE:
-//                assert !nodeStack.isEmpty();
-//                addBoolean(nodeStack.peekLast(), nonBlockingJsonParser.getBooleanValue());
-//                break;
+            case VALUE_STRING:
+                assert !nodeStack.isEmpty();
+                JsonNode stringNode = nodeStack.peekLast();
+                if (stringNode instanceof ObjectNode) {
+                    ((ObjectNode)stringNode).put(currentFieldName, nonBlockingJsonParser.getValueAsString());
+                }
+                else {
+                    ((ArrayNode)stringNode).add(nonBlockingJsonParser.getValueAsString());
+                }
+                break;
+
+            case VALUE_NUMBER_FLOAT:
+                assert !nodeStack.isEmpty();
+                JsonNode floatNode = nodeStack.peekLast();
+                if (floatNode instanceof ObjectNode) {
+                    ((ObjectNode)floatNode).put(currentFieldName, nonBlockingJsonParser.getFloatValue());
+                }
+                else {
+                    ((ArrayNode)floatNode).add(nonBlockingJsonParser.getFloatValue());
+                }
+                break;
+            case VALUE_NULL:
+                assert !nodeStack.isEmpty();
+                JsonNode nullNode = nodeStack.peekLast();
+                if (nullNode instanceof ObjectNode) {
+                    ((ObjectNode)nullNode).putNull(currentFieldName);
+                }
+                else {
+                    ((ArrayNode)nullNode).addNull();
+                }
+                break;
+
+            case VALUE_TRUE:
+            case VALUE_FALSE:
+                assert !nodeStack.isEmpty();
+                JsonNode booleanNode = nodeStack.peekLast();
+                if (booleanNode instanceof ObjectNode) {
+                    ((ObjectNode)booleanNode).put(currentFieldName, nonBlockingJsonParser.getBooleanValue());
+                }
+                else {
+                    ((ArrayNode)booleanNode).add(nonBlockingJsonParser.getBooleanValue());
+                }
+                break;
 
             default:
                 throw new IllegalStateException("Unsupported JSON event: " + event);
@@ -220,12 +236,22 @@ public class JacksonProcessor implements Publisher<JsonNode> {
         return null;
     }
 
-    private JsonNode createArray(JsonNode jsonNode) {
-        return null;
+    private JsonNode array(JsonNode node) {
+        if (node instanceof ObjectNode)
+            return ((ObjectNode)node).putArray(currentFieldName);
+        else if (node instanceof ArrayNode)
+            return ((ArrayNode)node).addArray();
+        else
+            return JsonNodeFactory.instance.arrayNode();
     }
 
-    private JsonNode createNode(JsonNode jsonNode) {
-        return null;
+    private JsonNode node(JsonNode node) {
+        if (node instanceof ObjectNode)
+            return ((ObjectNode)node).putObject(currentFieldName);
+        else if (node instanceof ArrayNode)
+            return ((ArrayNode)node).addObject();
+        else
+            return JsonNodeFactory.instance.objectNode();
     }
 
 }

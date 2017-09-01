@@ -1,6 +1,7 @@
 package org.particleframework.configuration.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.annotation.Bean;
@@ -34,9 +35,11 @@ public class ObjectMapperFactory {
     ObjectMapper objectMapper(Optional<JacksonConfiguration> jacksonConfiguration,
                               Optional<JsonFactory> jsonFactory) {
 
-        ObjectMapper objectMapper = jsonFactory.isPresent() ? new ObjectMapper(jsonFactory.get()) : new ObjectMapper();
+        ObjectMapper objectMapper = jsonFactory.map(ObjectMapper::new)
+                                               .orElseGet(ObjectMapper::new);
 
         objectMapper.registerModules(jacksonModules);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         jacksonConfiguration.ifPresent((configuration)->{
             String dateFormat = configuration.getDateFormat();
             if(dateFormat != null) {
