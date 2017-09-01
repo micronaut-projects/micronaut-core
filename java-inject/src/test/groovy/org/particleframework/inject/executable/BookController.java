@@ -12,32 +12,32 @@ public class BookController {
     BookService bookService;
 
     @Executable
-    String show(Long id) {
+    public String show(Long id) {
         return "$id - The Stand";
     }
 
     @Executable
-    String showArray(Long[] id) {
+    public String showArray(Long[] id) {
         return "${id[0]} - The Stand";
     }
 
     @Executable
-    String showPrimitive(long id) {
+    public String showPrimitive(long id) {
         return "$id - The Stand";
     }
 
     @Executable
-    String showPrimitiveArray(long[] id) {
+    public String showPrimitiveArray(long[] id) {
         return "${id[0]} - The Stand";
     }
 
     @Executable
-    void showVoidReturn(List<String> jobNames) {
+    public void showVoidReturn(List<String> jobNames) {
         jobNames.add("test");
     }
 
     @Executable
-    int showPrimitiveReturn(int[] values) {
+    public int showPrimitiveReturn(int[] values) {
         return values[0];
     }
 }

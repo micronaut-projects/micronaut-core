@@ -3,11 +3,11 @@ package org.particleframework.annotation.processing;
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.inject.annotation.Executable;
 import org.particleframework.inject.writer.BeanDefinitionClassWriter;
 import org.particleframework.inject.writer.BeanDefinitionWriter;
+import org.particleframework.inject.writer.ClassWriterOutputVisitor;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -50,19 +50,22 @@ import static javax.lang.model.type.TypeKind.*;
     "org.particleframework.context.annotation.Replaces",
     "org.particleframework.context.annotation.Value",
     "org.particleframework.inject.annotation.Executable",
-    "org.particleframework.inject.qualifiers.primary.Primary"
+    "org.particleframework.inject.qualifiers.primary.Primary",
+    "org.particleframework.stereotype.Controller"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private ServiceDescriptorGenerator serviceDescriptorGenerator;
+    private ClassWriterOutputVisitor classWriterOutputVisitor;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.serviceDescriptorGenerator = new ServiceDescriptorGenerator();
         this.beanDefinitionWriters = new LinkedHashMap<>();
+        this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, targetDirectory);
     }
 
     @Override
@@ -91,10 +94,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitor.getBeanDefinitionWriters().values().forEach(beanDefinitionWriter -> {
                     try {
                         beanDefinitionWriter.visitBeanDefinitionEnd();
-                        JavaFileObject javaFileObject = filer.createClassFile(beanDefinitionWriter.getBeanDefinitionName());
-                        try (OutputStream outputStream = javaFileObject.openOutputStream()) {
-                            beanDefinitionWriter.writeTo(outputStream);
-                        }
+                        beanDefinitionWriter.accept(classWriterOutputVisitor);
 
                         String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
                         String beanTypeName = beanDefinitionWriter.getBeanTypeName();
@@ -116,10 +116,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
                             beanDefinitionClassWriter.writeTo(out);
                         }
-                        serviceDescriptorGenerator.generate(
-                            targetDirectory,
-                            beanDefinitionWriter.getBeanDefinitionName(),
-                            BeanDefinition.class);
                         serviceDescriptorGenerator.generate(
                             targetDirectory,
                             beanDefinitionClassWriter.getBeanDefinitionClassName(),
@@ -586,7 +582,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
                     TypeMirror componentType = arrayType.getComponentType();
                     params.addParameter(argName, arrayType.toString());
-                    params.addGenericTypes(argName, Collections.singletonList(componentType.toString()));
+                    params.addGenericTypes(argName, Collections.singletonList(modelUtils.resolveTypeReference(componentType)));
                 } else if (kind == DECLARED) {
                     DeclaredType declaredType = (DeclaredType) typeMirror;
 

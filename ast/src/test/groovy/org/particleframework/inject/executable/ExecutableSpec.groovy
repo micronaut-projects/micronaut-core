@@ -18,7 +18,6 @@ package org.particleframework.inject.executable
 import org.particleframework.context.AbstractExecutableMethod
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.ExecutableHandle
 import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.MethodExecutionHandle
@@ -28,7 +27,6 @@ import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Singleton
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -83,12 +81,12 @@ class ExecutableSpec extends Specification {
 }
 
 @Singleton
-class BookServce {}
+class BookService {}
 
 @Controller
 class BookController {
     @Inject
-    BookServce bookServce
+    BookService bookService
 
     @Executable
     String show(Long id) {

@@ -436,21 +436,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Write the class to the given output stream
-     *
-     * @param outputStream The output stream
-     * @throws IOException If an error occurs
-     */
-    public void writeTo(OutputStream outputStream) throws IOException {
-        byte[] bytes = toByteArray();
-        writeTo(outputStream, bytes);
-    }
-
-    protected void writeTo(OutputStream outputStream, byte[] bytes) throws IOException {
-        outputStream.write(bytes);
-    }
-
-    /**
      * @return The bytes of the class
      */
     public byte[] toByteArray() {
@@ -460,29 +445,43 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         return ((ClassWriter) classWriter).toByteArray();
     }
 
+    public void writeTo(File compilationDir) throws IOException {
+        accept(new ClassWriterOutputVisitor() {
+            @Override
+            public OutputStream visitClass(String className) throws IOException {
+                File targetFile = new File(compilationDir, getClassFileName(className)).getCanonicalFile();
+                File parentDir = targetFile.getParentFile();
+                if (!parentDir.exists() && !parentDir.mkdirs()) {
+                    throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
+                }
+                return new FileOutputStream(targetFile);
+            }
+
+            @Override
+            public File visitServiceDescriptor(String classname) {
+                return compilationDir;
+            }
+        });
+    }
+
     /**
-     * Write the class to the given output stream
+     * Write the class to output via a visitor that manages output destination
      *
-     * @param compilationDir The compilation dir
+     * @param visitor the writer output visitor
      * @throws IOException If an error occurs
      */
-    public void writeTo(File compilationDir) throws IOException {
-        File targetFile = new File(compilationDir, getBeanDefinitionClassFile()).getCanonicalFile();
-        File parentDir = targetFile.getParentFile();
-        if (!parentDir.exists() && !parentDir.mkdirs()) {
-            throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
-        }
-        try (FileOutputStream out = new FileOutputStream(targetFile)) {
-            writeTo(out);
+    public void accept(ClassWriterOutputVisitor visitor) throws IOException {
+        try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
+            out.write(toByteArray());
             try {
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
-                methodExecutors.forEach((className, classWriter) ->{
+                methodExecutors.forEach((className, classWriter) -> {
                     try {
-                        String path = getClassFileName(className);
-                        try(FileOutputStream executorOut = new FileOutputStream(new File(compilationDir, path))) {
-                            writeTo(executorOut, classWriter.toByteArray());
-                        }
-                        serviceDescriptorGenerator.generate(compilationDir, className, ExecutableMethod.class);
+                        visitor.visitClass(className).write(classWriter.toByteArray());
+                        serviceDescriptorGenerator.generate(
+                            visitor.visitServiceDescriptor(className),
+                            className,
+                            ExecutableMethod.class);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -496,7 +495,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                     throw e;
                 }
             }
-
         }
     }
 
