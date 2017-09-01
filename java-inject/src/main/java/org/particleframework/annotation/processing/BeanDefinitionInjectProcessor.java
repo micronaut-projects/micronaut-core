@@ -580,9 +580,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 if (kind == ARRAY) {
-                    ArrayType arrayType = (ArrayType) typeMirror; // FIXME is there an API way of getting this without a cast?
+                    ArrayType arrayType = (ArrayType) typeMirror;
                     TypeMirror componentType = arrayType.getComponentType();
-                    params.addParameter(argName, arrayType.toString());
+                    params.addParameter(argName, modelUtils.resolveTypeReference(arrayType));
                     params.addGenericTypes(argName, Collections.singletonList(modelUtils.resolveTypeReference(componentType)));
                 } else if (kind == DECLARED) {
                     DeclaredType declaredType = (DeclaredType) typeMirror;

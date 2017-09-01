@@ -21,15 +21,10 @@ import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.inject.ExecutableHandle
 import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.MethodExecutionHandle
-import spock.lang.Ignore
 import spock.lang.Specification
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
+
 class ExecutableSpec extends Specification {
 
-    @Ignore
     void "test executable metadata"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
@@ -58,7 +53,6 @@ class ExecutableSpec extends Specification {
 
     }
 
-    @Ignore
     void "test executable responses"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()

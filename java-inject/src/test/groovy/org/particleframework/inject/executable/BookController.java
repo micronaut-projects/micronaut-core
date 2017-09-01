@@ -13,22 +13,22 @@ public class BookController {
 
     @Executable
     public String show(Long id) {
-        return "$id - The Stand";
+        return String.format("%d - The Stand", id);
     }
 
     @Executable
     public String showArray(Long[] id) {
-        return "${id[0]} - The Stand";
+        return String.format("%d - The Stand", id[0]);
     }
 
     @Executable
     public String showPrimitive(long id) {
-        return "$id - The Stand";
+        return String.format("%d - The Stand", id);
     }
 
     @Executable
     public String showPrimitiveArray(long[] id) {
-        return "${id[0]} - The Stand";
+        return String.format("%d - The Stand", id[0]);
     }
 
     @Executable

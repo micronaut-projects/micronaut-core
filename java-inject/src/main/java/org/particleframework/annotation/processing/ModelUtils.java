@@ -1,12 +1,16 @@
 package org.particleframework.annotation.processing;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
-import javax.lang.model.util.*;
+import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.ARRAY;
@@ -124,6 +128,34 @@ class ModelUtils {
         }
     }
 
+    Class<?> classOfPrimitiveArrayFor(String primitiveType) {
+        try {
+            switch (primitiveType) {
+                case "byte":
+                    return Class.forName("[B");
+                case "int":
+                    return Class.forName("[I");
+                case "short":
+                    return Class.forName("[S");
+                case "long":
+                    return Class.forName("[J");
+                case "float":
+                    return Class.forName("[F");
+                case "double":
+                    return Class.forName("[D");
+                case "char":
+                    return Class.forName("[C");
+                case "boolean":
+                    return Class.forName("[Z");
+                default:
+                    // this can never occur
+                    throw new IllegalArgumentException("primitiveType cannot be " + primitiveType);
+            }
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public TypeElement superClassFor(TypeElement element) {
         TypeMirror superclass = element.getSuperclass();
         if (superclass.getKind() == TypeKind.NONE) {
@@ -146,10 +178,7 @@ class ModelUtils {
 
     public Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
-        if (type.getKind().isPrimitive()) {
-            return classOfPrimitiveFor(type.toString());
-        }
-        return typeElement.getQualifiedName().toString();
+        return resolveTypeReference(type);
     }
 
     public Object resolveTypeReference(TypeMirror type) {
@@ -157,7 +186,13 @@ class ModelUtils {
         if (type.getKind().isPrimitive()) {
             result = classOfPrimitiveFor(type.toString());
         } else if (type.getKind() == ARRAY) {
-            result = type.toString();
+            ArrayType arrayType = (ArrayType) type;
+            TypeMirror componentType = arrayType.getComponentType();
+            if (componentType.getKind().isPrimitive()) {
+                result = classOfPrimitiveArrayFor(componentType.toString());
+            } else {
+                result = arrayType.toString();
+            }
         } else if (type.getKind() != VOID) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
             result = typeElement.getQualifiedName().toString();
