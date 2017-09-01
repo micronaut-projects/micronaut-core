@@ -4,8 +4,13 @@ import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
+import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.BeanDefinitionClass;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -106,14 +111,34 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     public ApplicationContext start() {
         startEnvironment();
-        return (ApplicationContext) super.start();
+        ApplicationContext ctx = (ApplicationContext) super.start();
+        return ctx;
     }
 
     protected void startEnvironment() {
         Environment environment = getEnvironment();
         environment.start();
+
         registerSingleton(Environment.class, environment);
         registerSingleton(new ExecutableMethodProcessorListener());
+    }
+
+    @Override
+    protected void initializeContext(List<BeanDefinitionClass> contextScopeBeans) {
+        Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
+        for (TypeConverter typeConverter : typeConverters) {
+            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
+            if(genericTypes != null && genericTypes.length == 2) {
+                Class source = genericTypes[0];
+                Class target = genericTypes[1];
+                if(source != null && target != null) {
+                    if(!(source == Object.class && target == Object.class)) {
+                        getConversionService().addConverter(source, target, typeConverter);
+                    }
+                }
+            }
+        }
+        super.initializeContext(contextScopeBeans);
     }
 
     @Override

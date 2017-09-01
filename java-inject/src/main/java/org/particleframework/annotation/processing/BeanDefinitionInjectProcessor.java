@@ -527,7 +527,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AnnotationMirror singletonAnn =
                 annotationUtils.findAnnotationWithStereotype(method, Singleton.class);
 
-            TypeElement producedElement = modelUtils.classElementFor(typeUtils.asElement(producedType));
+            Element element = typeUtils.asElement(producedType);
+            TypeElement producedElement = modelUtils.classElementFor(element);
             PackageElement producedPackageElement = elementUtils.getPackageOf(producedElement);
             String producedPackageName = producedPackageElement.getQualifiedName().toString();
 

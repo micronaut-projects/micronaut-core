@@ -15,21 +15,22 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
-import io.netty.util.ReferenceCountUtil;
 import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
@@ -45,6 +46,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author Graeme Rocher
@@ -190,51 +192,104 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                                 }
                                         );
                                     } else if (msg instanceof StreamedHttpRequest) {
-                                        ((StreamedHttpRequest) msg).subscribe(new Subscriber<HttpContent>() {
-                                            @Override
-                                            public void onSubscribe(Subscription s) {
-                                                s.request(Long.MAX_VALUE - 1);
-                                            }
-
-                                            @Override
-                                            public void onNext(HttpContent httpContent) {
-                                                requestContext.getRequest().addContent(httpContent);
-                                            }
-
-                                            @Override
-                                            public void onError(Throwable t) {
-                                                // TODO: error handling / error handlers
-                                                requestContext.getResponseTransmitter().sendServerError(ctx);
-                                            }
-
-                                            @Override
-                                            public void onComplete() {
-                                                channel.eventLoop().execute(() -> {
-
-                                                    List<NettyHttpRequestContext.UnboundBodyArgument> unboundBodyArguments = requestContext.getUnboundBodyArguments();
-                                                    Map<String, Object> resolvedArguments = requestContext.getRouteArguments();
-
-                                                    for (NettyHttpRequestContext.UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
-                                                        Argument argument = unboundBodyArgument.argument;
-                                                        BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
-                                                        Optional bound = argumentBinder.bind(argument, requestContext.getRequest());
-                                                        if (bound.isPresent()) {
-                                                            resolvedArguments.put(argument.getName(), bound.get());
-                                                        } else {
-                                                            // TODO: replace with 422
-                                                            requestContext.getResponseTransmitter().sendNotFound(channel);
-                                                            return;
+                                        MediaType contentType = nettyHttpRequest.getContentType();
+                                        StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
+                                        if("json".equals(contentType.getExtension())) {
+                                            JacksonProcessor jacksonProcessor = new JacksonProcessor();
+                                            streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
+                                                @Override
+                                                public void onSubscribe(Subscription s) {
+                                                    s.request(Long.MAX_VALUE);
+                                                    AtomicReference<JsonNode> nodeRef = new AtomicReference<>();
+                                                    jacksonProcessor.subscribe(new Subscriber<JsonNode>() {
+                                                        @Override
+                                                        public void onSubscribe(Subscription s) {
+                                                            s.request(Long.MAX_VALUE);
                                                         }
-                                                    }
 
-                                                    RouteMatch route = requestContext.getMatchedRoute();
-                                                    Object result = route.execute(resolvedArguments);
-                                                    Charset charset = serverConfiguration.getDefaultCharset();
-                                                    requestContext.getResponseTransmitter()
-                                                            .sendText(channel, result, charset);
-                                                });
-                                            }
-                                        });
+                                                        @Override
+                                                        public void onNext(JsonNode jsonNode) {
+                                                            nodeRef.set(jsonNode);
+                                                        }
+
+                                                        @Override
+                                                        public void onError(Throwable t) {
+                                                            // TODO: error handling / error handlers
+                                                            requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                        }
+
+                                                        @Override
+                                                        public void onComplete() {
+                                                            JsonNode jsonNode = nodeRef.get();
+                                                            if(jsonNode != null) {
+                                                                nettyHttpRequest.setBody(jsonNode);
+                                                                processRequestBody(channel, requestContext);
+                                                            }
+                                                            else {
+                                                                // TODO: should be  400: Bad Request
+                                                                requestContext.getResponseTransmitter().sendNotFound(channel);
+                                                            }
+                                                        }
+                                                    });
+                                                }
+
+                                                @Override
+                                                public void onNext(HttpContent httpContent) {
+                                                    ByteBuf content = httpContent.content();
+                                                    int len = content.readableBytes();
+                                                    if(len > 0) {
+                                                        byte[] bytes;
+                                                        if(content.hasArray()) {
+                                                            bytes = content.array();
+                                                        }
+                                                        else {
+                                                            bytes = new byte[len];
+                                                            content.readBytes(bytes);
+                                                        }
+
+                                                        jacksonProcessor.onNext(bytes);
+                                                    }
+                                                }
+
+                                                @Override
+                                                public void onError(Throwable t) {
+                                                    // TODO: error handling / error handlers
+                                                    requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                }
+
+                                                @Override
+                                                public void onComplete() {
+                                                    jacksonProcessor.onComplete();
+                                                }
+                                            });
+                                        }
+                                        else {
+
+                                            Subscriber<HttpContent> contentSubscriber = new Subscriber<HttpContent>() {
+                                                @Override
+                                                public void onSubscribe(Subscription s) {
+                                                    s.request(Long.MAX_VALUE - 1);
+                                                }
+
+                                                @Override
+                                                public void onNext(HttpContent httpContent) {
+                                                    requestContext.getRequest().addContent(httpContent);
+                                                }
+
+                                                @Override
+                                                public void onError(Throwable t) {
+                                                    // TODO: error handling / error handlers
+                                                    requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                }
+
+                                                @Override
+                                                public void onComplete() {
+                                                    processRequestBody(channel, requestContext);
+                                                }
+                                            };
+
+                                            streamedHttpRequest.subscribe(contentSubscriber);
+                                        }
 
                                     } else {
                                         // TODO: should be  400: Bad Request
@@ -276,6 +331,33 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
         }
         this.serverChannel = future.channel();
         return this;
+    }
+
+    protected void processRequestBody(Channel channel, NettyHttpRequestContext requestContext) {
+        channel.eventLoop().execute(() -> {
+
+            List<NettyHttpRequestContext.UnboundBodyArgument> unboundBodyArguments = requestContext.getUnboundBodyArguments();
+            Map<String, Object> resolvedArguments = requestContext.getRouteArguments();
+
+            for (NettyHttpRequestContext.UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
+                Argument argument = unboundBodyArgument.argument;
+                BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
+                Optional bound = argumentBinder.bind(argument, requestContext.getRequest());
+                if (bound.isPresent()) {
+                    resolvedArguments.put(argument.getName(), bound.get());
+                } else {
+                    // TODO: replace with 422
+                    requestContext.getResponseTransmitter().sendNotFound(channel);
+                    return;
+                }
+            }
+
+            RouteMatch route = requestContext.getMatchedRoute();
+            Object result = route.execute(resolvedArguments);
+            Charset charset = serverConfiguration.getDefaultCharset();
+            requestContext.getResponseTransmitter()
+                    .sendText(channel, result, charset);
+        });
     }
 
     @Override

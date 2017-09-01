@@ -1,6 +1,5 @@
 package org.particleframework.http.server.netty
 
-import groovy.transform.ToString
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -19,7 +18,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
     void "test simple string-based body parsing"() {
 
         when:
-        def json = '{"title:"The Stand"}'
+        def json = '{"title":"The Stand"}'
         def request = new Request.Builder()
                 .url("$server/json/string")
                 .header("Content-Length", json.length().toString())
@@ -32,6 +31,35 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
     }
 
+    void "test simple map body parsing"() {
+
+        when:
+        def json = '{"title":"The Stand"}'
+        def request = new Request.Builder()
+                .url("$server/json/map")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: [title:The Stand]"
+    }
+
+    void "test simple POGO body parsing"() {
+
+        when:
+        def json = '{"name":"Fred", "age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/object")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: Foo(Fred, 10)"
+    }
 
     @Controller
     static class JsonController {
@@ -79,9 +107,13 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         }
     }
 
-    @ToString
     static class Foo {
         String name
         Integer age
+
+        @Override
+        String toString() {
+            "Foo($name, $age)"
+        }
     }
 }

@@ -2,6 +2,7 @@ package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.util.Map;
 
 /**
  * Represents an argument to a method or constructor
@@ -24,6 +25,11 @@ public interface Argument<T> extends AnnotatedElement {
      * @return The generic types for the type. For example for Iterable<Foo> this would return an array containing Foo
      */
     Class[] getGenericTypes();
+
+    /**
+     * @return Obtain a map of the type parameters for the argument
+     */
+    Map<String,Class> getTypeParameters();
 
     /**
      * @return The qualifier or null if there is none

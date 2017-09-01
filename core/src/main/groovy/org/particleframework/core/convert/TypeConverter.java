@@ -1,7 +1,5 @@
 package org.particleframework.core.convert;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 

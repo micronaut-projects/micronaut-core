@@ -25,7 +25,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.annotation.Body;
 import org.particleframework.http.binding.binders.request.*;
-import org.particleframework.http.binding.binders.request.body.JsonStringBodyBinder;
+import org.particleframework.http.binding.binders.request.BodyAnnotationBinder;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.inject.Argument;
@@ -105,7 +105,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        JsonStringBodyBinder bodyBinder = new JsonStringBodyBinder(conversionService);
+        BodyAnnotationBinder bodyBinder = new BodyAnnotationBinder(conversionService);
         byAnnotation.put(Body.class, bodyBinder);
 
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);

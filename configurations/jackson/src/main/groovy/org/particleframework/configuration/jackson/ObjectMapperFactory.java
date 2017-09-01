@@ -1,11 +1,15 @@
 package org.particleframework.configuration.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.TypeConverter;
 
 import javax.inject.Inject;
 import java.text.SimpleDateFormat;
@@ -55,5 +59,10 @@ public class ObjectMapperFactory {
         });
 
         return objectMapper;
+    }
+
+    @Bean
+    JsonTypeConverter jsonTypeConverter(ObjectMapper objectMapper) {
+        return new JsonTypeConverter(objectMapper);
     }
 }
