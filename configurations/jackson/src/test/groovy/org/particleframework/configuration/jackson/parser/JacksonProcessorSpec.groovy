@@ -15,6 +15,8 @@
  */
 package org.particleframework.configuration.jackson.parser
 
+import com.fasterxml.jackson.core.JsonParseException
+import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.particleframework.context.ApplicationContext
@@ -29,7 +31,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class JacksonPublisherSpec extends Specification {
+class JacksonProcessorSpec extends Specification {
     @Shared @AutoCleanup
     ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
 
@@ -37,7 +39,7 @@ class JacksonPublisherSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonPublisher publisher = new JacksonPublisher()
+        JacksonProcessor publisher = new JacksonProcessor()
         Foo instance = new Foo(name: "Fred", age: 10)
 
 
@@ -86,6 +88,94 @@ class JacksonPublisherSpec extends Specification {
         foo != null
         foo.name == "Fred"
         foo.age == 10
+    }
+
+    void "test incomplete JSON error"() {
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor publisher = new JacksonProcessor()
+
+
+        when:
+        byte[] bytes = '{"name":"Fred","age":10'.bytes // invalid JSON
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        publisher.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        publisher.onNext(bytes)
+        publisher.onComplete()
+        then:
+        !complete
+        node == null
+        error != null
+        error instanceof JsonEOFException
+
+    }
+
+    void "test JSON syntax error"() {
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor publisher = new JacksonProcessor()
+
+
+        when:
+        byte[] bytes = '{"name":Fred,"age":10}'.bytes // invalid JSON
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        publisher.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        publisher.onNext(bytes)
+        publisher.onComplete()
+        then:
+        !complete
+        node == null
+        error != null
+        error instanceof JsonParseException
+
     }
 
 }

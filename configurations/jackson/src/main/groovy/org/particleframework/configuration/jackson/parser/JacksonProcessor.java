@@ -3,12 +3,13 @@ package org.particleframework.configuration.jackson.parser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
+import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.reactivestreams.Publisher;
+import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -26,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonPublisher implements Publisher<JsonNode> {
+public class JacksonProcessor implements Processor<byte[],JsonNode> {
 
     private final NonBlockingJsonParser nonBlockingJsonParser;
     private final AtomicReference<JsonNode> jsonNode = new AtomicReference<>();
@@ -35,11 +36,11 @@ public class JacksonPublisher implements Publisher<JsonNode> {
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private String currentFieldName;
 
-    public JacksonPublisher(JsonFactory jsonFactory) throws IOException {
+    public JacksonProcessor(JsonFactory jsonFactory) throws IOException {
         this.nonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
     }
 
-    public JacksonPublisher() throws IOException {
+    public JacksonProcessor() throws IOException {
         this(new JsonFactory());
     }
 
@@ -86,7 +87,7 @@ public class JacksonPublisher implements Publisher<JsonNode> {
                 @Override
                 public void request(long n) {
                     if (n > 0) {
-                        JsonNode jsonNode = JacksonPublisher.this.jsonNode.get();
+                        JsonNode jsonNode = JacksonProcessor.this.jsonNode.get();
                         if (jsonNode == null) {
                             requested.add(subscriber);
                         } else {
@@ -103,6 +104,11 @@ public class JacksonPublisher implements Publisher<JsonNode> {
             };
             subscriber.onSubscribe(subscription);
         }
+    }
+
+    @Override
+    public void onSubscribe(Subscription s) {
+        s.request(Long.MAX_VALUE);
     }
 
     /**
@@ -144,6 +150,26 @@ public class JacksonPublisher implements Publisher<JsonNode> {
                 subscriber.onError(e);
             }
             requested.clear();
+        }
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        this.error.set(t);
+        for (Subscriber<? super JsonNode> subscriber : requested) {
+            subscriber.onError(t);
+        }
+        requested.clear();
+    }
+
+    @Override
+    public void onComplete() {
+        if(jsonNode.get() == null) {
+            JsonEOFException error = new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input");
+            this.error.set(error);
+            for (Subscriber<? super JsonNode> subscriber : requested) {
+                subscriber.onError(error);
+            }
         }
     }
 
