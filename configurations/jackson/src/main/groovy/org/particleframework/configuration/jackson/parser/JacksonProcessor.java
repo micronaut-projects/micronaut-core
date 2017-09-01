@@ -36,11 +36,15 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private String currentFieldName;
 
-    public JacksonProcessor(JsonFactory jsonFactory) throws IOException {
-        this.nonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+    public JacksonProcessor(JsonFactory jsonFactory)  {
+        try {
+            this.nonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
+        }
     }
 
-    public JacksonProcessor() throws IOException {
+    public JacksonProcessor() {
         this(new JsonFactory());
     }
 

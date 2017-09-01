@@ -57,21 +57,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        Class[] genericTypes = argument.getGenericTypes();
-        Map<String,Class> typeParameterMap = null;
-
-        if(genericTypes.length > 0) {
-            TypeVariable<Class<T>>[] typeParameters = argumentType.getTypeParameters();
-            if(typeParameters != null && typeParameters.length == genericTypes.length) {
-                typeParameterMap = new LinkedHashMap<>();
-                for (int i = 0; i < typeParameters.length; i++) {
-                    TypeVariable<Class<T>> typeParameter = typeParameters[i];
-                    Class genericType = genericTypes[i];
-                    typeParameterMap.put(typeParameter.getName(), genericType);
-                }
-            }
-        }
-
+        Map<String,Class> typeParameterMap = argument.getTypeParameters();
         ConversionContext conversionContext;
         if(formatAnn != null) {
             if(typeParameterMap != null) {

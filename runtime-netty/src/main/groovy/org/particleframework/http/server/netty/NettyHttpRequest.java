@@ -15,15 +15,13 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.http.HttpHeaders;
-import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpParameters;
-import org.particleframework.http.HttpRequest;
+import org.particleframework.http.*;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.inject.ExecutableMethod;
@@ -39,7 +37,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettyHttpRequest implements HttpRequest<ByteBuf> {
+public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     private final io.netty.handler.codec.http.HttpRequest nettyRequest;
     private final HttpMethod httpMethod;
@@ -51,7 +49,8 @@ public class NettyHttpRequest implements HttpRequest<ByteBuf> {
     private URI path;
     private List<ByteBuf> receivedContent  = new ArrayList<>();
     private long receivedLength = 0;
-    private ByteBuf body;
+    private Object body;
+    private MediaType mediaType;
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
@@ -79,6 +78,20 @@ public class NettyHttpRequest implements HttpRequest<ByteBuf> {
 
     public ByteBuf[] getReceivedContent() {
         return receivedContent.toArray(new ByteBuf[receivedContent.size()]);
+    }
+
+    @Override
+    public MediaType getContentType() {
+        MediaType contentType = this.mediaType;
+        if (contentType == null) {
+            synchronized (this) { // double check
+                contentType = this.mediaType;
+                if (contentType == null) {
+                    this.mediaType = contentType = HttpRequest.super.getContentType();
+                }
+            }
+        }
+        return contentType;
     }
 
     @Override
@@ -153,12 +166,12 @@ public class NettyHttpRequest implements HttpRequest<ByteBuf> {
     }
 
     @Override
-    public ByteBuf getBody() {
-        ByteBuf body = this.body;
+    public T getBody() {
+        Object body = this.body;
         if(body == null) {
             this.body = body = Unpooled.unmodifiableBuffer(getReceivedContent());
         }
-        return body;
+        return (T)body;
     }
 
     /**
@@ -166,8 +179,8 @@ public class NettyHttpRequest implements HttpRequest<ByteBuf> {
      */
     public void release() {
         receivedContent.forEach(ByteBuf::release);
-        if(this.body != null) {
-            this.body.release();
+        if(this.body != null && body instanceof ByteBuf) {
+            ((ByteBuf)this.body).release();
         }
     }
 
@@ -186,4 +199,7 @@ public class NettyHttpRequest implements HttpRequest<ByteBuf> {
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
+    void setBody(T body) {
+        this.body = body;
+    }
 }

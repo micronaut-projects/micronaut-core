@@ -1,6 +1,5 @@
 package org.particleframework.http.binding.binders.request;
 
-import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.annotation.Body;
 
 /**
@@ -19,13 +18,4 @@ public interface BodyArgumentBinder<T> extends AnnotatedRequestArgumentBinder<Bo
         return Body.class;
     }
 
-    /**
-     * @return The required media type
-     */
-    MediaType getMediaType();
-
-    /**
-     * @return The argument type
-     */
-    Class<T> getArgumentType();
 }

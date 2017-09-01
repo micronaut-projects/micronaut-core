@@ -9,6 +9,7 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.*;
@@ -658,6 +659,10 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
+        initializeContext(contextScopeBeans);
+    }
+
+    protected void initializeContext(List<BeanDefinitionClass> contextScopeBeans) {
         for (BeanDefinitionClass contextScopeBean : contextScopeBeans) {
             BeanDefinition beanDefinition = contextScopeBean.load();
             beanDefinitions.put(beanDefinition.getType(), beanDefinition);

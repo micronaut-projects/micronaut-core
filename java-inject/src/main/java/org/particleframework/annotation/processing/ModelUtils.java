@@ -22,7 +22,7 @@ class ModelUtils {
     }
 
     TypeElement classElementFor(Element element) {
-        while (CLASS != element.getKind() ) {
+        while (!element.getKind().isClass() && !element.getKind().isInterface()) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;

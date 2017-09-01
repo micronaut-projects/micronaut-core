@@ -1,5 +1,7 @@
 package org.particleframework.core.reflect;
 
+import org.particleframework.core.convert.TypeConverter;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -104,5 +106,18 @@ public class GenericTypeUtils {
             }
         }
         return genericClasses;
+    }
+
+    public static Class[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
+        Type[] genericInterfaces = type.getGenericInterfaces();
+        for (Type genericInterface : genericInterfaces) {
+            if(genericInterface instanceof ParameterizedType) {
+                ParameterizedType pt = (ParameterizedType) genericInterface;
+                if( pt.getRawType() == interfaceType ) {
+                    return resolveTypeArguments(genericInterface);
+                }
+            }
+        }
+        return null;
     }
 }

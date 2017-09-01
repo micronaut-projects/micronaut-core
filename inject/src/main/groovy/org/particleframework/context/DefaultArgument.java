@@ -5,7 +5,9 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +44,23 @@ class DefaultArgument<T> implements Argument<T> {
     @Override
     public Class[] getGenericTypes() {
         return this.genericTypes;
+    }
+
+    @Override
+    public Map<String, Class> getTypeParameters() {
+        Map<String,Class> typeParameterMap  = null;
+        if(genericTypes.length > 0) {
+            TypeVariable<Class<T>>[] typeParameters = type.getTypeParameters();
+            if(typeParameters != null && typeParameters.length == genericTypes.length) {
+                typeParameterMap = new LinkedHashMap<>();
+                for (int i = 0; i < typeParameters.length; i++) {
+                    TypeVariable<Class<T>> typeParameter = typeParameters[i];
+                    Class genericType = genericTypes[i];
+                    typeParameterMap.put(typeParameter.getName(), genericType);
+                }
+            }
+        }
+        return typeParameterMap;
     }
 
     /**
