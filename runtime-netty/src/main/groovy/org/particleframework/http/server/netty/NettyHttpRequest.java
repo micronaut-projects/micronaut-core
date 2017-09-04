@@ -18,10 +18,13 @@ package org.particleframework.http.server.netty;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.*;
+import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.*;
+import org.particleframework.http.HttpHeaders;
+import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.inject.ExecutableMethod;
@@ -38,6 +41,8 @@ import java.util.*;
  * @since 1.0
  */
 public class NettyHttpRequest<T> implements HttpRequest<T> {
+
+    public static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
     private final io.netty.handler.codec.http.HttpRequest nettyRequest;
     private final HttpMethod httpMethod;
@@ -61,6 +66,13 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         String fullUri = nettyRequest.uri();
         this.uri = URI.create(fullUri);
         this.headers = new NettyHttpRequestHeaders(nettyRequest.headers(), conversionService);
+    }
+
+    /**
+     * @return Obtain a reference to the native Netty HTTP request
+     */
+    public io.netty.handler.codec.http.HttpRequest getNativeRequest() {
+        return nettyRequest;
     }
 
     void addContent(HttpContent httpContent) {

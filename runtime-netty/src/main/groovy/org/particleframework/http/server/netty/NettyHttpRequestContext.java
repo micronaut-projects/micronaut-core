@@ -1,14 +1,14 @@
 package org.particleframework.http.server.netty;
 
+import io.netty.channel.ChannelHandlerContext;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.web.router.RouteMatch;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.Charset;
+import java.util.*;
 
 /**
  * A context object used to store information about the current state of the request
@@ -19,15 +19,47 @@ import java.util.Map;
 @Internal
 class NettyHttpRequestContext {
 
+    private final ChannelHandlerContext context;
     private final NettyHttpRequest request;
     private final NettyHttpResponseTransmitter responseTransmitter;
     private RouteMatch matchedRoute;
     private Map<String, Object> routeArguments;
     private List<UnboundBodyArgument> unboundBodyArguments = new ArrayList<>();
 
-    public NettyHttpRequestContext(NettyHttpRequest request) {
+
+    public NettyHttpRequestContext(ChannelHandlerContext context, NettyHttpRequest request, HttpServerConfiguration serverConfiguration) {
+        this.context = context;
         this.request = request;
-        this.responseTransmitter = new NettyHttpResponseTransmitter();
+        this.responseTransmitter = new NettyHttpResponseTransmitter(serverConfiguration);
+    }
+
+    public void processRequestBody() {
+        context.channel().eventLoop().execute(() -> {
+
+            List<UnboundBodyArgument> unboundBodyArguments = getUnboundBodyArguments();
+            Map<String, Object> resolvedArguments = getRouteArguments();
+
+            for (UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
+                Argument argument = unboundBodyArgument.argument;
+                BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
+                Optional bound = argumentBinder.bind(argument, getRequest());
+                if (bound.isPresent()) {
+                    resolvedArguments.put(argument.getName(), bound.get());
+                } else {
+                    getResponseTransmitter().sendBadRequest(context);
+                    return;
+                }
+            }
+
+            RouteMatch route = getMatchedRoute();
+            Object result = route.execute(resolvedArguments);
+            getResponseTransmitter()
+                      .sendText(context.channel(), result);
+        });
+    }
+
+    public ChannelHandlerContext getContext() {
+        return context;
     }
 
     public RouteMatch getMatchedRoute() {

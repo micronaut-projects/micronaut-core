@@ -15,7 +15,6 @@
  */
 package org.particleframework.http.server.netty;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
@@ -26,7 +25,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
 import org.particleframework.bind.ArgumentBinder;
-import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
@@ -40,7 +38,6 @@ import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +45,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author Graeme Rocher
@@ -111,11 +107,15 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                 Channel channel = ctx.channel();
 
                                 NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, applicationContext.getEnvironment());
-                                NettyHttpRequestContext requestContext = new NettyHttpRequestContext(nettyHttpRequest);
+                                NettyHttpRequestContext requestContext = new NettyHttpRequestContext(ctx, nettyHttpRequest, serverConfiguration);
 
                                 // set the request on the channel
                                 channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
+                                channel.attr(NettyHttpRequest.KEY).set(nettyHttpRequest);
 
+                                if(LOG.isDebugEnabled()) {
+                                    LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());
+                                }
                                 Optional<RouteMatch> routeMatch = routerBean.flatMap((router) ->
                                         router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
                                                 .filter((match) -> match.test(nettyHttpRequest))
@@ -124,6 +124,9 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                 routeMatch.ifPresent((route -> {
 
+                                    if(LOG.isDebugEnabled()) {
+                                        LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName() );
+                                    }
                                     // TODO: check the media type vs the route and return 415 if invalid
 
                                     // TODO: here we need to analyze the binding requirements and if
@@ -132,7 +135,9 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                     requestContext.setMatchedRoute(route);
 
+                                    // TODO: Will need to return type data to make ResponseTransmitter flexible to handle different return types and encoders
                                     ReturnType returnType = route.getReturnType();
+
                                     boolean requiresBody = false;
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
                                     Map<String, Object> argumentValues;
@@ -171,11 +176,11 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                             if (!requiresBody) {
                                                 // if we arrived here the request is not processable
                                                 if(LOG.isErrorEnabled()) {
-                                                    LOG.error("Unbindable arguments for route: " + route);
+                                                    LOG.error("Non-bindable arguments for route: " + route);
                                                 }
                                                 requestContext
                                                         .getResponseTransmitter()
-                                                        .sendBadRequest(ctx);
+                                                        .sendNotFound(ctx.channel());
                                                 return;
                                             }
                                         }
@@ -185,7 +190,6 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                     requestContext.setRouteArguments(argumentValues);
 
                                     if (!requiresBody) {
-
                                         // TODO: here we need a way to make the encoding of the result flexible
                                         // also support for GSON views etc.
 
@@ -200,139 +204,45 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                     } else if (msg instanceof StreamedHttpRequest) {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
+
                                         if(contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
-                                            JacksonProcessor jacksonProcessor = new JacksonProcessor();
-                                            AtomicReference<JsonNode> nodeRef = new AtomicReference<>();
-                                            AtomicReference<Throwable> error = new AtomicReference<>();
-                                            streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
-                                                @Override
-                                                public void onSubscribe(Subscription s) {
-                                                    s.request(Long.MAX_VALUE);
-
-                                                    jacksonProcessor.subscribe(new Subscriber<JsonNode>() {
-                                                        @Override
-                                                        public void onSubscribe(Subscription s) {
-                                                            s.request(Long.MAX_VALUE);
-                                                        }
-
-                                                        @Override
-                                                        public void onNext(JsonNode jsonNode) {
-                                                            nodeRef.set(jsonNode);
-                                                        }
-
-                                                        @Override
-                                                        public void onError(Throwable t) {
-                                                            error.set(t);
-                                                            if(LOG.isErrorEnabled()) {
-                                                                LOG.error("Error processing JSON body: " + t.getMessage(), t);
-                                                            }
-                                                            requestContext.getResponseTransmitter().sendBadRequest(ctx);
-                                                        }
-
-                                                        @Override
-                                                        public void onComplete() {
-                                                            JsonNode jsonNode = nodeRef.get();
-                                                            if(jsonNode != null) {
-                                                                nettyHttpRequest.setBody(jsonNode);
-                                                                processRequestBody(channel, requestContext);
-                                                            }
-                                                            else {
-                                                                // TODO: should be  400: Bad Request
-                                                                requestContext.getResponseTransmitter().sendNotFound(channel);
-                                                            }
-                                                        }
-                                                    });
-                                                }
-
-                                                @Override
-                                                public void onNext(HttpContent httpContent) {
-                                                    try {
-                                                        ByteBuf content = httpContent.content();
-                                                        int len = content.readableBytes();
-                                                        if(len > 0) {
-                                                            byte[] bytes;
-                                                            if(content.hasArray()) {
-                                                                bytes = content.array();
-                                                            }
-                                                            else {
-                                                                bytes = new byte[len];
-                                                                content.readBytes(bytes);
-                                                            }
-
-                                                            jacksonProcessor.onNext(bytes);
-                                                        }
-                                                    } finally {
-                                                        httpContent.release();
-                                                    }
-                                                }
-
-                                                @Override
-                                                public void onError(Throwable t) {
-                                                    if(LOG.isErrorEnabled()) {
-                                                        LOG.error("Error processing JSON body: " + t.getMessage(), t);
-                                                    }
-                                                    requestContext.getResponseTransmitter().sendBadRequest(ctx);
-                                                }
-
-                                                @Override
-                                                public void onComplete() {
-                                                    if(error.get() == null) {
-                                                        jacksonProcessor.onComplete();
-                                                    }
-                                                }
-                                            });
+                                            JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(requestContext);
+                                            streamedHttpRequest.subscribe(contentSubscriber);
                                         }
                                         else {
-
-                                            Subscriber<HttpContent> contentSubscriber = new Subscriber<HttpContent>() {
-                                                @Override
-                                                public void onSubscribe(Subscription s) {
-                                                    s.request(Long.MAX_VALUE - 1);
-                                                }
-
-                                                @Override
-                                                public void onNext(HttpContent httpContent) {
-                                                    requestContext.getRequest().addContent(httpContent);
-                                                }
-
-                                                @Override
-                                                public void onError(Throwable t) {
-                                                    if(LOG.isErrorEnabled()) {
-                                                        LOG.error("Error processing Request body: " + t.getMessage(), t);
-                                                    }
-                                                    requestContext.getResponseTransmitter().sendBadRequest(ctx);
-                                                }
-
-                                                @Override
-                                                public void onComplete() {
-                                                    processRequestBody(channel, requestContext);
-                                                }
-                                            };
-
+                                            Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(requestContext);
                                             streamedHttpRequest.subscribe(contentSubscriber);
                                         }
 
                                     } else {
-                                        if(LOG.isErrorEnabled()) {
-                                            LOG.error("Request body expected, but was empty.");
+                                        if(LOG.isDebugEnabled()) {
+                                            LOG.debug("Request body expected, but was empty.");
                                         }
-                                        requestContext.getResponseTransmitter().sendBadRequest(ctx);
+                                        requestContext.getResponseTransmitter()
+                                                      .sendBadRequest(ctx);
                                     }
-
-
                                 }));
 
                                 if (!routeMatch.isPresent()) {
+                                    if(LOG.isDebugEnabled()) {
+                                        NettyHttpRequest request = requestContext.getRequest();
+                                        LOG.debug("No matching route found for URI {} and method {}", request.getUri(), request.getMethod());
+                                    }
                                     // TODO: check if any other routes exist for URI and return 405 if they do
 
                                     // TODO: Here we need to add routing for 404 handlers
-                                    requestContext.getResponseTransmitter().sendNotFound(channel);
+                                    requestContext
+                                            .getResponseTransmitter()
+                                            .sendNotFound(channel);
                                 }
                             }
 
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
 
+                                if(LOG.isErrorEnabled()) {
+                                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                                }
                                 // TODO: Here we need to add routing to error handlers
                                 DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
                                 ctx.channel().writeAndFlush(httpResponse)
@@ -356,41 +266,15 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
         return this;
     }
 
-    protected void processRequestBody(Channel channel, NettyHttpRequestContext requestContext) {
-        channel.eventLoop().execute(() -> {
-
-            List<NettyHttpRequestContext.UnboundBodyArgument> unboundBodyArguments = requestContext.getUnboundBodyArguments();
-            Map<String, Object> resolvedArguments = requestContext.getRouteArguments();
-
-            for (NettyHttpRequestContext.UnboundBodyArgument unboundBodyArgument : unboundBodyArguments) {
-                Argument argument = unboundBodyArgument.argument;
-                BodyArgumentBinder argumentBinder = unboundBodyArgument.argumentBinder;
-                Optional bound = argumentBinder.bind(argument, requestContext.getRequest());
-                if (bound.isPresent()) {
-                    resolvedArguments.put(argument.getName(), bound.get());
-                } else {
-                    // TODO: replace with 422
-                    requestContext.getResponseTransmitter().sendNotFound(channel);
-                    return;
-                }
-            }
-
-            RouteMatch route = requestContext.getMatchedRoute();
-            Object result = route.execute(resolvedArguments);
-            Charset charset = serverConfiguration.getDefaultCharset();
-            requestContext.getResponseTransmitter()
-                    .sendText(channel, result, charset);
-        });
-    }
-
     @Override
     public EmbeddedServer stop() {
         if (this.serverChannel != null) {
             try {
                 serverChannel.close().sync();
             } catch (Throwable e) {
-                // TODO: exception handling
-                e.printStackTrace();
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error stopping Particle server: " + e.getMessage() ,e );
+                }
             }
         }
         return this;
