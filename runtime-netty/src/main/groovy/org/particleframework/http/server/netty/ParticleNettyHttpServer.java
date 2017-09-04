@@ -41,6 +41,8 @@ import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -54,6 +56,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Singleton
 public class ParticleNettyHttpServer implements EmbeddedServer {
+    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
     static final AttributeKey<NettyHttpRequestContext> REQUEST_CONTEXT_KEY = AttributeKey.newInstance("REQUEST_CONTEXT_KEY");
 
     private volatile Channel serverChannel;
@@ -89,6 +92,7 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
         if (applicationContext == null) {
             throw new IllegalStateException("Netty HTTP Server implementation requires a reference to the ApplicationContext");
         }
+
         ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer() {
@@ -166,10 +170,12 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                             if (!requiresBody) {
                                                 // if we arrived here the request is not processable
-                                                // TODO: Change to 400: Bad Request
+                                                if(LOG.isErrorEnabled()) {
+                                                    LOG.error("Unbindable arguments for route: " + route);
+                                                }
                                                 requestContext
                                                         .getResponseTransmitter()
-                                                        .sendNotFound(channel);
+                                                        .sendBadRequest(ctx);
                                                 return;
                                             }
                                         }
@@ -194,13 +200,15 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                     } else if (msg instanceof StreamedHttpRequest) {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
-                                        if("json".equals(contentType.getExtension())) {
+                                        if(contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
                                             JacksonProcessor jacksonProcessor = new JacksonProcessor();
+                                            AtomicReference<JsonNode> nodeRef = new AtomicReference<>();
+                                            AtomicReference<Throwable> error = new AtomicReference<>();
                                             streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
                                                 @Override
                                                 public void onSubscribe(Subscription s) {
                                                     s.request(Long.MAX_VALUE);
-                                                    AtomicReference<JsonNode> nodeRef = new AtomicReference<>();
+
                                                     jacksonProcessor.subscribe(new Subscriber<JsonNode>() {
                                                         @Override
                                                         public void onSubscribe(Subscription s) {
@@ -214,8 +222,11 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                                         @Override
                                                         public void onError(Throwable t) {
-                                                            // TODO: error handling / error handlers
-                                                            requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                            error.set(t);
+                                                            if(LOG.isErrorEnabled()) {
+                                                                LOG.error("Error processing JSON body: " + t.getMessage(), t);
+                                                            }
+                                                            requestContext.getResponseTransmitter().sendBadRequest(ctx);
                                                         }
 
                                                         @Override
@@ -235,31 +246,39 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                                 @Override
                                                 public void onNext(HttpContent httpContent) {
-                                                    ByteBuf content = httpContent.content();
-                                                    int len = content.readableBytes();
-                                                    if(len > 0) {
-                                                        byte[] bytes;
-                                                        if(content.hasArray()) {
-                                                            bytes = content.array();
-                                                        }
-                                                        else {
-                                                            bytes = new byte[len];
-                                                            content.readBytes(bytes);
-                                                        }
+                                                    try {
+                                                        ByteBuf content = httpContent.content();
+                                                        int len = content.readableBytes();
+                                                        if(len > 0) {
+                                                            byte[] bytes;
+                                                            if(content.hasArray()) {
+                                                                bytes = content.array();
+                                                            }
+                                                            else {
+                                                                bytes = new byte[len];
+                                                                content.readBytes(bytes);
+                                                            }
 
-                                                        jacksonProcessor.onNext(bytes);
+                                                            jacksonProcessor.onNext(bytes);
+                                                        }
+                                                    } finally {
+                                                        httpContent.release();
                                                     }
                                                 }
 
                                                 @Override
                                                 public void onError(Throwable t) {
-                                                    // TODO: error handling / error handlers
-                                                    requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                    if(LOG.isErrorEnabled()) {
+                                                        LOG.error("Error processing JSON body: " + t.getMessage(), t);
+                                                    }
+                                                    requestContext.getResponseTransmitter().sendBadRequest(ctx);
                                                 }
 
                                                 @Override
                                                 public void onComplete() {
-                                                    jacksonProcessor.onComplete();
+                                                    if(error.get() == null) {
+                                                        jacksonProcessor.onComplete();
+                                                    }
                                                 }
                                             });
                                         }
@@ -278,8 +297,10 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                                 @Override
                                                 public void onError(Throwable t) {
-                                                    // TODO: error handling / error handlers
-                                                    requestContext.getResponseTransmitter().sendServerError(ctx);
+                                                    if(LOG.isErrorEnabled()) {
+                                                        LOG.error("Error processing Request body: " + t.getMessage(), t);
+                                                    }
+                                                    requestContext.getResponseTransmitter().sendBadRequest(ctx);
                                                 }
 
                                                 @Override
@@ -292,8 +313,10 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                         }
 
                                     } else {
-                                        // TODO: should be  400: Bad Request
-                                        requestContext.getResponseTransmitter().sendNotFound(channel);
+                                        if(LOG.isErrorEnabled()) {
+                                            LOG.error("Request body expected, but was empty.");
+                                        }
+                                        requestContext.getResponseTransmitter().sendBadRequest(ctx);
                                     }
 
 

@@ -60,8 +60,15 @@ public class NettyHttpResponseTransmitter {
     }
 
     public void sendServerError(ChannelHandlerContext ctx) {
-        DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+        DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
         ctx.channel().writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    public void sendBadRequest(ChannelHandlerContext ctx) {
+        DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
+        ctx.channel().writeAndFlush(httpResponse)
+                .addListener(ChannelFutureListener.CLOSE);
+
     }
 }

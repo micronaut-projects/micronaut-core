@@ -25,7 +25,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.annotation.Body;
 import org.particleframework.http.binding.binders.request.*;
-import org.particleframework.http.binding.binders.request.BodyAnnotationBinder;
+import org.particleframework.http.binding.binders.request.DefaultBodyAnnotationBinder;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.inject.Argument;
@@ -44,6 +44,7 @@ import java.util.Optional;
 public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
+    private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Class, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
 
@@ -54,7 +55,16 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         for (RequestArgumentBinder binder : binders) {
             if(binder instanceof AnnotatedRequestArgumentBinder) {
                 AnnotatedRequestArgumentBinder<?,?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
-                byAnnotation.put(annotatedRequestArgumentBinder.getAnnotationType(), annotatedRequestArgumentBinder);
+                Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
+                if(binder instanceof TypedRequestArgumentBinder) {
+                    TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+                    Class argumentType = typedRequestArgumentBinder.argumentType();
+                    byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
+                }
+                else {
+                    byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
+                }
+
             }
             else if(binder instanceof TypedRequestArgumentBinder) {
                 TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
@@ -83,7 +93,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         Annotation annotation = argument.findAnnotation(Bindable.class);
         if(annotation != null) {
 
-            RequestArgumentBinder<T> binder = byAnnotation.get(annotation.annotationType());
+            Class<? extends Annotation> annotationType = annotation.annotationType();
+            RequestArgumentBinder<T> binder = byTypeAndAnnotation.get(new TypeAndAnnotation(argument.getType(), annotationType));
+            if(binder ==  null) {
+                binder = byAnnotation.get(annotationType);
+            }
             if(binder != null) {
                 return Optional.of(binder);
             }
@@ -105,7 +119,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        BodyAnnotationBinder bodyBinder = new BodyAnnotationBinder(conversionService);
+        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
         byAnnotation.put(Body.class, bodyBinder);
 
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);
@@ -116,5 +130,33 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
         byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
+    }
+
+    private static final class TypeAndAnnotation {
+        private final Class<?> type;
+        private final Class<? extends Annotation> annotation;
+
+        public TypeAndAnnotation(Class<?> type, Class<? extends Annotation> annotation) {
+            this.type = type;
+            this.annotation = annotation;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            TypeAndAnnotation that = (TypeAndAnnotation) o;
+
+            if (!type.equals(that.type)) return false;
+            return annotation.equals(that.annotation);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = type.hashCode();
+            result = 31 * result + annotation.hashCode();
+            return result;
+        }
     }
 }

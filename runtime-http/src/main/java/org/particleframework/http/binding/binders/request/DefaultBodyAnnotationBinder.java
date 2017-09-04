@@ -19,11 +19,11 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
+public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
     private final ConversionService conversionService;
 
-    public BodyAnnotationBinder(ConversionService conversionService) {
+    public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 

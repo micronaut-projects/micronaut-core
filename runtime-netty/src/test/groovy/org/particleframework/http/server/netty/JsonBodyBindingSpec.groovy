@@ -3,6 +3,8 @@ package org.particleframework.http.server.netty
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.Response
+import org.particleframework.http.HttpStatus
 import org.particleframework.http.binding.annotation.Body
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Post
@@ -28,6 +30,42 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         client.newCall(
                 request.build()
         ).execute().body().string() == "Body: $json"
+
+    }
+
+    void "test simple string-based body parsing with invalid JSON"() {
+
+        when:
+        def json = '{"title":The Stand}'
+        def request = new Request.Builder()
+                .url("$server/json/string")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+
+    }
+
+    void "test simple string-based body parsing with incomplete JSON"() {
+
+        when:
+        def json = '{"title":"The Stand"'
+        def request = new Request.Builder()
+                .url("$server/json/string")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
 
     }
 
