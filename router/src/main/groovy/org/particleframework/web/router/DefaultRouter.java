@@ -17,10 +17,7 @@ package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -52,28 +49,60 @@ public class DefaultRouter implements Router {
             List<Route> constructedRoutes = builder.getConstructedRoutes();
             for (Route route : constructedRoutes) {
                 switch (route.getHttpMethod()) {
-                    case GET: getRoutes.add(route); break;
-                    case PUT: putRoutes.add(route); break;
-                    case POST: postRoutes.add(route); break;
-                    case PATCH: patchRoutes.add(route); break;
-                    case DELETE: deleteRoutes.add(route); break;
-                    case OPTIONS: optionsRoutes.add(route); break;
-                    case HEAD: headRoutes.add(route); break;
-                    case CONNECT: connectRoutes.add(route); break;
+                    case GET:
+                        getRoutes.add(route);
+                        break;
+                    case PUT:
+                        putRoutes.add(route);
+                        break;
+                    case POST:
+                        postRoutes.add(route);
+                        break;
+                    case PATCH:
+                        patchRoutes.add(route);
+                        break;
+                    case DELETE:
+                        deleteRoutes.add(route);
+                        break;
+                    case OPTIONS:
+                        optionsRoutes.add(route);
+                        break;
+                    case HEAD:
+                        headRoutes.add(route);
+                        break;
+                    case CONNECT:
+                        connectRoutes.add(route);
+                        break;
                 }
             }
         }
 
-        for(HttpMethod method : HttpMethod.values()) {
+        for (HttpMethod method : HttpMethod.values()) {
             switch (method) {
-                case GET: routesByMethod[method.ordinal()] = getRoutes.toArray(new Route[getRoutes.size()]); break;
-                case PUT: routesByMethod[method.ordinal()] = putRoutes.toArray(new Route[putRoutes.size()]); break;
-                case POST: routesByMethod[method.ordinal()] = postRoutes.toArray(new Route[postRoutes.size()]); break;
-                case PATCH: routesByMethod[method.ordinal()] = patchRoutes.toArray(new Route[patchRoutes.size()]); break;
-                case DELETE: routesByMethod[method.ordinal()] = deleteRoutes.toArray(new Route[deleteRoutes.size()]); break;
-                case OPTIONS: routesByMethod[method.ordinal()] = optionsRoutes.toArray(new Route[optionsRoutes.size()]); break;
-                case HEAD: routesByMethod[method.ordinal()] = headRoutes.toArray(new Route[headRoutes.size()]); break;
-                case CONNECT: routesByMethod[method.ordinal()] = connectRoutes.toArray(new Route[connectRoutes.size()]); break;
+                case GET:
+                    routesByMethod[method.ordinal()] = getRoutes.toArray(new Route[getRoutes.size()]);
+                    break;
+                case PUT:
+                    routesByMethod[method.ordinal()] = putRoutes.toArray(new Route[putRoutes.size()]);
+                    break;
+                case POST:
+                    routesByMethod[method.ordinal()] = postRoutes.toArray(new Route[postRoutes.size()]);
+                    break;
+                case PATCH:
+                    routesByMethod[method.ordinal()] = patchRoutes.toArray(new Route[patchRoutes.size()]);
+                    break;
+                case DELETE:
+                    routesByMethod[method.ordinal()] = deleteRoutes.toArray(new Route[deleteRoutes.size()]);
+                    break;
+                case OPTIONS:
+                    routesByMethod[method.ordinal()] = optionsRoutes.toArray(new Route[optionsRoutes.size()]);
+                    break;
+                case HEAD:
+                    routesByMethod[method.ordinal()] = headRoutes.toArray(new Route[headRoutes.size()]);
+                    break;
+                case CONNECT:
+                    routesByMethod[method.ordinal()] = connectRoutes.toArray(new Route[connectRoutes.size()]);
+                    break;
             }
         }
     }
@@ -82,9 +111,9 @@ public class DefaultRouter implements Router {
     public Stream<RouteMatch> find(HttpMethod httpMethod, CharSequence uri) {
         Route[] routes = routesByMethod[httpMethod.ordinal()];
         return Arrays.stream(routes)
-                    .map((route -> route.match(uri.toString())))
-                    .filter((Optional::isPresent))
-                    .map((Optional::get));
+                .map((route -> route.match(uri.toString())))
+                .filter((Optional::isPresent))
+                .map((Optional::get));
     }
 
     @Override
@@ -127,12 +156,22 @@ public class DefaultRouter implements Router {
         return findFirst(HttpMethod.HEAD, uri);
     }
 
+    @Override
+    public Stream<RouteMatch> findAny(CharSequence uri) {
+        return Arrays.stream(routesByMethod)
+                .filter(Objects::nonNull)
+                .flatMap(Arrays::stream)
+                .map(route -> route.match(uri.toString()))
+                .filter(Optional::isPresent)
+                .map(Optional::get);
+    }
+
     protected Optional<RouteMatch> findFirst(HttpMethod method, CharSequence uri) {
         Route[] routes = routesByMethod[method.ordinal()];
         return Arrays.stream(routes)
-              .map((route -> route.match(uri.toString())))
-              .filter((Optional::isPresent))
-              .map((Optional::get))
-              .findFirst();
+                .map((route -> route.match(uri.toString())))
+                .filter((Optional::isPresent))
+                .map((Optional::get))
+                .findFirst();
     }
 }

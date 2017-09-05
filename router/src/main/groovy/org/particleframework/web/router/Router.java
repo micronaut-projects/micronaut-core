@@ -110,4 +110,12 @@ public interface Router {
      * @return An {@link Optional} of {@link RouteMatch}
      */
     Optional<RouteMatch> HEAD(CharSequence uri);
+
+    /**
+     * Find any {@link RouteMatch} regardless of HTTP method
+     *
+     * @param uri The URI
+     * @return A stream of route matches
+     */
+    Stream<RouteMatch> findAny(CharSequence uri);
 }

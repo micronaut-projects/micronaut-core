@@ -15,6 +15,7 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
@@ -72,4 +73,10 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
     default R call() throws Exception {
         return execute();
     }
+
+
+    /**
+     * @return The matched HTTP method
+     */
+    HttpMethod getHttpMethod();
 }

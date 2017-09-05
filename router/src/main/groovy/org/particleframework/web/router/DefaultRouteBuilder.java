@@ -267,17 +267,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<RouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultRouteMatch(info, targetMethod));
+            return matchInfo.map((info) -> new DefaultRouteMatch(info, targetMethod, httpMethod));
         }
 
         class DefaultRouteMatch implements RouteMatch<Object> {
 
             private final UriMatchInfo matchInfo;
             private final MethodExecutionHandle executableMethod;
+            private final HttpMethod httpMethod;
 
-            public DefaultRouteMatch(UriMatchInfo matchInfo, MethodExecutionHandle executableMethod) {
+            public DefaultRouteMatch(UriMatchInfo matchInfo, MethodExecutionHandle executableMethod, HttpMethod httpMethod) {
                 this.matchInfo = matchInfo;
                 this.executableMethod = executableMethod;
+                this.httpMethod = httpMethod;
             }
 
             @Override
@@ -376,6 +378,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             @Override
             public ReturnType<Object> getReturnType() {
                 return targetMethod.getReturnType();
+            }
+
+            @Override
+            public HttpMethod getHttpMethod() {
+                return httpMethod;
             }
         }
     }

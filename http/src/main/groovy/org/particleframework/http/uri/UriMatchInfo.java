@@ -15,6 +15,8 @@
  */
 package org.particleframework.http.uri;
 
+import org.particleframework.http.HttpMethod;
+
 import java.net.URI;
 import java.util.Map;
 
@@ -35,4 +37,5 @@ public interface UriMatchInfo {
      * @return The variable values following a successful match
      */
     Map<String, Object> getVariables();
+
 }

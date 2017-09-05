@@ -3,17 +3,18 @@ package org.particleframework.http.server.netty;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 /**
  * Responsible for relaying the response to the client
@@ -36,7 +37,7 @@ public class NettyHttpResponseTransmitter {
      * @param channel The channel
      */
     public void sendNotFound(Channel channel) {
-        channel.attr(ParticleNettyHttpServer.REQUEST_CONTEXT_KEY).set(null);
+        channel.attr(NettyHttpRequest.KEY).set(null);
         DefaultHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
         channel.writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
@@ -108,5 +109,15 @@ public class NettyHttpResponseTransmitter {
                 .writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
 
+    }
+
+    public void sendMethodNotAllowed(ChannelHandlerContext ctx, List<HttpMethod> existingRoutes) {
+        DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED);
+
+        String allowed = existingRoutes.stream().collect(Collectors.joining(", "));
+        httpResponse.headers().add(HttpHeaderNames.ALLOW, allowed);
+        ctx.channel()
+                .writeAndFlush(httpResponse)
+                .addListener(ChannelFutureListener.CLOSE);
     }
 }

@@ -15,8 +15,14 @@
  */
 package org.particleframework.http.server.netty
 
+import okhttp3.MediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.HttpHeaders
+import org.particleframework.http.HttpStatus
 import org.particleframework.http.binding.annotation.Parameter
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.stereotype.Controller
@@ -88,6 +94,26 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+    }
+
+    void "test allowed methods handling"() {
+        when:"A request is sent to the server for the wrong HTTP method"
+        int newPort = SocketUtils.findAvailableTcpPort()
+        ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
+
+        def request = new Request.Builder()
+                .url("http://localhost:$newPort/person/job/test")
+                .header("Content-Length", "4")
+                .post(RequestBody.create(MediaType.parse("text/plain"), "test"))
+        OkHttpClient client = new OkHttpClient()
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+
+        then:
+        response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+        response.header(HttpHeaders.ALLOW) == 'PUT'
     }
 
 

@@ -23,16 +23,18 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AttributeKey;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
-import org.particleframework.http.MediaType;
+import org.particleframework.http.*;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -46,6 +48,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Graeme Rocher
@@ -54,8 +58,6 @@ import java.util.*;
 @Singleton
 public class ParticleNettyHttpServer implements EmbeddedServer {
     private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
-    static final AttributeKey<NettyHttpRequestContext> REQUEST_CONTEXT_KEY = AttributeKey.newInstance("REQUEST_CONTEXT_KEY");
-
     private volatile Channel serverChannel;
     private final HttpServerConfiguration serverConfiguration;
     private final ApplicationContext applicationContext;
@@ -82,10 +84,11 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
     @Override
     public EmbeddedServer start() {
         // TODO: allow configuration of threads and number of groups
-        NioEventLoopGroup workerGroup = new NioEventLoopGroup();
-        NioEventLoopGroup parentGroup = new NioEventLoopGroup();
-        ServerBootstrap serverBootstrap = new ServerBootstrap();
+        NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
+        NioEventLoopGroup parentGroup = createParentEventLoopGroup();
+        ServerBootstrap serverBootstrap = createServerBootstrap();
         // TODO: allow configuration of channel options
+
         if (applicationContext == null) {
             throw new IllegalStateException("Netty HTTP Server implementation requires a reference to the ApplicationContext");
         }
@@ -111,10 +114,10 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                 // set the request on the channel
                                 NettyHttpRequestContext requestContext = nettyHttpRequest.getRequestContext();
-                                channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
-                                channel.attr(NettyHttpRequest.KEY).set(nettyHttpRequest);
+                                channel.attr(NettyHttpRequest.KEY)
+                                        .set(nettyHttpRequest);
 
-                                if(LOG.isDebugEnabled()) {
+                                if (LOG.isDebugEnabled()) {
                                     LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());
                                 }
                                 Optional<RouteMatch> routeMatch = routerBean.flatMap((router) ->
@@ -125,8 +128,8 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                 routeMatch.ifPresent((route -> {
 
-                                    if(LOG.isDebugEnabled()) {
-                                        LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName() );
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                     }
                                     // TODO: check the media type vs the route and return 415 if invalid
 
@@ -156,17 +159,16 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                                 if (registeredBinder.isPresent()) {
                                                     ArgumentBinder argumentBinder = registeredBinder.get();
                                                     if (argumentBinder instanceof BodyArgumentBinder) {
-                                                        if(argumentBinder instanceof NonBlockingBodyArgumentBinder) {
+                                                        if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
                                                             Optional bindingResult = argumentBinder
                                                                     .bind(argument, nettyHttpRequest);
 
-                                                            if(binderRegistry.isPresent()) {
+                                                            if (binderRegistry.isPresent()) {
                                                                 argumentValues.put(argument.getName(), bindingResult.get());
                                                                 continue;
                                                             }
 
-                                                        }
-                                                        else {
+                                                        } else {
 
                                                             requiresBody = true;
                                                             BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
@@ -189,7 +191,7 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
                                             if (!requiresBody) {
                                                 // if we arrived here the request is not processable
-                                                if(LOG.isErrorEnabled()) {
+                                                if (LOG.isErrorEnabled()) {
                                                     LOG.error("Non-bindable arguments for route: " + route);
                                                 }
                                                 requestContext
@@ -206,8 +208,6 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                     if (!requiresBody) {
                                         // TODO: here we need a way to make the encoding of the result flexible
                                         // also support for GSON views etc.
-
-                                        // TODO: Also need to handle exceptions that emerge from invoke()
                                         channel.eventLoop().execute(() -> {
                                                     Object result = route.execute(argumentValues);
                                                     Charset charset = serverConfiguration.getDefaultCharset();
@@ -219,47 +219,58 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
 
-                                        if(contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
+                                        if (contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
                                             JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(requestContext);
                                             streamedHttpRequest.subscribe(contentSubscriber);
-                                        }
-                                        else {
+                                        } else {
                                             Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(requestContext);
                                             streamedHttpRequest.subscribe(contentSubscriber);
                                         }
 
                                     } else {
-                                        if(LOG.isDebugEnabled()) {
+                                        if (LOG.isDebugEnabled()) {
                                             LOG.debug("Request body expected, but was empty.");
                                         }
                                         requestContext.getResponseTransmitter()
-                                                      .sendBadRequest(ctx);
+                                                .sendBadRequest(ctx);
                                     }
                                 }));
 
                                 if (!routeMatch.isPresent()) {
-                                    if(LOG.isDebugEnabled()) {
-                                        NettyHttpRequest request = requestContext.getRequest();
-                                        LOG.debug("No matching route found for URI {} and method {}", request.getUri(), request.getMethod());
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
-                                    // TODO: check if any other routes exist for URI and return 405 if they do
-
-                                    // TODO: Here we need to add routing for 404 handlers
-                                    requestContext
-                                            .getResponseTransmitter()
-                                            .sendNotFound(channel);
+                                    List<org.particleframework.http.HttpMethod> existingRoutes = routerBean
+                                            .map(router ->
+                                                    router.findAny(nettyHttpRequest.getUri().toString())
+                                            ).orElse(Stream.empty())
+                                            .map(RouteMatch::getHttpMethod)
+                                            .collect(Collectors.toList());
+                                    if (!existingRoutes.isEmpty()) {
+                                        requestContext
+                                                .getResponseTransmitter()
+                                                .sendMethodNotAllowed(ctx, existingRoutes);
+                                    } else {
+                                        // TODO: Here we need to add routing for 404 handlers
+                                        requestContext
+                                                .getResponseTransmitter()
+                                                .sendNotFound(channel);
+                                    }
                                 }
                             }
 
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
 
-                                if(LOG.isErrorEnabled()) {
+                                if (LOG.isErrorEnabled()) {
                                     LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
                                 }
                                 // TODO: Here we need to add routing to error handlers
-                                DefaultHttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                                ctx.channel().writeAndFlush(httpResponse)
+                                DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
+                                        HttpVersion.HTTP_1_1,
+                                        HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                                ctx.channel()
+                                        .writeAndFlush(httpResponse)
                                         .addListener(ChannelFutureListener.CLOSE);
 
                             }
@@ -286,8 +297,8 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
             try {
                 serverChannel.close().sync();
             } catch (Throwable e) {
-                if(LOG.isErrorEnabled()) {
-                    LOG.error("Error stopping Particle server: " + e.getMessage() ,e );
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error stopping Particle server: " + e.getMessage(), e);
                 }
             }
         }
@@ -297,6 +308,18 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
     @Override
     public int getPort() {
         return serverConfiguration.getPort();
+    }
+
+    protected NioEventLoopGroup createParentEventLoopGroup() {
+        return new NioEventLoopGroup();
+    }
+
+    protected NioEventLoopGroup createWorkerEventLoopGroup() {
+        return new NioEventLoopGroup();
+    }
+
+    protected ServerBootstrap createServerBootstrap() {
+        return new ServerBootstrap();
     }
 
 }
