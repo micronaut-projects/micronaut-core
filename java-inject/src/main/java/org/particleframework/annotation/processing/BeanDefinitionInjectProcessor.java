@@ -75,7 +75,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         annotations.forEach(annotation -> {
             roundEnv.getElementsAnnotatedWith(annotation)
                 .stream()
-                // filtering Qualifier annotation definitions, which are not processed
+                // filtering annotation definitions, which are not processed
                 .filter(element -> element.getKind() != ANNOTATION_TYPE)
                 .forEach(element -> {
                     // FIXME handle abstract class annotations correctly
@@ -165,40 +165,44 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             note("Visit type %s for %s", classElement.getSimpleName(), o);
             assert (classElement.getKind() == CLASS) : "classElement must be a class";
 
-            // FIXME: need to handle abstract superclasses that are the defining class for annotaions
-            // like field and method injection that aren't overridden
-//            List<TypeElement> superClasses = modelUtils.superClassesFor(classElement);
-//            superClasses.forEach(element -> element.accept(this, o));
 
             Element enclosingElement = classElement.getEnclosingElement();
             if (enclosingElement.getKind() != CLASS) {
                 // it's not an inner class
-                // we know this class has supported annotations so we need a beandef writer for it
-                BeanDefinitionWriter beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
-                beanDefinitionWriters.put(this.concreteClass, beanDefinitionWriter);
 
-                ExecutableElement ctor = publicConstructorFor(classElement);
-                ExecutableElementParamInfo paramInfo = populateParameterData(ctor);
-                beanDefinitionWriter.visitBeanDefinitionConstructor(
-                    paramInfo.getParameters(),
-                    paramInfo.getQualifierTypes(),
-                    paramInfo.getGenericTypes());
+                if (this.concreteClass.getQualifiedName() == classElement.getQualifiedName()) {
+                    // we know this class has supported annotations so we need a beandef writer for it
+                    BeanDefinitionWriter beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
+                    beanDefinitionWriters.put(this.concreteClass, beanDefinitionWriter);
+
+                    ExecutableElement ctor = publicConstructorFor(classElement);
+                    ExecutableElementParamInfo paramInfo = populateParameterData(ctor);
+                    beanDefinitionWriter.visitBeanDefinitionConstructor(
+                        paramInfo.getParameters(),
+                        paramInfo.getQualifierTypes(),
+                        paramInfo.getGenericTypes());
+                }
 
                 List<? extends Element> elements = classElement.getEnclosedElements().stream()
-                    // we just handled the public ctor
+                    // already handled the public ctor
                     .filter(element -> element.getKind() != CONSTRUCTOR)
                     .collect(Collectors.toList());
-
                 if (isConfigurationPropertiesType) {
                     // handle non @Inject, @Value fields as config properties
                     ElementFilter.fieldsIn(elements).forEach(
                         field -> visitConfigurationProperty(field, o)
                     );
                 }
+
+                // now that BeanWriter is created and ctor initialized, handle
+                // annotated elements (e.g. @Inject) in superclasses
+                List<TypeElement> superClasses = modelUtils.superClassesFor(classElement);
+                Collections.reverse(superClasses);
+                superClasses.forEach(element -> element.accept(this, o));
+
                 return scan(elements, o);
             } else {
-                TypeElement outer = (TypeElement)enclosingElement;
-                // handle inner classes, e.g.
+                // handle inner classes, e.g. ConfigurationProperties types with nesting
                 return null;
             }
         }
@@ -219,6 +223,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
             if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
+                return null;
+            }
+
+            TypeElement declaringClassElement = modelUtils.classElementFor(method);
+            if (elementUtils.getName("java.lang.Object").equals(declaringClassElement.getQualifiedName())) {
+                // nothing to see here, move it along
                 return null;
             }
 
@@ -293,14 +303,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AnnotationMirror beanAnnotation = annotationUtils.findAnnotationWithStereotype(method, Bean.class);
             assert (beanAnnotation != null) : "bean annotation cannot be null";
             ExecutableElementParamInfo params = populateParameterData(method);
-
+            TypeElement declaringCLass = modelUtils.classElementFor(method);
             TypeMirror producedType = method.getReturnType();
 
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(method, producedType);
             beanDefinitionWriters.put(method, beanMethodWriter);
 
             beanMethodWriter.visitBeanFactoryMethod(
-                modelUtils.resolveTypeReference(this.concreteClass),
+                modelUtils.resolveTypeReference(declaringCLass),
                 method.getSimpleName().toString(),
                 params.getParameters(),
                 params.getQualifierTypes(),
@@ -322,11 +332,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeMirror producedType = method.getReturnType();
                 List<Object> genericTypes = genericUtils.resolveGenericTypes(producedType);
                 ExecutableElementParamInfo params = populateParameterData(method);
+                TypeElement declaringCLass = modelUtils.classElementFor(method);
 
                 BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
 
                 writer.visitExecutableMethod(
-                    modelUtils.resolveTypeReference(this.concreteClass),
+                    modelUtils.resolveTypeReference(declaringCLass),
                     modelUtils.resolveTypeReference(producedType),
                     genericTypes,
                     method.getSimpleName().toString(),
@@ -389,7 +400,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean isInjected = annotationUtils.hasStereotype(variable, Inject.class);
             boolean isValue = !isInjected &&
                 (annotationUtils.hasStereotype(variable, Value.class)); // || isConfigurationPropertiesType);
-            if (isInjected || isValue) { // && declaringClass.getProperty(fieldNode.getName()) == null ???
+            if (isInjected || isValue) {
                 BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
 
                 Object qualifierRef = annotationUtils.resolveQualifier(variable);
@@ -405,10 +416,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeMirror type = variable.asType();
                 Object fieldType = modelUtils.resolveTypeReference(type);
 
+                TypeElement declaringClass = modelUtils.classElementFor(variable);
+
                 if (isValue) {
                     writer.visitFieldValue(
-                        // FIXME: this needs to be the declaring class (i.e. AbstractB for concreteClass = B)
-                        this.concreteClass.getQualifiedName().toString(),
+                        declaringClass.getQualifiedName().toString(),
                         qualifierRef,
                         requiresReflection,
                         fieldType,
@@ -417,8 +429,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     );
                 } else {
                     writer.visitFieldInjectionPoint(
-                        // FIXME: this needs to be the declaring class (i.e. AbstractB for concreteClass = B)
-                        this.concreteClass.getQualifiedName().toString(),
+                        declaringClass.getQualifiedName().toString(),
                         qualifierRef,
                         requiresReflection,
                         fieldType,
@@ -455,7 +466,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     genericTypes = Collections.emptyList();
                 }
 
-                if(setterMethod.isPresent()) {
+                if (setterMethod.isPresent()) {
                     ExecutableElement method = setterMethod.get();
                     writer.visitSetterValue(
                             this.concreteClass.getQualifiedName().toString(),
