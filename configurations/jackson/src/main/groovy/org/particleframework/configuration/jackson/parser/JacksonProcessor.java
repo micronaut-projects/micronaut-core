@@ -183,11 +183,11 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
     private JsonNode asJsonNode(JsonToken event) throws IOException {
         switch (event) {
             case START_OBJECT:
-                nodeStack.push(node(nodeStack.peekLast()));
+                nodeStack.push(node(nodeStack.peekFirst()));
                 break;
 
             case START_ARRAY:
-                nodeStack.push(array(nodeStack.peekLast()));
+                nodeStack.push(array(nodeStack.peekFirst()));
                 break;
 
             case END_OBJECT:
@@ -206,7 +206,7 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
 
             case VALUE_NUMBER_INT:
                 assert !nodeStack.isEmpty();
-                JsonNode intNode = nodeStack.peekLast();
+                JsonNode intNode = nodeStack.peekFirst();
                 if (intNode instanceof ObjectNode) {
                     ((ObjectNode)intNode).put(currentFieldName, nonBlockingJsonParser.getLongValue());
                 }
@@ -217,7 +217,7 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
 
             case VALUE_STRING:
                 assert !nodeStack.isEmpty();
-                JsonNode stringNode = nodeStack.peekLast();
+                JsonNode stringNode = nodeStack.peekFirst();
                 if (stringNode instanceof ObjectNode) {
                     ((ObjectNode)stringNode).put(currentFieldName, nonBlockingJsonParser.getValueAsString());
                 }
@@ -228,7 +228,7 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
 
             case VALUE_NUMBER_FLOAT:
                 assert !nodeStack.isEmpty();
-                JsonNode floatNode = nodeStack.peekLast();
+                JsonNode floatNode = nodeStack.peekFirst();
                 if (floatNode instanceof ObjectNode) {
                     ((ObjectNode)floatNode).put(currentFieldName, nonBlockingJsonParser.getFloatValue());
                 }
@@ -238,7 +238,7 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
                 break;
             case VALUE_NULL:
                 assert !nodeStack.isEmpty();
-                JsonNode nullNode = nodeStack.peekLast();
+                JsonNode nullNode = nodeStack.peekFirst();
                 if (nullNode instanceof ObjectNode) {
                     ((ObjectNode)nullNode).putNull(currentFieldName);
                 }
@@ -250,7 +250,7 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
             case VALUE_TRUE:
             case VALUE_FALSE:
                 assert !nodeStack.isEmpty();
-                JsonNode booleanNode = nodeStack.peekLast();
+                JsonNode booleanNode = nodeStack.peekFirst();
                 if (booleanNode instanceof ObjectNode) {
                     ((ObjectNode)booleanNode).put(currentFieldName, nonBlockingJsonParser.getBooleanValue());
                 }

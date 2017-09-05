@@ -80,8 +80,4 @@ public class ObjectMapperFactory {
         return objectMapper;
     }
 
-    @Bean
-    JsonTypeConverter jsonTypeConverter(ObjectMapper objectMapper) {
-        return new JsonTypeConverter(objectMapper);
-    }
 }
