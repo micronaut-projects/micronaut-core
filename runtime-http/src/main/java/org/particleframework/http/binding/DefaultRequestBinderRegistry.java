@@ -30,6 +30,7 @@ import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.inject.Argument;
 
+import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,6 +43,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
@@ -49,7 +51,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final Map<Class, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
 
-    public DefaultRequestBinderRegistry(ConversionService<?> conversionService, RequestArgumentBinder...binders) {
+    public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
         this.conversionService = conversionService;
 
 

@@ -499,7 +499,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     else {
                         value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
                     }
-                    fieldInjectionPoint.set(bean, value);
+                    if(value != null) {
+                        fieldInjectionPoint.set(bean, value);
+                    }
                 } catch (Throwable e) {
                     if(e instanceof BeanContextException) {
                         throw (BeanContextException)e;
@@ -550,25 +552,28 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             path.pushMethodArgumentResolve(this, injectionPoint, argument);
             // can't use orElseThrow here due to compiler bug
             try {
-                Value valAnn = (Value) argument.getAnnotation(Value.class);
+                Value valAnn = argument.getAnnotation(Value.class);
                 Class argumentType = argument.getType();
+
                 if (isInnerConfiguration(argumentType)) {
                     return context.createBean(argumentType);
                 } else {
-                    String valString = resolveValueString(argument.getName(), valAnn);
+                    String argumentName = argument.getName();
+                    Class[] genericTypes = argument.getGenericTypes();
+                    String valString = resolveValueString(argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, argumentType, valString, argument.getGenericTypes());
+                    Optional value = resolveValue(applicationContext, argumentType, valString, genericTypes);
                     if (!value.isPresent() && argumentType == Optional.class) {
                         return value;
                     } else {
                         return value.orElseGet(() -> {
                             if (valAnn == null && isConfigurationProperties) {
-                                String cliOption = resolveCliOption(argument.getName());
+                                String cliOption = resolveCliOption(argumentName);
                                 if(cliOption != null) {
                                     return resolveValue(applicationContext,
                                             argumentType,
                                             cliOption,
-                                            argument.getGenericTypes())
+                                            genericTypes)
                                             .orElse(defaultValue);
                                 }
                                 else {
@@ -890,7 +895,19 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 return value;
             } else {
                 if (isConfigurationProperties && valueAnn == null) {
-                    return value.orElse(defaultValue);
+                    return value.orElseGet(()->{
+                        String cliOption = resolveCliOption(field.getName());
+                        if(cliOption != null) {
+                            return resolveValue((ApplicationContext) context,
+                                    fieldType,
+                                    cliOption,
+                                    GenericTypeUtils.resolveGenericTypeArguments(field))
+                                    .orElse(defaultValue);
+                        }
+                        else {
+                            return defaultValue;
+                        }
+                    });
                 } else {
                     return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
                 }

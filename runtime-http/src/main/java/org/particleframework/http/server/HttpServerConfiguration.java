@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server
+package org.particleframework.http.server;
 
-import groovy.transform.CompileStatic
-import org.particleframework.config.ConfigurationProperties
+import groovy.transform.CompileStatic;
+import org.particleframework.config.ConfigurationProperties;
 
-import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * <p>A base {@link ConfigurationProperties} for servers</p>
@@ -27,26 +27,40 @@ import java.nio.charset.StandardCharsets
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(value = 'particle.server', cliPrefix = "")
+@ConfigurationProperties(value = "particle.server", cliPrefix = "")
 @CompileStatic
-class HttpServerConfiguration {
+public class HttpServerConfiguration {
+
+    protected int port = 8080;
+    protected int securePort = 8443;
+    protected String host = "localhost";
+    protected Charset defaultCharset = StandardCharsets.UTF_8;
+
     /**
      * The default server port
      */
-    int port = 8080
+    public int getPort() {
+        return port;
+    }
 
     /**
      * The default secure (normally HTTPS) port
      */
-    int securePort = 8443
+    public int getSecurePort() {
+        return securePort;
+    }
 
     /**
      * The default host
      */
-    String host = "localhost"
+    public String getHost() {
+        return host;
+    }
 
     /**
      * The default charset to use when encoding and decoding responses if {@link org.particleframework.http.HttpHeaders#ACCEPT_CHARSET} or {@link org.particleframework.http.HttpHeaders#ACCEPT} is not sent by the client
      */
-    Charset defaultCharset = StandardCharsets.UTF_8
+    public Charset getDefaultCharset() {
+        return defaultCharset;
+    }
 }
