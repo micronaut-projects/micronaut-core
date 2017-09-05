@@ -99,6 +99,51 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: Foo(Fred, 10)"
     }
 
+    void "test future argument handling with string"() {
+
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/future")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: $json".toString()
+    }
+
+    void "test future argument handling with map"() {
+
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/futureMap")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: [name:Fred, age:10]".toString()
+    }
+
+    void "test future argument handling with POGO"() {
+
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/futureObject")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: Foo(Fred, 10)".toString()
+    }
+
     @Controller
     static class JsonController {
 

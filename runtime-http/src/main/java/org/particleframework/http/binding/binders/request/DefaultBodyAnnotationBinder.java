@@ -21,7 +21,7 @@ import java.util.Optional;
  */
 public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
-    private final ConversionService conversionService;
+    protected final ConversionService conversionService;
 
     public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         this.conversionService = conversionService;

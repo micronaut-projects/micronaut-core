@@ -31,6 +31,7 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
+import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
@@ -106,10 +107,10 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
                                 Channel channel = ctx.channel();
 
-                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, applicationContext.getEnvironment());
-                                NettyHttpRequestContext requestContext = new NettyHttpRequestContext(ctx, nettyHttpRequest, serverConfiguration);
+                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, ctx, applicationContext.getEnvironment(), serverConfiguration);
 
                                 // set the request on the channel
+                                NettyHttpRequestContext requestContext = nettyHttpRequest.getRequestContext();
                                 channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
                                 channel.attr(NettyHttpRequest.KEY).set(nettyHttpRequest);
 
@@ -155,9 +156,22 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                                 if (registeredBinder.isPresent()) {
                                                     ArgumentBinder argumentBinder = registeredBinder.get();
                                                     if (argumentBinder instanceof BodyArgumentBinder) {
-                                                        requiresBody = true;
-                                                        BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
-                                                        requestContext.addBodyArgument(argument, bodyArgumentBinder);
+                                                        if(argumentBinder instanceof NonBlockingBodyArgumentBinder) {
+                                                            Optional bindingResult = argumentBinder
+                                                                    .bind(argument, nettyHttpRequest);
+
+                                                            if(binderRegistry.isPresent()) {
+                                                                argumentValues.put(argument.getName(), bindingResult.get());
+                                                                continue;
+                                                            }
+
+                                                        }
+                                                        else {
+
+                                                            requiresBody = true;
+                                                            BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
+                                                            requestContext.addBodyArgument(argument, bodyArgumentBinder);
+                                                        }
                                                     } else {
 
                                                         Optional bindingResult = argumentBinder
@@ -198,7 +212,7 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
                                                     Object result = route.execute(argumentValues);
                                                     Charset charset = serverConfiguration.getDefaultCharset();
                                                     requestContext.getResponseTransmitter()
-                                                            .sendText(channel, result, charset);
+                                                            .sendText(ctx, result, charset);
                                                 }
                                         );
                                     } else if (msg instanceof StreamedHttpRequest) {

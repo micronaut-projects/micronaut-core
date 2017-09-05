@@ -54,7 +54,7 @@ class NettyHttpRequestContext {
             RouteMatch route = getMatchedRoute();
             Object result = route.execute(resolvedArguments);
             getResponseTransmitter()
-                      .sendText(context.channel(), result);
+                      .sendText(context, result);
         });
     }
 

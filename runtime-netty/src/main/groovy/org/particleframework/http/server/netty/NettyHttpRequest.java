@@ -15,9 +15,9 @@
  */
 package org.particleframework.http.server.netty;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
@@ -26,10 +26,9 @@ import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
-import org.particleframework.inject.ExecutableMethod;
 
-import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
@@ -48,6 +47,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private final HttpMethod httpMethod;
     private final URI uri;
     private final NettyHttpRequestHeaders headers;
+    private final NettyHttpRequestContext requestContext;
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
     private Locale locale;
@@ -57,10 +57,13 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private Object body;
     private MediaType mediaType;
 
-    public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
+    public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
+                            ChannelHandlerContext ctx,
+                            ConversionService conversionService,
+                            HttpServerConfiguration serverConfiguration) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(conversionService, "ConversionService cannot be null");
-
+        this.requestContext = new NettyHttpRequestContext(ctx, this, serverConfiguration);
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
         String fullUri = nettyRequest.uri();
@@ -73,6 +76,10 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
      */
     public io.netty.handler.codec.http.HttpRequest getNativeRequest() {
         return nettyRequest;
+    }
+
+    NettyHttpRequestContext getRequestContext() {
+        return requestContext;
     }
 
     void addContent(HttpContent httpContent) {

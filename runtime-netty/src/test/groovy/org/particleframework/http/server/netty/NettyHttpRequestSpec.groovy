@@ -15,11 +15,13 @@
  */
 package org.particleframework.http.server.netty
 
+import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.HttpVersion
 import org.particleframework.core.convert.DefaultConversionService
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpMethod
+import org.particleframework.http.server.HttpServerConfiguration
 import spock.lang.Specification
 import static io.netty.handler.codec.http.HttpMethod.*
 
@@ -32,7 +34,7 @@ class NettyHttpRequestSpec extends Specification {
     void "test netty http request parameters"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, new DefaultConversionService())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -55,7 +57,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, new DefaultConversionService())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -77,7 +79,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, new DefaultConversionService())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 

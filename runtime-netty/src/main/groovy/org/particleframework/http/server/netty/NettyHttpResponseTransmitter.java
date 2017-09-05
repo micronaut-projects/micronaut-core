@@ -8,8 +8,12 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 
 /**
  * Responsible for relaying the response to the client
@@ -18,6 +22,8 @@ import java.nio.charset.Charset;
  * @since 1.0
  */
 public class NettyHttpResponseTransmitter {
+    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
+
     private final Charset defaultCharset;
 
     public NettyHttpResponseTransmitter(HttpServerConfiguration serverConfiguration) {
@@ -39,27 +45,44 @@ public class NettyHttpResponseTransmitter {
     /**
      * Send the given object as text to the channel
      *
-     * @param channel The channel
+     * @param context The channel
      * @param object  The object
      */
-    public void sendText(Channel channel, Object object) {
-        sendText(channel, object, defaultCharset);
+    public void sendText(ChannelHandlerContext context, Object object) {
+        sendText(context, object, defaultCharset);
     }
     /**
      * Send the given object as text to the channel
      *
-     * @param channel The channel
+     * @param context The channel context
      * @param object  The object
      * @param charset The charset to use
      */
-    public void sendText(Channel channel, Object object, Charset charset) {
+    public void sendText(ChannelHandlerContext context, Object object, Charset charset) {
         DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-        httpResponse.content()
-                .writeCharSequence(
-                        object.toString(),
-                        charset);
-        channel.writeAndFlush(httpResponse)
-                .addListener(ChannelFutureListener.CLOSE);
+        if(object instanceof CompletableFuture) {
+            CompletableFuture<?> future = (CompletableFuture) object;
+            future.whenCompleteAsync((o, throwable) -> {
+                if(throwable != null) {
+                    if(LOG.isErrorEnabled()) {
+                        LOG.error("Error executing future: " + throwable.getMessage(), throwable);
+                    }
+                    sendServerError(context);
+                }
+                else {
+                    sendText(context, o, charset);
+                }
+            }, context.channel().eventLoop());
+        }
+        else {
+
+            httpResponse.content()
+                    .writeCharSequence(
+                            object.toString(),
+                            charset);
+            context.writeAndFlush(httpResponse)
+                    .addListener(ChannelFutureListener.CLOSE);
+        }
     }
 
     /**

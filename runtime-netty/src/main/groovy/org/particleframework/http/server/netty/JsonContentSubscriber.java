@@ -35,6 +35,12 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
         this.nettyHttpRequest = requestContext.getRequest();
     }
 
+    protected JsonContentSubscriber(NettyHttpRequest request) {
+        this.requestContext = request.getRequestContext();
+        this.ctx = requestContext.getContext();
+        this.nettyHttpRequest = requestContext.getRequest();
+    }
+
     @Override
     public void onSubscribe(Subscription s) {
         s.request(Long.MAX_VALUE);
@@ -65,8 +71,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
             public void onComplete() {
                 JsonNode jsonNode = nodeRef.get();
                 if (jsonNode != null) {
-                    nettyHttpRequest.setBody(jsonNode);
-                    requestContext.processRequestBody();
+                    JsonContentSubscriber.this.onComplete(jsonNode);
                 } else {
                     requestContext
                             .getResponseTransmitter()
@@ -74,6 +79,16 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
                 }
             }
         });
+    }
+
+    /**
+     * Called when the materialized JSON node has been built
+     *
+     * @param jsonNode The {@link JsonNode} instance
+     */
+    protected void onComplete(JsonNode jsonNode) {
+        nettyHttpRequest.setBody(jsonNode);
+        requestContext.processRequestBody();
     }
 
     @Override

@@ -13,14 +13,18 @@ import org.slf4j.LoggerFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpContentSubscriber implements Subscriber<HttpContent> {
+public class HttpContentSubscriber implements Subscriber<HttpContent> {
     private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
     private final NettyHttpRequestContext requestContext;
     private final ChannelHandlerContext ctx;
 
-    public HttpContentSubscriber(NettyHttpRequestContext requestContext) {
+    HttpContentSubscriber(NettyHttpRequestContext requestContext) {
         this.requestContext = requestContext;
         this.ctx = requestContext.getContext();
+    }
+
+    public HttpContentSubscriber(NettyHttpRequest request) {
+        this(request.getRequestContext());
     }
 
     @Override
