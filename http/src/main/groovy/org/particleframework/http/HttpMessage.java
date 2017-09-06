@@ -49,6 +49,14 @@ public interface HttpMessage<B> {
     }
 
     /**
+     * @return The value of the Content-Length header or -1L if none specified
+     */
+    default long getContentLength() {
+        return getHeaders()
+                .getFirst(HttpHeaders.CONTENT_LENGTH, Long.class)
+                .orElse(-1L);
+    }
+    /**
      * The request or response content type
      * @return The content type
      */
