@@ -44,7 +44,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return Obtain the remote address
      */
     InetSocketAddress getRemoteAddress();
-    
+
     /**
      * @return The protocol in use
      */

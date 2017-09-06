@@ -4,6 +4,7 @@ package org.particleframework.http;
 import org.particleframework.http.cookie.Cookie;
 
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 
@@ -34,11 +35,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     HttpResponse addCookie(Cookie cookie);
 
     /**
-     * Sets the response encoding
+     * Sets the response encoding. Should be called after {@link #setContentType(MediaType)}
      *
      * @param encoding The encoding to use
      */
-    HttpResponse setCharacterEncoding(CharSequence encoding);
+    default HttpResponse setCharacterEncoding(CharSequence encoding) {
+        if(encoding != null) {
+            MediaType mediaType = getContentType();
+            if(mediaType != null) {
+                setContentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())));
+            }
+        }
+        return this;
+    }
 
     /**
      * Sets the response encoding
@@ -98,6 +107,15 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         return this;
     }
 
+    /**
+     * Set the response content type
+     *
+     * @param mediaType The media type
+     */
+    default HttpResponse setContentType(MediaType mediaType) {
+        getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
+        return this;
+    }
     /**
      * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response
      *

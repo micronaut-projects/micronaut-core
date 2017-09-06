@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Represents a media type. See https://www.iana.org/assignments/media-types/media-types.xhtml and https://tools.ietf.org/html/rfc2046
@@ -136,13 +137,14 @@ public class MediaType implements CharSequence {
     public static final String CHARSET_PARAMETER = "charset";
     public static final String Q_PARAMETER = "q";
     public static final String V_PARAMETER = "v";
+
     private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
     private static final String QUALITY_RATING = "1.0";
+    private static final String SEMICOLON = ";";
 
     protected final String name;
     protected final String subtype;
     protected final String type;
-    protected final String fullName;
     protected final String extension;
     protected final Map<String, String> parameters;
 
@@ -184,15 +186,15 @@ public class MediaType implements CharSequence {
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
     public MediaType(String name, String extension, Map<String, String> params) {
-        this.fullName = name;
-        this.parameters = new LinkedHashMap<>();
-        this.parameters.put(Q_PARAMETER, QUALITY_RATING);
+
         if(name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
-        if(name.indexOf(';') > -1) {
-            String[] tokenWithArgs = name.split(";");
-            name = tokenWithArgs[0];
+        String withoutArgs;
+        if(name.contains(SEMICOLON)) {
+            this.parameters = new LinkedHashMap<>();
+            String[] tokenWithArgs = name.split(SEMICOLON);
+            withoutArgs = tokenWithArgs[0];
             String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length);
             for(String param : paramsList) {
                 int i = param.indexOf('=');
@@ -201,11 +203,15 @@ public class MediaType implements CharSequence {
                 }
             }
         }
-        this.name = name;
-        int i = name.indexOf('/');
+        else {
+            this.parameters = Collections.emptyMap();
+            withoutArgs = name;
+        }
+        this.name = withoutArgs;
+        int i = withoutArgs.indexOf('/');
         if(i > -1) {
-            this.type = name.substring(0, i);
-            this.subtype = name.substring(i + 1, name.length());
+            this.type = withoutArgs.substring(0, i);
+            this.subtype = withoutArgs.substring(i + 1, withoutArgs.length());
         }
         else {
             throw new IllegalArgumentException("Invalid mime type: " + name);
@@ -228,12 +234,6 @@ public class MediaType implements CharSequence {
         }
     }
 
-    /**
-     * @return Full name with parameters
-     */
-    public String getFullName() {
-        return fullName;
-    }
     /**
      * @return The name of the mime type without any parameters
      */
@@ -266,7 +266,7 @@ public class MediaType implements CharSequence {
      * @return The parameters to the media type
      */
     public Map<String, String> getParameters() {
-        return parameters;
+        return Collections.unmodifiableMap(parameters);
     }
 
     /**
@@ -310,7 +310,13 @@ public class MediaType implements CharSequence {
     }
 
     public String toString() {
-        return fullName;
+        if(parameters.isEmpty()) {
+            return name;
+        }
+        else {
+            return name + ";" + parameters.entrySet().stream().map(Object::toString)
+                    .collect(Collectors.joining(";"));
+        }
     }
 
     @Override

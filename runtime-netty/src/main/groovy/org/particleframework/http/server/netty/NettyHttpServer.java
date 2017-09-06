@@ -24,6 +24,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
@@ -171,7 +173,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                             Optional bindingResult = argumentBinder
                                                                     .bind(argument, nettyHttpRequest);
 
-                                                            if (binderRegistry.isPresent()) {
+                                                            if (bindingResult.isPresent()) {
                                                                 argumentValues.put(argument.getName(), bindingResult.get());
                                                                 continue;
                                                             }
@@ -291,13 +293,18 @@ public class NettyHttpServer implements EmbeddedServer {
                 })
                 // TODO: handle random port binding
                 .bind(serverConfiguration.getHost(), serverConfiguration.getPort());
-        try {
-            future.sync();
-        } catch (InterruptedException e) {
-            // TODO: exception handling
-            e.printStackTrace();
-        }
-        this.serverChannel = future.channel();
+
+        future.addListener(op -> {
+            if(future.isSuccess()) {
+                serverChannel = future.channel();
+            }
+            else {
+                Throwable cause = op.cause();
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
+                }
+            }
+        });
         return this;
     }
 
