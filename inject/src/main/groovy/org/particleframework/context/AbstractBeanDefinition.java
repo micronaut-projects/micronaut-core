@@ -28,7 +28,6 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -560,7 +559,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 } else {
                     String argumentName = argument.getName();
                     Class[] genericTypes = argument.getGenericTypes();
-                    String valString = resolveValueString(argumentName, valAnn);
+                    String valString = resolveValueString(injectionPoint.getMethod().getDeclaringClass(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argumentType, valString, genericTypes);
                     if (!value.isPresent() && argumentType == Optional.class) {
@@ -889,7 +888,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Field field = injectionPoint.getField();
             Value valueAnn = field.getAnnotation(Value.class);
             Class<?> fieldType = field.getType();
-            String valString = resolveValueString(injectionPoint.getName(), valueAnn);
+            String valString = resolveValueString(injectionPoint.getField().getDeclaringClass(), injectionPoint.getName(), valueAnn);
             Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
             if (!value.isPresent() && fieldType == Optional.class) {
                 return value;
@@ -1043,11 +1042,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return value;
     }
 
-    private String resolveValueString(String name, Value val) {
+    private String resolveValueString(Class<?> declaringClass, String name, Value val) {
         String valString;
         if (val == null) {
             if (isConfigurationProperties) {
-                String prefix = resolvePrefix();
+                String prefix = resolvePrefix(declaringClass);
                 valString = prefix + "." + name;
             } else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");
@@ -1077,12 +1076,21 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
-    private String resolvePrefix() {
-        Class type = getType();
-        ConfigurationProperties configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
-        String prefix = null;
+    private String resolvePrefix(Class<?> declaringClass) {
+        Class<?> type = declaringClass;
+        ConfigurationProperties configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+        StringBuilder prefix = null;
         if (configurationProperties != null) {
-            prefix = configurationProperties.value();
+            prefix = new StringBuilder(configurationProperties.value());
+            while(type != null) {
+                type = type.getSuperclass();
+                if(type != null) {
+                    configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+                    if(configurationProperties != null) {
+                        prefix.insert(0, configurationProperties.value() + '.');
+                    }
+                }
+            }
         } else {
             StringBuilder path = new StringBuilder();
             while (type != null) {
@@ -1094,17 +1102,19 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 }
 
                 type = type.getDeclaringClass();
-                configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
-                if (configurationProperties != null) {
-                    prefix = configurationProperties.value() + path;
-                    break;
+                if(type != null) {
+                    configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+                    if (configurationProperties != null) {
+                        prefix = new StringBuilder(configurationProperties.value() + path);
+                        break;
+                    }
                 }
             }
         }
         if (prefix == null) {
             throw new IllegalStateException("Unable to resolve configuration prefix. No @ConfigurationProperties root found");
         }
-        return prefix;
+        return prefix.toString();
     }
 
     private AbstractBeanDefinition addMethodInjectionPointInternal(
