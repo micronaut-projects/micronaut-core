@@ -16,7 +16,7 @@
 package org.particleframework.http.server.netty
 
 import okhttp3.Request
-import org.particleframework.bind.annotation.Format
+import org.particleframework.core.convert.Format
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.MediaType
 import org.particleframework.http.binding.annotation.Header

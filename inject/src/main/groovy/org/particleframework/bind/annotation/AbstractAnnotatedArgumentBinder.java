@@ -15,15 +15,11 @@
  */
 package org.particleframework.bind.annotation;
 
-import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.ConvertibleMultiValues;
-import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.*;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.TypeVariable;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -44,7 +40,6 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
     protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale) {
         Class<T> argumentType = argument.getType();
         Object value = resolveValue(argument, values, argumentType, annotationValue);
-        Format formatAnn = argument.findAnnotation(Format.class);
         if(value == null) {
             String fallbackName = getFallbackFormat(argument);
             if(!annotationValue.equals(fallbackName)) {
@@ -59,21 +54,11 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
 
         Map<String,Class> typeParameterMap = argument.getTypeParameters();
         ConversionContext conversionContext;
-        if(formatAnn != null) {
-            if(typeParameterMap != null) {
-                conversionContext = ConversionContext.of(typeParameterMap, formatAnn.value(), locale);
-            }
-            else{
-                conversionContext = ConversionContext.of(formatAnn.value(), locale);
-            }
+        if(typeParameterMap != null) {
+            conversionContext = ConversionContext.of(argument, typeParameterMap, locale);
         }
         else {
-            if(typeParameterMap != null) {
-                conversionContext = ConversionContext.of(typeParameterMap);
-            }
-            else{
-                conversionContext = ConversionContext.DEFAULT;
-            }
+            conversionContext = ConversionContext.of(argument, locale);
         }
         return doConvert(value, argumentType, conversionContext);
     }

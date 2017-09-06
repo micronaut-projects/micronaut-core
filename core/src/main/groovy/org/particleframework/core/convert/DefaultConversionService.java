@@ -91,9 +91,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 ZonedDateTime.class,
                 (object, targetType, context) -> {
                     try {
-                        DateTimeFormatter formatter = context.getFormat()
-                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        DateTimeFormatter formatter = resolveFormatter(context);
                         ZonedDateTime result = ZonedDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
@@ -108,9 +106,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 LocalDateTime.class,
                 (object, targetType, context) -> {
                     try {
-                        DateTimeFormatter formatter = context.getFormat()
-                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        DateTimeFormatter formatter = resolveFormatter(context);
                         LocalDateTime result = LocalDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
@@ -125,9 +121,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 LocalDate.class,
                 (object, targetType, context) -> {
                     try {
-                        DateTimeFormatter formatter = context.getFormat()
-                                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-                                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+                        DateTimeFormatter formatter = resolveFormatter(context);
                         LocalDate result = LocalDate.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
@@ -435,6 +429,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(newMap);
         });
 
+    }
+
+    private DateTimeFormatter resolveFormatter(ConversionContext context) {
+        Format ann = context.getAnnotation(Format.class);
+        Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
+        return format
+                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 
     private Class resolveComponentTypeForIterable(Class<Iterable> targetType, ConversionContext context) {
