@@ -11,9 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -23,7 +21,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class NettyHttpResponseTransmitter {
-    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final Charset defaultCharset;
 

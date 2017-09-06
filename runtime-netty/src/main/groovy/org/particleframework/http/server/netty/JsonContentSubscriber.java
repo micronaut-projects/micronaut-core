@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 public class JsonContentSubscriber implements Subscriber<HttpContent> {
-    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
 
     private final JacksonProcessor jacksonProcessor = new JacksonProcessor();

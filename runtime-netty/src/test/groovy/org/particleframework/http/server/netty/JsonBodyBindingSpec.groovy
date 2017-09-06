@@ -99,6 +99,36 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: Foo(Fred, 10)"
     }
 
+    void "test array POGO body parsing"() {
+
+        when:
+        def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
+        def request = new Request.Builder()
+                .url("$server/json/array")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+    }
+
+    void "test list POGO body parsing"() {
+
+        when:
+        def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
+        def request = new Request.Builder()
+                .url("$server/json/list")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+    }
+
     void "test future argument handling with string"() {
 
         when:
@@ -160,6 +190,14 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         @Post
         String object(@Body Foo foo) {
             "Body: $foo"
+        }
+
+        @Post array(@Body Foo[] foos) {
+            "Body: ${foos.join(',')}"
+        }
+
+        @Post list(@Body List<Foo> foos) {
+            "Body: ${foos.join(',')}"
         }
 
         @Post

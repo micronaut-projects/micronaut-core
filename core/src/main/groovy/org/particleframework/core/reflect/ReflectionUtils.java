@@ -3,6 +3,7 @@ package org.particleframework.core.reflect;
 import org.particleframework.core.reflect.exception.InvocationException;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -137,5 +138,14 @@ public class ReflectionUtils {
             currentType = currentType.getSuperclass();
         }
         return methodSet.stream();
+    }
+
+    public static Optional<Field> findDeclaredField(Class type, String name)  {
+        try {
+            Field declaredField = type.getDeclaredField(name);
+            return Optional.of(declaredField);
+        } catch (NoSuchFieldException e) {
+            return Optional.empty();
+        }
     }
 }

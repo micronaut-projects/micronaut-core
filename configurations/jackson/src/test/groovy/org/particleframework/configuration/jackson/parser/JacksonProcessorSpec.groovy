@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.reactivestreams.Subscriber
@@ -88,6 +89,64 @@ class JacksonProcessorSpec extends Specification {
         foo != null
         foo.name == "Fred"
         foo.age == 10
+    }
+
+
+    void "test publish JSON array async"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor publisher = new JacksonProcessor()
+        Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
+
+
+        when:
+        def string = objectMapper.writeValueAsString(instances)
+        byte[] bytes = objectMapper.writeValueAsBytes(instances)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        publisher.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        publisher.onNext(bytes)
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        node instanceof ArrayNode
+        string == '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+
+        when:
+        Foo[] foos = objectMapper.treeToValue(node, Foo[].class)
+
+        then:
+        foos.size() == 2
+        foos[0] != null
+        foos[0].name == "Fred"
+        foos[0].age == 10
     }
 
     void "test incomplete JSON error"() {

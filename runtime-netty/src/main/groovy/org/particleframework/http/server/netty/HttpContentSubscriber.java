@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
  * @since 1.0
  */
 public class HttpContentSubscriber implements Subscriber<HttpContent> {
-    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private final NettyHttpRequestContext requestContext;
     private final ChannelHandlerContext ctx;
 

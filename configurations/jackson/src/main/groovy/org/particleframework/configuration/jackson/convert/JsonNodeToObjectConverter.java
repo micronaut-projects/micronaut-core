@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.jackson;
+package org.particleframework.configuration.jackson.convert;
 
 
 
@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 
+import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -31,10 +32,11 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JsonTypeConverter implements TypeConverter<JsonNode, Object> {
+@Singleton
+public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object> {
     private final ObjectMapper objectMapper;
 
-    public JsonTypeConverter(ObjectMapper objectMapper) {
+    public JsonNodeToObjectConverter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
