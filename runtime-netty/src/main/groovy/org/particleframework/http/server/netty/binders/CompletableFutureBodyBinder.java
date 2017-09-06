@@ -48,7 +48,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                 CompletableFuture future = new CompletableFuture();
                 StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
                 Subscriber<HttpContent> subscriber;
-                if(contentType != null && contentType.getExtension().equals(MediaType.JSON.getExtension())) {
+                if(contentType != null && contentType.getExtension().equals(MediaType.APPLICATION_JSON_TYPE.getExtension())) {
 
                     subscriber = new JsonContentSubscriber(nettyHttpRequest) {
                         @Override

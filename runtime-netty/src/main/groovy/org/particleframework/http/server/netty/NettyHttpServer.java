@@ -36,7 +36,6 @@ import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -217,6 +216,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (!requiresBody) {
                                         // TODO: here we need a way to make the encoding of the result flexible
                                         // also support for GSON views etc.
+
+                                        // TODO: Need to run this logic on a separate thread pool if the method is blocking
                                         channel.eventLoop().execute(() -> {
                                                     Object result = route.execute(argumentValues);
                                                     Charset charset = serverConfiguration.getDefaultCharset();
@@ -228,7 +229,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
 
-                                        if (contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
+                                        if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
                                             JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(requestContext);
                                             streamedHttpRequest.subscribe(contentSubscriber);
                                         } else {

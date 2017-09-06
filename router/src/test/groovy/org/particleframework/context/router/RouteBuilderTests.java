@@ -90,9 +90,9 @@ public class RouteBuilderTests {
         @Inject
         void someRoutes(BookController controller, AuthorController authorController) {
             GET("/conditional{/message}", controller, "hello", String.class)
-                    .where((request)-> request.getContentType().equals(MediaType.JSON));
+                    .where((request)-> request.getContentType().equals(MediaType.APPLICATION_JSON_TYPE));
 
-            GET("/message{/message}", controller, "hello", String.class).accept(JSON);
+            GET("/message{/message}", controller, "hello", String.class).accept(APPLICATION_JSON_TYPE);
             GET("/books{/id}", controller, "show").nest(() ->
                     GET("/authors", controller)
             );
@@ -107,7 +107,7 @@ public class RouteBuilderTests {
             );
 
             GET("/books", controller);
-            POST("/books", controller, "save").accept(JSON);
+            POST("/books", controller, "save").accept(APPLICATION_JSON_TYPE);
 
             // handle errors TODO
 //            error(RuntimeException.class, controller, "error");

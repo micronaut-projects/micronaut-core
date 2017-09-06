@@ -33,54 +33,105 @@ public class MediaType implements CharSequence {
      * A wildcard media type representing all types
      */
     public static final MediaType ALL = new MediaType("*/*", "all");
+
     /**
      * Form encoded data: application/x-www-form-urlencoded
      */
-    public static final MediaType FORM = new MediaType("application/x-www-form-urlencoded", "form");
+    public static final String APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded";
+    /**
+     * Form encoded data: application/x-www-form-urlencoded
+     */
+    public static final MediaType APPLICATION_FORM_URLENCODED_TYPE = new MediaType(APPLICATION_FORM_URLENCODED);
+
     /**
      * Multi part form data: multipart/form-data
      */
-    public static final MediaType MULTIPART_FORM = new MediaType("multipart/form-data", "multipartForm");
+    public static final String MULTIPART_FORM_DATA = "multipart/form-data";
+    /**
+     * Multi part form data: multipart/form-data
+     */
+    public static final MediaType MULTIPART_FORM_DATA_TYPE = new MediaType(MULTIPART_FORM_DATA);
+
     /**
      * HTML: text/html
      */
-    public static final MediaType HTML = new MediaType("text/html");
+    public static final String TEXT_HTML = "text/html";
+    /**
+     * HTML: text/html
+     */
+    public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
     /**
      * XHTML: application/xhtml+xml
      */
-    public static final MediaType XHTML = new MediaType("application/xhtml+xml", "html");
+    public static final String APPLICATION_XHTML = "application/xhtml+xml";
+    /**
+     * XHTML: application/xhtml+xml
+     */
+    public static final MediaType APPLICATION_XHTML_TYPE = new MediaType(APPLICATION_XHTML, "html");
     /**
      * XML: application/xml
      */
-    public static final MediaType XML = new MediaType("application/xml");
+    public static final String APPLICATION_XML = "application/xml";
+    /**
+     * XML: application/xml
+     */
+    public static final MediaType APPLICATION_XML_TYPE = new MediaType(APPLICATION_XML);
     /**
      * JSON: application/json
      */
-    public static final MediaType JSON = new MediaType("application/json");
+    public static final String APPLICATION_JSON = "application/json";
+    /**
+     * JSON: application/json
+     */
+    public static final MediaType APPLICATION_JSON_TYPE = new MediaType(MediaType.APPLICATION_JSON);
     /**
      * XML: text/xml
      */
-    public static final MediaType TEXT_XML = new MediaType("text/xml");
+    public static final String TEXT_XML = "text/xml";
+    /**
+     * XML: text/xml
+     */
+    public static final MediaType TEXT_XML_TYPE = new MediaType(TEXT_XML);
     /**
      * JSON: text/json
      */
-    public static final MediaType TEXT_JSON = new MediaType("text/json");
+    public static final String TEXT_JSON = "text/json";
+    /**
+     * JSON: text/json
+     */
+    public static final MediaType TEXT_JSON_TYPE = new MediaType(TEXT_JSON);
     /**
      * HAL JSON: application/hal+json
      */
-    public static final MediaType HAL_JSON = new MediaType("application/hal+json");
+    public static final String APPLICATION_HAL_JSON = "application/hal+json";
+    /**
+     * HAL JSON: application/hal+json
+     */
+    public static final MediaType APPLICATION_HAL_JSON_TYPE = new MediaType(APPLICATION_HAL_JSON);
     /**
      * HAL XML: application/hal+xml
      */
-    public static final MediaType HAL_XML = new MediaType("application/hal+xml");
+    public static final String APPLICATION_HAL_XML = "application/hal+xml";
+    /**
+     * HAL XML: application/hal+xml
+     */
+    public static final MediaType APPLICATION_HAL_XML_TYPE = new MediaType(APPLICATION_HAL_XML);
     /**
      * Atom: application/atom+xml
      */
-    public static final MediaType ATOM_XML = new MediaType("application/atom+xml");
+    public static final String APPLICATION_ATOM_XML = "application/atom+xml";
+    /**
+     * Atom: application/atom+xml
+     */
+    public static final MediaType APPLICATION_ATOM_XML_TYPE = new MediaType(APPLICATION_ATOM_XML);
     /**
      * VND Error: application/vnd.error+json
      */
-    public static final MediaType VND_ERROR = new MediaType("application/vnd.error+json");
+    public static final String APPLICATION_VND_ERROR = "application/vnd.error+json";
+    /**
+     * VND Error: application/vnd.error+json
+     */
+    public static final MediaType APPLICATION_VND_ERROR_TYPE = new MediaType(APPLICATION_VND_ERROR);
 
     public static final String CHARSET_PARAMETER = "charset";
     public static final String Q_PARAMETER = "q";
