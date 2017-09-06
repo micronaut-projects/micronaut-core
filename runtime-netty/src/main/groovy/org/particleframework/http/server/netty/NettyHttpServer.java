@@ -24,17 +24,19 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.util.AttributeKey;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.*;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.uri.UriMatchInfo;
+import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -46,8 +48,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -56,14 +60,14 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class ParticleNettyHttpServer implements EmbeddedServer {
-    private static final Logger LOG = LoggerFactory.getLogger(ParticleNettyHttpServer.class);
+public class NettyHttpServer implements EmbeddedServer {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private volatile Channel serverChannel;
     private final HttpServerConfiguration serverConfiguration;
     private final ApplicationContext applicationContext;
 
     @Inject
-    public ParticleNettyHttpServer(
+    public NettyHttpServer(
             HttpServerConfiguration serverConfiguration,
             ApplicationContext applicationContext
     ) {
@@ -87,11 +91,16 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
         NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
         NioEventLoopGroup parentGroup = createParentEventLoopGroup();
         ServerBootstrap serverBootstrap = createServerBootstrap();
-        // TODO: allow configuration of channel options
+
 
         if (applicationContext == null) {
             throw new IllegalStateException("Netty HTTP Server implementation requires a reference to the ApplicationContext");
         }
+
+//      TODO: Restore once ConfigurationPropertiesInheritanceSpec passing for Java
+//        processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
+//        processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+
 
         ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
@@ -320,6 +329,28 @@ public class ParticleNettyHttpServer implements EmbeddedServer {
 
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
+    }
+
+    private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
+        ConversionService conversionService = applicationContext.getConversionService();
+        for (ChannelOption channelOption : options.keySet()) {
+            String name = channelOption.name();
+            Object value = options.get(channelOption);
+            Optional<Field> declaredField = ReflectionUtils.findDeclaredField(ChannelOption.class, name);
+            declaredField.ifPresent((field)-> {
+                Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
+                typeArg.ifPresent((arg) -> {
+                    Optional converted = conversionService.convert(value, arg);
+                    converted.ifPresent((convertedValue)->
+                            biConsumer.accept(channelOption, convertedValue)
+                    );
+                });
+
+            });
+            if(!declaredField.isPresent()) {
+                biConsumer.accept(channelOption, value);
+            }
+        }
     }
 
 }

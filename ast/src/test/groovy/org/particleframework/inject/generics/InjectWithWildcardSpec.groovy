@@ -35,7 +35,7 @@ class InjectWithWildcardSpec extends Specification {
 
         expect:
         context.getBean(WildCardInject) instanceof WildCardInject
-        
+
         cleanup:
         context.close()
     }
