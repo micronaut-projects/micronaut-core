@@ -2,7 +2,9 @@ package org.particleframework.http;
 
 import org.particleframework.http.cookie.Cookies;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Locale;
@@ -37,6 +39,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return Get the
      */
     URI getPath();
+
+    /**
+     * @return Obtain the remote address
+     */
+    InetSocketAddress getRemoteAddress();
+    
+    /**
+     * @return The protocol in use
+     */
+    default String getProtocol() {
+        return "http";
+    }
 
     @Override
     default Locale getLocale() {
