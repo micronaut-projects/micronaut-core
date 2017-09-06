@@ -15,7 +15,6 @@
  */
 package org.particleframework.http.server;
 
-import groovy.transform.CompileStatic;
 import org.particleframework.config.ConfigurationProperties;
 
 import java.nio.charset.Charset;
@@ -28,7 +27,6 @@ import java.nio.charset.StandardCharsets;
  * @since 1.0
  */
 @ConfigurationProperties(value = "particle.server", cliPrefix = "")
-@CompileStatic
 public class HttpServerConfiguration {
 
     protected int port = 8080;
