@@ -58,7 +58,7 @@ public interface RouteBuilder {
      *     DELETE "/book{/id}"
      * }</pre>
      *
-     * <p>By default it is assumed the accepted and returned content type is {@link org.particleframework.http.MediaType#JSON}.</p>
+     * <p>By default it is assumed the accepted and returned content type is {@link org.particleframework.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
      * @param cls The class
      * @return The {@link ResourceRoute}
@@ -89,7 +89,7 @@ public interface RouteBuilder {
      *     DELETE "/book"
      * }</pre>
      *
-     * <p>By default it is assumed the accepted and returned content type is {@link org.particleframework.http.MediaType#JSON}.</p>
+     * <p>By default it is assumed the accepted and returned content type is {@link org.particleframework.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
      * @param cls The class
      * @return The {@link ResourceRoute}

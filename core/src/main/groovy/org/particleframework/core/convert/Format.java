@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.bind.annotation;
+package org.particleframework.core.convert;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -21,8 +21,7 @@ import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation used to describe the format in the case where the format of an {@link org.particleframework.inject.Argument} to bound
- * needs to be altered. Commonly use to alter the formatting of {@link java.time.ZonedDateTime} instances.
+ * Annotation used to describe the format in the case where the format needs to be altered for the purposes of conversion. Commonly use to alter the formatting of {@link java.time.ZonedDateTime} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -31,5 +30,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 public @interface Format {
 
+    /**
+     * @return The format to use
+     */
     String value();
 }

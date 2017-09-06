@@ -24,6 +24,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.convert.ConversionContext;
@@ -36,7 +38,6 @@ import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -172,7 +173,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                             Optional bindingResult = argumentBinder
                                                                     .bind(argument, nettyHttpRequest);
 
-                                                            if (binderRegistry.isPresent()) {
+                                                            if (bindingResult.isPresent()) {
                                                                 argumentValues.put(argument.getName(), bindingResult.get());
                                                                 continue;
                                                             }
@@ -217,6 +218,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (!requiresBody) {
                                         // TODO: here we need a way to make the encoding of the result flexible
                                         // also support for GSON views etc.
+
+                                        // TODO: Need to run this logic on a separate thread pool if the method is blocking
                                         channel.eventLoop().execute(() -> {
                                                     Object result = route.execute(argumentValues);
                                                     Charset charset = serverConfiguration.getDefaultCharset();
@@ -228,7 +231,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
 
-                                        if (contentType != null && MediaType.JSON.getExtension().equals(contentType.getExtension())) {
+                                        if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
                                             JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(requestContext);
                                             streamedHttpRequest.subscribe(contentSubscriber);
                                         } else {
@@ -290,13 +293,18 @@ public class NettyHttpServer implements EmbeddedServer {
                 })
                 // TODO: handle random port binding
                 .bind(serverConfiguration.getHost(), serverConfiguration.getPort());
-        try {
-            future.sync();
-        } catch (InterruptedException e) {
-            // TODO: exception handling
-            e.printStackTrace();
-        }
-        this.serverChannel = future.channel();
+
+        future.addListener(op -> {
+            if(future.isSuccess()) {
+                serverChannel = future.channel();
+            }
+            else {
+                Throwable cause = op.cause();
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
+                }
+            }
+        });
         return this;
     }
 

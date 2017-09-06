@@ -29,6 +29,7 @@ import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
@@ -158,6 +159,14 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Override
     public HttpMethod getMethod() {
         return httpMethod;
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+        return (InetSocketAddress) getRequestContext()
+                .getContext()
+                .channel()
+                .remoteAddress();
     }
 
     @Override

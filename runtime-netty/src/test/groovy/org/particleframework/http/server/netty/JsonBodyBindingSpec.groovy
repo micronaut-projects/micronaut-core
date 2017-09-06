@@ -3,7 +3,6 @@ package org.particleframework.http.server.netty
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
-import okhttp3.Response
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.binding.annotation.Body
 import org.particleframework.stereotype.Controller
@@ -174,7 +173,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: Foo(Fred, 10)".toString()
     }
 
-    @Controller
+    @Controller(produces = org.particleframework.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
         @Post

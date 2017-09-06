@@ -28,11 +28,9 @@ import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ExecutableHandle;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots
@@ -204,7 +202,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
 
         DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
         }
 
         DefaultRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
@@ -212,7 +210,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, MediaType.JSON, targetMethod);
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
         }
 
         DefaultRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {

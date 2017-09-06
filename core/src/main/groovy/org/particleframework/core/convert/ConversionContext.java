@@ -15,6 +15,10 @@
  */
 package org.particleframework.core.convert;
 
+import org.particleframework.core.annotation.AnnotationUtil;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -28,7 +32,21 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext {
+public interface ConversionContext extends AnnotatedElement {
+    @Override
+    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return null;
+    }
+
+    @Override
+    default Annotation[] getAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    @Override
+    default Annotation[] getDeclaredAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
 
     /**
      * The default conversion context
@@ -52,12 +70,6 @@ public interface ConversionContext {
         return Locale.getDefault();
     }
 
-    /**
-     * @return The format to use
-     */
-    default Optional<String> getFormat() {
-        return Optional.empty();
-    }
 
     /**
      * @return The standard charset used in conversion
@@ -99,11 +111,11 @@ public interface ConversionContext {
     /**
      * Creates a {@link ConversionContext} for the given format and Locale
      *
-     * @param format The format
+     * @param annotatedElement The annotated element
      * @param locale The locale
      * @return The conversion context
      */
-    static ConversionContext of(String format, Locale locale) {
+    static ConversionContext of(AnnotatedElement annotatedElement, Locale locale) {
         return new ConversionContext() {
             @Override
             public Locale getLocale() {
@@ -111,39 +123,56 @@ public interface ConversionContext {
             }
 
             @Override
-            public Optional<String> getFormat() {
-                return Optional.of(format);
+            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+                return annotatedElement.getAnnotation(annotationClass);
+            }
+
+            @Override
+            public Annotation[] getAnnotations() {
+                return annotatedElement.getAnnotations();
+            }
+
+            @Override
+            public Annotation[] getDeclaredAnnotations() {
+                return annotatedElement.getDeclaredAnnotations();
             }
         };
     }
 
+
     /**
-     * Creates a {@link ConversionContext} for the given type variables, format and Locale
+     * Creates a {@link ConversionContext} for the given format and Locale
      *
-     * @param format The format
+     * @param annotatedElement The annotated element
      * @param locale The locale
      * @return The conversion context
      */
-    static ConversionContext of(Map<String, Class> typeVariables,
-                                String format,
-                                Locale locale) {
+    static ConversionContext of(AnnotatedElement annotatedElement,Map<String,Class> typeVariables, Locale locale) {
         return new ConversionContext() {
+            @Override
+            public Locale getLocale() {
+                return locale;
+            }
+
             @Override
             public Map<String, Class> getTypeVariables() {
                 return typeVariables;
             }
 
             @Override
-            public Locale getLocale() {
-                return locale;
+            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+                return annotatedElement.getAnnotation(annotationClass);
             }
 
             @Override
-            public Optional<String> getFormat() {
-                return Optional.of(format);
+            public Annotation[] getAnnotations() {
+                return annotatedElement.getAnnotations();
+            }
+
+            @Override
+            public Annotation[] getDeclaredAnnotations() {
+                return annotatedElement.getDeclaredAnnotations();
             }
         };
     }
-
-
 }
