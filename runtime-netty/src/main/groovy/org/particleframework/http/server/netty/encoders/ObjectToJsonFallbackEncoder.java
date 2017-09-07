@@ -65,6 +65,7 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
         DefaultFullHttpResponse httpResponse = res != null ? res.getNativeResponse() : new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
 
         byte[] bytes = objectMapper.writeValueAsBytes(msg);
+
         ByteBuf content = Unpooled.copiedBuffer(bytes);
         int len = bytes.length;
         httpResponse

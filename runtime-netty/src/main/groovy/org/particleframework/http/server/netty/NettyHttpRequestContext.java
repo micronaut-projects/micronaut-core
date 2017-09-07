@@ -9,6 +9,8 @@ import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.web.router.RouteMatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.Executor;
@@ -21,6 +23,7 @@ import java.util.concurrent.Executor;
  */
 @Internal
 class NettyHttpRequestContext {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final ChannelHandlerContext context;
     private final NettyHttpRequest request;
@@ -58,7 +61,18 @@ class NettyHttpRequestContext {
             RouteMatch route = getMatchedRoute();
             Object result = route.execute(resolvedArguments);
             if(result != null) {
-                context.writeAndFlush(result);
+                context.writeAndFlush(result)
+                        .addListener(future -> {
+                            if(!future.isSuccess()) {
+                                Throwable cause = future.cause();
+                                if(LOG.isErrorEnabled()) {
+                                    LOG.error("Error encoding response: " + cause.getMessage(), cause);
+                                }
+                                if(context.channel().isWritable()) {
+                                    getResponseTransmitter().sendServerError(context);
+                                }
+                            }
+                        });
             }
             else {
                 context.flush();
