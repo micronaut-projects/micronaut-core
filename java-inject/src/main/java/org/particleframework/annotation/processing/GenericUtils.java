@@ -3,13 +3,15 @@ package org.particleframework.annotation.processing;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static javax.lang.model.type.TypeKind.VOID;
+import static javax.lang.model.type.TypeKind.WILDCARD;
 
 class GenericUtils {
 
@@ -74,18 +76,32 @@ class GenericUtils {
         return Collections.emptyList();
     }
 
-    // FIXME I don't know if this works correctly.resolveGenericTypes
+    // FIXME I don't know if this works correctly for all cases
     // Needs a test case. See InjectTransform.resolveGenericTypes
     // It doesn't get covered either.
+    // test for FooBar<? extends Foo> and FooBar<? super Bar>
     List<Object> resolveGenericTypes(TypeMirror type) {
         if (type.getKind().isPrimitive() || type.getKind() == VOID) {
             return Collections.emptyList();
         }
-        List<Object> generics = new ArrayList<>();
-        ((DeclaredType)type).getTypeArguments().forEach(tm -> {
-            TypeElement element = (TypeElement) typeUtils.asElement(tm);
-            generics.add(element.getQualifiedName());
-        });
+
+        List<Object> generics = ((DeclaredType)type).getTypeArguments().stream()
+            .map(typeArg -> {
+                if (typeArg.getKind() == WILDCARD) {
+                    WildcardType wcType = (WildcardType)typeArg;
+                    TypeMirror extendsBound = wcType.getExtendsBound();
+                    TypeMirror superBound = wcType.getSuperBound();
+                    return extendsBound == null && superBound == null
+                        ? "java.lang.Object"
+                        // FIXME: is this giving me what I want it to? Maybe not
+                        // maybe what I really need is extendsBound or superBound, whichever is not null
+                        // needs a test case
+                        : typeUtils.getWildcardType(extendsBound,superBound).toString();
+                }
+                return typeArg.toString();
+            })
+            .collect(Collectors.toList());
+
         return generics;
     }
 }

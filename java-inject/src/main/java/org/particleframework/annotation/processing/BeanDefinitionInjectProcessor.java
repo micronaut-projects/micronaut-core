@@ -21,10 +21,7 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import javax.tools.JavaFileObject;
@@ -187,18 +184,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     // already handled the public ctor
                     .filter(element -> element.getKind() != CONSTRUCTOR)
                     .collect(Collectors.toList());
+
                 if (isConfigurationPropertiesType) {
                     // handle non @Inject, @Value fields as config properties
                     ElementFilter.fieldsIn(elements).forEach(
                         field -> visitConfigurationProperty(field, o)
                     );
+                } else {
+                    TypeElement superClass = modelUtils.superClassFor(classElement);
+                    if (superClass != null) superClass.accept(this, o);
                 }
-
-                // now that BeanWriter is created and ctor initialized, handle
-                // annotated elements (e.g. @Inject) in superclasses
-                List<TypeElement> superClasses = modelUtils.superClassesFor(classElement);
-                Collections.reverse(superClasses);
-                superClasses.forEach(element -> element.accept(this, o));
 
                 return scan(elements, o);
             } else {
@@ -222,23 +217,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitBeanFactoryMethod(method, o);
                 return null;
             }
+
             if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
-                return null;
-            }
-
-            TypeElement declaringClassElement = modelUtils.classElementFor(method);
-            if (elementUtils.getName("java.lang.Object").equals(declaringClassElement.getQualifiedName())) {
-                // nothing to see here, move it along
-                return null;
-            }
-
-            boolean isPublicMethod = method.getModifiers().contains(PUBLIC);
-            boolean isExecutableMethod = annotationUtils.hasStereotype(method, Executable.class);
-            if (isExecutableMethod
-                || (isExecutableType && isPublicMethod)) {
-                // InjectTransform 299 has test for Object.class?
-                // FIXME: if declaring class is not java.lang.Object
-                visitExecutableMethod(method, o);
                 return null;
             }
 
@@ -246,7 +226,83 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean postConstruct = annotationUtils.hasStereotype(method, PostConstruct.class);
             boolean preDestroy = annotationUtils.hasStereotype(method, PreDestroy.class);
             if (injected || postConstruct || preDestroy) {
-                // TODO figure out how to replicate all this logic.
+
+                visitAnnotatedMethod(method, o);
+                return null;
+            }
+
+            // which is better?
+//            if (declaringClassElement.getSuperclass().getKind() == NONE) {
+//                return null;
+//            }
+            TypeElement declaringClassElement = modelUtils.classElementFor(method);
+            if (elementUtils.getName("java.lang.Object").equals(declaringClassElement.getQualifiedName())) {
+                return null;
+            }
+
+            boolean isPublicMethod = method.getModifiers().contains(PUBLIC);
+            boolean isExecutableMethod = annotationUtils.hasStereotype(method, Executable.class);
+            if (isExecutableMethod || (isExecutableType && isPublicMethod)) {
+                visitExecutableMethod(method, o);
+                return null;
+            }
+
+            return null;
+        }
+
+        void visitBeanFactoryMethod(ExecutableElement method, Object o) {
+            AnnotationMirror beanAnnotation = annotationUtils.findAnnotationWithStereotype(method, Bean.class);
+            assert (beanAnnotation != null) : "bean annotation cannot be null";
+            TypeMirror returnType = method.getReturnType();
+            ExecutableElementParamInfo params = populateParameterData(method);
+
+            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(method, returnType);
+            beanDefinitionWriters.put(method, beanMethodWriter);
+
+            beanMethodWriter.visitBeanFactoryMethod(
+                modelUtils.resolveTypeReference(this.concreteClass),
+                method.getSimpleName().toString(),
+                params.getParameters(),
+                params.getQualifierTypes(),
+                params.getGenericTypes()
+            );
+
+            annotationUtils.getAnnotationElementValue("preDestroy", beanAnnotation)
+                .ifPresent(destroyMethodName -> {
+                    TypeElement destroyMethodDeclaringClass = (TypeElement)typeUtils.asElement(returnType);
+                    beanMethodWriter.visitPreDestroyMethod(
+                        destroyMethodDeclaringClass.getQualifiedName(),
+                        destroyMethodName
+                    );
+                });
+        }
+
+        void visitExecutableMethod(ExecutableElement method, Object o) {
+            TypeMirror returnType = method.getReturnType();
+            List<Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnType);
+            ExecutableElementParamInfo params = populateParameterData(method);
+
+            BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
+
+            writer.visitExecutableMethod(
+                modelUtils.resolveTypeReference(concreteClass),
+                modelUtils.resolveTypeReference(returnType),
+                returnTypeGenerics,
+                method.getSimpleName().toString(),
+                params.getParameters(),
+                params.getQualifierTypes(),
+                params.getGenericTypes());
+        }
+
+        void visitAnnotatedMethod(ExecutableElement method, Object o) {
+            ExecutableElementParamInfo params = populateParameterData(method);
+            TypeElement declaringClass = modelUtils.classElementFor(method);
+            BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
+            TypeMirror producedType = method.getReturnType();
+            Object returnType = modelUtils.resolveTypeReference(producedType);
+
+
+            // TODO figure out how to replicate all this logic.
                 /*
                 boolean isParent = methodNode.declaringClass != concreteClass
                 MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodNode.name, methodNode.parameters) : methodNode
@@ -274,85 +330,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
                  */
 
-                // for example
-                // concrete class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$B
-                // method = void setAnother(A a)
-                // method declaring class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$AbstractB
-                // isParent = true
-                // overriden method = void setAnother(A a)
-                // overriden method declaring class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$AbstractB
-                // overriden is false
-                // isPackagePrivate and isPrivate = false
-                // isPackagePrivateAndPackagesDiffer = false
-                // requiresReflection = false
-                // overriddenInjected = false
-                // isInheritedAndNotPublic = false
+            // for example
+            // concrete class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$B
+            // method = void setAnother(A a)
+            // method declaring class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$AbstractB
+            // isParent = true
+            // overriden method = void setAnother(A a)
+            // overriden method declaring class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$AbstractB
+            // overriden is false
+            // isPackagePrivate and isPrivate = false
+            // isPackagePrivateAndPackagesDiffer = false
+            // requiresReflection = false
+            // overriddenInjected = false
+            // isInheritedAndNotPublic = false
 
-                boolean isPackagePrivate = modelUtils.isPackagePrivate(method);
-                boolean isPrivate = modelUtils.isPrivate(method);
-                boolean isParent = method.getEnclosingElement() != this.concreteClass;
-                boolean requiresReflection = isPrivate;
+            boolean isPackagePrivate = modelUtils.isPackagePrivate(method);
+            boolean isPrivate = modelUtils.isPrivate(method);
+            boolean isParent = method.getEnclosingElement() != this.concreteClass;
+            boolean requiresReflection = isPrivate;
 
-                visitAnnotatedMethod(method, requiresReflection);
-                return null;
-            }
-            return null;
-        }
 
-        void visitBeanFactoryMethod(ExecutableElement method, Object o) {
-            AnnotationMirror beanAnnotation = annotationUtils.findAnnotationWithStereotype(method, Bean.class);
-            assert (beanAnnotation != null) : "bean annotation cannot be null";
-            ExecutableElementParamInfo params = populateParameterData(method);
-            TypeElement declaringCLass = modelUtils.classElementFor(method);
-            TypeMirror producedType = method.getReturnType();
-
-            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(method, producedType);
-            beanDefinitionWriters.put(method, beanMethodWriter);
-
-            beanMethodWriter.visitBeanFactoryMethod(
-                modelUtils.resolveTypeReference(declaringCLass),
-                method.getSimpleName().toString(),
-                params.getParameters(),
-                params.getQualifierTypes(),
-                params.getGenericTypes()
-            );
-
-            // TODO: this needs to be tested. I only translated this from InjectTransform.visitConstructorOrMethod(line 194ff)
-            // but none of the Spock specs reach this code
-            annotationUtils.getAnnotationElementValue("preDestroy", beanAnnotation)
-                .ifPresent(destroyMethodName -> {
-                    // this has to be an object type, right?
-                    TypeElement element = (TypeElement)typeUtils.asElement(producedType);
-                    beanMethodWriter.visitPreDestroyMethod(element.getQualifiedName(), destroyMethodName);
-                });
-        }
-
-        void visitExecutableMethod(ExecutableElement method, Object o) {
-            if (this.concreteClass.getSuperclass().getKind() != NONE) {
-                TypeMirror producedType = method.getReturnType();
-                List<Object> genericTypes = genericUtils.resolveGenericTypes(producedType);
-                ExecutableElementParamInfo params = populateParameterData(method);
-                TypeElement declaringCLass = modelUtils.classElementFor(method);
-
-                BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
-
-                writer.visitExecutableMethod(
-                    modelUtils.resolveTypeReference(declaringCLass),
-                    modelUtils.resolveTypeReference(producedType),
-                    genericTypes,
-                    method.getSimpleName().toString(),
-                    params.getParameters(),
-                    params.getQualifierTypes(),
-                    params.getGenericTypes());
-            }
-        }
-
-        void visitAnnotatedMethod(ExecutableElement method, boolean requiresReflection) {
-            ExecutableElementParamInfo params = populateParameterData(method);
-            TypeElement declaringClass = modelUtils.classElementFor(method);
-            BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
-            TypeMirror producedType = method.getReturnType();
-            Object returnType = modelUtils.resolveTypeReference(producedType);
 
             if (annotationUtils.hasStereotype(method, PostConstruct.class)) {
                 writer.visitPostConstructMethod(
@@ -397,6 +394,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            assert (variable.getKind() == FIELD) : "expected field for " + variable;
+
             boolean isInjected = annotationUtils.hasStereotype(variable, Inject.class);
             boolean isValue = !isInjected &&
                 (annotationUtils.hasStereotype(variable, Value.class)); // || isConfigurationPropertiesType);
@@ -425,7 +424,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         requiresReflection,
                         fieldType,
                         fieldName.toString(),
-                        false //isConfigurationPropertiesType
+                        isConfigurationPropertiesType //isConfigurationPropertiesType
                     );
                 } else {
                     writer.visitFieldInjectionPoint(
@@ -536,6 +535,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             Element element = typeUtils.asElement(producedType);
             TypeElement producedElement = modelUtils.classElementFor(element);
+
             PackageElement producedPackageElement = elementUtils.getPackageOf(producedElement);
             String producedPackageName = producedPackageElement.getQualifiedName().toString();
 
@@ -602,9 +602,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     assert (typeElement != null) : "typeElement cannot be null";
 
                     params.addParameter(argName, typeElement.toString());
-                    List<Object> typeParams = declaredType.getTypeArguments().stream()
-                        .map(TypeMirror::toString)
-                        .collect(Collectors.toList());
+                    List<Object> typeParams = genericUtils.resolveGenericTypes(declaredType);
                     if (!typeParams.isEmpty()) {
                         params.addGenericTypes(argName, typeParams);
                     }
@@ -618,36 +616,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             });
 
             return params;
-        }
-    }
-
-    static class ExecutableElementParamInfo {
-        Map<String, Object> parameters = new LinkedHashMap<>();
-        Map<String, Object> qualifierTypes = new LinkedHashMap<>();
-        Map<String, List<Object>> genericTypes = new LinkedHashMap<>();
-
-        void addParameter(String paramName, Object type) {
-            parameters.put(paramName, type);
-        }
-
-        void addQualifierType(String paramName, Object qualifier) {
-            qualifierTypes.put(paramName, qualifier);
-        }
-
-        void addGenericTypes(String paramName, List<Object> generics) {
-            genericTypes.put(paramName, generics);
-        }
-
-        Map<String, Object> getParameters() {
-            return Collections.unmodifiableMap(parameters);
-        }
-
-        Map<String, Object> getQualifierTypes() {
-            return Collections.unmodifiableMap(qualifierTypes);
-        }
-
-        Map<String, List<Object>> getGenericTypes() {
-            return Collections.unmodifiableMap(genericTypes);
         }
     }
 }
