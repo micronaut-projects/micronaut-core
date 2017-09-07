@@ -13,32 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.cookie;
+package org.particleframework.http;
 
 import org.particleframework.core.io.service.SoftServiceLoader;
+import org.particleframework.http.cookie.CookieFactory;
 
 /**
- * A CookieFactory creates {@link Cookie} instances and should be implemented by a concrete server
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface CookieFactory {
+public interface HttpResponseFactory {
 
     /**
      * The default {@link CookieFactory} instance
      */
-    CookieFactory INSTANCE = SoftServiceLoader.load(CookieFactory.class)
-                                              .first()
-                                              .map(SoftServiceLoader.Service::load)
-                                              .orElse(null);
+    HttpResponseFactory INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
+            .first()
+            .map(SoftServiceLoader.Service::load)
+            .orElse(null);
 
     /**
-     * Create a new cookie
-     *
-     * @param name The name
-     * @param value The value
-     * @return A Cookie instance
+     * @return The ok response
      */
-    Cookie create(String name, String value);
+    MutableHttpResponse ok();
+
+    /**
+     * @param status The status
+     * @return The restus response
+     */
+    MutableHttpResponse status(HttpStatus status);
+
+    /**
+     * Creates an {@link HttpStatus#OK} response with a body
+     *
+     * @param body The body
+     * @param <T> The body type
+     * @return The ok response with the given body
+     */
+    <T> MutableHttpResponse<T> ok(T body);
 }

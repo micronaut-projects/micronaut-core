@@ -15,11 +15,17 @@ import java.util.Optional;
 public interface PropertyResolver extends ValueResolver {
 
 
+    /**
+     * @see ValueResolver#get(CharSequence, Class)
+     */
     @Override
     default <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
         return getProperty(name.toString(), requiredType);
     }
 
+    /**
+     * @see ValueResolver#get(CharSequence, Class)
+     */
     @Override
     default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
         return getProperty(name.toString(), requiredType, defaultValue);

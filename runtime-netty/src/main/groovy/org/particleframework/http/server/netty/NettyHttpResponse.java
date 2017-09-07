@@ -20,10 +20,11 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
+import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpHeaders;
+import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 
@@ -33,9 +34,12 @@ import org.particleframework.http.server.netty.cookies.NettyCookies;
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyHttpResponse<B> implements HttpResponse<B> {
+public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
+    public static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
+
     final DefaultFullHttpResponse nettyResponse;
     final NettyHttpRequestHeaders headers;
+    private B body;
 
     public NettyHttpResponse(DefaultFullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
@@ -58,7 +62,7 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
     }
 
     @Override
-    public HttpResponse addCookie(Cookie cookie) {
+    public MutableHttpResponse<B> addCookie(Cookie cookie) {
         if(cookie instanceof NettyCookies.NettyCookie) {
             NettyCookies.NettyCookie nettyCookie = (NettyCookies.NettyCookie) cookie;
             String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
@@ -72,18 +76,23 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public B getBody() {
-        throw new UnsupportedOperationException("TODO");
+        return body;
     }
 
     @Override
-    public HttpResponse setCharacterEncoding(CharSequence encoding) {
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public HttpResponse setStatus(HttpStatus status, CharSequence message) {
+    public MutableHttpResponse<B> setStatus(HttpStatus status, CharSequence message) {
         message = message == null ? status.getReason() : message;
         nettyResponse.setStatus(new HttpResponseStatus(status.getCode(), message.toString()));
+        return this;
+    }
+
+    public DefaultFullHttpResponse getNativeResponse() {
+        return nettyResponse;
+    }
+
+    @Override
+    public MutableHttpResponse<B> setBody(B body) {
+        this.body = body;
         return this;
     }
 }

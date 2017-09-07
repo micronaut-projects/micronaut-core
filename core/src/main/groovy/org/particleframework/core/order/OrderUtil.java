@@ -16,6 +16,7 @@
 package org.particleframework.core.order;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -31,12 +32,25 @@ public class OrderUtil {
      *
      * @param list The list to sort
      */
-    public static void sort(List<? extends Ordered> list) {
+    public static void sort(List<?> list) {
         list.sort((o1, o2) -> {
             int order1 = getOrder(o1);
             int order2 = getOrder(o2);
             return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
         });
+    }
+
+    /**
+     * Sort the given list
+     *
+     * @param list The list to sort
+     */
+    public static void reverseSort(List<?> list) {
+        list.sort(Collections.reverseOrder((o1, o2) -> {
+            int order1 = getOrder(o1);
+            int order2 = getOrder(o2);
+            return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
+        }));
     }
     /**
      * Sort the given array
@@ -51,6 +65,25 @@ public class OrderUtil {
         });
     }
 
+    /**
+     * Sort the given array
+     *
+     * @param objects The array to sort
+     */
+    public static void sort(Object...objects) {
+        Arrays.sort(objects,(o1, o2) -> {
+            int order1 = getOrder(o1);
+            int order2 = getOrder(o2);
+            return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
+        });
+    }
+
+    private static int getOrder(Object o) {
+        if(o instanceof Ordered) {
+            return getOrder((Ordered)o);
+        }
+        return Ordered.LOWEST_PRECEDENCE;
+    }
     private static int getOrder(Ordered o) {
         return o.getOrder();
     }
