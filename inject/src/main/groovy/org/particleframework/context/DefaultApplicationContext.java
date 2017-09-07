@@ -95,7 +95,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @return The conversion service
      */
     protected ConversionService createConversionService() {
-        return new DefaultConversionService();
+        return DefaultConversionService.SHARED_INSTANCE;
     }
 
     @Override

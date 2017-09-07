@@ -19,7 +19,7 @@ public class MapPropertyResolver implements PropertyResolver {
 
     public MapPropertyResolver(Map<String, Object> map) {
         this.map = map;
-        this.conversionService = new DefaultConversionService();
+        this.conversionService = DefaultConversionService.SHARED_INSTANCE;
     }
 
     public MapPropertyResolver(Map<String, Object> map, ConversionService conversionService) {

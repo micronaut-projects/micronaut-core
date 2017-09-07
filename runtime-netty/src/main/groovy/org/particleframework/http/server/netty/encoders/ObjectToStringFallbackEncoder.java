@@ -15,12 +15,14 @@
  */
 package org.particleframework.http.server.netty.encoders;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.server.netty.NettyHttpResponse;
 
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
@@ -50,8 +52,20 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
+        NettyHttpResponse res = ctx
+                .channel()
+                .attr(NettyHttpResponse.KEY)
+                .get();
+
         String string = msg.toString();
-        DefaultFullHttpResponse defaultResult = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.copiedBuffer(string, StandardCharsets.UTF_8));
+        ByteBuf content = Unpooled.copiedBuffer(string, StandardCharsets.UTF_8);
+        FullHttpResponse defaultResult;
+        if(res != null) {
+            defaultResult = res.getNativeResponse().replace(content);
+        }
+        else {
+            defaultResult = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+        }
         defaultResult
                 .headers()
                 .add(HttpHeaderNames.CONTENT_LENGTH, string.length());

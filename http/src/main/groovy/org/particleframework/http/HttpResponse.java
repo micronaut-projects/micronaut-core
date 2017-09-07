@@ -1,13 +1,6 @@
 package org.particleframework.http;
 
 
-import org.particleframework.http.cookie.Cookie;
-
-import java.nio.charset.Charset;
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
-
 /**
  * <p>Common interface for HTTP response implementations</p>
  *
@@ -25,133 +18,45 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The current status
      */
     HttpStatus getStatus();
-    /**
-     * Adds the specified cookie to the response.  This method can be called
-     * multiple times to set more than one cookie.
-     *
-     * @param cookie the Cookie to return to the client
-     *
-     */
-    HttpResponse addCookie(Cookie cookie);
 
     /**
-     * Sets the response encoding. Should be called after {@link #setContentType(MediaType)}
+     * Return an {@link HttpStatus#OK} response with an empty body
      *
-     * @param encoding The encoding to use
+     * @return The ok response
      */
-    default HttpResponse setCharacterEncoding(CharSequence encoding) {
-        if(encoding != null) {
-            MediaType mediaType = getContentType();
-            if(mediaType != null) {
-                setContentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())));
-            }
+    static MutableHttpResponse ok() {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE;
+        if( factory == null) {
+            throw new IllegalStateException("No Server implementation found on classpath");
         }
-        return this;
+        return factory.ok();
     }
 
+
     /**
-     * Sets the response encoding
+     * Return an {@link HttpStatus#OK} response with an empty body
      *
-     * @param encoding The encoding to use
+     * @return The ok response
      */
-    default HttpResponse setCharacterEncoding(Charset encoding) {
-        return setCharacterEncoding(encoding.toString());
+    static <T> MutableHttpResponse<T> ok(T body) {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE;
+        if( factory == null) {
+            throw new IllegalStateException("No Server implementation found on classpath");
+        }
+        return factory.ok(body);
     }
 
     /**
-     * Sets the response status
+     * Return a response for the given status
      *
      * @param status The status
+     * @return The response
      */
-    HttpResponse setStatus(HttpStatus status, CharSequence message);
-    /**
-     * Set a response header
-     *
-     * @param name The name of the header
-     * @param value The value of the header
-     */
-    default HttpResponse addHeader(CharSequence name, CharSequence value) {
-        getHeaders().add(name, value);
-        return this;
+    static MutableHttpResponse status(HttpStatus status) {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE;
+        if( factory == null) {
+            throw new IllegalStateException("No Server implementation found on classpath");
+        }
+        return factory.status(status);
     }
-
-    /**
-     * Set multiple headers
-     *
-     * @param namesAndValues The names and values
-     */
-    default HttpResponse addHeaders(Map<CharSequence,CharSequence> namesAndValues) {
-        MutableHttpHeaders headers = getHeaders();
-        namesAndValues.forEach(headers::add);
-        return this;
-    }
-
-    /**
-     * Sets the content length
-     *
-     * @param length The length
-     * @return This HttpResponse
-     */
-    default HttpResponse setContentLength(long length) {
-        getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
-        return this;
-    }
-
-    /**
-     * Set the response content type
-     *
-     * @param contentType The content type
-     */
-    default HttpResponse setContentType(CharSequence contentType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
-        return this;
-    }
-
-    /**
-     * Set the response content type
-     *
-     * @param mediaType The media type
-     */
-    default HttpResponse setContentType(MediaType mediaType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
-        return this;
-    }
-    /**
-     * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response
-     *
-     * @param locale The locale
-     * @return This response
-     */
-    default HttpResponse setLocale(Locale locale) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, locale.toString());
-        return this;
-    }
-
-    /**
-     * Sets the response status
-     *
-     * @param status The status
-     */
-    default HttpResponse setStatus(int status) {
-        return setStatus(HttpStatus.valueOf(status));
-    }
-
-    /**
-     * Sets the response status
-     *
-     * @param status The status
-     */
-    default HttpResponse setStatus(int status, CharSequence message) {
-        return setStatus(HttpStatus.valueOf(status), message);
-    }
-
-    /**
-     * Sets the response status
-     *
-     * @param status The status
-     */
-    default HttpResponse setStatus(HttpStatus status) {
-        return setStatus(status, null);
-    }
-
 }

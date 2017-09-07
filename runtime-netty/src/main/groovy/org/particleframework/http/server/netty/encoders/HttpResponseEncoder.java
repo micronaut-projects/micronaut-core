@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty.encoders;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.server.netty.NettyHttpResponse;
@@ -44,6 +45,17 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
     @Override
     protected void encode(ChannelHandlerContext ctx, HttpResponse msg, List<Object> out) throws Exception {
         NettyHttpResponse res = (NettyHttpResponse) msg;
-        out.add(res.getNativeResponse());
+        DefaultFullHttpResponse nativeResponse = res.getNativeResponse();
+                ctx.channel()
+                .attr(NettyHttpResponse.KEY)
+                .set(res);
+
+        Object body = res.getBody();
+        if(body != null) {
+            out.add(body);
+        }
+        else {
+            out.add(nativeResponse);
+        }
     }
 }

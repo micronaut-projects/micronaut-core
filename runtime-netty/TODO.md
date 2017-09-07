@@ -14,3 +14,4 @@
 * Rename Binder -> Decoder
 * RxJava 1/2 Support
 * JSON Array Decoding
+* Support for Functions

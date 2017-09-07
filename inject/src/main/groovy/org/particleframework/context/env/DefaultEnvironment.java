@@ -40,11 +40,11 @@ public class DefaultEnvironment implements Environment {
     private final ClassPathAnnotationScanner annotationScanner;
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
-        this(name,classLoader, new DefaultConversionService());
+        this(name,classLoader, DefaultConversionService.SHARED_INSTANCE);
     }
 
     public DefaultEnvironment(String name) {
-        this(name,DefaultEnvironment.class.getClassLoader(), new DefaultConversionService());
+        this(name,DefaultEnvironment.class.getClassLoader(), DefaultConversionService.SHARED_INSTANCE);
     }
 
     public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {
