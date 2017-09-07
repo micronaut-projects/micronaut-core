@@ -20,6 +20,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
+import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
@@ -33,7 +34,9 @@ import org.particleframework.http.server.netty.cookies.NettyCookies;
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyHttpResponse<B> implements HttpResponse<B> {
+public class NettyHttpResponse<B> implements HttpResponse<B> {
+    public static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
+
     final DefaultFullHttpResponse nettyResponse;
     final NettyHttpRequestHeaders headers;
 
@@ -72,12 +75,7 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public B getBody() {
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public HttpResponse setCharacterEncoding(CharSequence encoding) {
-        throw new UnsupportedOperationException("TODO");
+        return null;
     }
 
     @Override
@@ -85,5 +83,9 @@ class NettyHttpResponse<B> implements HttpResponse<B> {
         message = message == null ? status.getReason() : message;
         nettyResponse.setStatus(new HttpResponseStatus(status.getCode(), message.toString()));
         return this;
+    }
+
+    public DefaultFullHttpResponse getNativeResponse() {
+        return nettyResponse;
     }
 }

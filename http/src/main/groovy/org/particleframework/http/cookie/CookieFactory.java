@@ -25,6 +25,9 @@ import org.particleframework.core.io.service.SoftServiceLoader;
  */
 public interface CookieFactory {
 
+    /**
+     * The default {@link CookieFactory} instance
+     */
     CookieFactory INSTANCE = SoftServiceLoader.load(CookieFactory.class)
                                               .first()
                                               .map(SoftServiceLoader.Service::load)

@@ -7,6 +7,7 @@ import org.particleframework.http.HttpStatus
 import org.particleframework.http.binding.annotation.Body
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Post
+import spock.lang.Ignore
 
 import java.util.concurrent.CompletableFuture
 
@@ -98,6 +99,22 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: Foo(Fred, 10)"
     }
 
+    void "test simple POGO body parse and return"() {
+
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/objectToObject")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == json
+    }
+
+
     void "test array POGO body parsing"() {
 
         when:
@@ -111,6 +128,21 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         client.newCall(
                 request.build()
         ).execute().body().string() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+    }
+
+    void "test array POGO body parsing and return"() {
+
+        when:
+        def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        def request = new Request.Builder()
+                .url("$server/json/arrayToArray")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == json
     }
 
     void "test list POGO body parsing"() {
@@ -191,8 +223,17 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
             "Body: $foo"
         }
 
+        @Post
+        Foo objectToObject(@Body Foo foo) {
+            return foo
+        }
+
         @Post array(@Body Foo[] foos) {
             "Body: ${foos.join(',')}"
+        }
+
+        @Post arrayToArray(@Body Foo[] foos) {
+            return foos
         }
 
         @Post list(@Body List<Foo> foos) {

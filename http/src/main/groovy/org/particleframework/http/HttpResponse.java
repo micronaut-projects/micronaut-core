@@ -154,5 +154,4 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         return setStatus(status, null);
     }
 
-
 }

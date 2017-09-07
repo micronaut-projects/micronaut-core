@@ -1,14 +1,17 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.web.router.RouteMatch;
 
-import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.Executor;
 
 /**
  * A context object used to store information about the current state of the request
@@ -27,15 +30,16 @@ class NettyHttpRequestContext {
     private List<UnboundBodyArgument> unboundBodyArguments = new ArrayList<>();
 
 
-    public NettyHttpRequestContext(ChannelHandlerContext context, NettyHttpRequest request, HttpServerConfiguration serverConfiguration) {
+    public NettyHttpRequestContext(ChannelHandlerContext context, NettyHttpRequest request, HttpServerConfiguration serverConfiguration, ConversionService conversionService) {
         this.context = context;
         this.request = request;
-        this.responseTransmitter = new NettyHttpResponseTransmitter(serverConfiguration);
+        this.responseTransmitter = new NettyHttpResponseTransmitter(serverConfiguration, conversionService);
     }
 
     public void processRequestBody() {
-        context.channel().eventLoop().execute(() -> {
-
+        // TODO: Allow customization of thread pool to execute actions
+        Executor executor = context.channel().eventLoop();
+        executor.execute(() -> {
             List<UnboundBodyArgument> unboundBodyArguments = getUnboundBodyArguments();
             Map<String, Object> resolvedArguments = getRouteArguments();
 
@@ -53,8 +57,12 @@ class NettyHttpRequestContext {
 
             RouteMatch route = getMatchedRoute();
             Object result = route.execute(resolvedArguments);
-            getResponseTransmitter()
-                      .sendText(context, result);
+            if(result != null) {
+                context.writeAndFlush(result);
+            }
+            else {
+                context.flush();
+            }
         });
     }
 

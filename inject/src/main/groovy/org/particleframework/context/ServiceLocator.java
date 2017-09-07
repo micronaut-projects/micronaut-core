@@ -41,7 +41,7 @@ public interface ServiceLocator {
      * Find all services for the given type and condition
      *
      * @param type The type
-     * @param condition A condition that accepts the name of the service and allows condition loading
+     * @param condition A condition that accepts the name of the service and allows conditional loading
      * @param <T> The generic type
      * @return The matching services
      */

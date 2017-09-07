@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.slf4j.Logger;
@@ -24,9 +25,11 @@ public class NettyHttpResponseTransmitter {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final Charset defaultCharset;
+    private final ConversionService conversionService;
 
-    public NettyHttpResponseTransmitter(HttpServerConfiguration serverConfiguration) {
-        defaultCharset = serverConfiguration.getDefaultCharset();
+    public NettyHttpResponseTransmitter(HttpServerConfiguration serverConfiguration, ConversionService conversionService) {
+        this.defaultCharset = serverConfiguration.getDefaultCharset();
+        this.conversionService = conversionService;
     }
 
     /**
@@ -106,7 +109,6 @@ public class NettyHttpResponseTransmitter {
         ctx.channel()
                 .writeAndFlush(httpResponse)
                 .addListener(ChannelFutureListener.CLOSE);
-
     }
 
     public void sendMethodNotAllowed(ChannelHandlerContext ctx, List<HttpMethod> existingRoutes) {

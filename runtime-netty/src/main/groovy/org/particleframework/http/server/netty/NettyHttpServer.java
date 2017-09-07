@@ -18,22 +18,17 @@ package org.particleframework.http.server.netty;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.bind.ArgumentBinder;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.context.env.Environment;
+import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.http.*;
+import org.particleframework.http.HttpMethod;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
@@ -48,9 +43,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.lang.reflect.Field;
-import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -63,27 +58,28 @@ import java.util.stream.Stream;
 @Singleton
 public class NettyHttpServer implements EmbeddedServer {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
+    public static final String HTTP_CODEC = "http-codec";
+    private final Provider<Router> routerProvider;
+    private final Provider<RequestBinderRegistry> requestBinderRegistryProvider;
     private volatile Channel serverChannel;
     private final HttpServerConfiguration serverConfiguration;
-    private final ApplicationContext applicationContext;
+    private final ChannelOutboundHandlerAdapter[] outboundHandlerAdapters;
+    private final Environment environment;
 
     @Inject
     public NettyHttpServer(
             HttpServerConfiguration serverConfiguration,
-            ApplicationContext applicationContext
+            Environment environment,
+            Provider<Router> routerProvider,
+            Provider<RequestBinderRegistry> requestBinderRegistryProvider,
+            ChannelOutboundHandlerAdapter[] outboundHandlerAdapters
     ) {
+        this.environment = environment;
         this.serverConfiguration = serverConfiguration;
-        this.applicationContext = applicationContext;
-        applicationContext.getConversionService().addConverter(
-                ByteBuf.class,
-                String.class,
-                new TypeConverter<ByteBuf, String>() {
-                    @Override
-                    public Optional<String> convert(ByteBuf object, Class<String> targetType, ConversionContext context) {
-                        return Optional.of(object.toString(context.getCharset()));
-                    }
-                }
-        );
+        this.routerProvider = routerProvider;
+        this.requestBinderRegistryProvider = requestBinderRegistryProvider;
+        this.outboundHandlerAdapters = outboundHandlerAdapters;
     }
 
     @Override
@@ -93,10 +89,6 @@ public class NettyHttpServer implements EmbeddedServer {
         NioEventLoopGroup parentGroup = createParentEventLoopGroup();
         ServerBootstrap serverBootstrap = createServerBootstrap();
 
-
-        if (applicationContext == null) {
-            throw new IllegalStateException("Netty HTTP Server implementation requires a reference to the ApplicationContext");
-        }
 
 //      TODO: Restore once ConfigurationPropertiesInheritanceSpec passing for Java
 //        processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
@@ -110,17 +102,23 @@ public class NettyHttpServer implements EmbeddedServer {
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
 
-                        Optional<Router> routerBean = applicationContext.findBean(Router.class);
-                        Optional<RequestBinderRegistry> binderRegistry = applicationContext.findBean(RequestBinderRegistry.class);
+                        Optional<Router> routerBean = resolveRouter();
+                        RequestBinderRegistry binderRegistry = requestBinderRegistryProvider.get();
 
-                        pipeline.addLast(new HttpServerCodec());
-                        pipeline.addLast(new HttpStreamsServerHandler());
-                        pipeline.addLast(new SimpleChannelInboundHandler<HttpRequest>() {
+                        pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
+                        List<ChannelOutboundHandlerAdapter> channelOutboundHandlerAdapters = Arrays.asList(outboundHandlerAdapters);
+                        OrderUtil.reverseSort(channelOutboundHandlerAdapters);
+                        for (ChannelOutboundHandlerAdapter outboundHandlerAdapter : outboundHandlerAdapters) {
+                            pipeline.addLast(outboundHandlerAdapter);
+                        }
+
+                        pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
+                        pipeline.addLast("particle-handler", new SimpleChannelInboundHandler<HttpRequest>() {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
                                 Channel channel = ctx.channel();
 
-                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, ctx, applicationContext.getEnvironment(), serverConfiguration);
+                                NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, ctx, environment, serverConfiguration);
 
                                 // set the request on the channel
                                 NettyHttpRequestContext requestContext = nettyHttpRequest.getRequestContext();
@@ -163,38 +161,36 @@ public class NettyHttpServer implements EmbeddedServer {
                                         argumentValues = new LinkedHashMap<>();
                                         // Begin try fulfilling the argument requirements
                                         for (Argument argument : requiredArguments) {
-                                            if (binderRegistry.isPresent()) {
-                                                Optional<ArgumentBinder> registeredBinder = binderRegistry.get()
-                                                        .findArgumentBinder(argument, nettyHttpRequest);
-                                                if (registeredBinder.isPresent()) {
-                                                    ArgumentBinder argumentBinder = registeredBinder.get();
-                                                    if (argumentBinder instanceof BodyArgumentBinder) {
-                                                        if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
-                                                            Optional bindingResult = argumentBinder
-                                                                    .bind(argument, nettyHttpRequest);
-
-                                                            if (bindingResult.isPresent()) {
-                                                                argumentValues.put(argument.getName(), bindingResult.get());
-                                                                continue;
-                                                            }
-
-                                                        } else {
-
-                                                            requiresBody = true;
-                                                            BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
-                                                            requestContext.addBodyArgument(argument, bodyArgumentBinder);
-                                                        }
-                                                    } else {
-
+                                            Optional<ArgumentBinder> registeredBinder =
+                                                            binderRegistry.findArgumentBinder(argument, nettyHttpRequest);
+                                            if (registeredBinder.isPresent()) {
+                                                ArgumentBinder argumentBinder = registeredBinder.get();
+                                                if (argumentBinder instanceof BodyArgumentBinder) {
+                                                    if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
                                                         Optional bindingResult = argumentBinder
                                                                 .bind(argument, nettyHttpRequest);
-                                                        if (argument.getType() == Optional.class) {
-                                                            argumentValues.put(argument.getName(), bindingResult);
-                                                            continue;
-                                                        } else if (bindingResult.isPresent()) {
+
+                                                        if (bindingResult.isPresent()) {
                                                             argumentValues.put(argument.getName(), bindingResult.get());
                                                             continue;
                                                         }
+
+                                                    } else {
+
+                                                        requiresBody = true;
+                                                        BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
+                                                        requestContext.addBodyArgument(argument, bodyArgumentBinder);
+                                                    }
+                                                } else {
+
+                                                    Optional bindingResult = argumentBinder
+                                                            .bind(argument, nettyHttpRequest);
+                                                    if (argument.getType() == Optional.class) {
+                                                        argumentValues.put(argument.getName(), bindingResult);
+                                                        continue;
+                                                    } else if (bindingResult.isPresent()) {
+                                                        argumentValues.put(argument.getName(), bindingResult.get());
+                                                        continue;
                                                     }
                                                 }
                                             }
@@ -220,13 +216,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         // also support for GSON views etc.
 
                                         // TODO: Need to run this logic on a separate thread pool if the method is blocking
-                                        channel.eventLoop().execute(() -> {
-                                                    Object result = route.execute(argumentValues);
-                                                    Charset charset = serverConfiguration.getDefaultCharset();
-                                                    requestContext.getResponseTransmitter()
-                                                            .sendText(ctx, result, charset);
-                                                }
-                                        );
+                                        requestContext.processRequestBody();
                                     } else if (msg instanceof StreamedHttpRequest) {
                                         MediaType contentType = nettyHttpRequest.getContentType();
                                         StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
@@ -252,7 +242,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
-                                    List<org.particleframework.http.HttpMethod> existingRoutes = routerBean
+                                    List<HttpMethod> existingRoutes = routerBean
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
                                             ).orElse(Stream.empty())
@@ -288,24 +278,34 @@ public class NettyHttpServer implements EmbeddedServer {
                             }
                         });
 
-
                     }
                 })
                 // TODO: handle random port binding
                 .bind(serverConfiguration.getHost(), serverConfiguration.getPort());
 
         future.addListener(op -> {
-            if(future.isSuccess()) {
+            if (future.isSuccess()) {
                 serverChannel = future.channel();
-            }
-            else {
+            } else {
                 Throwable cause = op.cause();
-                if(LOG.isErrorEnabled()) {
+                if (LOG.isErrorEnabled()) {
                     LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
                 }
             }
         });
         return this;
+    }
+
+    private Optional<Router> resolveRouter() {
+        try {
+            Router router = routerProvider.get();
+            return Optional.of(router);
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("No router found for Particle server: " + e.getMessage(), e);
+            }
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -340,22 +340,21 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
-        ConversionService conversionService = applicationContext.getConversionService();
         for (ChannelOption channelOption : options.keySet()) {
             String name = channelOption.name();
             Object value = options.get(channelOption);
             Optional<Field> declaredField = ReflectionUtils.findDeclaredField(ChannelOption.class, name);
-            declaredField.ifPresent((field)-> {
+            declaredField.ifPresent((field) -> {
                 Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
                 typeArg.ifPresent((arg) -> {
-                    Optional converted = conversionService.convert(value, arg);
-                    converted.ifPresent((convertedValue)->
+                    Optional converted = environment.convert(value, arg);
+                    converted.ifPresent((convertedValue) ->
                             biConsumer.accept(channelOption, convertedValue)
                     );
                 });
 
             });
-            if(!declaredField.isPresent()) {
+            if (!declaredField.isPresent()) {
                 biConsumer.accept(channelOption, value);
             }
         }
