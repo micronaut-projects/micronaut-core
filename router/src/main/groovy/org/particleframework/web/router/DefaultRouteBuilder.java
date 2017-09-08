@@ -30,7 +30,10 @@ import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.inject.Argument;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots
@@ -339,8 +342,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                         } else if (argumentValues.containsKey(name)) {
                             value = argumentValues.get(name);
                         }
-
-                        if (value == NO_VALUE) {
+                        if(value instanceof Supplier) {
+                            Supplier supplier = (Supplier) value;
+                            Object o = supplier.get();
+                            Object fv = value;
+                            o = o instanceof Optional ? ((Optional<?>)o).orElseThrow(()-> new IllegalArgumentException("Unable to convert value [" + fv + "] for argument: " + argument)) : o;
+                            if(o != null) {
+                                Optional<?> result = conversionService.convert(o, argument.getType());
+                                argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Unable to convert value [" + fv + "] for argument: " + argument)));
+                            }
+                            else {
+                                throw new IllegalArgumentException("Required argument [" + argument + "] not specified");
+                            }
+                        }
+                        else if (value == NO_VALUE) {
                             throw new IllegalArgumentException("Required argument [" + argument + "] not specified");
                         } else {
                             Object finalValue = value;
@@ -376,6 +391,54 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             @Override
             public ReturnType<Object> getReturnType() {
                 return targetMethod.getReturnType();
+            }
+
+            @Override
+            public RouteMatch<Object> decorate(Function<RouteMatch<Object>, Object> executor) {
+                Map<String, Object> variables = getVariables();
+                Collection<Argument> arguments = getRequiredArguments();
+                RouteMatch thisRoute = this;
+                return new DefaultRouteMatch(matchInfo, executableMethod, httpMethod) {
+                    @Override
+                    public Collection<Argument> getRequiredArguments() {
+                        return Collections.unmodifiableCollection(arguments);
+                    }
+
+                    @Override
+                    public Object execute(Map argumentValues) {
+                        return executor.apply(thisRoute);
+                    }
+
+                    @Override
+                    public Map<String, Object> getVariables() {
+                        return variables;
+                    }
+                };
+            }
+
+            @Override
+            public RouteMatch<Object> fulfill(Map<String, Object> argumentValues) {
+                Map<String, Object> oldVariables = getVariables();
+                Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
+                newVariables.putAll(argumentValues);
+                Set<String> argumentNames = argumentValues.keySet();
+                List<Argument> requiredArguments = getRequiredArguments()
+                        .stream()
+                        .filter(arg -> !argumentNames.contains(arg.getName()))
+                        .collect(Collectors.toList());
+
+
+                return new DefaultRouteMatch(matchInfo, executableMethod, httpMethod) {
+                    @Override
+                    public Collection<Argument> getRequiredArguments() {
+                        return Collections.unmodifiableCollection(requiredArguments);
+                    }
+
+                    @Override
+                    public Map<String, Object> getVariables() {
+                        return newVariables;
+                    }
+                };
             }
 
             @Override

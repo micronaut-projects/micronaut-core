@@ -89,8 +89,9 @@ class NettyHttpServerSpec extends Specification {
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
         new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:10000)
 
-        then:"A 404 is returned"
-        thrown(FileNotFoundException)
+        then:"A 400 is returned"
+        def e = thrown(IOException)
+        e.message.contains('400')
 
         cleanup:
         applicationContext?.stop()

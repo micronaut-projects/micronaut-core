@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
@@ -28,13 +29,15 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
+import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -47,7 +50,10 @@ import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -121,14 +127,13 @@ public class NettyHttpServer implements EmbeddedServer {
                                 NettyHttpRequest nettyHttpRequest = new NettyHttpRequest(msg, ctx, environment, serverConfiguration);
 
                                 // set the request on the channel
-                                NettyHttpRequestContext requestContext = nettyHttpRequest.getRequestContext();
                                 channel.attr(NettyHttpRequest.KEY)
                                         .set(nettyHttpRequest);
 
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());
                                 }
-                                Optional<RouteMatch> routeMatch = routerBean.flatMap((router) ->
+                                Optional<RouteMatch<Object>> routeMatch = routerBean.flatMap((router) ->
                                         router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
                                                 .filter((match) -> match.test(nettyHttpRequest))
                                                 .findFirst()
@@ -140,15 +145,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                     }
                                     // TODO: check the media type vs the route and return 415 if invalid
-
-                                    // TODO: here we need to analyze the binding requirements and if
-                                    // the body is required then add an additional handler to the pipeline
-                                    // right now only URL parameters are supported
-
-                                    requestContext.setMatchedRoute(route);
-
-                                    // TODO: Will need to return type data to make ResponseTransmitter flexible to handle different return types and encoders
-                                    ReturnType returnType = route.getReturnType();
+                                    nettyHttpRequest.setMatchedRoute(route);
 
                                     boolean requiresBody = false;
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
@@ -162,7 +159,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         // Begin try fulfilling the argument requirements
                                         for (Argument argument : requiredArguments) {
                                             Optional<ArgumentBinder> registeredBinder =
-                                                            binderRegistry.findArgumentBinder(argument, nettyHttpRequest);
+                                                    binderRegistry.findArgumentBinder(argument, nettyHttpRequest);
                                             if (registeredBinder.isPresent()) {
                                                 ArgumentBinder argumentBinder = registeredBinder.get();
                                                 if (argumentBinder instanceof BodyArgumentBinder) {
@@ -172,14 +169,13 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                                         if (bindingResult.isPresent()) {
                                                             argumentValues.put(argument.getName(), bindingResult.get());
-                                                            continue;
                                                         }
 
                                                     } else {
-
+                                                        argumentValues.put(argument.getName(), (Supplier<Optional>) () ->
+                                                                argumentBinder.bind(argument, nettyHttpRequest)
+                                                        );
                                                         requiresBody = true;
-                                                        BodyArgumentBinder bodyArgumentBinder = (BodyArgumentBinder) argumentBinder;
-                                                        requestContext.addBodyArgument(argument, bodyArgumentBinder);
                                                     }
                                                 } else {
 
@@ -187,54 +183,89 @@ public class NettyHttpServer implements EmbeddedServer {
                                                             .bind(argument, nettyHttpRequest);
                                                     if (argument.getType() == Optional.class) {
                                                         argumentValues.put(argument.getName(), bindingResult);
-                                                        continue;
                                                     } else if (bindingResult.isPresent()) {
                                                         argumentValues.put(argument.getName(), bindingResult.get());
-                                                        continue;
                                                     }
                                                 }
-                                            }
-
-                                            if (!requiresBody) {
-                                                // if we arrived here the request is not processable
-                                                if (LOG.isErrorEnabled()) {
-                                                    LOG.error("Non-bindable arguments for route: " + route);
-                                                }
-                                                requestContext
-                                                        .getResponseTransmitter()
-                                                        .sendNotFound(ctx.channel());
-                                                return;
                                             }
                                         }
 
                                     }
 
-                                    requestContext.setRouteArguments(argumentValues);
+                                    route = route.fulfill(argumentValues);
 
-                                    if (!requiresBody) {
-                                        // TODO: here we need a way to make the encoding of the result flexible
-                                        // also support for GSON views etc.
+                                    if(!route.isExecutable()) {
+                                            // if we arrived here the request is not processable
+                                            if (LOG.isErrorEnabled()) {
+                                                LOG.error("Non-bindable arguments for route: " + route);
+                                            }
+                                            ctx.writeAndFlush(HttpResponse.badRequest())
+                                                    .addListener(ChannelFutureListener.CLOSE);
+                                    }
+                                    else {
 
-                                        // TODO: Need to run this logic on a separate thread pool if the method is blocking
-                                        requestContext.processRequestBody();
-                                    } else if (msg instanceof StreamedHttpRequest) {
-                                        MediaType contentType = nettyHttpRequest.getContentType();
-                                        StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
+                                        // decorate the execution of the route so that it runs an async executor
+                                        // TODO: Allow customization of thread pool to execute actions
+                                        Executor executor = ctx.channel().eventLoop();
+                                        route = route.decorate(finalRoute -> {
+                                            executor.execute(() -> {
 
-                                        if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
-                                            JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(requestContext);
-                                            streamedHttpRequest.subscribe(contentSubscriber);
+                                                Object result;
+                                                try {
+                                                    result = finalRoute.execute();
+                                                    ChannelFuture channelFuture;
+                                                    if (result != null) {
+                                                        channelFuture = ctx.writeAndFlush(result);
+                                                    } else {
+                                                        HttpResponse res = ctx.channel().attr(NettyHttpResponse.KEY).get();
+                                                        if (res == null) {
+                                                            res = HttpResponse.ok();
+                                                        }
+                                                        channelFuture = ctx.writeAndFlush(res);
+                                                    }
+
+                                                    channelFuture.addListener(future -> {
+                                                        if (!future.isSuccess()) {
+                                                            Throwable cause = future.cause();
+                                                            if (LOG.isErrorEnabled()) {
+                                                                LOG.error("Error encoding response: " + cause.getMessage(), cause);
+                                                            }
+                                                            if (ctx.channel().isWritable()) {
+                                                                ctx.pipeline().fireExceptionCaught(cause);
+                                                            }
+                                                        }
+                                                    });
+                                                } catch (Throwable e) {
+                                                    ctx.pipeline().fireExceptionCaught(e);
+                                                }
+                                            });
+                                            return null;
+                                        });
+                                        nettyHttpRequest.setMatchedRoute(route);
+
+                                        if (!requiresBody) {
+                                            route.execute();
+                                        } else if (msg instanceof StreamedHttpRequest) {
+                                            MediaType contentType = nettyHttpRequest.getContentType();
+                                            StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
+
+                                            if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
+                                                JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(nettyHttpRequest);
+                                                streamedHttpRequest.subscribe(contentSubscriber);
+                                            } else {
+                                                Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(nettyHttpRequest);
+                                                streamedHttpRequest.subscribe(contentSubscriber);
+                                            }
+
                                         } else {
-                                            Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(requestContext);
-                                            streamedHttpRequest.subscribe(contentSubscriber);
+                                            if (LOG.isDebugEnabled()) {
+                                                LOG.debug("Request body expected, but was empty.");
+                                            }
+                                            ctx.writeAndFlush(HttpResponse.badRequest())
+                                                    .addListener(ChannelFutureListener.CLOSE);
+
                                         }
 
-                                    } else {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Request body expected, but was empty.");
-                                        }
-                                        requestContext.getResponseTransmitter()
-                                                .sendBadRequest(ctx);
                                     }
                                 }));
 
@@ -242,21 +273,20 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
-                                    List<HttpMethod> existingRoutes = routerBean
+                                    Set<HttpMethod> existingRoutes = routerBean
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
                                             ).orElse(Stream.empty())
                                             .map(RouteMatch::getHttpMethod)
-                                            .collect(Collectors.toList());
+                                            .collect(Collectors.toSet());
                                     if (!existingRoutes.isEmpty()) {
-                                        requestContext
-                                                .getResponseTransmitter()
-                                                .sendMethodNotAllowed(ctx, existingRoutes);
+                                        ctx.writeAndFlush(HttpResponse.notAllowed(
+                                                existingRoutes
+                                        )).addListener(ChannelFutureListener.CLOSE);
                                     } else {
                                         // TODO: Here we need to add routing for 404 handlers
-                                        requestContext
-                                                .getResponseTransmitter()
-                                                .sendNotFound(channel);
+                                        ctx.writeAndFlush(HttpResponse.notFound())
+                                           .addListener(ChannelFutureListener.CLOSE);
                                     }
                                 }
                             }
@@ -267,13 +297,26 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (LOG.isErrorEnabled()) {
                                     LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
                                 }
-                                // TODO: Here we need to add routing to error handlers
-                                DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
-                                        HttpVersion.HTTP_1_1,
-                                        HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                                ctx.channel()
-                                        .writeAndFlush(httpResponse)
-                                        .addListener(ChannelFutureListener.CLOSE);
+                                // TODO: Remove this dependency on Jackson and add custom exception handling
+                                if (cause instanceof JsonParseException) {
+                                    ctx.writeAndFlush(HttpResponse.badRequest())
+                                            .addListener(ChannelFutureListener.CLOSE);
+                                }
+                                else if(cause instanceof ContentLengthExceededException) {
+                                    ctx.writeAndFlush(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE))
+                                            .addListener(ChannelFutureListener.CLOSE);
+                                }
+                                else {
+                                    // TODO: Here we need to add routing to error handlers
+                                    DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
+                                            HttpVersion.HTTP_1_1,
+                                            HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                                    ctx.channel()
+                                            .writeAndFlush(httpResponse)
+                                            .addListener(ChannelFutureListener.CLOSE);
+
+                                }
+
 
                             }
                         });
@@ -294,18 +337,6 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         });
         return this;
-    }
-
-    private Optional<Router> resolveRouter() {
-        try {
-            Router router = routerProvider.get();
-            return Optional.of(router);
-        } catch (Exception e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("No router found for Particle server: " + e.getMessage(), e);
-            }
-            return Optional.empty();
-        }
     }
 
     @Override
@@ -337,6 +368,18 @@ public class NettyHttpServer implements EmbeddedServer {
 
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
+    }
+
+    private Optional<Router> resolveRouter() {
+        try {
+            Router router = routerProvider.get();
+            return Optional.of(router);
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("No router found for Particle server: " + e.getMessage(), e);
+            }
+            return Optional.empty();
+        }
     }
 
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {

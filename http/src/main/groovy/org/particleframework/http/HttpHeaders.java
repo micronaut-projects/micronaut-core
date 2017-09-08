@@ -21,7 +21,10 @@ import org.particleframework.core.convert.ConvertibleMultiValues;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.stream.Collectors;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
@@ -381,4 +384,34 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
         return getFirst(name, String.class);
     }
 
+    /**
+     * The request or response content type
+     * @return The content type
+     */
+    default Optional<MediaType> contentType() {
+        return findFirst(HttpHeaders.CONTENT_TYPE)
+                .map(MediaType::new);
+    }
+
+    /**
+     * The request or response content type
+     * @return The content type
+     */
+    default OptionalLong contentLength() {
+        Optional<Long> optional = getFirst(HttpHeaders.CONTENT_LENGTH, Long.class);
+        return optional.map(OptionalLong::of).orElseGet(OptionalLong::empty);
+    }
+
+    /**
+     * A list of accepted {@link MediaType} instances
+     *
+     * @return A list of zero or many {@link MediaType} instances
+     */
+    default List<MediaType> accept() {
+        return getAll(HttpHeaders.ACCEPT)
+                .stream()
+                .map(MediaType::new)
+                .distinct()
+                .collect(Collectors.toList());
+    }
 }

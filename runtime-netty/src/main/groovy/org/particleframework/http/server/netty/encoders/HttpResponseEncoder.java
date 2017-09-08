@@ -19,6 +19,8 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpUtil;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.server.netty.NettyHttpResponse;

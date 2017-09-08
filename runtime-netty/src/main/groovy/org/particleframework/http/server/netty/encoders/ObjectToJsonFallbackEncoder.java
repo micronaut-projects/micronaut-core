@@ -23,6 +23,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 
 import javax.inject.Singleton;
@@ -68,9 +69,14 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
 
         ByteBuf content = Unpooled.copiedBuffer(bytes);
         int len = bytes.length;
-        httpResponse
-                .headers()
-                .add(HttpHeaderNames.CONTENT_LENGTH, len);
+        HttpHeaders headers = httpResponse.headers();
+        if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+            headers
+                    .add(HttpHeaderNames.CONTENT_LENGTH, len);
+        }
+        if(headers.get(HttpHeaderNames.CONTENT_TYPE) == null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.APPLICATION_JSON_TYPE );
+        }
         out.add(httpResponse.replace(content));
     }
 

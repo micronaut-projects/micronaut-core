@@ -22,6 +22,7 @@ import org.particleframework.core.convert.DefaultConversionService
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.MutableHttpResponse
 import org.particleframework.http.cookie.Cookie
 import spock.lang.Specification
 
@@ -39,7 +40,7 @@ class NettyHttpResponseSpec extends Specification {
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
         HttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
 
-        response.setStatus(HttpStatus."$status")
+        response.status(HttpStatus."$status")
         response.headers.add(header, value)
 
         expect:
@@ -55,10 +56,10 @@ class NettyHttpResponseSpec extends Specification {
     void "test add simple cookie"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        HttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
+        MutableHttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
 
-        response.setStatus(HttpStatus."$status")
-        response.addCookie(Cookie.of("foo", "bar"))
+        response.status(HttpStatus."$status")
+        response.cookie(Cookie.of("foo", "bar"))
 
         expect:
         response.status == HttpStatus."$status"
@@ -72,10 +73,10 @@ class NettyHttpResponseSpec extends Specification {
     void "test add cookie with max age"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        HttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
+        MutableHttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
 
-        response.setStatus(HttpStatus."$status")
-        response.addCookie(Cookie.of("foo", "bar").setMaxAge(Duration.ofHours(2)))
+        response.status(HttpStatus."$status")
+        response.cookie(Cookie.of("foo", "bar").setMaxAge(Duration.ofHours(2)))
 
         expect:
         response.status == HttpStatus."$status"

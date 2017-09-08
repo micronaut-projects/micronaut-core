@@ -13,5 +13,5 @@
 * Pluggable Encoders
 * Rename Binder -> Decoder
 * RxJava 1/2 Support
-* JSON Array Decoding
-* Support for Functions
+* JSON Array Decoding via Stream
+* Support for Functions (Serverless)

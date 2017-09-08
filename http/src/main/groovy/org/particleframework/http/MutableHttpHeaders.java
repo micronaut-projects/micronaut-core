@@ -15,8 +15,12 @@
  */
 package org.particleframework.http;
 
+import java.net.URI;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 /**
  * Extends {@link HttpHeaders} add methods for mutation of headers
@@ -26,6 +30,46 @@ import java.time.format.DateTimeFormatter;
  */
 public interface MutableHttpHeaders extends HttpHeaders {
 
+    /**
+     * Set the allowed HTTP methods
+     *
+     * @param methods The methods to specify in the Allowed HTTP header
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders allow(HttpMethod...methods) {
+        return allow(Arrays.asList(methods));
+    }
+
+    /**
+     * Set the allowed HTTP methods
+     *
+     * @param methods The methods to specify in the Allowed HTTP header
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders allow(Collection<HttpMethod> methods) {
+        String value = methods.stream().distinct().collect(Collectors.joining(","));
+        return add(HttpHeaders.ALLOW, value);
+    }
+
+    /**
+     * Sets the location header to the given URI
+     *
+     * @param uri The URI
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders location(URI uri) {
+        return add(HttpHeaders.LOCATION, uri.toString());
+    }
+
+    /**
+     * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type
+     *
+     * @param mediaType The media type
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders contentType(MediaType mediaType) {
+        return add(HttpHeaders.CONTENT_TYPE, mediaType);
+    }
     /**
      * Add a header for the given name and value
      *
