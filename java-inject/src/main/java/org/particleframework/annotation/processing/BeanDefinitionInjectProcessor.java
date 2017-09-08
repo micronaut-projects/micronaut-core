@@ -79,7 +79,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 // filtering annotation definitions, which are not processed
                 .filter(element -> element.getKind() != ANNOTATION_TYPE)
                 .forEach(element -> {
-                    // FIXME handle abstract class annotations correctly
                     TypeElement typeElement = modelUtils.classElementFor(element);
                     AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
                     beanDefinitionWriters.put(typeElement.getQualifiedName().toString(), visitor);
@@ -166,7 +165,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             note("Visit type %s for %s", classElement.getSimpleName(), o);
             assert (classElement.getKind() == CLASS) : "classElement must be a class";
 
-
             Element enclosingElement = classElement.getEnclosingElement();
             if (enclosingElement.getKind() != CLASS) {
                 // it's not an inner class
@@ -191,7 +189,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 if (isConfigurationPropertiesType) {
                     // handle non @Inject, @Value fields as config properties
-                    ElementFilter.fieldsIn(elements).forEach(
+                    ElementFilter.fieldsIn(elementUtils.getAllMembers(classElement)).forEach(
                         field -> visitConfigurationProperty(field, o)
                     );
                 } else {
@@ -434,7 +432,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
             }
             return null;
-//            return super.visitVariable(variable, o);
         }
 
         public Object visitConfigurationProperty(VariableElement field, Object o) {
@@ -462,26 +459,28 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     genericTypes = Collections.emptyList();
                 }
 
+                TypeElement declaringClass = modelUtils.classElementFor(field);
+
                 if (setterMethod.isPresent()) {
                     ExecutableElement method = setterMethod.get();
                     writer.visitSetterValue(
-                            this.concreteClass.getQualifiedName().toString(),
-                            qualifierRef,
-                            modelUtils.requiresReflection(method),
-                            fieldType,
-                            field.getSimpleName().toString(),
-                            method.getSimpleName().toString(),
-                            genericTypes,
-                            true);
+                        modelUtils.resolveTypeReference(declaringClass),
+                        qualifierRef,
+                        modelUtils.requiresReflection(method),
+                        fieldType,
+                        field.getSimpleName().toString(),
+                        method.getSimpleName().toString(),
+                        genericTypes,
+                        isConfigurationPropertiesType);
                 }
                 else {
                     writer.visitFieldValue(
-                            this.concreteClass.getQualifiedName().toString(),
-                            qualifierRef,
-                            !field.getModifiers().contains(Modifier.PUBLIC),
-                            fieldType,
-                            field.getSimpleName().toString(),
-                            true);
+                        modelUtils.resolveTypeReference(declaringClass),
+                        qualifierRef,
+                        !field.getModifiers().contains(Modifier.PUBLIC),
+                        fieldType,
+                        field.getSimpleName().toString(),
+                        isConfigurationPropertiesType);
                 }
             }
 
@@ -570,7 +569,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }).findFirst();
             return element.isPresent()? element.get() : null;
         }
-
 
         private ExecutableElementParamInfo populateParameterData(ExecutableElement element) {
             ExecutableElementParamInfo params = new ExecutableElementParamInfo();

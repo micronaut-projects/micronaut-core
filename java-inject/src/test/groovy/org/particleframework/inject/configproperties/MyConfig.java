@@ -22,7 +22,7 @@ public class MyConfig {
     Map<String,Integer> flags;
     Optional<URL> url;
     Optional<URL> anotherUrl;
-//    Inner inner;
+    Inner inner;
 
     public Integer getAnotherPort() {
         return anotherPort;
