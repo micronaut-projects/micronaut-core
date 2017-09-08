@@ -7,6 +7,7 @@ import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.configurations.requiresbean.RequiresBean
 import org.particleframework.inject.configurations.requirescondition.TravisBean
+import org.particleframework.inject.configurations.requiresconditionclass.TravisBean2
 import org.particleframework.inject.configurations.requiresconfig.RequiresConfig
 import org.particleframework.inject.configurations.requiresproperty.RequiresProperty
 import org.particleframework.inject.configurations.requiressdk.RequiresJava9
@@ -28,6 +29,7 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresConfig)
         !context.containsBean(RequiresJava9)
         !context.containsBean(TravisBean)
+        !context.containsBean(TravisBean2)
     }
 
     void "test requires property when not present"() {
