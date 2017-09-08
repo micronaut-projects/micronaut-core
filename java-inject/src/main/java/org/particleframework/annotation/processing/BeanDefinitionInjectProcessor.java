@@ -21,7 +21,10 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import javax.tools.JavaFileObject;
@@ -32,7 +35,8 @@ import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
 import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.type.TypeKind.*;
+import static javax.lang.model.type.TypeKind.ARRAY;
+import static javax.lang.model.type.TypeKind.DECLARED;
 
 @SupportedAnnotationTypes({
     "javax.annotation.PostConstruct",
@@ -296,40 +300,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         void visitAnnotatedMethod(ExecutableElement method, Object o) {
             ExecutableElementParamInfo params = populateParameterData(method);
-            TypeElement declaringClass = modelUtils.classElementFor(method);
             BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
-            TypeMirror producedType = method.getReturnType();
-            Object returnType = modelUtils.resolveTypeReference(producedType);
+            TypeMirror returnType = method.getReturnType();
+            TypeElement declaringClass = modelUtils.classElementFor(method);
 
-
-            // TODO figure out how to replicate all this logic.
-                /*
-                boolean isParent = methodNode.declaringClass != concreteClass
-                MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodNode.name, methodNode.parameters) : methodNode
-                boolean overridden = isParent && overriddenMethod.declaringClass != methodNode.declaringClass
-
-                boolean isPackagePrivate = isPackagePrivate(methodNode, methodNode.modifiers)
-                boolean isPrivate = methodNode.isPrivate()
-                if (isParent && !isPrivate && !isPackagePrivate) {
-                    if (overridden) {
-                        // bail out if the method has been overridden, since it will have already been handled
-                        return
-                    }
-                }
-                boolean isPackagePrivateAndPackagesDiffer = overridden && (overriddenMethod.declaringClass.packageName != methodNode.declaringClass.packageName) && isPackagePrivate
-                boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
-                boolean overriddenInjected = overridden && stereoTypeFinder.hasStereoType(overriddenMethod, Inject)
-
-                if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
-                    // bail out if the overridden method is package private and in the same package
-                    // and is not annotated with @Inject
-                    return
-                }
-                if (!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
-                    requiresReflection = true
-                }
-                 */
-
+            // implementation note: this logic tracks the logic for the same code in ast:InjectTransform
             // for example
             // concrete class = org.particleframework.inject.inheritance.AbstractInheritanceSpec$B
             // method = void setAnother(A a)
@@ -344,18 +319,40 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // overriddenInjected = false
             // isInheritedAndNotPublic = false
 
+            boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
+            ExecutableElement overridingMethod = modelUtils.overridingMethod(method, this.concreteClass).orElse(method);
+            TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
+            boolean overridden = isParent &&
+                !overridingClass.getQualifiedName().equals(declaringClass.getQualifiedName());
+
             boolean isPackagePrivate = modelUtils.isPackagePrivate(method);
             boolean isPrivate = modelUtils.isPrivate(method);
-            boolean isParent = method.getEnclosingElement() != this.concreteClass;
-            boolean requiresReflection = isPrivate;
+            if (overridden && !(isPrivate && isPackagePrivate)) {
+                // bail out if the method has been overridden, since it will have already been handled
+                return;
+            }
 
+            PackageElement packageOfOverridingClass = elementUtils.getPackageOf(overridingMethod);
+            PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
+            boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
+                !packageOfOverridingClass.getQualifiedName().equals(packageOfDeclaringClass.getQualifiedName());
+            boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer;
+            boolean overriddenInjected = overridden && annotationUtils.hasStereotype(overridingMethod, Inject.class);
 
+            if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+                // bail out if the overridden method is package private and in the same package
+                // and is not annotated with @Inject
+                return;
+            }
+            if (!requiresReflection && modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, method)) {
+                requiresReflection = true;
+            }
 
             if (annotationUtils.hasStereotype(method, PostConstruct.class)) {
                 writer.visitPostConstructMethod(
-                    declaringClass.getQualifiedName().toString(),
+                    modelUtils.resolveTypeReference(declaringClass),
                     requiresReflection,
-                    returnType,
+                    modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
@@ -363,9 +360,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             } else if (annotationUtils.hasStereotype(method, PreDestroy.class)) {
                 writer.visitPreDestroyMethod(
-                    declaringClass.getQualifiedName().toString(),
+                    modelUtils.resolveTypeReference(declaringClass),
                     requiresReflection,
-                    returnType,
+                    modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
@@ -373,9 +370,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             } else if (annotationUtils.hasStereotype(method, Inject.class)) {
                 writer.visitMethodInjectionPoint(
-                    declaringClass.getQualifiedName().toString(),
+                    modelUtils.resolveTypeReference(declaringClass),
                     requiresReflection,
-                    returnType,
+                    modelUtils.resolveTypeReference(returnType),
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
