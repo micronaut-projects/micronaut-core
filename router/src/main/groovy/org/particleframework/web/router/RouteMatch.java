@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -59,6 +60,22 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
      */
     R execute(Map<String, Object> argumentValues);
 
+    /**
+     * Returns a new {@link RouteMatch} fulfilling arguments required by this route to execute. The new route will not
+     * return the given arguments from the {@link #getRequiredArguments()} method
+     *
+     * @param argumentValues The argument values
+     * @return The fulfilled route
+     */
+    RouteMatch<R> fulfill(Map<String, Object> argumentValues);
+
+    /**
+     * Decorates the execution of the route with the given executor
+     *
+     * @param executor The executor
+     * @return A new route match
+     */
+    RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
 
     /**
      * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}

@@ -2,6 +2,7 @@ package org.particleframework.http.server.netty;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
+import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -15,17 +16,16 @@ import org.slf4j.LoggerFactory;
  */
 public class HttpContentSubscriber implements Subscriber<HttpContent> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    private final NettyHttpRequestContext requestContext;
+    private final NettyHttpRequest nettyHttpRequest;
+    private final RouteMatch<Object> route;
     private final ChannelHandlerContext ctx;
 
-    HttpContentSubscriber(NettyHttpRequestContext requestContext) {
-        this.requestContext = requestContext;
-        this.ctx = requestContext.getContext();
+    public HttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest) {
+        this.nettyHttpRequest = nettyHttpRequest;
+        this.route = nettyHttpRequest.getMatchedRoute();
+        this.ctx = nettyHttpRequest.getChannelHandlerContext();
     }
 
-    public HttpContentSubscriber(NettyHttpRequest request) {
-        this(request.getRequestContext());
-    }
 
     @Override
     public void onSubscribe(Subscription s) {
@@ -34,9 +34,7 @@ public class HttpContentSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onNext(HttpContent httpContent) {
-        requestContext
-                .getRequest()
-                .addContent(httpContent);
+        nettyHttpRequest.addContent(httpContent);
     }
 
     @Override
@@ -49,6 +47,6 @@ public class HttpContentSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onComplete() {
-        requestContext.processRequestBody();
+        route.execute();
     }
 }

@@ -41,7 +41,7 @@ class GreenLightningParticleDispatcher implements RestListener {
 
         final Optional<Router> routerBean = applicationContext.findBean(Router.class);
 
-        final Optional<RouteMatch> routeMatch = routerBean.flatMap((router) -> {
+        final Optional<RouteMatch<Object>> routeMatch = routerBean.flatMap((router) -> {
                     return router.find(HttpMethod.GET, routePath.toString())
 //                            .filter((match) -> match.test( ?? ))
                             .findFirst();

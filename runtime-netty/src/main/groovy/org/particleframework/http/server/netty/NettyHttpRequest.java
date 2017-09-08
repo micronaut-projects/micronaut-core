@@ -28,6 +28,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
+import org.particleframework.web.router.RouteMatch;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -48,7 +49,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private final HttpMethod httpMethod;
     private final URI uri;
     private final NettyHttpRequestHeaders headers;
-    private final NettyHttpRequestContext requestContext;
+    private final ChannelHandlerContext channelHandlerContext;
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
     private Locale locale;
@@ -57,6 +58,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private long receivedLength = 0;
     private Object body;
     private MediaType mediaType;
+    private RouteMatch<Object> matchedRoute;
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
@@ -64,7 +66,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
                             HttpServerConfiguration serverConfiguration) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(conversionService, "ConversionService cannot be null");
-        this.requestContext = new NettyHttpRequestContext(ctx, this);
+        this.channelHandlerContext = ctx;
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
         String fullUri = nettyRequest.uri();
@@ -79,8 +81,8 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return nettyRequest;
     }
 
-    NettyHttpRequestContext getRequestContext() {
-        return requestContext;
+    public ChannelHandlerContext getChannelHandlerContext() {
+        return channelHandlerContext;
     }
 
     void addContent(HttpContent httpContent) {
@@ -163,8 +165,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     @Override
     public InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) getRequestContext()
-                .getContext()
+        return (InetSocketAddress) getChannelHandlerContext()
                 .channel()
                 .remoteAddress();
     }
@@ -229,5 +230,13 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     void setBody(T body) {
         this.body = body;
+    }
+
+    void setMatchedRoute(RouteMatch<Object> matchedRoute) {
+        this.matchedRoute = matchedRoute;
+    }
+
+    RouteMatch<Object> getMatchedRoute() {
+        return matchedRoute;
     }
 }

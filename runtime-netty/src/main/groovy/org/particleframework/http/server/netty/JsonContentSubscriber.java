@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -29,18 +30,13 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
     private final AtomicReference<Throwable> error = new AtomicReference<>();
     private final ChannelHandlerContext ctx;
     private final NettyHttpRequest nettyHttpRequest;
-    private final NettyHttpRequestContext requestContext;
+    private final RouteMatch<Object> route;
 
-    protected JsonContentSubscriber(NettyHttpRequestContext requestContext) {
-        this.requestContext = requestContext;
-        this.ctx = requestContext.getContext();
-        this.nettyHttpRequest = requestContext.getRequest();
-    }
 
-    protected JsonContentSubscriber(NettyHttpRequest request) {
-        this.requestContext = request.getRequestContext();
-        this.ctx = requestContext.getContext();
-        this.nettyHttpRequest = requestContext.getRequest();
+    public JsonContentSubscriber(NettyHttpRequest request) {
+        this.nettyHttpRequest = request;
+        this.route = request.getMatchedRoute();
+        this.ctx = request.getChannelHandlerContext();
     }
 
     @Override
@@ -87,7 +83,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
      */
     protected void onComplete(JsonNode jsonNode) {
         nettyHttpRequest.setBody(jsonNode);
-        requestContext.processRequestBody();
+        route.execute();
     }
 
     @Override
