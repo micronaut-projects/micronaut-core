@@ -62,7 +62,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> addCookie(Cookie cookie) {
+    public MutableHttpResponse<B> cookie(Cookie cookie) {
         if(cookie instanceof NettyCookies.NettyCookie) {
             NettyCookies.NettyCookie nettyCookie = (NettyCookies.NettyCookie) cookie;
             String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
@@ -80,7 +80,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> setStatus(HttpStatus status, CharSequence message) {
+    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
         message = message == null ? status.getReason() : message;
         nettyResponse.setStatus(new HttpResponseStatus(status.getCode(), message.toString()));
         return this;

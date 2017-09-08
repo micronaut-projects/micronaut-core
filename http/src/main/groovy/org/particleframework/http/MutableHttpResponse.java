@@ -21,6 +21,7 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * A version of the {@link HttpResponse} interface that is mutable allowing the ability to set headers, character encoding etc.
@@ -29,6 +30,17 @@ import java.util.Map;
  * @since 1.0
  */
 public interface MutableHttpResponse<B> extends HttpResponse<B> {
+
+    /**
+     * Mutate the headers with the given consumer
+     *
+     * @param headers The headers
+     * @return This response
+     */
+    default MutableHttpResponse<B> headers(Consumer<MutableHttpHeaders> headers) {
+        headers.accept(getHeaders());
+        return this;
+    }
     /**
      * Adds the specified cookie to the response.  This method can be called
      * multiple times to set more than one cookie.
@@ -36,18 +48,18 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param cookie the Cookie to return to the client
      *
      */
-    MutableHttpResponse<B> addCookie(Cookie cookie);
+    MutableHttpResponse<B> cookie(Cookie cookie);
 
     /**
-     * Sets the response encoding. Should be called after {@link #setContentType(MediaType)}
+     * Sets the response encoding. Should be called after {@link #contentType(MediaType)}
      *
      * @param encoding The encoding to use
      */
-    default MutableHttpResponse<B> setCharacterEncoding(CharSequence encoding) {
+    default MutableHttpResponse<B> characterEncoding(CharSequence encoding) {
         if(encoding != null) {
             MediaType mediaType = getContentType();
             if(mediaType != null) {
-                setContentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())));
+                contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())));
             }
         }
         return this;
@@ -58,8 +70,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param encoding The encoding to use
      */
-    default MutableHttpResponse<B> setCharacterEncoding(Charset encoding) {
-        return setCharacterEncoding(encoding.toString());
+    default MutableHttpResponse<B> characterEncoding(Charset encoding) {
+        return characterEncoding(encoding.toString());
     }
 
     /**
@@ -67,14 +79,14 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param status The status
      */
-    MutableHttpResponse<B> setStatus(HttpStatus status, CharSequence message);
+    MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
     /**
      * Set a response header
      *
      * @param name The name of the header
      * @param value The value of the header
      */
-    default MutableHttpResponse<B> addHeader(CharSequence name, CharSequence value) {
+    default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
         getHeaders().add(name, value);
         return this;
     }
@@ -84,7 +96,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param namesAndValues The names and values
      */
-    default MutableHttpResponse<B> addHeaders(Map<CharSequence,CharSequence> namesAndValues) {
+    default MutableHttpResponse<B> headers(Map<CharSequence,CharSequence> namesAndValues) {
         MutableHttpHeaders headers = getHeaders();
         namesAndValues.forEach(headers::add);
         return this;
@@ -96,7 +108,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param length The length
      * @return This HttpResponse
      */
-    default MutableHttpResponse<B> setContentLength(long length) {
+    default MutableHttpResponse<B> contentLength(long length) {
         getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
         return this;
     }
@@ -106,7 +118,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param contentType The content type
      */
-    default MutableHttpResponse<B> setContentType(CharSequence contentType) {
+    default MutableHttpResponse<B> contentType(CharSequence contentType) {
         getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
         return this;
     }
@@ -116,7 +128,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param mediaType The media type
      */
-    default MutableHttpResponse<B> setContentType(MediaType mediaType) {
+    default MutableHttpResponse<B> contentType(MediaType mediaType) {
         getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
         return this;
     }
@@ -126,8 +138,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param locale The locale
      * @return This response
      */
-    default MutableHttpResponse<B> setLocale(Locale locale) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, locale.toString());
+    default MutableHttpResponse<B> locale(Locale locale) {
+        getHeaders().add(HttpHeaders.CONTENT_LANGUAGE, locale.toString());
         return this;
     }
 
@@ -136,8 +148,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param status The status
      */
-    default MutableHttpResponse<B> setStatus(int status) {
-        return setStatus(HttpStatus.valueOf(status));
+    default MutableHttpResponse<B> status(int status) {
+        return status(HttpStatus.valueOf(status));
     }
 
     /**
@@ -145,8 +157,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param status The status
      */
-    default MutableHttpResponse<B> setStatus(int status, CharSequence message) {
-        return setStatus(HttpStatus.valueOf(status), message);
+    default MutableHttpResponse<B> status(int status, CharSequence message) {
+        return status(HttpStatus.valueOf(status), message);
     }
 
     /**
@@ -154,8 +166,8 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param status The status
      */
-    default MutableHttpResponse<B> setStatus(HttpStatus status) {
-        return setStatus(status, null);
+    default MutableHttpResponse<B> status(HttpStatus status) {
+        return status(status, null);
     }
 
 

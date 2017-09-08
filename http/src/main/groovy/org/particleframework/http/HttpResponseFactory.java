@@ -16,7 +16,11 @@
 package org.particleframework.http;
 
 import org.particleframework.core.io.service.SoftServiceLoader;
+import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.http.cookie.CookieFactory;
+
+import java.net.URI;
+import java.util.Optional;
 
 /**
  * A factory interface for creating {@link MutableHttpResponse} instances
@@ -29,15 +33,15 @@ public interface HttpResponseFactory {
     /**
      * The default {@link CookieFactory} instance
      */
-    HttpResponseFactory INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
+    Optional<HttpResponseFactory> INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
             .first()
-            .map(SoftServiceLoader.Service::load)
-            .orElse(null);
+            .map(SoftServiceLoader.Service::load);
+
 
     /**
      * @return The ok response
      */
-    default MutableHttpResponse ok() {
+    default <T> MutableHttpResponse<T> ok() {
         return ok(null);
     }
 
@@ -45,7 +49,7 @@ public interface HttpResponseFactory {
      * @param status The status
      * @return The restus response
      */
-    default MutableHttpResponse status(HttpStatus status) {
+    default <T> MutableHttpResponse<T> status(HttpStatus status) {
         return status(status, null);
     }
 
@@ -53,7 +57,7 @@ public interface HttpResponseFactory {
      * Creates an {@link HttpStatus#OK} response with a body
      *
      * @param body The body
-     * @param <T> The body type
+     * @param <T>  The body type
      * @return The ok response with the given body
      */
     <T> MutableHttpResponse<T> ok(T body);
@@ -65,5 +69,6 @@ public interface HttpResponseFactory {
      * @param reason An alternatively reason message
      * @return The response
      */
-    MutableHttpResponse status(HttpStatus status, String reason);
+    <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
+
 }

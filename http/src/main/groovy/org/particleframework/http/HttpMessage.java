@@ -53,7 +53,7 @@ public interface HttpMessage<B> {
      */
     default long getContentLength() {
         return getHeaders()
-                .getFirst(HttpHeaders.CONTENT_LENGTH, Long.class)
+                .contentLength()
                 .orElse(-1L);
     }
     /**
@@ -61,8 +61,8 @@ public interface HttpMessage<B> {
      * @return The content type
      */
     default MediaType getContentType() {
-        return getHeaders().findFirst(HttpHeaders.CONTENT_TYPE)
-                .map(MediaType::new)
+        return getHeaders()
+                .contentType()
                 .orElse(null);
     }
 
