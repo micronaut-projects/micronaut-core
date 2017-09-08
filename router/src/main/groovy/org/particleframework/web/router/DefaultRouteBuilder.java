@@ -424,7 +424,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 Set<String> argumentNames = argumentValues.keySet();
                 List<Argument> requiredArguments = getRequiredArguments()
                         .stream()
-                        .filter(arg -> argumentNames.contains(arg.getName()))
+                        .filter(arg -> !argumentNames.contains(arg.getName()))
                         .collect(Collectors.toList());
 
 

@@ -96,4 +96,12 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
      * @return The matched HTTP method
      */
     HttpMethod getHttpMethod();
+
+    /**
+     * @return Whether the route match can be executed without passing any additional arguments ie. via {@link #execute()}
+     */
+    default boolean isExecutable() {
+        return getRequiredArguments().size() == 0;
+    }
+
 }

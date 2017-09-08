@@ -145,14 +145,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                         LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                     }
                                     // TODO: check the media type vs the route and return 415 if invalid
-
-                                    // TODO: here we need to analyze the binding requirements and if
-                                    // the body is required then add an additional handler to the pipeline
-                                    // right now only URL parameters are supported
-
                                     nettyHttpRequest.setMatchedRoute(route);
 
-                                    // TODO: Will need to return type data to make ResponseTransmitter flexible to handle different return types and encoders
                                     boolean requiresBody = false;
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
                                     Map<String, Object> argumentValues;
@@ -175,7 +169,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                                         if (bindingResult.isPresent()) {
                                                             argumentValues.put(argument.getName(), bindingResult.get());
-                                                            continue;
                                                         }
 
                                                     } else {
@@ -190,22 +183,10 @@ public class NettyHttpServer implements EmbeddedServer {
                                                             .bind(argument, nettyHttpRequest);
                                                     if (argument.getType() == Optional.class) {
                                                         argumentValues.put(argument.getName(), bindingResult);
-                                                        continue;
                                                     } else if (bindingResult.isPresent()) {
                                                         argumentValues.put(argument.getName(), bindingResult.get());
-                                                        continue;
                                                     }
                                                 }
-                                            }
-
-                                            if (!requiresBody) {
-                                                // if we arrived here the request is not processable
-                                                if (LOG.isErrorEnabled()) {
-                                                    LOG.error("Non-bindable arguments for route: " + route);
-                                                }
-                                                ctx.writeAndFlush(HttpResponse.notFound())
-                                                        .addListener(ChannelFutureListener.CLOSE);
-                                                return;
                                             }
                                         }
 
@@ -213,65 +194,77 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                     route = route.fulfill(argumentValues);
 
-                                    // decorate the execution of the route so that it runs an async executor
-                                    // TODO: Allow customization of thread pool to execute actions
-                                    Executor executor = ctx.channel().eventLoop();
-                                    route = route.decorate(finalRoute -> {
-                                        executor.execute(() -> {
-
-                                            Object result;
-                                            try {
-                                                result = finalRoute.execute();
-                                                ChannelFuture channelFuture;
-                                                if (result != null) {
-                                                    channelFuture = ctx.writeAndFlush(result);
-                                                } else {
-                                                    HttpResponse res = ctx.channel().attr(NettyHttpResponse.KEY).get();
-                                                    if (res == null) {
-                                                        res = HttpResponse.ok();
-                                                    }
-                                                    channelFuture = ctx.writeAndFlush(res);
-                                                }
-
-                                                channelFuture.addListener(future -> {
-                                                    if (!future.isSuccess()) {
-                                                        Throwable cause = future.cause();
-                                                        if (LOG.isErrorEnabled()) {
-                                                            LOG.error("Error encoding response: " + cause.getMessage(), cause);
-                                                        }
-                                                        if (ctx.channel().isWritable()) {
-                                                            ctx.pipeline().fireExceptionCaught(cause);
-                                                        }
-                                                    }
-                                                });
-                                            } catch (Throwable e) {
-                                                ctx.pipeline().fireExceptionCaught(e);
+                                    if(!route.isExecutable()) {
+                                            // if we arrived here the request is not processable
+                                            if (LOG.isErrorEnabled()) {
+                                                LOG.error("Non-bindable arguments for route: " + route);
                                             }
+                                            ctx.writeAndFlush(HttpResponse.badRequest())
+                                                    .addListener(ChannelFutureListener.CLOSE);
+                                    }
+                                    else {
+
+                                        // decorate the execution of the route so that it runs an async executor
+                                        // TODO: Allow customization of thread pool to execute actions
+                                        Executor executor = ctx.channel().eventLoop();
+                                        route = route.decorate(finalRoute -> {
+                                            executor.execute(() -> {
+
+                                                Object result;
+                                                try {
+                                                    result = finalRoute.execute();
+                                                    ChannelFuture channelFuture;
+                                                    if (result != null) {
+                                                        channelFuture = ctx.writeAndFlush(result);
+                                                    } else {
+                                                        HttpResponse res = ctx.channel().attr(NettyHttpResponse.KEY).get();
+                                                        if (res == null) {
+                                                            res = HttpResponse.ok();
+                                                        }
+                                                        channelFuture = ctx.writeAndFlush(res);
+                                                    }
+
+                                                    channelFuture.addListener(future -> {
+                                                        if (!future.isSuccess()) {
+                                                            Throwable cause = future.cause();
+                                                            if (LOG.isErrorEnabled()) {
+                                                                LOG.error("Error encoding response: " + cause.getMessage(), cause);
+                                                            }
+                                                            if (ctx.channel().isWritable()) {
+                                                                ctx.pipeline().fireExceptionCaught(cause);
+                                                            }
+                                                        }
+                                                    });
+                                                } catch (Throwable e) {
+                                                    ctx.pipeline().fireExceptionCaught(e);
+                                                }
+                                            });
+                                            return null;
                                         });
-                                        return null;
-                                    });
-                                    nettyHttpRequest.setMatchedRoute(route);
+                                        nettyHttpRequest.setMatchedRoute(route);
 
-                                    if (!requiresBody) {
-                                        route.execute();
-                                    } else if (msg instanceof StreamedHttpRequest) {
-                                        MediaType contentType = nettyHttpRequest.getContentType();
-                                        StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
+                                        if (!requiresBody) {
+                                            route.execute();
+                                        } else if (msg instanceof StreamedHttpRequest) {
+                                            MediaType contentType = nettyHttpRequest.getContentType();
+                                            StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
 
-                                        if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
-                                            JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(nettyHttpRequest);
-                                            streamedHttpRequest.subscribe(contentSubscriber);
+                                            if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
+                                                JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(nettyHttpRequest);
+                                                streamedHttpRequest.subscribe(contentSubscriber);
+                                            } else {
+                                                Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(nettyHttpRequest);
+                                                streamedHttpRequest.subscribe(contentSubscriber);
+                                            }
+
                                         } else {
-                                            Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(nettyHttpRequest);
-                                            streamedHttpRequest.subscribe(contentSubscriber);
-                                        }
+                                            if (LOG.isDebugEnabled()) {
+                                                LOG.debug("Request body expected, but was empty.");
+                                            }
+                                            ctx.writeAndFlush(HttpResponse.badRequest())
+                                                    .addListener(ChannelFutureListener.CLOSE);
 
-                                    } else {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Request body expected, but was empty.");
                                         }
-                                        ctx.writeAndFlush(HttpResponse.badRequest())
-                                                .addListener(ChannelFutureListener.CLOSE);
 
                                     }
                                 }));
