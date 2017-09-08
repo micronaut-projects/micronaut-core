@@ -19,7 +19,6 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.particleframework.core.convert.DefaultConversionService;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpResponseFactory;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpResponse;
@@ -32,19 +31,23 @@ import org.particleframework.http.MutableHttpResponse;
  */
 public class NettyHttpResponseFactory implements HttpResponseFactory {
     @Override
-    public MutableHttpResponse ok() {
-        return new NettyHttpResponse(DefaultConversionService.SHARED_INSTANCE);
-    }
-
-    @Override
-    public MutableHttpResponse status(HttpStatus status) {
-        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(status.getCode()));
-        return new NettyHttpResponse(fullHttpResponse, DefaultConversionService.SHARED_INSTANCE);
-    }
-
-    @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        MutableHttpResponse<T> ok = ok();
-        return ok.setBody(body);
+        MutableHttpResponse<T> ok = new NettyHttpResponse<>(DefaultConversionService.SHARED_INSTANCE);
+
+        return body != null ? ok.setBody(body) : ok;
+    }
+
+    @Override
+    public MutableHttpResponse status(HttpStatus status, String reason) {
+        HttpResponseStatus nettyStatus;
+        if(reason == null) {
+            nettyStatus = HttpResponseStatus.valueOf(status.getCode());
+        }
+        else {
+            nettyStatus = new HttpResponseStatus(status.getCode(), reason);
+        }
+
+        DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, nettyStatus);
+        return new NettyHttpResponse(fullHttpResponse, DefaultConversionService.SHARED_INSTANCE);
     }
 }

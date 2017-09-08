@@ -59,16 +59,18 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
         String string = msg.toString();
         ByteBuf content = Unpooled.copiedBuffer(string, StandardCharsets.UTF_8);
-        FullHttpResponse defaultResult;
+        FullHttpResponse httpResponse;
         if(res != null) {
-            defaultResult = res.getNativeResponse().replace(content);
+            httpResponse = res.getNativeResponse().replace(content);
         }
         else {
-            defaultResult = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+            httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
         }
-        defaultResult
-                .headers()
-                .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
-        out.add(defaultResult);
+        if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+            httpResponse
+                    .headers()
+                    .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
+        }
+        out.add(httpResponse);
     }
 }

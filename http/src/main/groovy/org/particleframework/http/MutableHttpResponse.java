@@ -23,6 +23,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
+ * A version of the {@link HttpResponse} interface that is mutable allowing the ability to set headers, character encoding etc.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -19,6 +19,8 @@ import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.http.cookie.CookieFactory;
 
 /**
+ * A factory interface for creating {@link MutableHttpResponse} instances
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,13 +37,17 @@ public interface HttpResponseFactory {
     /**
      * @return The ok response
      */
-    MutableHttpResponse ok();
+    default MutableHttpResponse ok() {
+        return ok(null);
+    }
 
     /**
      * @param status The status
      * @return The restus response
      */
-    MutableHttpResponse status(HttpStatus status);
+    default MutableHttpResponse status(HttpStatus status) {
+        return status(status, null);
+    }
 
     /**
      * Creates an {@link HttpStatus#OK} response with a body
@@ -51,4 +57,13 @@ public interface HttpResponseFactory {
      * @return The ok response with the given body
      */
     <T> MutableHttpResponse<T> ok(T body);
+
+    /**
+     * Return a response for the given status
+     *
+     * @param status The status
+     * @param reason An alternatively reason message
+     * @return The response
+     */
+    MutableHttpResponse status(HttpStatus status, String reason);
 }

@@ -59,23 +59,27 @@ class NettyHttpRequestContext {
             }
 
             RouteMatch route = getMatchedRoute();
-            Object result = route.execute(resolvedArguments);
-            if(result != null) {
-                context.writeAndFlush(result)
-                        .addListener(future -> {
-                            if(!future.isSuccess()) {
-                                Throwable cause = future.cause();
-                                if(LOG.isErrorEnabled()) {
-                                    LOG.error("Error encoding response: " + cause.getMessage(), cause);
+            try {
+                Object result = route.execute(resolvedArguments);
+                if(result != null) {
+                    context.writeAndFlush(result)
+                            .addListener(future -> {
+                                if(!future.isSuccess()) {
+                                    Throwable cause = future.cause();
+                                    if(LOG.isErrorEnabled()) {
+                                        LOG.error("Error encoding response: " + cause.getMessage(), cause);
+                                    }
+                                    if(context.channel().isWritable()) {
+                                        getResponseTransmitter().sendServerError(context);
+                                    }
                                 }
-                                if(context.channel().isWritable()) {
-                                    getResponseTransmitter().sendServerError(context);
-                                }
-                            }
-                        });
-            }
-            else {
-                context.flush();
+                            });
+                }
+                else {
+                    context.flush();
+                }
+            } catch (Throwable e) {
+                context.pipeline().fireExceptionCaught(e);
             }
         });
     }

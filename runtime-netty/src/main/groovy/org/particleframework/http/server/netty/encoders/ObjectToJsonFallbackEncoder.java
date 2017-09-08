@@ -68,9 +68,11 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
 
         ByteBuf content = Unpooled.copiedBuffer(bytes);
         int len = bytes.length;
-        httpResponse
-                .headers()
-                .add(HttpHeaderNames.CONTENT_LENGTH, len);
+        if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+            httpResponse
+                    .headers()
+                    .add(HttpHeaderNames.CONTENT_LENGTH, len);
+        }
         out.add(httpResponse.replace(content));
     }
 

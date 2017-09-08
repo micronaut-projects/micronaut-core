@@ -24,6 +24,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
+import spock.lang.Unroll
 
 /**
  * @author Graeme Rocher
@@ -31,40 +32,27 @@ import org.particleframework.web.router.annotation.Get
  */
 class HttpResponseSpec extends AbstractParticleSpec {
 
-    void "test ok status"() {
+    @Unroll
+    void "test custom HTTP response for action #action"() {
         when:
         def request = new Request.Builder()
-                .url("$server/response/ok")
-                .get()
-        then:
-        client.newCall(
-                request.build()
-        ).execute().code() == HttpStatus.OK.code
-    }
-
-
-    void "test ok status with body"() {
-        when:
-        def request = new Request.Builder()
-                .url("$server/response/okWithBody")
+                .url("$server/response/$action")
                 .get()
         def response = client.newCall(
                 request.build()
         ).execute()
-        then:
-        response.code() == HttpStatus.OK.code
-        response.body().string() == 'some text'
-    }
 
-    void "test custom status"() {
-        when:
-        def request = new Request.Builder()
-                .url("$server/response/status")
-                .get()
         then:
-        client.newCall(
-                request.build()
-        ).execute().code() == HttpStatus.MOVED_PERMANENTLY.code
+        response.code() == status.code
+        body == null || response.body().string() == body
+
+
+        where:
+        action             | status                       | body
+        "ok"               | HttpStatus.OK                | null
+        "okWithBody"       | HttpStatus.OK                | "some text"
+        "okWithBodyObject" | HttpStatus.OK                | '{"name":"blah","age":10}'
+        "status"           | HttpStatus.MOVED_PERMANENTLY | null
     }
 
     @Controller
@@ -81,8 +69,18 @@ class HttpResponseSpec extends AbstractParticleSpec {
         }
 
         @Get
+        HttpResponse<Foo> okWithBodyObject() {
+            HttpResponse.ok(new Foo(name: "blah", age: 10))
+        }
+
+        @Get
         HttpMessage status() {
             HttpResponse.status(HttpStatus.MOVED_PERMANENTLY)
         }
+    }
+
+    static class Foo {
+        String name
+        Integer age
     }
 }

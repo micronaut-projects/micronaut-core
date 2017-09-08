@@ -62,8 +62,7 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service) {
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        return SoftServiceLoader.load(service, cl);
+        return SoftServiceLoader.load(service, SoftServiceLoader.class.getClassLoader());
     }
 
 
