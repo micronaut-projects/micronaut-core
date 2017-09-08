@@ -22,7 +22,7 @@ public class MyConfig {
     Map<String,Integer> flags;
     Optional<URL> url;
     Optional<URL> anotherUrl;
-    Inner inner;
+//    Inner inner;
 
     public Integer getAnotherPort() {
         return anotherPort;
@@ -32,7 +32,7 @@ public class MyConfig {
         return defaultPort;
     }
 
-    static class Inner {
+    public static class Inner {
         boolean enabled;
 
         public boolean isEnabled() {
@@ -139,4 +139,12 @@ public class MyConfig {
     public void setAnotherUrl(Optional<URL> anotherUrl) {
         this.anotherUrl = anotherUrl;
     }
+
+//    public Inner getInner() {
+//        return inner;
+//    }
+//
+//    public void setInner(Inner inner) {
+//        this.inner = inner;
+//    }
 }

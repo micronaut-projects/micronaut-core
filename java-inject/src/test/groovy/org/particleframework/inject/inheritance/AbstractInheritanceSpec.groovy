@@ -2,14 +2,10 @@ package org.particleframework.inject.inheritance
 
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
 import spock.lang.Specification
-/**
- * Created by graemerocher on 15/05/2017.
- */
+
 class AbstractInheritanceSpec extends Specification {
 
-    @Ignore
     void "test values are injected for abstract parent class"() {
         given:
         BeanContext context  = new DefaultBeanContext()
@@ -23,5 +19,4 @@ class AbstractInheritanceSpec extends Specification {
         b.another != null
         b.a.is(b.another)
     }
-
 }

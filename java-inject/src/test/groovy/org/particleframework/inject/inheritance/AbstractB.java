@@ -6,7 +6,9 @@ public abstract class AbstractB {
     // inject via field
     @Inject
     protected A a;
+
     private A another;
+
     // inject via method
     @Inject
     public void setAnother(A a) {
