@@ -30,10 +30,12 @@ import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
+import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -251,10 +253,6 @@ public class NettyHttpServer implements EmbeddedServer {
                                     nettyHttpRequest.setMatchedRoute(route);
 
                                     if (!requiresBody) {
-                                        // TODO: here we need a way to make the encoding of the result flexible
-                                        // also support for GSON views etc.
-
-                                        // TODO: Need to run this logic on a separate thread pool if the method is blocking
                                         route.execute();
                                     } else if (msg instanceof StreamedHttpRequest) {
                                         MediaType contentType = nettyHttpRequest.getContentType();
@@ -291,12 +289,11 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (!existingRoutes.isEmpty()) {
                                         ctx.writeAndFlush(HttpResponse.notAllowed(
                                                 existingRoutes
-                                        ))
-                                                .addListener(ChannelFutureListener.CLOSE);
+                                        )).addListener(ChannelFutureListener.CLOSE);
                                     } else {
                                         // TODO: Here we need to add routing for 404 handlers
                                         ctx.writeAndFlush(HttpResponse.notFound())
-                                                .addListener(ChannelFutureListener.CLOSE);
+                                           .addListener(ChannelFutureListener.CLOSE);
                                     }
                                 }
                             }
@@ -311,7 +308,12 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (cause instanceof JsonParseException) {
                                     ctx.writeAndFlush(HttpResponse.badRequest())
                                             .addListener(ChannelFutureListener.CLOSE);
-                                } else {
+                                }
+                                else if(cause instanceof ContentLengthExceededException) {
+                                    ctx.writeAndFlush(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE))
+                                            .addListener(ChannelFutureListener.CLOSE);
+                                }
+                                else {
                                     // TODO: Here we need to add routing to error handlers
                                     DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
                                             HttpVersion.HTTP_1_1,

@@ -26,6 +26,7 @@ import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
@@ -55,10 +56,10 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private Locale locale;
     private URI path;
     private List<ByteBuf> receivedContent  = new ArrayList<>();
-    private long receivedLength = 0;
     private Object body;
     private MediaType mediaType;
     private RouteMatch<Object> matchedRoute;
+
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
@@ -94,7 +95,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
             byteBuf.release();
         } else {
             receivedContent.add(byteBuf);
-            receivedLength += contentBytes;
         }
     }
 

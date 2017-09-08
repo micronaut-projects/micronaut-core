@@ -14,4 +14,8 @@ public class ContentLengthExceededException extends HttpException {
     public ContentLengthExceededException(String message, Throwable cause) {
         super(message, cause);
     }
+
+    public ContentLengthExceededException(long advertisedLength, long receivedLength) {
+        this("The received length ["+receivedLength+"] exceeds the specified content length ["+advertisedLength+"]");
+    }
 }

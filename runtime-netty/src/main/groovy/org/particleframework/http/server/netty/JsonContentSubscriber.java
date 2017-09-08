@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -31,10 +32,13 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
     private final ChannelHandlerContext ctx;
     private final NettyHttpRequest nettyHttpRequest;
     private final RouteMatch<Object> route;
-
+    private final long advertisedLength;
+    private long accumulatedLength = 0;
+    private Subscription subscription;
 
     public JsonContentSubscriber(NettyHttpRequest request) {
         this.nettyHttpRequest = request;
+        this.advertisedLength = request.getContentLength();
         this.route = request.getMatchedRoute();
         this.ctx = request.getChannelHandlerContext();
     }
@@ -42,7 +46,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
     @Override
     public void onSubscribe(Subscription s) {
         s.request(Long.MAX_VALUE);
-
+        this.subscription = s;
         jacksonProcessor.subscribe(new Subscriber<JsonNode>() {
             @Override
             public void onSubscribe(Subscription s) {
@@ -88,12 +92,19 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onNext(HttpContent httpContent) {
-        // TODO: content length checks
         try {
             ByteBuf content = httpContent.content();
             int len = content.readableBytes();
             if (len > 0) {
                 byte[] bytes;
+                accumulatedLength += (long) len;
+                if(advertisedLength != -1 && accumulatedLength > advertisedLength) {
+                    if(subscription != null) {
+                        subscription.cancel();
+                    }
+                    error.set(new ContentLengthExceededException(advertisedLength, accumulatedLength));
+                    onError(error.get());
+                }
                 if (content.hasArray()) {
                     bytes = content.array();
                 } else {
@@ -113,6 +124,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error processing JSON body: " + t.getMessage(), t);
         }
+        error.set(t);
         ctx.pipeline().fireExceptionCaught(t);
     }
 

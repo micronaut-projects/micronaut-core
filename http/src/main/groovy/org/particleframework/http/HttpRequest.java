@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Locale;
 
@@ -85,10 +86,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             else {
                 return getHeaders().findFirst(HttpHeaders.ACCEPT_CHARSET)
                             .map(Charset::forName)
-                            .orElse(null);
+                            .orElse(StandardCharsets.UTF_8);
             }
         } catch (UnsupportedCharsetException e) {
-            return null;
+            return StandardCharsets.UTF_8;
         }
     }
 
