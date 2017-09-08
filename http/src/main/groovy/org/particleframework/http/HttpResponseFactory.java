@@ -34,7 +34,9 @@ public interface HttpResponseFactory {
      * The default {@link CookieFactory} instance
      */
     Optional<HttpResponseFactory> INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
-            .first()
+            .firstOr("org.particleframework.http.server.netty.NettyHttpResponseFactory",
+                      HttpResponseFactory.class.getClassLoader()
+            )
             .map(SoftServiceLoader.Service::load);
 
 

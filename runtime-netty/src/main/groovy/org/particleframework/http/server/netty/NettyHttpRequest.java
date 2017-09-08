@@ -64,7 +64,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
                             HttpServerConfiguration serverConfiguration) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(conversionService, "ConversionService cannot be null");
-        this.requestContext = new NettyHttpRequestContext(ctx, this, serverConfiguration, conversionService);
+        this.requestContext = new NettyHttpRequestContext(ctx, this);
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
         String fullUri = nettyRequest.uri();

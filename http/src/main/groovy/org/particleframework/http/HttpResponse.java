@@ -5,6 +5,7 @@ import org.particleframework.http.exceptions.UriSyntaxException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Set;
 
 /**
  * <p>Common interface for HTTP response implementations</p>
@@ -96,6 +97,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(HttpMethod... allowed) {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No Server implementation found on classpath")
+        );
+        return factory.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
+                .headers((headers) -> headers.allow(allowed));
+    }
+
+    /**
+     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body
+     *
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> notAllowed(Set<HttpMethod> allowed) {
         HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No Server implementation found on classpath")
         );

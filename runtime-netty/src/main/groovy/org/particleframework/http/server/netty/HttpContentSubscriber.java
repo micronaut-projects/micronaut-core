@@ -44,9 +44,7 @@ public class HttpContentSubscriber implements Subscriber<HttpContent> {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error processing Request body: " + t.getMessage(), t);
         }
-        requestContext
-                .getResponseTransmitter()
-                .sendBadRequest(ctx);
+        ctx.pipeline().fireExceptionCaught(t);
     }
 
     @Override

@@ -2,9 +2,11 @@ package org.particleframework.http.server.netty;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
+import org.particleframework.http.HttpResponse;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -62,9 +64,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
                     LOG.error("Error processing JSON body: " + t.getMessage(), t);
                 }
                 error.set(t);
-                requestContext
-                        .getResponseTransmitter()
-                        .sendBadRequest(ctx);
+                ctx.pipeline().fireExceptionCaught(t);
             }
 
             @Override
@@ -73,9 +73,8 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
                 if (jsonNode != null) {
                     JsonContentSubscriber.this.onComplete(jsonNode);
                 } else {
-                    requestContext
-                            .getResponseTransmitter()
-                            .sendBadRequest(ctx);
+                    ctx.writeAndFlush(HttpResponse.badRequest())
+                            .addListener(ChannelFutureListener.CLOSE);
                 }
             }
         });
@@ -118,8 +117,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error processing JSON body: " + t.getMessage(), t);
         }
-        requestContext.getResponseTransmitter()
-                .sendBadRequest(ctx);
+        ctx.pipeline().fireExceptionCaught(t);
     }
 
     @Override

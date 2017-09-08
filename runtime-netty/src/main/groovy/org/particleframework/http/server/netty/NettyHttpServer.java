@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
@@ -28,13 +29,13 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ReturnType;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -148,8 +149,6 @@ public class NettyHttpServer implements EmbeddedServer {
                                     requestContext.setMatchedRoute(route);
 
                                     // TODO: Will need to return type data to make ResponseTransmitter flexible to handle different return types and encoders
-                                    ReturnType returnType = route.getReturnType();
-
                                     boolean requiresBody = false;
                                     Collection<Argument> requiredArguments = route.getRequiredArguments();
                                     Map<String, Object> argumentValues;
@@ -200,9 +199,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                                 if (LOG.isErrorEnabled()) {
                                                     LOG.error("Non-bindable arguments for route: " + route);
                                                 }
-                                                requestContext
-                                                        .getResponseTransmitter()
-                                                        .sendNotFound(ctx.channel());
+                                                ctx.writeAndFlush(org.particleframework.http.HttpResponse.notFound())
+                                                   .addListener(ChannelFutureListener.CLOSE);
                                                 return;
                                             }
                                         }
@@ -233,8 +231,9 @@ public class NettyHttpServer implements EmbeddedServer {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Request body expected, but was empty.");
                                         }
-                                        requestContext.getResponseTransmitter()
-                                                .sendBadRequest(ctx);
+                                        ctx.writeAndFlush(HttpResponse.badRequest())
+                                                .addListener(ChannelFutureListener.CLOSE);
+
                                     }
                                 }));
 
@@ -242,21 +241,21 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
-                                    List<HttpMethod> existingRoutes = routerBean
+                                    Set<HttpMethod> existingRoutes = routerBean
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
                                             ).orElse(Stream.empty())
                                             .map(RouteMatch::getHttpMethod)
-                                            .collect(Collectors.toList());
+                                            .collect(Collectors.toSet());
                                     if (!existingRoutes.isEmpty()) {
-                                        requestContext
-                                                .getResponseTransmitter()
-                                                .sendMethodNotAllowed(ctx, existingRoutes);
+                                        ctx.writeAndFlush(org.particleframework.http.HttpResponse.notAllowed(
+                                                existingRoutes
+                                        ))
+                                        .addListener(ChannelFutureListener.CLOSE);
                                     } else {
                                         // TODO: Here we need to add routing for 404 handlers
-                                        requestContext
-                                                .getResponseTransmitter()
-                                                .sendNotFound(channel);
+                                        ctx.writeAndFlush(org.particleframework.http.HttpResponse.notFound())
+                                                .addListener(ChannelFutureListener.CLOSE);
                                     }
                                 }
                             }
@@ -267,13 +266,22 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (LOG.isErrorEnabled()) {
                                     LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
                                 }
-                                // TODO: Here we need to add routing to error handlers
-                                DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
-                                        HttpVersion.HTTP_1_1,
-                                        HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                                ctx.channel()
-                                        .writeAndFlush(httpResponse)
-                                        .addListener(ChannelFutureListener.CLOSE);
+                                // TODO: Remove this dependency on Jackson and add custom exception handling
+                                if(cause instanceof JsonParseException) {
+                                    ctx.writeAndFlush(HttpResponse.badRequest())
+                                            .addListener(ChannelFutureListener.CLOSE);
+                                }
+                                else {
+                                    // TODO: Here we need to add routing to error handlers
+                                    DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
+                                            HttpVersion.HTTP_1_1,
+                                            HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                                    ctx.channel()
+                                            .writeAndFlush(httpResponse)
+                                            .addListener(ChannelFutureListener.CLOSE);
+
+                                }
+
 
                             }
                         });

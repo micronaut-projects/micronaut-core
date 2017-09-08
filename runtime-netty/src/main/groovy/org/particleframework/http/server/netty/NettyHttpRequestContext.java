@@ -1,12 +1,10 @@
 package org.particleframework.http.server.netty;
 
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.ConversionService;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
-import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.web.router.RouteMatch;
 import org.slf4j.Logger;
@@ -27,16 +25,14 @@ class NettyHttpRequestContext {
 
     private final ChannelHandlerContext context;
     private final NettyHttpRequest request;
-    private final NettyHttpResponseTransmitter responseTransmitter;
     private RouteMatch matchedRoute;
     private Map<String, Object> routeArguments;
     private List<UnboundBodyArgument> unboundBodyArguments = new ArrayList<>();
 
 
-    public NettyHttpRequestContext(ChannelHandlerContext context, NettyHttpRequest request, HttpServerConfiguration serverConfiguration, ConversionService conversionService) {
+    public NettyHttpRequestContext(ChannelHandlerContext context, NettyHttpRequest request) {
         this.context = context;
         this.request = request;
-        this.responseTransmitter = new NettyHttpResponseTransmitter(serverConfiguration, conversionService);
     }
 
     public void processRequestBody() {
@@ -53,7 +49,8 @@ class NettyHttpRequestContext {
                 if (bound.isPresent()) {
                     resolvedArguments.put(argument.getName(), bound.get());
                 } else {
-                    getResponseTransmitter().sendBadRequest(context);
+                    context.writeAndFlush(HttpResponse.badRequest())
+                           .addListener(ChannelFutureListener.CLOSE);
                     return;
                 }
             }
@@ -70,7 +67,7 @@ class NettyHttpRequestContext {
                                         LOG.error("Error encoding response: " + cause.getMessage(), cause);
                                     }
                                     if(context.channel().isWritable()) {
-                                        getResponseTransmitter().sendServerError(context);
+                                        context.pipeline().fireExceptionCaught(cause);
                                     }
                                 }
                             });
@@ -111,13 +108,6 @@ class NettyHttpRequestContext {
      */
     public Map<String, Object> getRouteArguments() {
         return routeArguments;
-    }
-
-    /**
-     * @return The response transmitter
-     */
-    public NettyHttpResponseTransmitter getResponseTransmitter() {
-        return responseTransmitter;
     }
 
     public NettyHttpRequest getRequest() {

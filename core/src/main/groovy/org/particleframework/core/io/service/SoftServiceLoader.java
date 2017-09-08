@@ -104,6 +104,22 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
         return Optional.empty();
     }
 
+    /**
+     * @return Return the first such instance
+     */
+    public Optional<Service<S>> firstOr(String alternative, ClassLoader classLoader) {
+        Iterator<Service<S>> i = iterator();
+        if(i.hasNext()) {
+            return Optional.of(i.next());
+        }
+
+        Optional<Class> alternativeClass = ClassUtils.forName(alternative, classLoader);
+        if(alternativeClass.isPresent()) {
+            return Optional.of(newService(alternative,alternativeClass));
+        }
+        return Optional.empty();
+    }
+
     @Override
     public Iterator<Service<S>> iterator() {
         return new Iterator<Service<S>>() {
@@ -189,35 +205,39 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
 
             String nextName = unprocessed.next();
             Optional<Class> loadedClass = ClassUtils.forName(nextName, classLoader);
-            return new Service<S>() {
-                @Override
-                public String getName() {
-                    return nextName;
-                }
-
-                @Override
-                public boolean isPresent() {
-                    return loadedClass.isPresent();
-                }
-
-                @Override
-                public <X extends Throwable> S orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
-                    return InstantiationUtils.instantiate((Class<S>)loadedClass.orElseThrow(exceptionSupplier));
-                }
-
-                @Override
-                public S load() {
-                    return loadedClass.map(aClass -> {
-                        try {
-                            return InstantiationUtils.instantiate((Class<S>) aClass);
-                        } catch (Throwable e) {
-                            throw new ServiceConfigurationError("Error loading service ["+aClass.getName()+"]: " + e.getMessage(), e);
-                        }
-                    })
-                                      .orElseThrow(()-> new ServiceConfigurationError("Call to load() when class '"+nextName+"' is not present"));
-                }
-            };
+            return newService(nextName, loadedClass);
         }
+    }
+
+    protected Service<S> newService(String name, Optional<Class> loadedClass) {
+        return new Service<S>() {
+            @Override
+            public String getName() {
+                return name;
+            }
+
+            @Override
+            public boolean isPresent() {
+                return loadedClass.isPresent();
+            }
+
+            @Override
+            public <X extends Throwable> S orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
+                return InstantiationUtils.instantiate((Class<S>)loadedClass.orElseThrow(exceptionSupplier));
+            }
+
+            @Override
+            public S load() {
+                return loadedClass.map(aClass -> {
+                    try {
+                        return InstantiationUtils.instantiate((Class<S>) aClass);
+                    } catch (Throwable e) {
+                        throw new ServiceConfigurationError("Error loading service ["+aClass.getName()+"]: " + e.getMessage(), e);
+                    }
+                })
+                                  .orElseThrow(()-> new ServiceConfigurationError("Call to load() when class '"+ name +"' is not present"));
+            }
+        };
     }
 
     /**
