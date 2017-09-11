@@ -37,6 +37,7 @@ import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
@@ -62,19 +63,20 @@ import java.util.stream.Stream;
  */
 @Singleton
 public class NettyHttpServer implements EmbeddedServer {
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CODEC = "http-codec";
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+
     private final Provider<Router> routerProvider;
     private final Provider<RequestBinderRegistry> requestBinderRegistryProvider;
     private volatile Channel serverChannel;
-    private final HttpServerConfiguration serverConfiguration;
+    private final NettyHttpServerConfiguration serverConfiguration;
     private final ChannelOutboundHandlerAdapter[] outboundHandlerAdapters;
     private final Environment environment;
 
     @Inject
     public NettyHttpServer(
-            HttpServerConfiguration serverConfiguration,
+            NettyHttpServerConfiguration serverConfiguration,
             Environment environment,
             Provider<Router> routerProvider,
             Provider<RequestBinderRegistry> requestBinderRegistryProvider,
@@ -96,8 +98,8 @@ public class NettyHttpServer implements EmbeddedServer {
 
 
 //      TODO: Restore once ConfigurationPropertiesInheritanceSpec passing for Java
-//        processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
-//        processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+        processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
+        processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
 
 
         ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
