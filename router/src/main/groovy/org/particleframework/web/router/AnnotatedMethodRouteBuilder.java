@@ -99,6 +99,15 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                         method.getMethodName(),
                         method.getArgumentTypes())
         );
+
+        httpMethodsHandlers.put(Trace.class, (Annotation ann, ExecutableMethod method)->
+                TRACE(resolveUri(((Trace)ann).value(),
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes())
+        );
     }
 
     private String resolveUri(String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {

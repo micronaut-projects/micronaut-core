@@ -154,6 +154,18 @@ public interface RouteBuilder {
      */
     ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class...parameterTypes);
 
+
+    /**
+     * Register a route to handle the error
+     *
+     * @param originatingClass The class where the error originates from
+     * @param error The error type
+     * @param type The type to route to
+     * @param method The method THe method to route to
+     * @param parameterTypes The paramter types for the target method
+     * @return The route
+     */
+    ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class...parameterTypes);
     /**
      * Register a route to handle the error
      *
@@ -734,6 +746,84 @@ public interface RouteBuilder {
      */
     UriRoute HEAD(String uri, Class type, String method, Class...parameterTypes);
 
+
+    /**
+     * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
+     * specified "index" is used by default.
+     *
+     * @param uri The URI
+     * @param target The target object
+     * @return The route
+     */
+    default UriRoute TRACE(String uri, Object target) {
+        return TRACE(uri, target, TRACE.methodName());
+    }
+
+    /**
+     * <p>Route to the specified object. The URI route is built by the configured {@link UriNamingStrategy}</p>
+     *
+     * @param target The object
+     * @return The route
+     */
+    default UriRoute TRACE(Object target) {
+        Class<?> type = target.getClass();
+        return TRACE( getUriNamingStrategy().resolveUri(type), target );
+    }
+
+    /**
+     * <p>Route to the specified object and ID. The URI route is built by the configured {@link UriNamingStrategy}</p>
+     *
+     * @param target The object
+     * @return The route
+     */
+    default UriRoute TRACE(Object target, PropertyConvention id) {
+        Class<?> type = target.getClass();
+        return TRACE(getUriNamingStrategy().resolveUri(type, id), target, TRACE.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class. The URI route is built by the configured {@link UriNamingStrategy}</p>
+     *
+     * @param type The class
+     * @return The route
+     */
+    default UriRoute TRACE(Class type) {
+        return TRACE(getUriNamingStrategy().resolveUri(type), type, TRACE.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class and ID. The URI route is built by the configured {@link UriNamingStrategy}</p>
+     *
+     * @param type The class
+     * @return The route
+     */
+    default UriRoute TRACE(Class type, PropertyConvention id) {
+        return HEAD(getUriNamingStrategy().resolveUri(type, id), type, TRACE.methodName());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param target The target
+     * @param method The method
+     * @return The route
+     */
+    UriRoute TRACE(String uri, Object target, String method, Class...parameterTypes);
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param type The type
+     * @param method The method
+     * @return The route
+     */
+    UriRoute TRACE(String uri, Class type, String method, Class...parameterTypes);
     /**
      * <p>A URI naming strategy is used to dictate the default name to use when building a URI for a class</p>
      *

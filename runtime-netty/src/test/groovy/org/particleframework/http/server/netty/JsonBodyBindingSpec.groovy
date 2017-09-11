@@ -1,9 +1,11 @@
 package org.particleframework.http.server.netty
 
+import com.fasterxml.jackson.core.JsonParseException
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.binding.annotation.Body
 import org.particleframework.stereotype.Controller
@@ -50,6 +52,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
+        response.message() == "Invalid JSON"
 
     }
 
@@ -68,6 +71,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
+        response.message() == "Invalid JSON"
 
     }
 
@@ -267,6 +271,10 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
             future.thenApply({ Foo foo ->
                 "Body: $foo".toString()
             })
+        }
+
+        HttpResponse jsonError(JsonParseException jsonParseException) {
+            return HttpResponse.status(HttpStatus.BAD_REQUEST,"Invalid JSON")
         }
     }
 

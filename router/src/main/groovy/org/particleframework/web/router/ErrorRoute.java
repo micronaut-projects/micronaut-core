@@ -28,7 +28,10 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface ErrorRoute extends Route {
-
+    /**
+     * @return The type the exception originates from. Null if the error route is global.
+     */
+    Class<?> originatingType();
     /**
      * @return The type of exception
      */
@@ -41,6 +44,15 @@ public interface ErrorRoute extends Route {
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(Throwable exception);
+
+    /**
+     * Match the given exception
+     *
+     * @param originatingClass The class where the error originates from
+     * @param exception The exception to match
+     * @return The route match
+     */
+    <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception);
 
     @Override
     ErrorRoute accept(MediaType mediaType);

@@ -39,14 +39,23 @@ import java.util.function.Predicate;
  */
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
+    /**
+     * A {@link org.particleframework.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used
+     */
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
+
+    /**
+     * A {@link org.particleframework.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used
+     */
     public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
         @Override
         public String resolveUri(Class type) {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
     };
+
+
     static final Object NO_VALUE = new Object();
 
 
@@ -113,6 +122,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return statusRoute;
     }
 
+
+    @Override
+    public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+
+        MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
+                new RoutingException("No such route: " + type.getName() + "." + method)
+        );
+
+        DefaultErrorRoute errorRoute = new DefaultErrorRoute(originatingClass, error, executableHandle, beanContext.getEnvironment());
+        this.errorRoutes.add(errorRoute);
+        return errorRoute;
+    }
 
     @Override
     public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
@@ -197,6 +219,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildRoute(HttpMethod.HEAD, uri, type, method, parameterTypes);
     }
 
+    @Override
+    public UriRoute TRACE(String uri, Object target, String method, Class[] parameterTypes) {
+        return buildRoute(HttpMethod.TRACE, uri, target.getClass(), method, parameterTypes);
+    }
+
+    @Override
+    public UriRoute TRACE(String uri, Class type, String method, Class[] parameterTypes) {
+        return buildRoute(HttpMethod.TRACE, uri, type, method, parameterTypes);
+    }
+
     protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class... parameterTypes) {
         Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
 
@@ -219,15 +251,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         private final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
         private final Class<? extends Throwable> error;
+        private final Class originatingClass;
         private final MethodExecutionHandle targetMethod;
         private final ConversionService<?> conversionService;
 
         private MediaType mediaType = MediaType.APPLICATION_JSON_TYPE;
 
         public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            this(null, error, targetMethod, conversionService);
+        }
+
+        public DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            this.originatingClass = originatingClass;
             this.error = error;
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
+        }
+
+        @Override
+        public Class<?> originatingType() {
+            return originatingClass;
         }
 
         @Override
@@ -236,7 +279,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Optional<RouteMatch> match(Throwable exception) {
+        public <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception) {
+            if(originatingClass == this.originatingClass) {
+                return match(exception);
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<RouteMatch<T>> match(Throwable exception) {
             if(error.isInstance(exception)) {
                 return Optional.of(new ErrorRouteMatch(exception, targetMethod, conditions, conversionService));
             }
@@ -275,12 +326,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
             DefaultErrorRoute that = (DefaultErrorRoute) o;
 
-            return error.equals(that.error);
+            if (error != null ? !error.equals(that.error) : that.error != null) return false;
+            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
         }
 
         @Override
         public int hashCode() {
-            return error.hashCode();
+            int result = error != null ? error.hashCode() : 0;
+            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
+            return result;
         }
 
         @Override
@@ -288,18 +342,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if(o == this) {
                 return 0;
             }
-            Class<? extends Throwable> oClass = o.exceptionType();
-            Class<? extends Throwable> thisClass = this.error;
-            if(thisClass == oClass) {
+            Class<? extends Throwable> thatExceptionType = o.exceptionType();
+            Class<? extends Throwable> thisExceptionType = this.error;
+
+            if(thisExceptionType == thatExceptionType) {
                 return 0;
             }
-            else if(thisClass.isAssignableFrom(oClass)) {
+            else if(thisExceptionType.isAssignableFrom(thatExceptionType)) {
                 return 1;
             }
-            else if(oClass.isAssignableFrom(thisClass)) {
+            else if(thatExceptionType.isAssignableFrom(thisExceptionType)) {
                 return -1;
             }
-            return 0;
+            return -1;
         }
     }
 

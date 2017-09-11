@@ -138,153 +138,31 @@ public class NettyHttpServer implements EmbeddedServer {
                                                 .findFirst()
                                 );
 
-                                routeMatch.ifPresent((route -> {
 
+                                routeMatch.ifPresent((route -> {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                     }
-                                    // TODO: check the media type vs the route and return 415 if invalid
-                                    nettyHttpRequest.setMatchedRoute(route);
-
-                                    boolean requiresBody = false;
-                                    Collection<Argument> requiredArguments = route.getRequiredArguments();
-                                    Map<String, Object> argumentValues;
-
-                                    if (requiredArguments.isEmpty()) {
-                                        // no required arguments so just execute
-                                        argumentValues = Collections.emptyMap();
-                                    } else {
-                                        argumentValues = new LinkedHashMap<>();
-                                        // Begin try fulfilling the argument requirements
-                                        for (Argument argument : requiredArguments) {
-                                            Optional<ArgumentBinder> registeredBinder =
-                                                    binderRegistry.findArgumentBinder(argument, nettyHttpRequest);
-                                            if (registeredBinder.isPresent()) {
-                                                ArgumentBinder argumentBinder = registeredBinder.get();
-                                                if (argumentBinder instanceof BodyArgumentBinder) {
-                                                    if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
-                                                        Optional bindingResult = argumentBinder
-                                                                .bind(argument, nettyHttpRequest);
-
-                                                        if (bindingResult.isPresent()) {
-                                                            argumentValues.put(argument.getName(), bindingResult.get());
-                                                        }
-
-                                                    } else {
-                                                        argumentValues.put(argument.getName(), (Supplier<Optional>) () ->
-                                                                argumentBinder.bind(argument, nettyHttpRequest)
-                                                        );
-                                                        requiresBody = true;
-                                                    }
-                                                } else {
-
-                                                    Optional bindingResult = argumentBinder
-                                                            .bind(argument, nettyHttpRequest);
-                                                    if (argument.getType() == Optional.class) {
-                                                        argumentValues.put(argument.getName(), bindingResult);
-                                                    } else if (bindingResult.isPresent()) {
-                                                        argumentValues.put(argument.getName(), bindingResult.get());
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                    }
-
-                                    route = route.fulfill(argumentValues);
-
-                                    if(!route.isExecutable()) {
-                                            // if we arrived here the request is not processable
-                                            if (LOG.isDebugEnabled()) {
-                                                LOG.debug("Bad request: Unbindable arguments for route: " + route);
-                                            }
-                                            ctx.writeAndFlush(HttpResponse.badRequest())
-                                                    .addListener(ChannelFutureListener.CLOSE);
-                                    }
-                                    else {
-
-                                        // decorate the execution of the route so that it runs an async executor
-                                        // TODO: Allow customization of thread pool to execute actions
-                                        Executor executor = ctx.channel().eventLoop();
-
-                                        route = route.decorate(finalRoute -> {
-                                            executor.execute(() -> {
-
-                                                Object result;
-                                                try {
-                                                    result = finalRoute.execute();
-                                                    ChannelFuture channelFuture;
-                                                    if (result != null) {
-                                                        channelFuture = ctx.writeAndFlush(result);
-                                                    } else {
-                                                        HttpResponse res = ctx.channel().attr(NettyHttpResponse.KEY).get();
-                                                        if (res == null) {
-                                                            res = HttpResponse.ok();
-                                                        }
-                                                        channelFuture = ctx.writeAndFlush(res);
-                                                    }
-
-                                                    channelFuture.addListener(future -> {
-                                                        if (!future.isSuccess()) {
-                                                            Throwable cause = future.cause();
-                                                            if (LOG.isErrorEnabled()) {
-                                                                LOG.error("Error encoding response: " + cause.getMessage(), cause);
-                                                            }
-                                                            if (ctx.channel().isWritable()) {
-                                                                ctx.pipeline().fireExceptionCaught(cause);
-                                                            }
-                                                        }
-                                                    });
-                                                } catch (Throwable e) {
-                                                    ctx.pipeline().fireExceptionCaught(e);
-                                                }
-                                            });
-                                            return null;
-                                        });
-                                        nettyHttpRequest.setMatchedRoute(route);
-
-                                        if (!requiresBody) {
-                                            route.execute();
-                                        } else if (msg instanceof StreamedHttpRequest) {
-                                            MediaType contentType = nettyHttpRequest.getContentType();
-                                            StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) msg;
-
-                                            if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
-                                                JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(nettyHttpRequest);
-                                                streamedHttpRequest.subscribe(contentSubscriber);
-                                            } else {
-                                                Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(nettyHttpRequest);
-                                                streamedHttpRequest.subscribe(contentSubscriber);
-                                            }
-
-                                        } else {
-                                            if (LOG.isDebugEnabled()) {
-                                                LOG.debug("Request body expected, but was empty.");
-                                            }
-                                            ctx.writeAndFlush(HttpResponse.badRequest())
-                                                    .addListener(ChannelFutureListener.CLOSE);
-
-                                        }
-
-                                    }
+                                    handleRouteMatch(route, nettyHttpRequest, binderRegistry, ctx);
                                 }));
 
                                 if (!routeMatch.isPresent()) {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
+
                                     Set<HttpMethod> existingRoutes = routerBean
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
                                             ).orElse(Stream.empty())
                                             .map(UriRouteMatch::getHttpMethod)
                                             .collect(Collectors.toSet());
+
                                     if (!existingRoutes.isEmpty()) {
                                         ctx.writeAndFlush(HttpResponse.notAllowed(
                                                 existingRoutes
                                         )).addListener(ChannelFutureListener.CLOSE);
                                     } else {
-                                        // TODO: Here we need to add routing for 404 handlers
                                         ctx.writeAndFlush(HttpResponse.notFound())
                                            .addListener(ChannelFutureListener.CLOSE);
                                     }
@@ -297,6 +175,34 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (LOG.isErrorEnabled()) {
                                     LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
                                 }
+
+                                NettyHttpRequest nettyHttpRequest = ctx.channel().attr(NettyHttpRequest.KEY).get();
+
+                                if(nettyHttpRequest != null) {
+
+                                    RouteMatch matchedRoute = nettyHttpRequest.getMatchedRoute();
+                                    Class declaringType = matchedRoute.getDeclaringType();
+                                    try {
+                                        Optional<Router> router = resolveRouter();
+                                        if(router.isPresent() && declaringType != null) {
+                                            Router routerObject = router.get();
+                                            Optional<RouteMatch<Object>> match = routerObject.route(declaringType, cause);
+                                            if(match.isPresent()) {
+                                                RouteMatch<Object> finalRoute = fulfillArgumentRequirements(match.get(), null, requestBinderRegistryProvider.get());;
+                                                if(finalRoute.isExecutable()) {
+                                                    finalRoute = prepareRouteForExecution(finalRoute, ctx);
+                                                    finalRoute.execute();
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        if(LOG.isErrorEnabled()) {
+                                            LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
+                                        }
+                                    }
+                                }
+
                                 // TODO: Remove this dependency on Jackson and add custom exception handling
                                 if (cause instanceof JsonParseException) {
                                     ctx.writeAndFlush(HttpResponse.badRequest())
@@ -364,6 +270,146 @@ public class NettyHttpServer implements EmbeddedServer {
 
     protected NioEventLoopGroup createWorkerEventLoopGroup() {
         return new NioEventLoopGroup();
+    }
+
+    private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
+        // TODO: check the media type vs the route and return 415 if invalid
+        request.setMatchedRoute(route);
+
+        route = fulfillArgumentRequirements(route, request, binderRegistry);
+
+        if(!route.isExecutable()) {
+            // if we arrived here the request is not processable
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Bad request: Unbindable arguments for route: " + route);
+            }
+            context.writeAndFlush(HttpResponse.badRequest())
+                    .addListener(ChannelFutureListener.CLOSE);
+        }
+        else {
+
+            // decorate the execution of the route so that it runs an async executor
+            // TODO: Allow customization of thread pool to execute actions
+            route = prepareRouteForExecution(route, context);
+
+            request.setMatchedRoute(route);
+
+            if (!request.isBodyRequired()) {
+                route.execute();
+            } else {
+                HttpRequest nativeRequest = request.getNativeRequest();
+                if (nativeRequest instanceof StreamedHttpRequest) {
+                    MediaType contentType = request.getContentType();
+                    StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
+
+                    if (contentType != null && MediaType.APPLICATION_JSON_TYPE.getExtension().equals(contentType.getExtension())) {
+                        JsonContentSubscriber contentSubscriber = new JsonContentSubscriber(request);
+                        streamedHttpRequest.subscribe(contentSubscriber);
+                    } else {
+                        Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(request);
+                        streamedHttpRequest.subscribe(contentSubscriber);
+                    }
+
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Request body expected, but was empty.");
+                    }
+                    context.writeAndFlush(HttpResponse.badRequest())
+                            .addListener(ChannelFutureListener.CLOSE);
+
+                }
+            }
+
+        }
+    }
+
+    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, ChannelHandlerContext context) {
+        Executor executor = context.channel().eventLoop();
+
+        route = route.decorate(finalRoute -> {
+            executor.execute(() -> {
+
+                Object result;
+                try {
+                    result = finalRoute.execute();
+                    ChannelFuture channelFuture;
+                    if (result != null) {
+                        channelFuture = context.writeAndFlush(result);
+                    } else {
+                        HttpResponse res = context.channel().attr(NettyHttpResponse.KEY).get();
+                        if (res == null) {
+                            res = HttpResponse.ok();
+                        }
+                        channelFuture = context.writeAndFlush(res);
+                    }
+
+                    channelFuture.addListener(future -> {
+                        if (!future.isSuccess()) {
+                            Throwable cause = future.cause();
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error encoding response: " + cause.getMessage(), cause);
+                            }
+                            if (context.channel().isWritable()) {
+                                context.pipeline().fireExceptionCaught(cause);
+                            }
+                        }
+                    });
+                } catch (Throwable e) {
+                    context.pipeline().fireExceptionCaught(e);
+                }
+            });
+            return null;
+        });
+        return route;
+    }
+
+    private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+        Collection<Argument> requiredArguments = route.getRequiredArguments();
+        Map<String, Object> argumentValues;
+
+        if (requiredArguments.isEmpty()) {
+            // no required arguments so just execute
+            argumentValues = Collections.emptyMap();
+        } else {
+            argumentValues = new LinkedHashMap<>();
+            // Begin try fulfilling the argument requirements
+            for (Argument argument : requiredArguments) {
+                Optional<ArgumentBinder> registeredBinder =
+                        binderRegistry.findArgumentBinder(argument, request);
+                if (registeredBinder.isPresent()) {
+                    ArgumentBinder argumentBinder = registeredBinder.get();
+                    String argumentName = argument.getName();
+                    if (argumentBinder instanceof BodyArgumentBinder) {
+                        if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
+                            Optional bindingResult = argumentBinder
+                                    .bind(argument, request);
+
+                            if (bindingResult.isPresent()) {
+                                argumentValues.put(argumentName, bindingResult.get());
+                            }
+
+                        } else {
+                            argumentValues.put(argumentName, (Supplier<Optional>) () ->
+                                    argumentBinder.bind(argument, request)
+                            );
+                            request.setBodyRequired(true);
+                        }
+                    } else {
+
+                        Optional bindingResult = argumentBinder
+                                .bind(argument, request);
+                        if (argument.getType() == Optional.class) {
+                            argumentValues.put(argumentName, bindingResult);
+                        } else if (bindingResult.isPresent()) {
+                            argumentValues.put(argumentName, bindingResult.get());
+                        }
+                    }
+                }
+            }
+        }
+
+        route = route.fulfill(argumentValues);
+        return route;
     }
 
     protected ServerBootstrap createServerBootstrap() {

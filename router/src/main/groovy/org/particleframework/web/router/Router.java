@@ -75,6 +75,16 @@ public interface Router {
      * @return The {@link RouteMatch}
      */
     <T> Optional<RouteMatch<T>> route(Throwable error);
+
+    /**
+     * Match a route to an error
+     *
+     * @param originatingClass The class the error originates from
+     * @param error The error
+     * @param <T> The matched route
+     * @return The {@link RouteMatch}
+     */
+    <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error);
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
      *

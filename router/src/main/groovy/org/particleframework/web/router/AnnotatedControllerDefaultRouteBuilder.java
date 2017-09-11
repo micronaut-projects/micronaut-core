@@ -44,22 +44,34 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
         Controller controllerAnn = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
-        if(controllerAnn != null && !controllerAnn.value().isEmpty()) {
-            String methodName = method.getMethodName();
-            Optional<MethodConvention> methodConvention = MethodConvention.forMethod(methodName);
-            Optional<Argument> idArg = Arrays.stream(method.getArguments())
-                                             .filter((argument -> argument.getName()
-                                             .equals(PropertyConvention.ID.lowerCaseName())))
-                                             .findFirst();
+        if(controllerAnn != null ) {
+            if(!controllerAnn.value().isEmpty()) {
 
-            String id = idArg.map((arg)-> "{/id}").orElse("");
-            methodConvention.ifPresent((convention)->
-                   buildRoute( HttpMethod.valueOf(convention.httpMethod()),
-                           controllerAnn.value() + id,
-                           declaringType,
-                           methodName,
-                           method.getArgumentTypes()
-            ));
+                String methodName = method.getMethodName();
+                Optional<MethodConvention> methodConvention = MethodConvention.forMethod(methodName);
+
+
+                Optional<Argument> idArg = Arrays.stream(method.getArguments())
+                        .filter((argument -> argument.getName()
+                                .equals(PropertyConvention.ID.lowerCaseName())))
+                        .findFirst();
+
+                String id = idArg.map((arg)-> "{/id}").orElse("");
+                methodConvention.ifPresent((convention)->
+                        buildRoute( HttpMethod.valueOf(convention.httpMethod()),
+                                controllerAnn.value() + id,
+                                declaringType,
+                                methodName,
+                                method.getArgumentTypes()
+                        ));
+            }
+            else {
+                Class[] argumentTypes = method.getArgumentTypes();
+                if(argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
+                    Class argumentType = argumentTypes[0];
+                    error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                }
+            }
         }
     }
 }

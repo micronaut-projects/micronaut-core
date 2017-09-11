@@ -149,10 +149,25 @@ public class DefaultRouter implements Router {
     }
 
     @Override
+    public <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error) {
+        for (ErrorRoute errorRoute : errorRoutes) {
+            Optional<RouteMatch<T>> match = errorRoute.match(originatingClass, error);
+            if(match.isPresent()) {
+                return match;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public <T> Optional<RouteMatch<T>> route(Throwable error) {
         for (ErrorRoute errorRoute : errorRoutes) {
-            Optional<RouteMatch<T>> result = errorRoute.match(error);
-            return result;
+            if(errorRoute.originatingType() == null) {
+                Optional<RouteMatch<T>> match = errorRoute.match(error);
+                if(match.isPresent()) {
+                    return match;
+                }
+            }
         }
         return Optional.empty();
     }
