@@ -116,6 +116,13 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
     }
 
     /**
+     * @return Whether more input is needed
+     */
+    public boolean needMoreInput() {
+        return nonBlockingJsonParser.getNonBlockingInputFeeder().needMoreInput();
+    }
+
+    /**
      * This method should be invoked by the thread which provides the bytes that produces the fully formed JSON. This could be in chunks, using
      * a ByteBuf or whatever form.
      *

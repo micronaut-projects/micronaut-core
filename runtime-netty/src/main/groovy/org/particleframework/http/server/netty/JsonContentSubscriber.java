@@ -45,11 +45,13 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onSubscribe(Subscription s) {
-        s.request(Long.MAX_VALUE);
         this.subscription = s;
+        this.subscription.request(1L); // start with 1
+
         jacksonProcessor.subscribe(new Subscriber<JsonNode>() {
             @Override
             public void onSubscribe(Subscription s) {
+                // downstream subscriber controlled by previous subscription, so just request everything
                 s.request(Long.MAX_VALUE);
             }
 
@@ -113,6 +115,10 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
                 }
 
                 jacksonProcessor.onNext(bytes);
+                if(jacksonProcessor.needMoreInput()) {
+                    // request more input
+                    subscription.request(1L);
+                }
             }
         } finally {
             httpContent.release();
