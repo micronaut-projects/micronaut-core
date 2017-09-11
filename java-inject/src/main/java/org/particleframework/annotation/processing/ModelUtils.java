@@ -1,9 +1,6 @@
 package org.particleframework.annotation.processing;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
@@ -26,7 +23,7 @@ class ModelUtils {
     }
 
     TypeElement classElementFor(Element element) {
-        while (!element.getKind().isClass() && !element.getKind().isInterface()) {
+        while (!(element.getKind().isClass() || element.getKind().isInterface())) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
@@ -156,7 +153,7 @@ class ModelUtils {
         }
     }
 
-    public TypeElement superClassFor(TypeElement element) {
+    TypeElement superClassFor(TypeElement element) {
         TypeMirror superclass = element.getSuperclass();
         if (superclass.getKind() == TypeKind.NONE) {
             return null;
@@ -165,7 +162,7 @@ class ModelUtils {
         return (TypeElement) kind.asElement();
     }
 
-    public List<TypeElement> superClassesFor(TypeElement classElement) {
+    List<TypeElement> superClassesFor(TypeElement classElement) {
         List<TypeElement> superClasses = new ArrayList<>();
         TypeElement superclass = superClassFor(classElement);
                 while (superclass != null) {
@@ -176,12 +173,12 @@ class ModelUtils {
         return superClasses;
     }
 
-    public Object resolveTypeReference(TypeElement typeElement) {
+    Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
         return resolveTypeReference(type);
     }
 
-    public Object resolveTypeReference(TypeMirror type) {
+    Object resolveTypeReference(TypeMirror type) {
         Object result = Void.TYPE;
         if (type.getKind().isPrimitive()) {
             result = classOfPrimitiveFor(type.toString());
@@ -200,22 +197,60 @@ class ModelUtils {
         return result;
     }
 
-    public boolean isPackagePrivate(Element element) {
+    boolean isPackagePrivate(Element element) {
         Set<Modifier> modifiers = element.getModifiers();
         return !(modifiers.contains(PUBLIC)
             || modifiers.contains(PROTECTED)
             || modifiers.contains(PRIVATE));
     }
 
-    public boolean isPrivate(Element element) {
+
+    // FIXME review/test this
+    boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, ExecutableElement method) {
+        PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
+        PackageElement packageOfConcreteClass = elementUtils.getPackageOf(concreteClass);
+
+        return declaringClass != concreteClass &&
+            !packageOfDeclaringClass.getQualifiedName().equals(packageOfConcreteClass.getQualifiedName())
+            && (isProtected(method) || !isPublic(method));
+    }
+
+    /**
+     * Tests if candidate method is overriden from a given class or subclass
+     *
+     * @param overridden the candidate overridden method
+     * @param classElement the type element that may contain the overriding method, either directly or in a subclass
+     * @return the overriding method
+     */
+    Optional<ExecutableElement> overridingMethod(ExecutableElement overridden, TypeElement classElement) {
+        List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
+        for (ExecutableElement method: methods) {
+            if (!method.equals(overridden)) {
+                if (elementUtils.overrides(method, overridden, classElement)) {
+                    return Optional.ofNullable(method);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    boolean isPrivate(Element element) {
         return element.getModifiers().contains(PRIVATE);
     }
 
-    public boolean isAbstract(Element element) {
+    boolean isProtected(Element element) {
+        return element.getModifiers().contains(PROTECTED);
+    }
+
+    boolean isPublic(Element element) {
+        return element.getModifiers().contains(PUBLIC);
+    }
+
+    boolean isAbstract(Element element) {
         return element.getModifiers().contains(ABSTRACT);
     }
 
-    public boolean isStatic(Element element) {
+    boolean isStatic(Element element) {
         return element.getModifiers().contains(STATIC);
     }
 }
