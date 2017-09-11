@@ -21,6 +21,7 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -389,11 +390,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            assert (variable.getKind() == FIELD) : "expected field for " + variable;
+            if( variable.getKind() != FIELD) return null;
 
             boolean isInjected = annotationUtils.hasStereotype(variable, Inject.class);
             boolean isValue = !isInjected &&
                 (annotationUtils.hasStereotype(variable, Value.class)); // || isConfigurationPropertiesType);
+
             if (isInjected || isValue) {
                 BeanDefinitionWriter writer = beanDefinitionWriters.get(this.concreteClass);
 
@@ -461,6 +463,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeElement declaringClass = modelUtils.classElementFor(field);
 
+
                 if (setterMethod.isPresent()) {
                     ExecutableElement method = setterMethod.get();
                     writer.visitSetterValue(
@@ -474,17 +477,30 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         isConfigurationPropertiesType);
                 }
                 else {
+                    boolean isPrivate = modelUtils.isPrivate(field);
+                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());
+
+                    Object declaringType = modelUtils.resolveTypeReference(declaringClass);
+                    String fieldName = field.getSimpleName().toString();
                     writer.visitFieldValue(
-                        modelUtils.resolveTypeReference(declaringClass),
+                        declaringType,
                         qualifierRef,
-                        !field.getModifiers().contains(Modifier.PUBLIC),
+                        requiresReflection,
                         fieldType,
-                        field.getSimpleName().toString(),
+                        fieldName,
                         isConfigurationPropertiesType);
                 }
             }
 
             return null;
+        }
+
+        protected boolean isInheritedAndNotPublic(TypeElement declaringClass, Set<Modifier> modifiers) {
+            PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
+            PackageElement concretePackage = elementUtils.getPackageOf(concreteClass);
+            return !declaringClass.equals(concreteClass) &&
+                    !declaringPackage.equals(concretePackage) &&
+                    !(modifiers.contains(Modifier.PUBLIC));
         }
 
         @Override

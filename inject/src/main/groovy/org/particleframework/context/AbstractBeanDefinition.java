@@ -559,7 +559,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 } else {
                     String argumentName = argument.getName();
                     Class[] genericTypes = argument.getGenericTypes();
-                    String valString = resolveValueString(injectionPoint.getMethod().getDeclaringClass(), argumentName, valAnn);
+                    Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
+                    String valString = resolveValueString(declaringClass, argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argumentType, valString, genericTypes);
                     if (!value.isPresent() && argumentType == Optional.class) {
@@ -567,7 +568,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     } else {
                         return value.orElseGet(() -> {
                             if (valAnn == null && isConfigurationProperties) {
-                                String cliOption = resolveCliOption(argumentName);
+                                String cliOption = resolveCliOption(declaringClass, argumentName);
                                 if(cliOption != null) {
                                     return resolveValue(applicationContext,
                                             argumentType,
@@ -888,14 +889,15 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Field field = injectionPoint.getField();
             Value valueAnn = field.getAnnotation(Value.class);
             Class<?> fieldType = field.getType();
-            String valString = resolveValueString(injectionPoint.getField().getDeclaringClass(), injectionPoint.getName(), valueAnn);
+            Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
+            String valString = resolveValueString(declaringClass, injectionPoint.getName(), valueAnn);
             Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
             if (!value.isPresent() && fieldType == Optional.class) {
                 return value;
             } else {
                 if (isConfigurationProperties && valueAnn == null) {
                     return value.orElseGet(()->{
-                        String cliOption = resolveCliOption(field.getName());
+                        String cliOption = resolveCliOption(declaringClass, field.getName());
                         if(cliOption != null) {
                             return resolveValue((ApplicationContext) context,
                                     fieldType,
@@ -1057,9 +1059,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return valString;
     }
 
-    private String resolveCliOption(String name) {
-        Class type = getType();
-        ConfigurationProperties configurationProperties = (ConfigurationProperties) type.getAnnotation(ConfigurationProperties.class);
+    private String resolveCliOption(Class<?> declaringClass, String name) {
+        ConfigurationProperties configurationProperties = declaringClass.getAnnotation(ConfigurationProperties.class);
         if(configurationProperties != null ) {
             String[] prefix = configurationProperties.cliPrefix();
             if(prefix.length == 1) {
