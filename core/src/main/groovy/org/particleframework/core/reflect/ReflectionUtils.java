@@ -16,6 +16,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public class ReflectionUtils {
+    public static final Class[] EMPTY_CLASS_ARRAY = new Class[0];
     private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS
             = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
         {

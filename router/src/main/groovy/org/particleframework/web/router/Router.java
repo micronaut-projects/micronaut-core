@@ -16,6 +16,7 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpStatus;
 
 import java.net.URI;
 import java.util.Optional;
@@ -36,7 +37,7 @@ public interface Router {
      * @param uri The URI
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default <T> Stream<RouteMatch<T>> find(HttpMethod httpMethod, URI uri) {
+    default <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, URI uri) {
         return find(httpMethod, uri.toString());
     }
 
@@ -47,7 +48,7 @@ public interface Router {
      * @param uri The URI
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    <T> Stream<RouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri);
+    <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri);
 
     /**
      * Finds the first possible route for the given HTTP method and URI
@@ -56,14 +57,33 @@ public interface Router {
      * @param uri The URI
      * @return The route match
      */
-    <T> Optional<RouteMatch<T>> route(HttpMethod httpMethod, CharSequence uri);
+    <T> Optional<UriRouteMatch<T>> route(HttpMethod httpMethod, CharSequence uri);
+
+    /**
+     * Found a {@link RouteMatch} for the given {@link HttpStatus} code
+     *
+     * @param status The HTTP status
+     * @return The {@link RouteMatch}
+     */
+    <T> Optional<RouteMatch<T>> route(HttpStatus status);
+
+    /**
+     * Match a route to an error
+     *
+     * @param error The error
+     * @param <T> The matched route
+     * @return The {@link RouteMatch}
+     */
+    <T> Optional<RouteMatch<T>> route(Throwable error);
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
      *
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> GET(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> GET(CharSequence uri) {
+        return route(HttpMethod.GET, uri);
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#POST} method and the given URI
@@ -71,7 +91,9 @@ public interface Router {
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> POST(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> POST(CharSequence uri) {
+        return route(HttpMethod.POST, uri);
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#PUT} method and the given URI
@@ -79,21 +101,27 @@ public interface Router {
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> PUT(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> PUT(CharSequence uri) {
+        return route(HttpMethod.PUT, uri);
+    }
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#PATCH} method and the given URI
      *
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> PATCH(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> PATCH(CharSequence uri) {
+        return route(HttpMethod.PATCH, uri);
+    }
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#DELETE} method and the given URI
      *
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> DELETE(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> DELETE(CharSequence uri){
+        return route(HttpMethod.DELETE, uri);
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#OPTIONS} method and the given URI
@@ -101,7 +129,9 @@ public interface Router {
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> OPTIONS(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> OPTIONS(CharSequence uri) {
+        return route(HttpMethod.OPTIONS, uri);
+    }
 
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#HEAD} method and the given URI
@@ -109,7 +139,9 @@ public interface Router {
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    <T> Optional<RouteMatch<T>> HEAD(CharSequence uri);
+    default <T> Optional<UriRouteMatch<T>> HEAD(CharSequence uri){
+        return route(HttpMethod.HEAD, uri);
+    }
 
     /**
      * Find any {@link RouteMatch} regardless of HTTP method
@@ -117,5 +149,8 @@ public interface Router {
      * @param uri The URI
      * @return A stream of route matches
      */
-    <T> Stream<RouteMatch<T>> findAny(CharSequence uri);
+    <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri);
+
+
+
 }

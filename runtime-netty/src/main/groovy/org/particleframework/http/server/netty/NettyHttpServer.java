@@ -36,12 +36,12 @@ import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
-import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
+import org.particleframework.web.router.UriRouteMatch;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,8 +96,6 @@ public class NettyHttpServer implements EmbeddedServer {
         NioEventLoopGroup parentGroup = createParentEventLoopGroup();
         ServerBootstrap serverBootstrap = createServerBootstrap();
 
-
-//      TODO: Restore once ConfigurationPropertiesInheritanceSpec passing for Java
         processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
         processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
 
@@ -134,7 +132,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());
                                 }
-                                Optional<RouteMatch<Object>> routeMatch = routerBean.flatMap((router) ->
+                                Optional<UriRouteMatch<Object>> routeMatch = routerBean.flatMap((router) ->
                                         router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
                                                 .filter((match) -> match.test(nettyHttpRequest))
                                                 .findFirst()
@@ -197,8 +195,8 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                     if(!route.isExecutable()) {
                                             // if we arrived here the request is not processable
-                                            if (LOG.isErrorEnabled()) {
-                                                LOG.error("Non-bindable arguments for route: " + route);
+                                            if (LOG.isDebugEnabled()) {
+                                                LOG.debug("Bad request: Unbindable arguments for route: " + route);
                                             }
                                             ctx.writeAndFlush(HttpResponse.badRequest())
                                                     .addListener(ChannelFutureListener.CLOSE);
@@ -208,6 +206,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         // decorate the execution of the route so that it runs an async executor
                                         // TODO: Allow customization of thread pool to execute actions
                                         Executor executor = ctx.channel().eventLoop();
+
                                         route = route.decorate(finalRoute -> {
                                             executor.execute(() -> {
 
@@ -278,7 +277,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
                                             ).orElse(Stream.empty())
-                                            .map(RouteMatch::getHttpMethod)
+                                            .map(UriRouteMatch::getHttpMethod)
                                             .collect(Collectors.toSet());
                                     if (!existingRoutes.isEmpty()) {
                                         ctx.writeAndFlush(HttpResponse.notAllowed(

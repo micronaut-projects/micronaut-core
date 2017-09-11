@@ -18,47 +18,36 @@ package org.particleframework.web.router;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Represents a Route definition constructed by a {@link RouteBuilder}
- *
- * @see RouteBuilder
- * @see ResourceRoute
+ * Represents a {@link Route} that matches an exception
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Route {
-
+public interface ErrorRoute extends Route {
 
     /**
-     * @return The MediaType for this route
+     * @return The type of exception
      */
-    MediaType getMediaType();
+    Class<? extends Throwable> exceptionType();
 
     /**
-     * Applies the given media type the route
+     * Match the given exception
      *
-     * @param mediaType The media type
-     * @return A new route with the media type applied
+     * @param exception The exception to match
+     * @return The route match
      */
-    Route accept(MediaType mediaType);
+    <T> Optional<RouteMatch<T>> match(Throwable exception);
 
-    /**
-     * Defines routes nested within this route
-     *
-     * @param nested The nested routes
-     * @return This route
-     */
-    Route nest(Runnable nested);
+    @Override
+    ErrorRoute accept(MediaType mediaType);
 
-    /**
-     * Match this {@link Route} only if the given predicate is true
-     *
-     * @param condition The condition which accepts a {@link HttpRequest}
-     * @return This route
-     */
-    Route where(Predicate<HttpRequest> condition);
+    @Override
+    ErrorRoute nest(Runnable nested);
 
+    @Override
+    ErrorRoute where(Predicate<HttpRequest> condition);
 }

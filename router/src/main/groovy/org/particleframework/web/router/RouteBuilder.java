@@ -15,8 +15,11 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.core.naming.conventions.TypeConvention;
+import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.stereotype.Controller;
 
 import java.util.List;
@@ -38,7 +41,18 @@ public interface RouteBuilder {
     /**
      * @return Obtain a list of constructed routes
      */
-    List<Route> getConstructedRoutes();
+    List<UriRoute> getUriRoutes();
+
+    /**
+     * @return Obtain a list of constructed routes
+     */
+    List<StatusRoute> getStatusRoutes();
+
+    /**
+     * @return Obtain a list of constructed routes
+     */
+    List<ErrorRoute> getErrorRoutes();
+
     /**
      * @return The URI naming strategy
      */
@@ -110,24 +124,25 @@ public interface RouteBuilder {
     /**
      * Register a route to handle the returned status code
      *
-     * @param code The status code
+     * @param status The status code
      * @param instance The instance
      * @param method The method
      * @return The route
      */
-    default Route status(int code, Object instance, String method) {
-        return status(code, instance.getClass(), method);
+    default StatusRoute status(HttpStatus status, Object instance, String method) {
+        return status(status, instance.getClass(), method, ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
     /**
      * Register a route to handle the returned status code
      *
-     * @param code The status code
+     * @param status The status code
      * @param type The type
      * @param method The method
      * @return The route
      */
-    Route status(int code, Class type, String method);
+    StatusRoute status(HttpStatus status, Class type, String method, Class...parameterTypes);
+
 
     /**
      * Register a route to handle the error
@@ -137,7 +152,29 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route error(Class<? extends Throwable> error, Class type, String method);
+    ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class...parameterTypes);
+
+    /**
+     * Register a route to handle the error
+     *
+     * @param error The error
+     * @param type The type
+     * @return The route
+     */
+    default ErrorRoute error(Class<? extends Throwable> error, Class type) {
+        return error(error, type, NameUtils.decapitalize(NameUtils.trimSuffix(type.getSimpleName(), "Exception", "Error")), ReflectionUtils.EMPTY_CLASS_ARRAY);
+    }
+
+    /**
+     * Register a route to handle the error
+     *
+     * @param error The error
+     * @param instance The instance
+     * @return The route
+     */
+    default ErrorRoute error(Class<? extends Throwable> error, Object instance) {
+        return error(error, instance.getClass(), NameUtils.decapitalize(NameUtils.trimSuffix(error.getSimpleName(), "Exception", "Error")), ReflectionUtils.EMPTY_CLASS_ARRAY);
+    }
 
     /**
      * Register a route to handle the error
@@ -147,8 +184,8 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    default Route error(Class<? extends Throwable> error, Object instance, String method) {
-        return error(error, instance.getClass(), method);
+    default ErrorRoute error(Class<? extends Throwable> error, Object instance, String method) {
+        return error(error, instance.getClass(), method, ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
     /**
@@ -159,7 +196,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route GET(String uri, Object target) {
+    default UriRoute GET(String uri, Object target) {
         return GET(uri, target, INDEX.methodName());
     }
 
@@ -169,7 +206,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route GET(Object target) {
+    default UriRoute GET(Object target) {
         Class<?> type = target.getClass();
         return GET( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -180,7 +217,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route GET(Object target, PropertyConvention id) {
+    default UriRoute GET(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return GET(getUriNamingStrategy().resolveUri(type, id), target, SHOW.methodName());
     }
@@ -191,7 +228,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route GET(Class type) {
+    default UriRoute GET(Class type) {
         return GET(getUriNamingStrategy().resolveUri(type), type, INDEX.methodName());
     }
 
@@ -201,7 +238,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route GET(Class type, PropertyConvention id) {
+    default UriRoute GET(Class type, PropertyConvention id) {
         return GET(getUriNamingStrategy().resolveUri(type, id), type, SHOW.methodName());
     }
 
@@ -215,7 +252,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route GET(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute GET(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -227,7 +264,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route GET(String uri, Class<?> type, String method, Class...parameterTypes);
+    UriRoute GET(String uri, Class<?> type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP POST. Since the method to execute is not
@@ -237,8 +274,8 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route POST(String uri, Object target, Class...parameterTypes) {
-        return POST(uri, target, SAVE.methodName());
+    default UriRoute POST(String uri, Object target, Class...parameterTypes) {
+        return POST(uri, target, SAVE.methodName(), parameterTypes);
     }
 
     /**
@@ -247,7 +284,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route POST(Object target) {
+    default UriRoute POST(Object target) {
         Class<?> type = target.getClass();
         return POST( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -258,7 +295,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route POST(Object target, PropertyConvention id) {
+    default UriRoute POST(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return POST(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.methodName());
     }
@@ -269,7 +306,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route POST(Class type) {
+    default UriRoute POST(Class type) {
         return POST(getUriNamingStrategy().resolveUri(type), type, SAVE.methodName());
     }
 
@@ -279,7 +316,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route POST(Class type, PropertyConvention id) {
+    default UriRoute POST(Class type, PropertyConvention id) {
         return POST(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.methodName());
     }
 
@@ -293,7 +330,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route POST(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute POST(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -305,7 +342,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route POST(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute POST(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PUT. Since the method to execute is not
@@ -315,7 +352,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route PUT(String uri, Object target) {
+    default UriRoute PUT(String uri, Object target) {
         return PUT(uri, target, UPDATE.methodName());
     }
 
@@ -325,7 +362,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PUT(Object target) {
+    default UriRoute PUT(Object target) {
         Class<?> type = target.getClass();
         return PUT( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -336,7 +373,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PUT(Object target, PropertyConvention id) {
+    default UriRoute PUT(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return PUT(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.methodName());
     }
@@ -347,7 +384,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PUT(Class type) {
+    default UriRoute PUT(Class type) {
         return PUT(getUriNamingStrategy().resolveUri(type), type, UPDATE.methodName());
     }
 
@@ -357,7 +394,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PUT(Class type, PropertyConvention id) {
+    default UriRoute PUT(Class type, PropertyConvention id) {
         return PUT(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.methodName());
     }
 
@@ -371,7 +408,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PUT(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute PUT(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -383,7 +420,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PUT(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute PUT(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PATCH. Since the method to execute is not
@@ -393,7 +430,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route PATCH(String uri, Object target) {
+    default UriRoute PATCH(String uri, Object target) {
         return PATCH(uri, target, UPDATE.methodName());
     }
 
@@ -403,7 +440,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PATCH(Object target) {
+    default UriRoute PATCH(Object target) {
         Class<?> type = target.getClass();
         return PATCH( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -414,7 +451,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route PATCH(Object target, PropertyConvention id) {
+    default UriRoute PATCH(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return PATCH(getUriNamingStrategy().resolveUri(type, id), target, UPDATE.methodName());
     }
@@ -425,7 +462,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PATCH(Class type) {
+    default UriRoute PATCH(Class type) {
         return PATCH(getUriNamingStrategy().resolveUri(type), type, UPDATE.methodName());
     }
 
@@ -435,7 +472,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route PATCH(Class type, PropertyConvention id) {
+    default UriRoute PATCH(Class type, PropertyConvention id) {
         return PATCH(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.methodName());
     }
 
@@ -449,7 +486,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PATCH(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute PATCH(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -461,7 +498,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route PATCH(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute PATCH(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP DELETE. Since the method to execute is not
@@ -471,7 +508,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route DELETE(String uri, Object target) {
+    default UriRoute DELETE(String uri, Object target) {
         return DELETE(uri, target, DELETE.methodName());
     }
 
@@ -481,7 +518,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route DELETE(Object target) {
+    default UriRoute DELETE(Object target) {
         Class<?> type = target.getClass();
         return DELETE( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -492,7 +529,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route DELETE(Object target, PropertyConvention id) {
+    default UriRoute DELETE(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return DELETE(getUriNamingStrategy().resolveUri(type, id), target, DELETE.methodName());
     }
@@ -503,7 +540,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route DELETE(Class type) {
+    default UriRoute DELETE(Class type) {
         return DELETE(getUriNamingStrategy().resolveUri(type), type, DELETE.methodName());
     }
 
@@ -513,7 +550,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route DELETE(Class type, PropertyConvention id) {
+    default UriRoute DELETE(Class type, PropertyConvention id) {
         return DELETE(getUriNamingStrategy().resolveUri(type, id), type, DELETE.methodName());
     }
 
@@ -527,7 +564,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route DELETE(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute DELETE(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -539,7 +576,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route DELETE(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute DELETE(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP OPTIONS. Since the method to execute is not
@@ -549,7 +586,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route OPTIONS(String uri, Object target) {
+    default UriRoute OPTIONS(String uri, Object target) {
         return OPTIONS(uri, target, OPTIONS.methodName());
     }
 
@@ -559,7 +596,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route OPTIONS(Object target) {
+    default UriRoute OPTIONS(Object target) {
         Class<?> type = target.getClass();
         return OPTIONS( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -570,7 +607,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route OPTIONS(Object target, PropertyConvention id) {
+    default UriRoute OPTIONS(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return OPTIONS(getUriNamingStrategy().resolveUri(type, id), target, OPTIONS.methodName());
     }
@@ -581,7 +618,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route OPTIONS(Class type) {
+    default UriRoute OPTIONS(Class type) {
         return OPTIONS(getUriNamingStrategy().resolveUri(type), type, OPTIONS.methodName());
     }
 
@@ -591,7 +628,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route OPTIONS(Class type, PropertyConvention id) {
+    default UriRoute OPTIONS(Class type, PropertyConvention id) {
         return OPTIONS(getUriNamingStrategy().resolveUri(type, id), type, OPTIONS.methodName());
     }
 
@@ -605,7 +642,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route OPTIONS(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute OPTIONS(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -617,7 +654,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route OPTIONS(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute OPTIONS(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
@@ -627,7 +664,7 @@ public interface RouteBuilder {
      * @param target The target object
      * @return The route
      */
-    default Route HEAD(String uri, Object target) {
+    default UriRoute HEAD(String uri, Object target) {
         return HEAD(uri, target, HEAD.methodName());
     }
 
@@ -637,7 +674,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route HEAD(Object target) {
+    default UriRoute HEAD(Object target) {
         Class<?> type = target.getClass();
         return HEAD( getUriNamingStrategy().resolveUri(type), target );
     }
@@ -648,7 +685,7 @@ public interface RouteBuilder {
      * @param target The object
      * @return The route
      */
-    default Route HEAD(Object target, PropertyConvention id) {
+    default UriRoute HEAD(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
         return HEAD(getUriNamingStrategy().resolveUri(type, id), target, HEAD.methodName());
     }
@@ -659,7 +696,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route HEAD(Class type) {
+    default UriRoute HEAD(Class type) {
         return HEAD(getUriNamingStrategy().resolveUri(type), type, HEAD.methodName());
     }
 
@@ -669,7 +706,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default Route HEAD(Class type, PropertyConvention id) {
+    default UriRoute HEAD(Class type, PropertyConvention id) {
         return HEAD(getUriNamingStrategy().resolveUri(type, id), type, HEAD.methodName());
     }
 
@@ -683,7 +720,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route HEAD(String uri, Object target, String method, Class...parameterTypes);
+    UriRoute HEAD(String uri, Object target, String method, Class...parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
@@ -695,7 +732,7 @@ public interface RouteBuilder {
      * @param method The method
      * @return The route
      */
-    Route HEAD(String uri, Class type, String method, Class...parameterTypes);
+    UriRoute HEAD(String uri, Class type, String method, Class...parameterTypes);
 
     /**
      * <p>A URI naming strategy is used to dictate the default name to use when building a URI for a class</p>

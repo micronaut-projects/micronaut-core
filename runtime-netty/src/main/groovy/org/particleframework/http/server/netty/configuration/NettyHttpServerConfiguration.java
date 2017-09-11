@@ -76,7 +76,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static abstract class EventLoopConfig {
         protected int threads;
 
-        public int getThreads() {
+        /**
+         * @return The number of threads to use
+         */
+        public int getNumOfThreads() {
             return threads;
         }
     }

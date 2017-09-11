@@ -16,7 +16,10 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
+
+import java.util.function.Predicate;
 
 /**
  * <p>A resource route is a composite route to a REST endpoint</p>
@@ -24,7 +27,7 @@ import org.particleframework.http.MediaType;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ResourceRoute  {
+public interface ResourceRoute extends Route {
 
     /**
      * Accept the given media type
@@ -57,4 +60,7 @@ public interface ResourceRoute  {
      * @return The resource route
      */
     ResourceRoute exclude(HttpMethod... methods);
+
+    @Override
+    ResourceRoute where(Predicate<HttpRequest> condition);
 }
