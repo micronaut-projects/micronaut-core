@@ -19,6 +19,7 @@ import org.particleframework.context.Qualifier;
 import org.particleframework.inject.BeanDefinition;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -56,5 +57,10 @@ class CompositeQualifier<T> implements Qualifier<T> {
     @Override
     public int hashCode() {
         return Arrays.hashCode(qualifiers);
+    }
+
+    @Override
+    public String toString() {
+        return Arrays.stream(qualifiers).map(Object::toString).collect(Collectors.joining(" and "));
     }
 }

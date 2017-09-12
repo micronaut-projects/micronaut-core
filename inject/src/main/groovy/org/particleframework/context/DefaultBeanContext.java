@@ -421,7 +421,7 @@ public class DefaultBeanContext implements BeanContext {
 
     <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         // allow injection the bean context
-        if (beanType == BeanContext.class) {
+        if (thisInterfaces.contains(beanType)) {
             return Optional.of((T) this);
         }
 

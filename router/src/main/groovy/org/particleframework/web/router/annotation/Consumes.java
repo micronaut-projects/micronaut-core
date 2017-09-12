@@ -43,5 +43,5 @@ public @interface Consumes {
     /**
      * @return The {@link MediaType} values that this component is able to consume
      */
-    String[] value() default MediaType.APPLICATION_JSON;
+    String[] value();
 }
