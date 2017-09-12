@@ -70,7 +70,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "Invalid JSON"
+        response.message() == "No!! Invalid JSON"
 
     }
 
@@ -89,7 +89,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "Invalid JSON"
+        response.message() == "No!! Invalid JSON"
 
     }
 
@@ -292,7 +292,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         }
 
         HttpResponse jsonError(JsonParseException jsonParseException) {
-            return HttpResponse.status(HttpStatus.BAD_REQUEST,"Invalid JSON")
+            return HttpResponse.status(HttpStatus.BAD_REQUEST,"No!! Invalid JSON")
         }
     }
 

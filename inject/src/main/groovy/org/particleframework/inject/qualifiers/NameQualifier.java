@@ -1,12 +1,13 @@
 package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
-import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.BeanDefinition;
 
 import java.util.Locale;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Stream;
+
+import static org.particleframework.core.util.ArgumentUtils.check;
 
 /**
  * Qualifies using a name
@@ -18,19 +19,19 @@ class NameQualifier<T> implements Qualifier<T> {
     private final String name;
 
     NameQualifier(String name) {
-        this.name = name;
+        this.name = Objects.requireNonNull(name, "Argument [name] cannot be null");
     }
 
     @Override
-    public BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates) throws NonUniqueBeanException {
-        Stream<BeanDefinition<T>> filtered = candidates.filter(candidate -> {
-                String typeName = candidate.getType().getSimpleName();
-                return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
-            }
-        );
+    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
+        check("beanType", beanType).notNull();
+        check("candidates", candidates).notNull();
 
-        Optional<BeanDefinition<T>> first = filtered.findFirst();
-        return first.orElse(null);
+        return candidates.filter(candidate -> {
+                    String typeName = candidate.getType().getSimpleName();
+                    return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
+                }
+        );
     }
 
     @Override

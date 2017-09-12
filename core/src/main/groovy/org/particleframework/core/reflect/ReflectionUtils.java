@@ -149,4 +149,25 @@ public class ReflectionUtils {
             return Optional.empty();
         }
     }
+
+    public static Set<Class> getAllInterfaces(Class<?> aClass) {
+        Set<Class> interfaces = new HashSet<>();
+        return populateInterfaces(aClass, interfaces);
+    }
+
+    protected static Set<Class> populateInterfaces(Class<?> aClass, Set<Class> interfaces) {
+        Class<?>[] theInterfaces = aClass.getInterfaces();
+        interfaces.addAll(Arrays.asList(theInterfaces));
+        for (Class<?> theInterface : theInterfaces) {
+            populateInterfaces(theInterface, interfaces);
+        }
+        if(!aClass.isInterface()) {
+            Class<?> superclass = aClass.getSuperclass();
+            while(superclass != null) {
+                populateInterfaces(superclass, interfaces);
+                superclass = superclass.getSuperclass();
+            }
+        }
+        return interfaces;
+    }
 }

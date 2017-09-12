@@ -30,6 +30,7 @@ public class ResponseController {
     public HttpResponse disallow() {
         return HttpResponse.notAllowed(HttpMethod.DELETE);
     }
+
     @Get
     public HttpResponse accepted() {
         return HttpResponse.accepted();

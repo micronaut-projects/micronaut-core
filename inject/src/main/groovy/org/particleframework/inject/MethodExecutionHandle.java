@@ -6,7 +6,7 @@ package org.particleframework.inject;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodExecutionHandle<R> extends ExecutableHandle<R> {
+public interface MethodExecutionHandle<R> extends ExecutionHandle<R> {
 
     /**
      * @return Return the return type

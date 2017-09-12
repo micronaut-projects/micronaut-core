@@ -1,0 +1,47 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package org.particleframework.web.router.annotation;
+
+import org.particleframework.http.MediaType;
+import org.particleframework.stereotype.Controller;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+/**
+ * <p>An annotation to indicate the {@link MediaType}s produced by a particular component. Typically a {@link org.particleframework.stereotype.Controller}</p>
+ *
+ * <p>Generally with controllers one can use {@link Controller#produces()} ()}, however this annotation is more generic and applies
+ * to any component</p>
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ * @see Controller#produces()
+ */
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface Produces {
+
+    /**
+     * @return The {@link MediaType} values that this component is able to produce
+     */
+    String[] value() default MediaType.APPLICATION_JSON;
+}

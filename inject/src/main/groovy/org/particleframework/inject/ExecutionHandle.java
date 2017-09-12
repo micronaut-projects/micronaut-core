@@ -24,7 +24,7 @@ package org.particleframework.inject;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ExecutableHandle<R> {
+public interface ExecutionHandle<R> {
 
     /**
      * @return The declaring type

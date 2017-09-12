@@ -15,7 +15,6 @@
  */
 package org.particleframework.http.server.netty;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
@@ -24,6 +23,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -35,9 +35,10 @@ import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
-import org.particleframework.http.exceptions.ContentLengthExceededException;
+import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.inject.Argument;
+import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -47,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.lang.reflect.Field;
 import java.util.*;
@@ -67,8 +67,7 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_CODEC = "http-codec";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
-    private final Provider<Router> routerProvider;
-    private final Provider<RequestBinderRegistry> requestBinderRegistryProvider;
+    private final BeanLocator beanLocator;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final ChannelOutboundHandlerAdapter[] outboundHandlerAdapters;
@@ -78,14 +77,12 @@ public class NettyHttpServer implements EmbeddedServer {
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             Environment environment,
-            Provider<Router> routerProvider,
-            Provider<RequestBinderRegistry> requestBinderRegistryProvider,
+            BeanLocator beanLocator,
             ChannelOutboundHandlerAdapter[] outboundHandlerAdapters
     ) {
         this.environment = environment;
         this.serverConfiguration = serverConfiguration;
-        this.routerProvider = routerProvider;
-        this.requestBinderRegistryProvider = requestBinderRegistryProvider;
+        this.beanLocator = beanLocator;
         this.outboundHandlerAdapters = outboundHandlerAdapters;
     }
 
@@ -107,8 +104,8 @@ public class NettyHttpServer implements EmbeddedServer {
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
 
-                        Optional<Router> routerBean = resolveRouter();
-                        RequestBinderRegistry binderRegistry = requestBinderRegistryProvider.get();
+                        Optional<Router> routerBean = beanLocator.findBean(Router.class);
+                        RequestBinderRegistry binderRegistry = beanLocator.getBean(RequestBinderRegistry.class);
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
                         List<ChannelOutboundHandlerAdapter> channelOutboundHandlerAdapters = Arrays.asList(outboundHandlerAdapters);
@@ -193,18 +190,32 @@ public class NettyHttpServer implements EmbeddedServer {
                                     RouteMatch matchedRoute = nettyHttpRequest.getMatchedRoute();
                                     Class declaringType = matchedRoute.getDeclaringType();
                                     try {
-                                        Optional<Router> router = resolveRouter();
-                                        if(router.isPresent() && declaringType != null) {
-                                            Router routerObject = router.get();
+                                        if(routerBean.isPresent() && declaringType != null) {
+                                            Router routerObject = routerBean.get();
                                             Optional<RouteMatch<Object>> match = routerObject.route(declaringType, cause);
                                             if(match.isPresent()) {
-                                                RouteMatch<Object> finalRoute = fulfillArgumentRequirements(match.get(), null, requestBinderRegistryProvider.get());;
+                                                RouteMatch<Object> finalRoute = fulfillArgumentRequirements(
+                                                                                    match.get(),
+                                                                                null,
+                                                                                    binderRegistry);
                                                 if(finalRoute.isExecutable()) {
                                                     finalRoute = prepareRouteForExecution(finalRoute, ctx);
                                                     finalRoute.execute();
                                                     return;
                                                 }
                                             }
+                                        }
+
+                                        Optional<ExceptionHandler> exceptionHandler = beanLocator
+                                                .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
+
+                                        if (exceptionHandler.isPresent()) {
+                                            Object result = exceptionHandler
+                                                                .get()
+                                                                .handle(nettyHttpRequest, cause);
+                                            ctx.writeAndFlush(result)
+                                                    .addListener(ChannelFutureListener.CLOSE);
+                                            return;
                                         }
                                     } catch (Exception e) {
                                         if(LOG.isErrorEnabled()) {
@@ -213,25 +224,10 @@ public class NettyHttpServer implements EmbeddedServer {
                                     }
                                 }
 
-                                // TODO: Remove this dependency on Jackson and add custom exception handling
-                                if (cause instanceof JsonParseException) {
-                                    ctx.writeAndFlush(HttpResponse.badRequest())
-                                            .addListener(ChannelFutureListener.CLOSE);
-                                }
-                                else if(cause instanceof ContentLengthExceededException) {
-                                    ctx.writeAndFlush(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE))
-                                            .addListener(ChannelFutureListener.CLOSE);
-                                }
-                                else {
-                                    // TODO: Here we need to add routing to error handlers
-                                    DefaultFullHttpResponse httpResponse = new DefaultFullHttpResponse(
-                                            HttpVersion.HTTP_1_1,
-                                            HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                                    ctx.channel()
-                                            .writeAndFlush(httpResponse)
-                                            .addListener(ChannelFutureListener.CLOSE);
 
-                                }
+                                ctx.channel()
+                                        .writeAndFlush(HttpResponse.serverError())
+                                        .addListener(ChannelFutureListener.CLOSE);
 
 
                             }
@@ -424,18 +420,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
-    }
-
-    private Optional<Router> resolveRouter() {
-        try {
-            Router router = routerProvider.get();
-            return Optional.of(router);
-        } catch (Exception e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("No router found for Particle server: " + e.getMessage(), e);
-            }
-            return Optional.empty();
-        }
     }
 
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
