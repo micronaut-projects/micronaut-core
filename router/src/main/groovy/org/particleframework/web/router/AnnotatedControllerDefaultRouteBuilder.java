@@ -21,12 +21,14 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.MediaType;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * <p>This {@link RouteBuilder} will handle public methods of {@link Controller} instances that are mapped by convention</p>
@@ -44,22 +46,43 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
         Controller controllerAnn = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
-        if(controllerAnn != null && !controllerAnn.value().isEmpty()) {
-            String methodName = method.getMethodName();
-            Optional<MethodConvention> methodConvention = MethodConvention.forMethod(methodName);
-            Optional<Argument> idArg = Arrays.stream(method.getArguments())
-                                             .filter((argument -> argument.getName()
-                                             .equals(PropertyConvention.ID.lowerCaseName())))
-                                             .findFirst();
+        if(controllerAnn != null ) {
+            if(!controllerAnn.value().isEmpty()) {
 
-            String id = idArg.map((arg)-> "{/id}").orElse("");
-            methodConvention.ifPresent((convention)->
-                   buildRoute( HttpMethod.valueOf(convention.httpMethod()),
-                           controllerAnn.value() + id,
-                           declaringType,
-                           methodName,
-                           method.getArgumentTypes()
-            ));
+                String methodName = method.getMethodName();
+                Optional<MethodConvention> methodConvention = MethodConvention.forMethod(methodName);
+
+
+                Optional<Argument> idArg = Arrays.stream(method.getArguments())
+                        .filter((argument -> argument.getName()
+                                .equals(PropertyConvention.ID.lowerCaseName())))
+                        .findFirst();
+
+                String id = idArg.map((arg)-> "{/id}").orElse("");
+                methodConvention.ifPresent((convention) -> {
+                    UriRoute uriRoute = buildRoute(HttpMethod.valueOf(convention.httpMethod()),
+                            controllerAnn.value() + id,
+                            declaringType,
+                            methodName,
+                            method.getArgumentTypes()
+                    );
+                    processAccepts(controllerAnn, uriRoute);
+                });
+            }
+            else {
+                Class[] argumentTypes = method.getArgumentTypes();
+                if(argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
+                    Class argumentType = argumentTypes[0];
+                    ErrorRoute errorRoute = error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                    processAccepts(controllerAnn, errorRoute);
+                }
+            }
         }
+    }
+
+    protected void processAccepts(Controller controllerAnn, Route route) {
+        String[] consumes = controllerAnn.consumes();
+        MediaType[] accepts = Arrays.asList(consumes).stream().map(MediaType::new).toArray(MediaType[]::new);
+        route.accept(accepts);
     }
 }

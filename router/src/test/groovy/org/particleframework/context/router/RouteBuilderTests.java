@@ -19,11 +19,9 @@ import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.DefaultApplicationContext;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
-import org.particleframework.web.router.DefaultRouteBuilder;
-import org.particleframework.web.router.DefaultRouter;
-import org.particleframework.web.router.Route;
-import org.particleframework.web.router.Router;
+import org.particleframework.web.router.*;
 
 import javax.inject.Inject;
 
@@ -44,7 +42,7 @@ public class RouteBuilderTests {
                     .registerSingleton(new AuthorController());
         MyRouteBuilder routeBuilder = new MyRouteBuilder(beanContext);
         routeBuilder.someRoutes(new BookController(), new AuthorController());
-        List<Route> builtRoutes = routeBuilder.getBuiltRoutes();
+        List<UriRoute> builtRoutes = routeBuilder.getUriRoutes();
         Router router = new DefaultRouter(routeBuilder);
 
         // test invoking routes
@@ -52,6 +50,8 @@ public class RouteBuilderTests {
 
         assertEquals("Hello World", router.GET("/message/World").get().invoke());
         assertEquals("Book 1", router.GET("/books/1").get().invoke());
+        assertEquals("not found", router.route(HttpStatus.NOT_FOUND).get().invoke());
+        assertEquals("class not found: error", router.route(new ClassNotFoundException("error")).get().invoke());
 
         // test route state
 
@@ -110,9 +110,10 @@ public class RouteBuilderTests {
             POST("/books", controller, "save").accept(APPLICATION_JSON_TYPE);
 
             // handle errors TODO
-//            error(RuntimeException.class, controller, "error");
+            error(ClassNotFoundException.class, controller);
+            error(ReflectiveOperationException.class, controller);
             // handle status codes
-//            status(404, controller, "notFound");
+            status(HttpStatus.NOT_FOUND, controller, "notFound");
 
             // REST resources
             resources(controller);
@@ -133,6 +134,16 @@ public class RouteBuilderTests {
         String save() { return "dummy"; }
         String delete() { return "dummy"; }
         String update() { return "dummy"; }
+
+        String notFound() { return "not found";}
+
+        String classNotFound(ClassNotFoundException e) {
+            return "class not found: " + e.getMessage();
+        }
+
+        String reflectiveOperation(ReflectiveOperationException e) {
+            return "reflect exception";
+        }
     }
 
     static class AuthorController {

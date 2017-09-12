@@ -36,7 +36,7 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
     /**
      * @return The bean that declares this injection point
      */
-    Class getDeclaringType();
+    Class<?> getDeclaringType();
 
     /**
      * @return The name of the method

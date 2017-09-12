@@ -59,6 +59,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private Object body;
     private MediaType mediaType;
     private RouteMatch<Object> matchedRoute;
+    private boolean bodyRequired;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -238,5 +239,13 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     RouteMatch<Object> getMatchedRoute() {
         return matchedRoute;
+    }
+
+    void setBodyRequired(boolean bodyRequired) {
+        this.bodyRequired = bodyRequired;
+    }
+
+    boolean isBodyRequired() {
+        return bodyRequired;
     }
 }

@@ -15,9 +15,8 @@
  */
 package org.particleframework.web.router;
 
-import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.uri.UriMatchInfo;
+import org.particleframework.http.MediaType;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
@@ -28,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * A {@link Route} that is executable
@@ -36,8 +34,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, Callable<R>, Predicate<HttpRequest> {
-
+public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Predicate<HttpRequest> {
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
      *
@@ -46,11 +43,13 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
      * @return The required arguments in order to invoke this route
      */
     default Collection<Argument> getRequiredArguments() {
-        Map<String, Object> matchVariables = getVariables();
-        return Arrays.stream(getArguments())
-                .filter((arg) -> !matchVariables.containsKey(arg.getName()))
-                .collect(Collectors.toList());
+        return Arrays.asList(getArguments());
     }
+
+    /**
+     * @return The variable values following a successful match
+     */
+    Map<String, Object> getVariables();
 
     /**
      * Execute the route with the given values. The passed map should contain values for every argument returned by {@link #getRequiredArguments()}
@@ -86,16 +85,16 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
         return execute(Collections.emptyMap());
     }
 
+    /**
+     * Same as {@link #execute()}
+     *
+     * @return The result
+     * @throws Exception When an exception occurs
+     */
     @Override
     default R call() throws Exception {
         return execute();
     }
-
-
-    /**
-     * @return The matched HTTP method
-     */
-    HttpMethod getHttpMethod();
 
     /**
      * @return Whether the route match can be executed without passing any additional arguments ie. via {@link #execute()}
@@ -103,5 +102,4 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, UriMatchInfo, C
     default boolean isExecutable() {
         return getRequiredArguments().size() == 0;
     }
-
 }

@@ -21,6 +21,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
+import org.particleframework.web.router.UriRouteMatch;
 
 import java.util.Optional;
 
@@ -41,7 +42,7 @@ class GreenLightningParticleDispatcher implements RestListener {
 
         final Optional<Router> routerBean = applicationContext.findBean(Router.class);
 
-        final Optional<RouteMatch<Object>> routeMatch = routerBean.flatMap((router) -> {
+        final Optional<UriRouteMatch<Object>> routeMatch = routerBean.flatMap((router) -> {
                     return router.find(HttpMethod.GET, routePath.toString())
 //                            .filter((match) -> match.test( ?? ))
                             .findFirst();

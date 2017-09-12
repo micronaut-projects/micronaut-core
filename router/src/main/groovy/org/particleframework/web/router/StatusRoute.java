@@ -16,43 +16,39 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Represents a Route definition constructed by a {@link RouteBuilder}
- *
- * @see RouteBuilder
- * @see ResourceRoute
+ * Represents a {@link Route} that matches a status
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Route {
+public interface StatusRoute extends Route {
 
     /**
-     * Applies the given media type the route
-     *
-     * @param mediaType The media type
-     * @return A new route with the media type applied
+     * @return The status
      */
-    Route accept(MediaType... mediaType);
+    HttpStatus status();
 
     /**
-     * Defines routes nested within this route
+     * Match the given HTTP status
      *
-     * @param nested The nested routes
-     * @return This route
+     * @param status The status to match
+     * @return The route match
      */
-    Route nest(Runnable nested);
+    <T> Optional<RouteMatch<T>> match(HttpStatus status);
 
-    /**
-     * Match this {@link Route} only if the given predicate is true
-     *
-     * @param condition The condition which accepts a {@link HttpRequest}
-     * @return This route
-     */
-    Route where(Predicate<HttpRequest> condition);
+    @Override
+    StatusRoute accept(MediaType... mediaType);
 
+    @Override
+    StatusRoute nest(Runnable nested);
+
+    @Override
+    StatusRoute where(Predicate<HttpRequest> condition);
 }

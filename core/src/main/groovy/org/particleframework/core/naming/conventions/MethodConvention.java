@@ -59,7 +59,12 @@ public enum MethodConvention {
     /**
      * The default head method of controllers
      */
-    HEAD;
+    HEAD,
+
+    /**
+     * The default trace method of controllers
+     */
+    TRACE;
 
     private final String lowerCase;
     private final String httpMethod;

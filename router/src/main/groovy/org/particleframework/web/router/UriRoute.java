@@ -15,29 +15,17 @@
  */
 package org.particleframework.web.router;
 
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.MediaType;
+import org.particleframework.http.HttpMethod;
+import org.particleframework.http.uri.UriMatcher;
 
-import java.util.function.Predicate;
+import java.net.URI;
+import java.util.Optional;
 
 /**
- * Represents a Route definition constructed by a {@link RouteBuilder}
- *
- * @see RouteBuilder
- * @see ResourceRoute
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Route {
-
-    /**
-     * Applies the given media type the route
-     *
-     * @param mediaType The media type
-     * @return A new route with the media type applied
-     */
-    Route accept(MediaType... mediaType);
+public interface UriRoute extends Route, UriMatcher {
 
     /**
      * Defines routes nested within this route
@@ -48,11 +36,26 @@ public interface Route {
     Route nest(Runnable nested);
 
     /**
-     * Match this {@link Route} only if the given predicate is true
-     *
-     * @param condition The condition which accepts a {@link HttpRequest}
-     * @return This route
+     * @return The HTTP method for this route
      */
-    Route where(Predicate<HttpRequest> condition);
+    HttpMethod getHttpMethod();
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     *
+     * @param uri The URI The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    @Override
+    default Optional<UriRouteMatch> match(URI uri) {
+        return match(uri.toString());
+    }
 
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found
+     *
+     * @param uri The URI The URI
+     * @return An {@link Optional} of {@link RouteMatch}
+     */
+    @Override
+    Optional<UriRouteMatch> match(String uri);
 }
