@@ -1271,7 +1271,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         Qualifier qualifier = null;
         Annotation ann = injectionPoint.getQualifier();
         if (ann != null) {
-            qualifier = Qualifiers.qualify(ann);
+            qualifier = Qualifiers.byAnnotation(ann);
         }
         return qualifier;
     }
@@ -1280,7 +1280,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         Qualifier qualifier = null;
         Annotation ann = argument.getQualifier();
         if (ann != null) {
-            qualifier = Qualifiers.qualify(ann);
+            qualifier = Qualifiers.byAnnotation(ann);
         }
         return qualifier;
     }

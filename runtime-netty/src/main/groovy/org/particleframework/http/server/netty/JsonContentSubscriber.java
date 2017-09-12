@@ -7,13 +7,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.web.router.RouteMatch;
+import org.particleframework.web.router.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -22,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class JsonContentSubscriber implements Subscriber<HttpContent> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 

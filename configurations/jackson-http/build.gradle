@@ -1,0 +1,7 @@
+dependencies {
+    compileOnly project(":java-inject")
+
+    compile project(":runtime-http")
+    compile project(":router")
+    compile project(":configurations/jackson")
+}

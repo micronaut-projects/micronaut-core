@@ -6,7 +6,7 @@ package org.particleframework.inject;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint, ExecutableHandle<T> {
+public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint, ExecutionHandle<T> {
 
     /**
      * Invoke the constructor

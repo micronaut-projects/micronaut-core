@@ -24,9 +24,7 @@ class AnnotationQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public BeanDefinition<T> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates) throws NonUniqueBeanException {
-
-        Stream<BeanDefinition<T>> filtered;
+    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
         String name;
         if (qualifier instanceof Named) {
             Named named = (Named) qualifier;
@@ -37,7 +35,7 @@ class AnnotationQualifier<T> implements Qualifier<T> {
             name = qualifier.annotationType().getSimpleName();
         }
 
-        filtered = candidates.filter(candidate -> {
+        return candidates.filter(candidate -> {
                     String candidateName = candidate.getType().getSimpleName();
 
                     if(candidateName.equalsIgnoreCase(name)) {
@@ -53,10 +51,8 @@ class AnnotationQualifier<T> implements Qualifier<T> {
                     return false;
                 }
         );
-
-        Optional<BeanDefinition<T>> first = filtered.findFirst();
-        return first.orElse(null);
     }
+
 
     @Override
     public boolean equals(Object o) {

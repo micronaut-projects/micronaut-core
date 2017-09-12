@@ -71,7 +71,7 @@ public class GenericTypeUtils {
      * @return The type arguments
      */
     public static Class[] resolveTypeArguments(Type genericType) {
-        Class[] typeArguments = null;
+        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
         if(genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();
@@ -93,7 +93,7 @@ public class GenericTypeUtils {
      * Resolves a single generic type argument for the given field
      *
      * @param field The field
-     * @return The type argument or null if it non-exists
+     * @return The type argument or {@link Optional#empty()}
      */
     public static Optional<Class> resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
@@ -117,7 +117,7 @@ public class GenericTypeUtils {
      * @return The type arguments as a class array
      */
     public static Class[] resolveGenericTypeArguments(Field field) {
-        Class[] genericClasses = new Class[0];
+        Class[] genericClasses = ReflectionUtils.EMPTY_CLASS_ARRAY;
         Type genericType = field != null ? field.getGenericType() : null;
         if (genericType instanceof ParameterizedType) {
             Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
@@ -129,7 +129,7 @@ public class GenericTypeUtils {
                         genericClasses[i] = (Class) typeArgument;
                     }
                     else {
-                        return new Class[0];
+                        return ReflectionUtils.EMPTY_CLASS_ARRAY;
                     }
                 }
             }
@@ -155,6 +155,29 @@ public class GenericTypeUtils {
                 }
             }
         }
-        return null;
+        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+
+    /**
+     * Resolve all of the type arguments for the given super type from the given type
+     *
+     * @param type The type to resolve from
+     * @param superType The interface to resolve from
+     * @return The type arguments to the interface
+     */
+    public static Class[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superType) {
+        Type superclass = type.getGenericSuperclass();
+        while(superclass != null) {
+            if(superclass instanceof ParameterizedType) {
+                ParameterizedType pt = (ParameterizedType) superclass;
+                if( pt.getRawType() == superType ) {
+                    return resolveTypeArguments(superclass);
+                }
+            }
+
+            superclass = superType.getGenericSuperclass();
+        }
+        return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 }

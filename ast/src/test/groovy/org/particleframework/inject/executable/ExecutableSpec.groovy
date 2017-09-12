@@ -18,7 +18,7 @@ package org.particleframework.inject.executable
 import org.particleframework.context.AbstractExecutableMethod
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.inject.ExecutableHandle
+import org.particleframework.inject.ExecutionHandle
 import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.MethodExecutionHandle
 import org.particleframework.inject.annotation.Executable
@@ -64,7 +64,7 @@ class ExecutableSpec extends Specification {
     void "test executable responses"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
-        ExecutableHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
+        ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
 
         expect:
         method.invoke(args as Object[]) == result

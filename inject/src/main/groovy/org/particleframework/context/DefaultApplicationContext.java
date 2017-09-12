@@ -128,7 +128,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
         for (TypeConverter typeConverter : typeConverters) {
             Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
-            if(genericTypes != null && genericTypes.length == 2) {
+            if(genericTypes.length == 2) {
                 Class source = genericTypes[0];
                 Class target = genericTypes[1];
                 if(source != null && target != null) {

@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.util;
 
+import java.util.Objects;
+
 /**
  * Utility methods for checking method argument values
  *
@@ -35,13 +37,33 @@ public class ArgumentUtils {
     }
 
     /**
+     * Perform a check on an argument
+     *
+     * @param name The name of the argument
+     * @param value The value of the argument
+     * @return The {@link ArgumentCheck}
+     */
+    public static <T> ArgumentCheck check(String name, T value) {
+        return new ArgumentCheck<T>(name, value);
+    }
+    /**
      * Allows producing error messages
      */
-    public static class ArgumentCheck {
+    public static class ArgumentCheck<T> {
         private final Check check;
+        private final String name;
+        private final T value;
 
         public ArgumentCheck(Check check) {
             this.check = check;
+            this.name = null;
+            this.value = null;
+        }
+
+        public ArgumentCheck(String name, T value) {
+            this.check = null;
+            this.name = name;
+            this.value = value;
         }
 
         /**
@@ -51,8 +73,19 @@ public class ArgumentUtils {
          * @throws  IllegalArgumentException Thrown with the given message if the check fails
          */
         public void orElseFail(String message) {
-            if(!check.condition()) {
+            if(check != null && !check.condition()) {
                 throw new IllegalArgumentException(message);
+            }
+        }
+
+        /**
+         * Fail the argument with the given message
+         *
+         * @throws  IllegalArgumentException Thrown with the given message if the check fails
+         */
+        public void notNull() {
+            if(name != null && value != null) {
+                Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
             }
         }
     }
