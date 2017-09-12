@@ -3,7 +3,6 @@ package org.particleframework.inject.configproperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -44,7 +43,6 @@ class ConfigurationPropertiesSpec extends Specification {
         config.primitiveDefaultValue == 9999
     }
 
-    @Ignore("WIP")
     void "test configuration inner class properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")

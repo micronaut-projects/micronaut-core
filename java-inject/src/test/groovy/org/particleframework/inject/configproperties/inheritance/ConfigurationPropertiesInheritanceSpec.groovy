@@ -25,7 +25,6 @@ import spock.lang.Specification
  */
 class ConfigurationPropertiesInheritanceSpec extends Specification {
 
-//    @Ignore
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")

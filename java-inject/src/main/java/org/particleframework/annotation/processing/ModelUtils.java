@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.ARRAY;
+import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
 class ModelUtils {
@@ -27,6 +28,14 @@ class ModelUtils {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
+    }
+
+    String simpleBinaryNameFor(TypeElement typeElement) {
+        Name elementBinaryName = elementUtils.getBinaryName(typeElement);
+        PackageElement packageElement = elementUtils.getPackageOf(typeElement);
+
+        String packageName = packageElement.getQualifiedName().toString();
+        return elementBinaryName.toString().replaceFirst(packageName + "\\.","");
     }
 
     Optional<ExecutableElement> findSetterMethodFor(Element field) {
@@ -178,6 +187,10 @@ class ModelUtils {
         return resolveTypeReference(type);
     }
 
+    boolean isObjectClass(TypeElement element) {
+        return element.getSuperclass().getKind() == NONE;
+    }
+
     Object resolveTypeReference(TypeMirror type) {
         Object result = Void.TYPE;
         if (type.getKind().isPrimitive()) {
@@ -208,7 +221,6 @@ class ModelUtils {
             else {
                 result = qualifiedName.toString();
             }
-            System.out.println("result = " + result);
         }
         return result;
     }
