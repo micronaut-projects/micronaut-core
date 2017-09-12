@@ -255,8 +255,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final MethodExecutionHandle targetMethod;
         private final ConversionService<?> conversionService;
 
-        private MediaType mediaType = MediaType.APPLICATION_JSON_TYPE;
-
         public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             this(null, error, targetMethod, conversionService);
         }
@@ -294,15 +292,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return Optional.empty();
         }
 
-        public MediaType getMediaType() {
-            return mediaType;
-        }
-
         @Override
-        public ErrorRoute accept(MediaType mediaType) {
-            if(mediaType != null) {
-                this.mediaType = mediaType;
-            }
+        public ErrorRoute accept(MediaType... mediaType) {
             return this;
         }
 
@@ -368,8 +359,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final MethodExecutionHandle targetMethod;
         private final ConversionService<?> conversionService;
 
-        private MediaType mediaType = MediaType.APPLICATION_JSON_TYPE;
-
         public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             this.status = status;
             this.targetMethod = targetMethod;
@@ -389,16 +378,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return Optional.empty();
         }
 
-        @Override
-        public MediaType getMediaType() {
-            return mediaType;
-        }
 
         @Override
-        public StatusRoute accept(MediaType mediaType) {
-            if(mediaType != null) {
-                this.mediaType = mediaType;
-            }
+        public StatusRoute accept(MediaType... mediaType) {
             return this;
         }
 
@@ -441,7 +423,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     class DefaultUriRoute implements UriRoute {
 
         private final HttpMethod httpMethod;
-        private final MediaType mediaType;
+        private final Set<MediaType> acceptedMediaTypes;
         private final UriMatchTemplate uriMatchTemplate;
         private final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
         private final MethodExecutionHandle targetMethod;
@@ -452,17 +434,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaType, targetMethod);
+            this(httpMethod, new UriMatchTemplate(uriTemplate), new HashSet<>(Collections.singletonList(mediaType)), targetMethod);
         }
 
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
+            this(httpMethod, uriTemplate, new HashSet<>(Collections.singletonList(MediaType.APPLICATION_JSON_TYPE)), targetMethod);
         }
 
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
+        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, Set<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
-            this.mediaType = mediaType;
+            this.acceptedMediaTypes = mediaTypes;
             this.targetMethod = targetMethod;
         }
 
@@ -477,15 +459,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return httpMethod;
         }
 
-        @Override
-        public MediaType getMediaType() {
-            return mediaType;
-        }
 
         @Override
-        public Route accept(MediaType mediaType) {
+        public Route accept(MediaType... mediaTypes) {
             DefaultRouteBuilder.this.uriRoutes.remove(this);
-            DefaultUriRoute newRoute = new DefaultUriRoute(httpMethod, uriMatchTemplate, mediaType, targetMethod);
+            DefaultUriRoute newRoute = new DefaultUriRoute(httpMethod, uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), targetMethod);
             DefaultRouteBuilder.this.uriRoutes.add(newRoute);
             return newRoute;
         }
@@ -511,7 +489,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultRouteMatch(httpMethod, info, targetMethod, conditions, beanContext.getEnvironment()));
+            return matchInfo.map((info) -> new DefaultUriRouteMatch(httpMethod, info, targetMethod, conditions, acceptedMediaTypes, beanContext.getEnvironment()));
         }
 
 
@@ -566,7 +544,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         private final Map<HttpMethod, Route> resourceRoutes;
         private final DefaultUriRoute getRoute;
-        private MediaType mediaType;
 
         DefaultResourceRoute(Map<HttpMethod, Route> resourceRoutes, DefaultUriRoute getRoute) {
             this.resourceRoutes = resourceRoutes;
@@ -582,15 +559,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public MediaType getMediaType() {
-            return mediaType;
-        }
-
-        @Override
-        public ResourceRoute accept(MediaType mediaType) {
-            this.mediaType = mediaType;
+        public ResourceRoute accept(MediaType... mediaTypes) {
             DefaultRouteBuilder.this.uriRoutes.remove(getRoute);
-            DefaultUriRoute getRoute = new DefaultUriRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, mediaType, this.getRoute.targetMethod);
+            DefaultUriRoute getRoute = new DefaultUriRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), this.getRoute.targetMethod);
             DefaultRouteBuilder.this.uriRoutes.add(getRoute);
 
             Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
@@ -598,7 +569,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 if (value != this.getRoute) {
                     DefaultUriRoute defaultRoute = (DefaultUriRoute) value;
                     DefaultRouteBuilder.this.uriRoutes.remove(defaultRoute);
-                    DefaultUriRoute newRoute = new DefaultUriRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, mediaType, this.getRoute.targetMethod);
+                    DefaultUriRoute newRoute = new DefaultUriRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), this.getRoute.targetMethod);
                     newMap.put(key, newRoute);
                     DefaultRouteBuilder.this.uriRoutes.add(defaultRoute);
                 }

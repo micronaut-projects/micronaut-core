@@ -36,6 +36,24 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
     }
 
+    void "test simple string-based body parsing with invalid mime type"() {
+
+        when:
+        def json = '{"title":The Stand}'
+        def request = new Request.Builder()
+                .url("$server/json/string")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/xml"), json))
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.UNSUPPORTED_MEDIA_TYPE.code
+
+    }
+
 
     void "test simple string-based body parsing with invalid JSON"() {
 

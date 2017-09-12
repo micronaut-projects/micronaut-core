@@ -16,6 +16,7 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
 
@@ -55,4 +56,12 @@ public interface UriRouteMatch<R> extends UriMatchInfo, RouteMatch<R> {
 
     @Override
     UriRouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
+
+    /**
+     * Whether the specified content type is an accepted type
+     *
+     * @param contentType The content type
+     * @return True if it is
+     */
+    boolean accept(MediaType contentType);
 }

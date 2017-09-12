@@ -143,7 +143,17 @@ public class NettyHttpServer implements EmbeddedServer {
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                     }
-                                    handleRouteMatch(route, nettyHttpRequest, binderRegistry, ctx);
+
+                                    if(!route.accept(nettyHttpRequest.getContentType())) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Matched route is not a supported media type: {}", nettyHttpRequest.getContentType());
+                                        }
+                                        ctx.writeAndFlush(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE))
+                                                .addListener(ChannelFutureListener.CLOSE);
+                                    }
+                                    else {
+                                        handleRouteMatch(route, nettyHttpRequest, binderRegistry, ctx);
+                                    }
                                 }));
 
                                 if (!routeMatch.isPresent()) {

@@ -31,19 +31,13 @@ import java.util.function.Predicate;
  */
 public interface Route {
 
-
-    /**
-     * @return The MediaType for this route
-     */
-    MediaType getMediaType();
-
     /**
      * Applies the given media type the route
      *
      * @param mediaType The media type
      * @return A new route with the media type applied
      */
-    Route accept(MediaType mediaType);
+    Route accept(MediaType... mediaType);
 
     /**
      * Defines routes nested within this route

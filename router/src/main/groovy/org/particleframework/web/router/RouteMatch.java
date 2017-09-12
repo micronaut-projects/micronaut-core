@@ -16,6 +16,7 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.MediaType;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
@@ -84,6 +85,12 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
         return execute(Collections.emptyMap());
     }
 
+    /**
+     * Same as {@link #execute()}
+     *
+     * @return The result
+     * @throws Exception When an exception occurs
+     */
     @Override
     default R call() throws Exception {
         return execute();
@@ -95,5 +102,4 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
     default boolean isExecutable() {
         return getRequiredArguments().size() == 0;
     }
-
 }

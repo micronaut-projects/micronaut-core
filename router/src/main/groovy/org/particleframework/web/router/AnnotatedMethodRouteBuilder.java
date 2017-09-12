@@ -17,13 +17,17 @@ package org.particleframework.web.router;
 
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
+import org.particleframework.http.MediaType;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.*;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 /**
  * Responsible for building {@link Route} instances for the annotations found in the {@link org.particleframework.web.router.annotation} package
@@ -33,7 +37,7 @@ import java.util.function.BiConsumer;
  */
 public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Action> {
 
-    private final Map<Class, BiConsumer<Annotation,ExecutableMethod>> httpMethodsHandlers = new LinkedHashMap<>();
+    private final Map<Class, BiFunction<Annotation,ExecutableMethod, Route>> httpMethodsHandlers = new LinkedHashMap<>();
 
 
     public AnnotatedMethodRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
@@ -126,9 +130,15 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         Annotation annotation = method.findAnnotation(Action.class);
         if(annotation != null) {
             Class<? extends Annotation> annotationClass = annotation.annotationType();
-            BiConsumer<Annotation, ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
+            BiFunction<Annotation, ExecutableMethod, Route> handler = httpMethodsHandlers.get(annotationClass);
             if(handler != null) {
-                handler.accept(annotation, method);
+                Route route = handler.apply(annotation, method);
+                Class<?> declaringType = method.getDeclaringType();
+                Controller controllerAnn = declaringType.getAnnotation(Controller.class);
+                if(controllerAnn != null) {
+                    MediaType[] accepts = Arrays.asList(controllerAnn.consumes()).stream().map(MediaType::new).toArray(MediaType[]::new);
+                    route.accept(accepts);
+                }
             }
         }
     }

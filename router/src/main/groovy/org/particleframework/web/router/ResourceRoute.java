@@ -32,10 +32,10 @@ public interface ResourceRoute extends Route {
     /**
      * Accept the given media type
      *
-     * @param mediaType The media type
+     * @param mediaTypes The media types
      * @return This route
      */
-    ResourceRoute accept(MediaType mediaType);
+    ResourceRoute accept(MediaType... mediaTypes);
 
     /**
      * Nest more routes within this {@link ResourceRoute}

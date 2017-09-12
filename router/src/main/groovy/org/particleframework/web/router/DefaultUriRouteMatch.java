@@ -18,6 +18,7 @@ package org.particleframework.web.router;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
@@ -33,20 +34,23 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteMatch<T> {
+public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteMatch<T> {
 
     private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
+    private final Set<MediaType> acceptedMediaTypes;
 
-    protected DefaultRouteMatch(HttpMethod httpMethod,
-                                UriMatchInfo matchInfo,
-                                MethodExecutionHandle executableMethod,
-                                List<Predicate<HttpRequest>> conditions,
-                                ConversionService<?> conversionService
+    protected DefaultUriRouteMatch(HttpMethod httpMethod,
+                                   UriMatchInfo matchInfo,
+                                   MethodExecutionHandle executableMethod,
+                                   List<Predicate<HttpRequest>> conditions,
+                                   Set<MediaType> acceptedMediaTypes,
+                                   ConversionService<?> conversionService
     ) {
         super(conditions, executableMethod, conversionService);
         this.matchInfo = matchInfo;
         this.httpMethod = httpMethod;
+        this.acceptedMediaTypes = acceptedMediaTypes;
     }
 
     @Override
@@ -54,7 +58,7 @@ public class DefaultRouteMatch<T> extends AbstractRouteMatch<T> implements UriRo
         Map<String, Object> variables = getVariables();
         Collection<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new DefaultRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, conversionService) {
+        return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(arguments);
@@ -73,6 +77,11 @@ public class DefaultRouteMatch<T> extends AbstractRouteMatch<T> implements UriRo
     }
 
     @Override
+    public boolean accept(MediaType contentType) {
+        return contentType == null || acceptedMediaTypes.contains(contentType);
+    }
+
+    @Override
     public UriRouteMatch<T> fulfill(Map<String, Object> argumentValues) {
         Map<String, Object> oldVariables = getVariables();
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
@@ -84,7 +93,7 @@ public class DefaultRouteMatch<T> extends AbstractRouteMatch<T> implements UriRo
                 .collect(Collectors.toList());
 
 
-        return new DefaultRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, conversionService) {
+        return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(requiredArguments);
