@@ -21,19 +21,18 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpServerCodec;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.*;
-import org.particleframework.http.HttpHeaders;
-import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
@@ -70,6 +69,7 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CODEC = "http-codec";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    public static final String PARTICLE_HANDLER = "particle-handler";
 
     private final BeanLocator beanLocator;
     private volatile Channel serverChannel;
@@ -101,6 +101,7 @@ public class NettyHttpServer implements EmbeddedServer {
         processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
 
 
+        int port = serverConfiguration.getPort();
         ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer() {
@@ -119,7 +120,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         }
 
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-                        pipeline.addLast("particle-handler", new SimpleChannelInboundHandler<HttpRequest>() {
+                        pipeline.addLast(PARTICLE_HANDLER, new SimpleChannelInboundHandler<HttpRequest>() {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
                                 Channel channel = ctx.channel();
@@ -238,8 +239,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                     }
                 })
-                // TODO: handle random port binding
-                .bind(serverConfiguration.getHost(), serverConfiguration.getPort());
+                .bind(serverConfiguration.getHost(), port == -1 ? SocketUtils.findAvailableTcpPort() : port);
 
         future.addListener(op -> {
             if (future.isSuccess()) {
@@ -282,9 +282,7 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
-        // TODO: check the media type vs the route and return 415 if invalid
         request.setMatchedRoute(route);
-
         route = fulfillArgumentRequirements(route, request, binderRegistry);
 
         if (!route.isExecutable()) {

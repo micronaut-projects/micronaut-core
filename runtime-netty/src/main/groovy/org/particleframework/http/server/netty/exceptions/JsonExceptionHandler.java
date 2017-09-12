@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.jackson;
+package org.particleframework.http.server.netty.exceptions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.particleframework.http.HttpRequest;
@@ -33,7 +33,7 @@ import javax.inject.Singleton;
  */
 @Produces(MediaType.APPLICATION_JSON)
 @Singleton
-public class JacksonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object>{
+public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object>{
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
         // TODO: Send JSON back with detailed error
