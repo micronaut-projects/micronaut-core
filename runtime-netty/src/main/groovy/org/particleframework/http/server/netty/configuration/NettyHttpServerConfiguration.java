@@ -67,9 +67,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         return parent;
     }
 
+    @ConfigurationProperties("worker")
     public static class Worker extends EventLoopConfig{
     }
 
+    @ConfigurationProperties("parent")
     public static class Parent extends EventLoopConfig {
     }
 

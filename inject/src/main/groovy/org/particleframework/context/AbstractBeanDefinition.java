@@ -889,31 +889,34 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             Field field = injectionPoint.getField();
             Value valueAnn = field.getAnnotation(Value.class);
             Class<?> fieldType = field.getType();
-            Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
-            String valString = resolveValueString(declaringClass, injectionPoint.getName(), valueAnn);
-            Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
-            if (!value.isPresent() && fieldType == Optional.class) {
-                return value;
+            if (isInnerConfiguration(fieldType)) {
+                return context.createBean(fieldType);
             } else {
-                if (isConfigurationProperties && valueAnn == null) {
-                    return value.orElseGet(()->{
-                        String cliOption = resolveCliOption(declaringClass, field.getName());
-                        if(cliOption != null) {
-                            return resolveValue((ApplicationContext) context,
-                                    fieldType,
-                                    cliOption,
-                                    GenericTypeUtils.resolveGenericTypeArguments(field))
-                                    .orElse(defaultValue);
-                        }
-                        else {
-                            return defaultValue;
-                        }
-                    });
+                Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
+                String valString = resolveValueString(declaringClass, injectionPoint.getName(), valueAnn);
+                Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
+                if (!value.isPresent() && fieldType == Optional.class) {
+                    return value;
                 } else {
-                    return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
+                    if (isConfigurationProperties && valueAnn == null) {
+                        return value.orElseGet(()->{
+                            String cliOption = resolveCliOption(declaringClass, field.getName());
+                            if(cliOption != null) {
+                                return resolveValue((ApplicationContext) context,
+                                        fieldType,
+                                        cliOption,
+                                        GenericTypeUtils.resolveGenericTypeArguments(field))
+                                        .orElse(defaultValue);
+                            }
+                            else {
+                                return defaultValue;
+                            }
+                        });
+                    } else {
+                        return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
+                    }
                 }
             }
-
         } else {
             throw new DependencyInjectionException(resolutionContext, injectionPoint, "@Value requires a BeanContext that implements PropertyResolver");
         }
@@ -1093,27 +1096,24 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 }
             }
         } else {
-            StringBuilder path = new StringBuilder();
+            prefix = new StringBuilder();
             while (type != null) {
                 String name = type.getName();
-                int i = name.indexOf('$');
+                int i = name.lastIndexOf('$');
                 if (i > -1) {
-                    name = Introspector.decapitalize(name.substring(i, name.length()));
-                    path.append('.').append(name);
+                    name = name.substring(i + 1, name.length());
                 }
+                prefix.append('.').append(Introspector.decapitalize(name));
 
                 type = type.getDeclaringClass();
                 if(type != null) {
                     configurationProperties = type.getAnnotation(ConfigurationProperties.class);
                     if (configurationProperties != null) {
-                        prefix = new StringBuilder(configurationProperties.value() + path);
+                        prefix.insert(0, configurationProperties.value());
                         break;
                     }
                 }
             }
-        }
-        if (prefix == null) {
-            throw new IllegalStateException("Unable to resolve configuration prefix. No @ConfigurationProperties root found");
         }
         return prefix.toString();
     }

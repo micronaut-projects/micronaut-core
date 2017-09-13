@@ -47,7 +47,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption
         config.host == 'localhost'
-//        config.worker.threads == 8 TODO: uncomment when nested classes working in Java support
+//        config.worker.threads == 8
 
         cleanup:
         beanContext.close()
