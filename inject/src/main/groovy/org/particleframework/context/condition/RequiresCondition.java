@@ -108,7 +108,7 @@ public class RequiresCondition implements Condition<ConditionContext> {
         }
         else {
             try {
-                return condition.newInstance().matches(context);
+                return conditionClass.newInstance().matches(context);
             } catch (Throwable e) {
                 // maybe a Groovy closure
                 Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class)conditionClass, Object.class, Object.class);
