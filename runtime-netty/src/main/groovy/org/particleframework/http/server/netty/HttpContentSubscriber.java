@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HttpContentSubscriber implements Subscriber<HttpContent> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    private final NettyHttpRequest nettyHttpRequest;
+    protected final NettyHttpRequest nettyHttpRequest;
     private final RouteMatch<Object> route;
     private final ChannelHandlerContext ctx;
     private final long advertisedLength;
@@ -35,7 +35,7 @@ public class HttpContentSubscriber implements Subscriber<HttpContent> {
 
     @Override
     public void onSubscribe(Subscription s) {
-        s.request(Long.MAX_VALUE - 1);
+        s.request(Long.MAX_VALUE );
         this.subscription = s;
     }
 
@@ -50,9 +50,13 @@ public class HttpContentSubscriber implements Subscriber<HttpContent> {
             onError(new ContentLengthExceededException(advertisedLength, receivedLength));
         }
         else {
-
-            nettyHttpRequest.addContent(httpContent);
+            addContent(httpContent);
         }
+        httpContent.release();
+    }
+
+    protected void addContent(HttpContent httpContent) {
+        nettyHttpRequest.addContent(httpContent);
     }
 
     @Override

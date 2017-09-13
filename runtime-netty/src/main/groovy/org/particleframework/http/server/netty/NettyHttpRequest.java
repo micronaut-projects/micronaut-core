@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.*;
@@ -26,7 +27,6 @@ import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
-import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
@@ -60,6 +60,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private MediaType mediaType;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
+    private HttpPostRequestDecoder postRequestDecoder;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -214,6 +215,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         }
     }
 
+
     private URI decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return URI.create(queryStringDecoder.path());
@@ -246,6 +248,12 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     }
 
     boolean isBodyRequired() {
-        return bodyRequired;
+        return bodyRequired || org.particleframework.http.util.HttpUtil.isFormData(this);
+    }
+
+    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
+        this.postRequestDecoder = postRequestDecoder;
+        NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
+        parameters.setPostRequestDecoder(postRequestDecoder);
     }
 }

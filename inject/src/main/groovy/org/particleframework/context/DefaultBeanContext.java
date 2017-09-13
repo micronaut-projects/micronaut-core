@@ -565,7 +565,7 @@ public class DefaultBeanContext implements BeanContext {
                     Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
                     List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                     if(beanDefinitionList.isEmpty()) {
-                        throw new NoSuchBeanException(beanType, qualifier);
+                        return null;
                     }
 
                     Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()

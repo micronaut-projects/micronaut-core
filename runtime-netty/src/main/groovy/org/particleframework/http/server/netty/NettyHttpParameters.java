@@ -15,9 +15,13 @@
  */
 package org.particleframework.http.server.netty;
 
+import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpParameters;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -31,7 +35,7 @@ public class NettyHttpParameters implements HttpParameters {
     private final ConversionService conversionService;
 
     public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
-        this.parameters = parameters;
+        this.parameters = new LinkedHashMap<>(parameters);
         this.conversionService = conversionService;
     }
 
@@ -68,5 +72,30 @@ public class NettyHttpParameters implements HttpParameters {
             return null;
         }
         return all.get(0);
+    }
+
+    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
+        if(postRequestDecoder != null) {
+
+            List<InterfaceHttpData> bodyHttpDatas = postRequestDecoder.getBodyHttpDatas();
+            for (InterfaceHttpData bodyHttpData : bodyHttpDatas) {
+                switch (bodyHttpData.getHttpDataType()) {
+                    case Attribute:
+                        Attribute attribute = (Attribute) bodyHttpData;
+                        String name = attribute.getName();
+                        try {
+                            if(parameters.containsKey(name)) {
+                                parameters.get(name).add(attribute.getValue());
+                            }
+                            else {
+                                parameters.put(name, Collections.singletonList(attribute.getValue()));
+                            }
+                        } catch (IOException ioe) {
+                            // ignore
+                        }
+                        break;
+                }
+            }
+        }
     }
 }

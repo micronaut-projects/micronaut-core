@@ -104,6 +104,7 @@ abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
     @Override
     public T execute(Map argumentValues) {
         Argument[] targetArguments = getArguments();
+
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {

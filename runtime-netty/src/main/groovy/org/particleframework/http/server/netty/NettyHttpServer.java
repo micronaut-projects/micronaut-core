@@ -38,6 +38,7 @@ import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.qualifiers.Qualifiers;
@@ -285,7 +286,7 @@ public class NettyHttpServer implements EmbeddedServer {
         request.setMatchedRoute(route);
         route = fulfillArgumentRequirements(route, request, binderRegistry);
 
-        if (!route.isExecutable()) {
+        if (!route.isExecutable() && !request.isBodyRequired()) {
             // if we arrived here the request is not processable
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Bad request: Unbindable arguments for route: " + route);
@@ -339,7 +340,13 @@ public class NettyHttpServer implements EmbeddedServer {
 
                 Object result;
                 try {
-                    result = finalRoute.execute();
+                    try {
+                        result = finalRoute.execute();
+                    } catch (IllegalArgumentException e) {
+                        // TODO: catch more specific exception
+                        result = HttpResponse.badRequest();
+                    }
+
                     ChannelFuture channelFuture;
                     if (result != null) {
                         channelFuture = context.writeAndFlush(result);
@@ -410,6 +417,10 @@ public class NettyHttpServer implements EmbeddedServer {
                             argumentValues.put(argumentName, bindingResult);
                         } else if (bindingResult.isPresent()) {
                             argumentValues.put(argumentName, bindingResult.get());
+                        } else if(HttpUtil.isFormData(request)) {
+                            argumentValues.put(argumentName, (Supplier<Optional>) () ->
+                                    argumentBinder.bind(argument, request)
+                            );
                         }
                     }
                 }
