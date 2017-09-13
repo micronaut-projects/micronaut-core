@@ -12,8 +12,6 @@ public class MyConfig {
     int port;
     Integer defaultValue = 9999;
     int primitiveDefaultValue = 9999;
-    protected int defaultPort = 9999;
-    protected Integer anotherPort;
     List<String> stringList;
     List<Integer> intList;
     List<URL> urlList;
@@ -23,6 +21,8 @@ public class MyConfig {
     Optional<URL> url;
     Optional<URL> anotherUrl;
     Inner inner;
+    protected int defaultPort = 9999;
+    protected Integer anotherPort;
 
     public Integer getAnotherPort() {
         return anotherPort;
@@ -32,9 +32,13 @@ public class MyConfig {
         return defaultPort;
     }
 
+    @ConfigurationProperties("foo.bar.inner")
     public static class Inner {
         boolean enabled;
 
+        public boolean getEnabled() {
+            return enabled;
+        }
         public boolean isEnabled() {
             return enabled;
         }
@@ -66,14 +70,6 @@ public class MyConfig {
 
     public void setPrimitiveDefaultValue(int primitiveDefaultValue) {
         this.primitiveDefaultValue = primitiveDefaultValue;
-    }
-
-    public void setDefaultPort(int defaultPort) {
-        this.defaultPort = defaultPort;
-    }
-
-    public void setAnotherPort(Integer anotherPort) {
-        this.anotherPort = anotherPort;
     }
 
     public List<String> getStringList() {
@@ -140,11 +136,11 @@ public class MyConfig {
         this.anotherUrl = anotherUrl;
     }
 
-//    public Inner getInner() {
-//        return inner;
-//    }
-//
-//    public void setInner(Inner inner) {
-//        this.inner = inner;
-//    }
+    public Inner getInner() {
+        return inner;
+    }
+
+    public void setInner(Inner inner) {
+        this.inner = inner;
+    }
 }

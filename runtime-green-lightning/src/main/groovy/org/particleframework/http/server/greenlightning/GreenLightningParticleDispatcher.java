@@ -53,7 +53,7 @@ class GreenLightningParticleDispatcher implements RestListener {
             final Object result = route.execute();
             final Writable responseWritable = writer -> writer.writeUTF8Text(result.toString());
             greenCommandChannel.publishHTTPResponse(request, 200,
-                    request.getRequestContext() | HTTPFieldReader.END_OF_RESPONSE,
+//                    request.getRequestContext() | HTTPFieldReader.END_OF_RESPONSE,
                     HTTPContentTypeDefaults.TXT,
                     responseWritable);
         });

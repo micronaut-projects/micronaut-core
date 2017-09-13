@@ -1,11 +1,9 @@
 package org.particleframework.inject.configproperties
 
-import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
 import spock.lang.Specification
-
 /**
  * Created by graemerocher on 13/06/2017.
  */
@@ -47,35 +45,5 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
         config.inner.enabled
-    }
-
-    @ConfigurationProperties('foo.bar')
-    static class MyConfig {
-        int port
-        Integer defaultValue = 9999
-        int primitiveDefaultValue = 9999
-        protected int defaultPort = 9999
-        protected Integer anotherPort
-        List<String> stringList
-        List<Integer> intList
-        List<URL> urlList
-        List<URL> urlList2
-        List<URL> emptyList
-        Map<String,Integer> flags
-        Optional<URL> url
-        Optional<URL> anotherUrl
-        Inner inner
-
-        Integer getAnotherPort() {
-            return anotherPort
-        }
-
-        int getDefaultPort() {
-            return defaultPort
-        }
-
-        static class Inner {
-            boolean enabled
-        }
     }
 }

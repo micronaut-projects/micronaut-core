@@ -28,7 +28,7 @@ class RequiresBeanSpec extends Specification {
     }
 
     @Ignore
-    void "test that a configuration can be required for a bean"() {
+    void "test that a condition can be required for a bean"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
