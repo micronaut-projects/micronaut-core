@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty
+package org.particleframework.http.server.netty.binding
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -24,6 +24,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MutableHttpResponse
 import org.particleframework.http.cookie.Cookie
+import org.particleframework.http.server.netty.NettyHttpResponse
 import spock.lang.Specification
 
 import java.time.Duration

@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.configuration.jackson.server.http;
 
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.server.netty.HttpContentSubscriber;
+import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
+import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.web.router.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 
@@ -32,7 +35,7 @@ import javax.inject.Singleton;
 @Singleton
 public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
     @Override
-    public Subscriber<HttpContent> build(NettyHttpRequest request) {
+    public HttpContentSubscriber build(NettyHttpRequest request) {
         return new JsonContentSubscriber(request);
     }
 }

@@ -21,6 +21,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.util.AttributeKey;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpHeaders;
@@ -208,6 +209,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     /**
      * Release and cleanup resources
      */
+    @Internal
     public void release() {
         receivedContent.forEach(ByteBuf::release);
         if(this.body != null && body instanceof ByteBuf) {
@@ -215,6 +217,24 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         }
     }
 
+
+    /**
+     * Sets the body
+     *
+     * @param body The body to set
+     */
+    @Internal
+    public void setBody(T body) {
+        this.body = body;
+    }
+
+    /**
+     * @return Obtains the matched route
+     */
+    @Internal
+    public RouteMatch<Object> getMatchedRoute() {
+        return matchedRoute;
+    }
 
     private URI decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
@@ -231,26 +251,25 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
-    void setBody(T body) {
-        this.body = body;
-    }
 
+    @Internal
     void setMatchedRoute(RouteMatch<Object> matchedRoute) {
         this.matchedRoute = matchedRoute;
     }
 
-    RouteMatch<Object> getMatchedRoute() {
-        return matchedRoute;
-    }
 
+
+    @Internal
     void setBodyRequired(boolean bodyRequired) {
         this.bodyRequired = bodyRequired;
     }
 
+    @Internal
     boolean isBodyRequired() {
         return bodyRequired || org.particleframework.http.util.HttpUtil.isFormData(this);
     }
 
+    @Internal
     void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
         this.postRequestDecoder = postRequestDecoder;
         NettyHttpParameters parameters = (NettyHttpParameters) getParameters();

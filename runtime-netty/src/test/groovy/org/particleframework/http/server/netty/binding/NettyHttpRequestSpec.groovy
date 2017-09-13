@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty
+package org.particleframework.http.server.netty.binding
 
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
@@ -22,6 +22,7 @@ import org.particleframework.core.convert.DefaultConversionService
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpMethod
 import org.particleframework.http.server.HttpServerConfiguration
+import org.particleframework.http.server.netty.NettyHttpRequest
 import spock.lang.Specification
 import static io.netty.handler.codec.http.HttpMethod.*
 

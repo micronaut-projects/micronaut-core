@@ -7,6 +7,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.reflect.ClassUtils;
+import org.particleframework.inject.BeanConfiguration;
 
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
@@ -65,6 +66,22 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     Environment addPackage(String pkg);
 
     /**
+     * Exclude configurations by name
+     *
+     * @param names The names of the configuration
+     * @return This environment
+     */
+    Environment addConfigurationExcludes(String...names);
+
+    /**
+     * Exclude configurations by name
+     *
+     * @param names The names of the configuration
+     * @return This environment
+     */
+    Environment addConfigurationIncludes(String...names);
+
+    /**
      * @return The application packages
      */
     Collection<String> getPackages();
@@ -106,4 +123,12 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
         }
         return Optional.empty();
     }
+
+    /**
+     * Whether the current environment includes the given configuration
+     *
+     * @param configuration The configuration
+     * @return True if it does
+     */
+    boolean isActive(BeanConfiguration configuration);
 }

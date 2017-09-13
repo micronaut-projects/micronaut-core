@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.encoders;
+package org.particleframework.configuration.jackson.server.http.encoders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.NettyHttpResponse;
+import org.particleframework.http.server.netty.encoders.ObjectToStringFallbackEncoder;
 
 import javax.inject.Singleton;
 import java.util.List;

@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty
+package org.particleframework.http.server.netty.binding
 
 import okhttp3.Request
 import org.particleframework.core.convert.Format
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.MediaType
 import org.particleframework.http.binding.annotation.Header
+import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
 import spock.lang.Shared

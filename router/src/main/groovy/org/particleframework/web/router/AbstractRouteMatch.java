@@ -20,6 +20,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.inject.ReturnType;
+import org.particleframework.web.router.exceptions.RoutingException;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -123,21 +124,21 @@ abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
                     Supplier supplier = (Supplier) value;
                     Object o = supplier.get();
                     Object fv = value;
-                    o = o instanceof Optional ? ((Optional<?>)o).orElseThrow(()-> new IllegalArgumentException("Unable to convert value [" + fv + "] for argument: " + argument)) : o;
+                    o = o instanceof Optional ? ((Optional<?>)o).orElseThrow(()-> new RoutingException("Unable to convert value [" + fv + "] for argument: " + argument)) : o;
                     if(o != null) {
                         Optional<?> result = conversionService.convert(o, argument.getType());
-                        argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Unable to convert value [" + fv + "] for argument: " + argument)));
+                        argumentList.add(result.orElseThrow(() -> new RoutingException("Unable to convert value [" + fv + "] for argument: " + argument)));
                     }
                     else {
-                        throw new IllegalArgumentException("Required argument [" + argument + "] not specified");
+                        throw new RoutingException("Required argument [" + argument + "] not specified");
                     }
                 }
                 else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new IllegalArgumentException("Required argument [" + argument + "] not specified");
+                    throw new RoutingException("Required argument [" + argument + "] not specified");
                 } else {
                     Object finalValue = value;
                     Optional<?> result = conversionService.convert(finalValue, argument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Unable to convert value [" + finalValue + "] for argument: " + argument)));
+                    argumentList.add(result.orElseThrow(() -> new RoutingException("Unable to convert value [" + finalValue + "] for argument: " + argument)));
                 }
             }
 

@@ -472,6 +472,15 @@ public class DefaultBeanContext implements BeanContext {
         return ServiceLoader.load(BeanConfiguration.class, classLoader);
     }
 
+    /**
+     * Registers an active configuration
+     *
+     * @param configuration The configuration to register
+     */
+    protected void registerConfiguration(BeanConfiguration configuration) {
+        beanConfigurations.put(configuration.getName(), configuration);
+    }
+
     private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
         synchronized (singletonObjects) {
             T createdBean = doCreateBean(resolutionContext, definition, qualifier, true);
@@ -611,7 +620,16 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanConfigurations() {
         while (beanConfigurationIterator.hasNext()) {
             BeanConfiguration configuration = beanConfigurationIterator.next();
-            beanConfigurations.put(configuration.getName(), configuration);
+            registerConfiguration(configuration);
+        }
+
+        if(LOG.isDebugEnabled()) {
+            String activeConfigurations = beanConfigurations.values()
+                                                .stream()
+                                                .filter(config -> config.isEnabled(this))
+                                                .map(BeanConfiguration::getName)
+                                                .collect(Collectors.joining(","));
+            LOG.debug("Loaded active configurations: {}", activeConfigurations);
         }
     }
 

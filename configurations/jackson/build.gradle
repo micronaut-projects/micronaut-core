@@ -1,6 +1,9 @@
 dependencies {
     compile project(":inject")
+
+    compileOnly project(":runtime-netty")
     compileOnly project(":java-inject")
+
     compile 'org.reactivestreams:reactive-streams:1.0.1'
     compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
     compile 'com.fasterxml.jackson.datatype:jackson-datatype-jsr353:2.9.0'

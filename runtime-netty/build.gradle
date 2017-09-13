@@ -3,7 +3,7 @@ dependencies {
     compile project(":router")
 
 
-    compile project(":configurations/jackson")
+
 
     compileOnly project(":ast")
     compileOnly project(":java-inject")
@@ -11,6 +11,7 @@ dependencies {
     compile 'com.typesafe.netty:netty-reactive-streams-http:2.0.0'
     compile "io.netty:netty-codec-http:$nettyVersion"
 
+    testCompile project(":configurations/jackson")
     testCompile project(":ast")
     testCompile project(":java-inject")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'

@@ -1,4 +1,4 @@
-package org.particleframework.http.server.netty;
+package org.particleframework.configuration.jackson.server.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
@@ -8,6 +8,9 @@ import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
+import org.particleframework.http.server.netty.HttpContentSubscriber;
+import org.particleframework.http.server.netty.NettyHttpRequest;
+import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -16,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * This class will handle subscribing to a JSON stream and binding once the events are complete in a non-blocking manner
@@ -24,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Singleton
-public class JsonContentSubscriber implements Subscriber<HttpContent> {
+public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
 
@@ -37,12 +41,17 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
     private final long advertisedLength;
     private long accumulatedLength = 0;
     private Subscription subscription;
+    private Consumer<JsonNode> completionHandler;
 
     public JsonContentSubscriber(NettyHttpRequest request) {
         this.nettyHttpRequest = request;
         this.advertisedLength = request.getContentLength();
         this.route = request.getMatchedRoute();
         this.ctx = request.getChannelHandlerContext();
+        this.completionHandler = (jsonNode -> {
+            nettyHttpRequest.setBody(jsonNode);
+            route.execute();
+        });
     }
 
     @Override
@@ -90,8 +99,7 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
      * @param jsonNode The {@link JsonNode} instance
      */
     protected void onComplete(JsonNode jsonNode) {
-        nettyHttpRequest.setBody(jsonNode);
-        route.execute();
+        this.completionHandler.accept(jsonNode);
     }
 
     @Override
@@ -141,5 +149,11 @@ public class JsonContentSubscriber implements Subscriber<HttpContent> {
         if (error.get() == null) {
             jacksonProcessor.onComplete();
         }
+    }
+
+    @Override
+    public HttpContentSubscriber onComplete(Consumer<JsonNode> consumer) {
+        this.completionHandler = consumer;
+        return this;
     }
 }

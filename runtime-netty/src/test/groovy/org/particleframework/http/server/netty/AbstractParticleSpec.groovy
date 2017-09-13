@@ -31,8 +31,14 @@ abstract class AbstractParticleSpec extends Specification {
 
     @Shared int serverPort = SocketUtils.findAvailableTcpPort()
     @Shared @AutoCleanup ApplicationContext applicationContext =
-                            ParticleApplication.run('-port',String.valueOf(serverPort))
+                            ParticleApplication.build('-port',String.valueOf(serverPort))
+                                               .include(configurationNames() as String[])
+                                               .run()
 
     @Shared String server = "http://localhost:$serverPort"
     @Shared OkHttpClient client = new OkHttpClient()
+
+    Collection<String> configurationNames() {
+        ['org.particleframework.configuration.jackson','org.particleframework.web.router']
+    }
 }

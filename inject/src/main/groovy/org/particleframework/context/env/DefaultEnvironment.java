@@ -2,6 +2,7 @@ package org.particleframework.context.env;
 
 import org.particleframework.config.MapPropertyResolver;
 import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.DefaultConversionService;
@@ -10,6 +11,7 @@ import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.order.OrderUtil;
+import org.particleframework.inject.BeanConfiguration;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -38,6 +40,9 @@ public class DefaultEnvironment implements Environment {
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final Map<Class, SoftServiceLoader> serviceMap = new ConcurrentHashMap<>();
     private final ClassPathAnnotationScanner annotationScanner;
+    private Collection<String> configurationIncludes = new HashSet<>();
+    private Collection<String> configurationExcludes = new HashSet<>();
+
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
         this(name,classLoader, DefaultConversionService.SHARED_INSTANCE);
@@ -79,6 +84,12 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
+    public boolean isActive(BeanConfiguration configuration) {
+        String name = configuration.getName();
+        return !configurationExcludes.contains(name) && (configurationIncludes.isEmpty() || configurationIncludes.contains(name));
+    }
+
+    @Override
     public Environment addPropertySource(PropertySource propertySource) {
         propertySources.add(propertySource);
         return this;
@@ -88,6 +99,22 @@ public class DefaultEnvironment implements Environment {
     public Environment addPackage(String pkg) {
         if(!this.packages.contains(pkg)) {
             this.packages.add(pkg);
+        }
+        return this;
+    }
+
+    @Override
+    public Environment addConfigurationExcludes(@Nullable String... names) {
+        if(names != null) {
+            configurationExcludes.addAll(Arrays.asList(names));
+        }
+        return this;
+    }
+
+    @Override
+    public Environment addConfigurationIncludes(String... names) {
+        if(names != null) {
+            configurationIncludes.addAll(Arrays.asList(names));
         }
         return this;
     }

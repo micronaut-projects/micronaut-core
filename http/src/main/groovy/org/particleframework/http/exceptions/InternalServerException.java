@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
-
-import io.netty.handler.codec.http.HttpContent;
-import org.reactivestreams.Subscriber;
-
-import java.util.function.Consumer;
+package org.particleframework.http.exceptions;
 
 /**
+ * Thrown for an unrecoverable server exceptions
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpContentSubscriber<T> extends Subscriber<HttpContent> {
+public class InternalServerException extends HttpException {
+    public InternalServerException(String message) {
+        super(message);
+    }
 
-    /**
-     * Allows overriding the default completion handler
-     *
-     * @param consumer The consumer
-     * @return This HttpContentSubscriber
-     */
-    HttpContentSubscriber onComplete(Consumer<T> consumer);
+    public InternalServerException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

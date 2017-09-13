@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.exceptions;
+package org.particleframework.configuration.jackson.server.http;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.particleframework.http.HttpRequest;

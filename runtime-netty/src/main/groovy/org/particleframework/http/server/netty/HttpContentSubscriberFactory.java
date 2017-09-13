@@ -21,7 +21,7 @@ import org.reactivestreams.Subscriber;
 /**
  * Interface that allows plugging into the constructor of the {@link HttpContent} subscriber
  *
- * @see JsonContentSubscriber
+ * @see DefaultHttpContentSubscriber
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,6 +33,6 @@ public interface HttpContentSubscriberFactory {
      * @param request The request
      * @return The subscriber
      */
-    Subscriber<HttpContent> build(NettyHttpRequest request);
+    HttpContentSubscriber build(NettyHttpRequest request);
 }
 

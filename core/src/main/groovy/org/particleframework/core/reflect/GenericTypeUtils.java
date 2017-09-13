@@ -20,11 +20,15 @@ public class GenericTypeUtils {
      * @return A single Class or null
      */
     public static Optional<Class> resolveSuperGenericTypeArgument(Class type) {
-        Type genericSuperclass = type.getGenericSuperclass();
-        if(genericSuperclass instanceof ParameterizedType) {
-            return resolveSingleTypeArgument(genericSuperclass);
+        try {
+            Type genericSuperclass = type.getGenericSuperclass();
+            if(genericSuperclass instanceof ParameterizedType) {
+                return resolveSingleTypeArgument(genericSuperclass);
+            }
+            return Optional.empty();
+        } catch (NoClassDefFoundError e) {
+            return Optional.empty();
         }
-        return Optional.empty();
     }
 
     /**

@@ -22,7 +22,7 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FormDataHttpContentSubscriber extends HttpContentSubscriber {
+public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber {
 
     private final HttpPostRequestDecoder decoder;
 

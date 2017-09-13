@@ -26,7 +26,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
-import org.particleframework.context.Qualifier;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.order.OrderUtil;
@@ -36,17 +35,18 @@ import org.particleframework.http.*;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
+import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 import org.particleframework.web.router.UriRouteMatch;
-import org.particleframework.web.router.annotation.Consumes;
+import org.particleframework.web.router.exceptions.RoutingException;
+import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -204,7 +204,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         null,
                                                         binderRegistry);
                                                 if (finalRoute.isExecutable()) {
-                                                    finalRoute = prepareRouteForExecution(finalRoute, ctx);
+                                                    finalRoute = prepareRouteForExecution(finalRoute, nettyHttpRequest, binderRegistry);
                                                     finalRoute.execute();
                                                     return;
                                                 }
@@ -291,13 +291,13 @@ public class NettyHttpServer implements EmbeddedServer {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Bad request: Unbindable arguments for route: " + route);
             }
-            context.writeAndFlush(HttpResponse.badRequest())
+            context.writeAndFlush(handleBadRequest(request, binderRegistry))
                     .addListener(ChannelFutureListener.CLOSE);
         } else {
 
             // decorate the execution of the route so that it runs an async executor
             // TODO: Allow customization of thread pool to execute actions
-            route = prepareRouteForExecution(route, context);
+            route = prepareRouteForExecution(route, request, binderRegistry);
 
             request.setMatchedRoute(route);
 
@@ -309,13 +309,13 @@ public class NettyHttpServer implements EmbeddedServer {
                     MediaType contentType = request.getContentType();
                     StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
                     Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                                                                                    new SubscriberQualifier(contentType));
+                                                                                                    new ConsumesMediaTypeQualifier<>(contentType));
 
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
                         streamedHttpRequest.subscribe(factory.build(request));
                     } else {
-                        Subscriber<HttpContent> contentSubscriber = new HttpContentSubscriber(request);
+                        Subscriber<HttpContent> contentSubscriber = new DefaultHttpContentSubscriber(request);
                         streamedHttpRequest.subscribe(contentSubscriber);
                     }
 
@@ -323,7 +323,7 @@ public class NettyHttpServer implements EmbeddedServer {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Request body expected, but was empty.");
                     }
-                    context.writeAndFlush(HttpResponse.badRequest())
+                    context.writeAndFlush(handleBadRequest(request, binderRegistry))
                             .addListener(ChannelFutureListener.CLOSE);
 
                 }
@@ -332,7 +332,8 @@ public class NettyHttpServer implements EmbeddedServer {
         }
     }
 
-    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, ChannelHandlerContext context) {
+    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+        ChannelHandlerContext context = request.getChannelHandlerContext();
         Executor executor = context.channel().eventLoop();
 
         route = route.decorate(finalRoute -> {
@@ -342,9 +343,8 @@ public class NettyHttpServer implements EmbeddedServer {
                 try {
                     try {
                         result = finalRoute.execute();
-                    } catch (IllegalArgumentException e) {
-                        // TODO: catch more specific exception
-                        result = HttpResponse.badRequest();
+                    } catch (RoutingException e) {
+                        result = handleBadRequest(request, binderRegistry);
                     }
 
                     ChannelFuture channelFuture;
@@ -376,6 +376,20 @@ public class NettyHttpServer implements EmbeddedServer {
             return null;
         });
         return route;
+    }
+
+    protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+        Optional<Router> routerBean = beanLocator.findBean(Router.class);
+        try {
+            return routerBean.flatMap(router ->
+                    router.route(HttpStatus.BAD_REQUEST)
+                          .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
+                          .filter(match -> match.isExecutable())
+                          .map(match -> match.execute())
+            ).orElse(HttpResponse.badRequest());
+        } catch (Exception e) {
+            throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
+        }
     }
 
     private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
@@ -456,44 +470,4 @@ public class NettyHttpServer implements EmbeddedServer {
         }
     }
 
-    private static class SubscriberQualifier implements Qualifier<HttpContentSubscriberFactory> {
-        private final MediaType contentType;
-
-        public SubscriberQualifier(MediaType contentType) {
-            this.contentType = contentType;
-        }
-
-        @Override
-        public Stream<BeanDefinition<HttpContentSubscriberFactory>> reduce(Class<HttpContentSubscriberFactory> beanType, Stream<BeanDefinition<HttpContentSubscriberFactory>> candidates) {
-            return candidates.filter(candidate -> {
-                        Consumes consumes = candidate.getType().getAnnotation(Consumes.class);
-                        if(consumes != null) {
-                            Set<String> consumedTypes = Arrays.stream(consumes.value()).map(MediaType::new).map(MediaType::getExtension).collect(Collectors.toSet());
-                            return consumedTypes.contains(contentType.getExtension());
-                        }
-                        return false;
-                    }
-            );
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            SubscriberQualifier that = (SubscriberQualifier) o;
-
-            return contentType.equals(that.contentType);
-        }
-
-        @Override
-        public int hashCode() {
-            return contentType.hashCode();
-        }
-
-        @Override
-        public String toString() {
-            return HttpHeaders.CONTENT_TYPE + ": " + contentType;
-        }
-    }
 }

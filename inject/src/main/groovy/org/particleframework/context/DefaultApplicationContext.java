@@ -115,6 +115,23 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return ctx;
     }
 
+    @Override
+    public ApplicationContext stop() {
+        return (ApplicationContext) super.stop();
+    }
+
+    @Override
+    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
+        return getEnvironment().getProperty(name, requiredType, typeArguments);
+    }
+
+    @Override
+    protected void registerConfiguration(BeanConfiguration configuration) {
+        if(getEnvironment().isActive(configuration)) {
+            super.registerConfiguration(configuration);
+        }
+    }
+
     protected void startEnvironment() {
         Environment environment = getEnvironment();
         environment.start();
@@ -139,15 +156,5 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             }
         }
         super.initializeContext(contextScopeBeans);
-    }
-
-    @Override
-    public ApplicationContext stop() {
-        return (ApplicationContext) super.stop();
-    }
-
-    @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
-        return getEnvironment().getProperty(name, requiredType, typeArguments);
     }
 }

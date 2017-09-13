@@ -19,6 +19,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.DefaultApplicationContext;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
+import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -40,6 +41,8 @@ public class ParticleApplication {
 
     private Collection<Class> classes = new ArrayList<>();
     private Collection<Package> packages = new ArrayList<>();
+    private Collection<String> configurationIncludes = new HashSet<>();
+    private Collection<String> configurationExcludes = new HashSet<>();
     private String[] args = new String[0];
     private String environment;
     private Package defaultPackage;
@@ -58,7 +61,6 @@ public class ParticleApplication {
         ApplicationContext applicationContext = new DefaultApplicationContext(environmentToUse);
         applicationContext.registerSingleton(commandLine);
 
-        // TODO: Deduce main class to scan etc.
         // Add packages to scan
         Environment environment = applicationContext.getEnvironment();
         for (Class cls : classes) {
@@ -111,8 +113,10 @@ public class ParticleApplication {
      * @param classes The application
      * @return The classes
      */
-    public ParticleApplication classes(Class... classes) {
-        this.classes.addAll(Arrays.asList(classes));
+    public ParticleApplication classes(@Nullable  Class... classes) {
+        if(classes != null) {
+            this.classes.addAll(Arrays.asList(classes));
+        }
         return this;
     }
 
@@ -122,7 +126,7 @@ public class ParticleApplication {
      * @param args The arguments
      * @return This application
      */
-    public ParticleApplication args(String... args) {
+    public ParticleApplication args(@Nullable String... args) {
         if (args != null) {
             this.args = args;
         }
@@ -135,7 +139,7 @@ public class ParticleApplication {
      * @param environment The environment
      * @return This application
      */
-    public ParticleApplication env(String environment) {
+    public ParticleApplication env(@Nullable String environment) {
         if (environment != null && environment.length() > 0) {
             this.environment = environment;
         }
@@ -148,7 +152,7 @@ public class ParticleApplication {
      * @param packages The packages
      * @return This application
      */
-    public ParticleApplication packages(Package... packages) {
+    public ParticleApplication packages(@Nullable Package... packages) {
         if (packages != null) {
             this.packages.addAll(Arrays.asList(packages));
         }
@@ -179,8 +183,10 @@ public class ParticleApplication {
      * @param configurations The configurations to include
      * @return This application
      */
-    public ParticleApplication include(String... configurations) {
-        // TODO
+    public ParticleApplication include(@Nullable  String... configurations) {
+        if(configurations != null) {
+            this.configurationIncludes.addAll(Arrays.asList(configurations));
+        }
         return this;
     }
 
@@ -190,9 +196,12 @@ public class ParticleApplication {
      * @param configurations The configurations to exclude
      * @return This application
      */
-    public ParticleApplication exclude(String... configurations) {
-        // TODO
+    public ParticleApplication exclude(@Nullable String... configurations) {
+        if(configurations != null) {
+            this.configurationExcludes.addAll(Arrays.asList(configurations));
+        }
         return this;
+
     }
 
 
@@ -209,14 +218,45 @@ public class ParticleApplication {
         return this;
     }
 
+
+    /**
+     * Run the application for the given arguments. Classes for the application will be discovered automatically
+     *
+     * @param args The arguments
+     * @return The {@link ApplicationContext}
+     */
+    public static ParticleApplication build(String... args) {
+        return new ParticleApplication().args(args);
+    }
+
+    /**
+     * Run the application for the given arguments. Classes for the application will be discovered automatically
+     *
+     * @param args The arguments
+     * @return The {@link ApplicationContext}
+     */
     public static ApplicationContext run(String... args) {
         return run(new Class[0], args);
     }
 
+    /**
+     * Run the application for the given arguments.
+     *
+     * @param cls The application class
+     * @param args The arguments
+     * @return The {@link ApplicationContext}
+     */
     public static ApplicationContext run(Class cls, String... args) {
         return run(new Class[]{cls}, args);
     }
 
+    /**
+     * Run the application for the given arguments.
+     *
+     * @param classes The application classes
+     * @param args The arguments
+     * @return The {@link ApplicationContext}
+     */
     public static ApplicationContext run(Class[] classes, String... args) {
         return new ParticleApplication()
                 .classes(classes)
