@@ -27,6 +27,8 @@ import org.particleframework.inject.annotation.Executable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>Abstract base class for generated {@link ExecutableMethod} classes to implement. The generated classes should implement
@@ -64,6 +66,13 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
         this(method, genericReturnTypes, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Override
+    public String toString() {
+        Stream<String> stringStream = Arrays.stream(getArguments()).map(Argument::toString);
+        String text = stringStream.collect(Collectors.joining(","));
+        return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
     }
 
     @Override

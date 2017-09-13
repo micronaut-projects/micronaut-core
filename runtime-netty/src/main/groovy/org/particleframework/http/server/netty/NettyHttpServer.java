@@ -143,17 +143,21 @@ public class NettyHttpServer implements EmbeddedServer {
 
 
                                 routeMatch.ifPresent((route -> {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
-                                    }
-
                                     if (!route.accept(nettyHttpRequest.getContentType())) {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Matched route is not a supported media type: {}", nettyHttpRequest.getContentType());
                                         }
-                                        ctx.writeAndFlush(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE))
+                                        Object unsupportedResult =
+                                                findStatusRoute(HttpStatus.UNSUPPORTED_MEDIA_TYPE, nettyHttpRequest, binderRegistry)
+                                                .map(RouteMatch::execute)
+                                                .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
+
+                                        ctx.writeAndFlush(unsupportedResult)
                                                 .addListener(ChannelFutureListener.CLOSE);
                                     } else {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
+                                        }
                                         handleRouteMatch(route, nettyHttpRequest, binderRegistry, ctx);
                                     }
                                 }));
@@ -171,11 +175,22 @@ public class NettyHttpServer implements EmbeddedServer {
                                             .collect(Collectors.toSet());
 
                                     if (!existingRoutes.isEmpty()) {
-                                        ctx.writeAndFlush(HttpResponse.notAllowed(
-                                                existingRoutes
-                                        )).addListener(ChannelFutureListener.CLOSE);
+                                        Object notAllowedResponse =
+                                                findStatusRoute(HttpStatus.METHOD_NOT_ALLOWED, nettyHttpRequest, binderRegistry)
+                                                        .map(RouteMatch::execute)
+                                                        .orElse(HttpResponse.notAllowed(
+                                                                existingRoutes
+                                                        ));
+
+                                        ctx.writeAndFlush(notAllowedResponse)
+                                                .addListener(ChannelFutureListener.CLOSE);
                                     } else {
-                                        ctx.writeAndFlush(HttpResponse.notFound())
+                                        Object notFoundResponse =
+                                                findStatusRoute(HttpStatus.NOT_FOUND, nettyHttpRequest, binderRegistry)
+                                                        .map(RouteMatch::execute)
+                                                        .orElse(HttpResponse.notFound());
+
+                                        ctx.writeAndFlush(notFoundResponse)
                                                 .addListener(ChannelFutureListener.CLOSE);
                                     }
                                 }
@@ -195,19 +210,20 @@ public class NettyHttpServer implements EmbeddedServer {
                                     RouteMatch matchedRoute = nettyHttpRequest.getMatchedRoute();
                                     Class declaringType = matchedRoute.getDeclaringType();
                                     try {
-                                        if (routerBean.isPresent() && declaringType != null) {
-                                            Router routerObject = routerBean.get();
-                                            Optional<RouteMatch<Object>> match = routerObject.route(declaringType, cause);
+                                        if (declaringType != null) {
+
+                                            Optional<RouteMatch<Object>> match = routerBean
+                                                    .flatMap(router -> router.route(declaringType, cause))
+                                                    .map(route -> fulfillArgumentRequirements(route, nettyHttpRequest, binderRegistry))
+                                                    .filter(RouteMatch::isExecutable);
+
+
                                             if (match.isPresent()) {
-                                                RouteMatch<Object> finalRoute = fulfillArgumentRequirements(
-                                                        match.get(),
-                                                        null,
-                                                        binderRegistry);
-                                                if (finalRoute.isExecutable()) {
-                                                    finalRoute = prepareRouteForExecution(finalRoute, nettyHttpRequest, binderRegistry);
-                                                    finalRoute.execute();
-                                                    return;
-                                                }
+                                                RouteMatch finalRoute = match.get();
+                                                Object result = finalRoute.execute();
+                                                ctx.writeAndFlush(result)
+                                                        .addListener(ChannelFutureListener.CLOSE);
+                                                return;
                                             }
                                         }
 
@@ -222,16 +238,27 @@ public class NettyHttpServer implements EmbeddedServer {
                                                     .addListener(ChannelFutureListener.CLOSE);
                                             return;
                                         }
-                                    } catch (Exception e) {
+                                    } catch (Throwable e) {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
                                         }
                                     }
                                 }
 
+                                Object errorResponse;
+                                try {
+                                    errorResponse = findStatusRoute(HttpStatus.INTERNAL_SERVER_ERROR, nettyHttpRequest, binderRegistry)
+                                            .map(RouteMatch::execute)
+                                            .orElse(HttpResponse.serverError());
+                                } catch (Throwable e) {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
+                                    }
+                                    errorResponse = HttpResponse.serverError();
+                                }
 
                                 ctx.channel()
-                                        .writeAndFlush(HttpResponse.serverError())
+                                        .writeAndFlush(errorResponse)
                                         .addListener(ChannelFutureListener.CLOSE);
 
 
@@ -309,7 +336,7 @@ public class NettyHttpServer implements EmbeddedServer {
                     MediaType contentType = request.getContentType();
                     StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
                     Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                                                                                    new ConsumesMediaTypeQualifier<>(contentType));
+                            new ConsumesMediaTypeQualifier<>(contentType));
 
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
@@ -344,19 +371,26 @@ public class NettyHttpServer implements EmbeddedServer {
                     try {
                         result = finalRoute.execute();
                     } catch (RoutingException e) {
-                        result = handleBadRequest(request, binderRegistry);
+                        result = HttpResponse.badRequest();
                     }
 
                     ChannelFuture channelFuture;
-                    if (result != null) {
-                        channelFuture = context.writeAndFlush(result);
-                    } else {
-                        HttpResponse res = context.channel().attr(NettyHttpResponse.KEY).get();
-                        if (res == null) {
-                            res = HttpResponse.ok();
+                    if (result == null) {
+                        result = context.channel().attr(NettyHttpResponse.KEY).get();
+                        if (result == null) {
+                            result = HttpResponse.ok();
                         }
-                        channelFuture = context.writeAndFlush(res);
                     }
+                    if (result instanceof HttpResponse) {
+                        HttpStatus status = ((HttpResponse) result).getStatus();
+                        if (status.getCode() >= 300) {
+                            // handle re-mapping of errors
+                            result = findStatusRoute(status, request, binderRegistry)
+                                    .map(RouteMatch::execute)
+                                    .orElse(result);
+                        }
+                    }
+                    channelFuture = context.writeAndFlush(result);
 
                     channelFuture.addListener(future -> {
                         if (!future.isSuccess()) {
@@ -378,14 +412,22 @@ public class NettyHttpServer implements EmbeddedServer {
         return route;
     }
 
+    private Optional<RouteMatch<Object>> findStatusRoute(HttpStatus status, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+        Optional<Router> routerBean = beanLocator.findBean(Router.class);
+        return routerBean.flatMap(router ->
+                router.route(status)
+        ).map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
+                .filter(RouteMatch::isExecutable);
+    }
+
     protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
         Optional<Router> routerBean = beanLocator.findBean(Router.class);
         try {
             return routerBean.flatMap(router ->
                     router.route(HttpStatus.BAD_REQUEST)
-                          .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
-                          .filter(match -> match.isExecutable())
-                          .map(match -> match.execute())
+                            .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
+                            .filter(match -> match.isExecutable())
+                            .map(match -> match.execute())
             ).orElse(HttpResponse.badRequest());
         } catch (Exception e) {
             throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
@@ -431,7 +473,7 @@ public class NettyHttpServer implements EmbeddedServer {
                             argumentValues.put(argumentName, bindingResult);
                         } else if (bindingResult.isPresent()) {
                             argumentValues.put(argumentName, bindingResult.get());
-                        } else if(HttpUtil.isFormData(request)) {
+                        } else if (HttpUtil.isFormData(request)) {
                             argumentValues.put(argumentName, (Supplier<Optional>) () ->
                                     argumentBinder.bind(argument, request)
                             );

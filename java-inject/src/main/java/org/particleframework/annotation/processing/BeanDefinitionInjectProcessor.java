@@ -586,7 +586,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
                     assert (typeElement != null) : "typeElement cannot be null";
 
-                    params.addParameter(argName, typeElement.toString());
+                    params.addParameter(argName, modelUtils.resolveTypeReference(typeElement));
                     List<Object> typeParams = genericUtils.resolveGenericTypes(declaredType);
                     if (!typeParams.isEmpty()) {
                         params.addGenericTypes(argName, typeParams);

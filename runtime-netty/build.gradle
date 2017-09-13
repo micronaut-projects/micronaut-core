@@ -16,5 +16,4 @@ dependencies {
     testCompile project(":java-inject")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 
-    testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }

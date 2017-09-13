@@ -21,7 +21,7 @@ import java.util.concurrent.CompletableFuture
 class JsonBodyBindingSpec extends AbstractParticleSpec {
 
 
-    void "test simple string-based body parsing"() {
+    void  "test simple string-based body parsing"() {
 
         when:
         def json = '{"title":"The Stand"}'

@@ -16,7 +16,7 @@
 package org.particleframework.web.router;
 
 
-import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
@@ -59,22 +59,27 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     static final Object NO_VALUE = new Object();
 
 
-    private final ApplicationContext beanContext;
+    private final ExecutionHandleLocator executionHandleLocator;
     private final UriNamingStrategy uriNamingStrategy;
+    private final ConversionService<?> conversionService;
 
     private DefaultUriRoute currentParentRoute = null;
     private List<UriRoute> uriRoutes = new ArrayList<>();
     private List<StatusRoute> statusRoutes = new ArrayList<>();
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
 
-    public DefaultRouteBuilder(ApplicationContext beanContext) {
-        this.beanContext = beanContext;
-        this.uriNamingStrategy = CAMEL_CASE_NAMING_STRATEGY;
+    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator) {
+        this(executionHandleLocator, CAMEL_CASE_NAMING_STRATEGY);
     }
 
-    public DefaultRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
-        this.beanContext = beanContext;
+    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy) {
+        this(executionHandleLocator, uriNamingStrategy, ConversionService.SHARED);
+    }
+
+    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+        this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -111,13 +116,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+        Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, executableHandle, beanContext.getEnvironment());
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, executableHandle, conversionService);
         this.statusRoutes.add(statusRoute);
         return statusRoute;
     }
@@ -125,26 +130,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+        Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultErrorRoute errorRoute = new DefaultErrorRoute(originatingClass, error, executableHandle, beanContext.getEnvironment());
+        DefaultErrorRoute errorRoute = new DefaultErrorRoute(originatingClass, error, executableHandle, conversionService);
         this.errorRoutes.add(errorRoute);
         return errorRoute;
     }
 
     @Override
     public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+        Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultErrorRoute errorRoute = new DefaultErrorRoute(error, executableHandle, beanContext.getEnvironment());
+        DefaultErrorRoute errorRoute = new DefaultErrorRoute(error, executableHandle, conversionService);
         this.errorRoutes.add(errorRoute);
         return errorRoute;
     }
@@ -230,7 +235,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class... parameterTypes) {
-        Optional<MethodExecutionHandle<Object>> executionHandle = beanContext.findExecutionHandle(type, method, parameterTypes);
+        Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
@@ -489,7 +494,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(httpMethod, info, targetMethod, conditions, acceptedMediaTypes, beanContext.getEnvironment()));
+            return matchInfo.map((info) -> new DefaultUriRouteMatch(httpMethod, info, targetMethod, conditions, acceptedMediaTypes, conversionService));
         }
 
 

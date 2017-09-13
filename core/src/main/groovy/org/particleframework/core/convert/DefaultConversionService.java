@@ -33,7 +33,6 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
-    public static final DefaultConversionService SHARED_INSTANCE = new DefaultConversionService();
 
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()

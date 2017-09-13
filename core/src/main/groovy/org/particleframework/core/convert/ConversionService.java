@@ -12,6 +12,11 @@ import java.util.function.Function;
 public interface ConversionService<Impl extends ConversionService> {
 
     /**
+     * The default shared conversion service
+     */
+    ConversionService<?> SHARED = new DefaultConversionService();
+
+    /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
      *
      * @param object     The object to convert
