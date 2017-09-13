@@ -104,7 +104,7 @@ public class RequiresCondition implements Condition<ConditionContext> {
         }
         else {
             try {
-                return !condition.newInstance().matches(context);
+                return condition.newInstance().matches(context);
             } catch (Throwable e) {
                 if(LOG.isErrorEnabled()) {
                     LOG.error("Error instantiating condition ["+condition.getName()+"]: " + e.getMessage(), e);

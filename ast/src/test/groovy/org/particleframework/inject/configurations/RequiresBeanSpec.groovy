@@ -7,12 +7,13 @@ import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.configurations.requiresbean.RequiresBean
 import org.particleframework.inject.configurations.requirescondition.TravisBean
-import org.particleframework.inject.configurations.requiresconditionclass.TravisBean2
+import org.particleframework.inject.configurations.requiresconditionfalse.TravisBean2
+import org.particleframework.inject.configurations.requiresconditiontrue.TrueBean
 import org.particleframework.inject.configurations.requiresconfig.RequiresConfig
 import org.particleframework.inject.configurations.requiresproperty.RequiresProperty
 import org.particleframework.inject.configurations.requiressdk.RequiresJava9
+import spock.lang.Ignore
 import spock.lang.Specification
-
 /**
  * Created by graemerocher on 19/05/2017.
  */
@@ -30,6 +31,27 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresJava9)
         !context.containsBean(TravisBean)
         !context.containsBean(TravisBean2)
+    }
+
+    void "test that a condition can be required for a bean when false"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        expect:
+        context.containsBean(ABean)
+        !context.containsBean(TravisBean)
+    }
+
+    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueBean")
+    void "test that a condition can be required for a bean when true"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        expect:
+        context.containsBean(ABean)
+        context.containsBean(TrueBean)
     }
 
     void "test requires property when not present"() {

@@ -147,17 +147,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isConfigurationPropertiesType = annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class);
         }
 
-        public TypeElement getConcreteClass() {
+        TypeElement getConcreteClass() {
             return concreteClass;
         }
 
-        public Map<Element, BeanDefinitionWriter> getBeanDefinitionWriters() {
+        Map<Element, BeanDefinitionWriter> getBeanDefinitionWriters() {
             return beanDefinitionWriters;
-        }
-
-        @Override
-        public Object scan(Element e, Object o) {
-            return super.scan(e, o);
         }
 
         @Override
@@ -165,14 +160,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             assert (classElement.getKind() == CLASS) : "classElement must be a class";
 
             Element enclosingElement = classElement.getEnclosingElement();
-            if (!enclosingElement.getKind().isClass()
-                || this.concreteClass.getQualifiedName() == classElement.getQualifiedName()
-                ) {
+            // don't process inner class unless this is the visitor for it
+            if (!enclosingElement.getKind().isClass() ||
+                concreteClass.getQualifiedName().equals(classElement.getQualifiedName())) {
 
-                if (this.concreteClass.getQualifiedName() == classElement.getQualifiedName()) {
+                if (concreteClass.getQualifiedName().equals(classElement.getQualifiedName())) {
                     // we know this class has supported annotations so we need a beandef writer for it
                     BeanDefinitionWriter beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
-                    beanDefinitionWriters.put(this.concreteClass, beanDefinitionWriter);
+                    beanDefinitionWriters.put(concreteClass, beanDefinitionWriter);
 
                     ExecutableElement ctor = publicConstructorFor(classElement);
                     ExecutableElementParamInfo paramInfo = populateParameterData(ctor);

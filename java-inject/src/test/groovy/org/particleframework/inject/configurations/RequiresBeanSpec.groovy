@@ -6,11 +6,11 @@ import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.configurations.requiresbean.RequiresBean
-import org.particleframework.inject.configurations.requirescondition.TravisBean
+import org.particleframework.inject.configurations.requiresconditionfalse.TravisBean
+import org.particleframework.inject.configurations.requiresconditiontrue.TrueBean
 import org.particleframework.inject.configurations.requiresconfig.RequiresConfig
 import org.particleframework.inject.configurations.requiresproperty.RequiresProperty
 import org.particleframework.inject.configurations.requiressdk.RequiresJava9
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class RequiresBeanSpec extends Specification {
@@ -27,8 +27,7 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresJava9)
     }
 
-    @Ignore
-    void "test that a condition can be required for a bean"() {
+    void "test that a condition can be required for a bean when false"() {
         given:
         BeanContext context = new DefaultBeanContext()
         context.start()
@@ -36,6 +35,16 @@ class RequiresBeanSpec extends Specification {
         expect:
         context.containsBean(ABean)
         !context.containsBean(TravisBean)
+    }
+
+    void "test that a condition can be required for a bean when true"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        expect:
+        context.containsBean(ABean)
+        context.containsBean(TrueBean)
     }
 
     void "test requires property when not present"() {
