@@ -657,7 +657,7 @@ public class DefaultBeanContext implements BeanContext {
         Map<String, BeanDefinitionClass> replacements = new LinkedHashMap<>();
         while (beanDefinitionClassIterator.hasNext()) {
             BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
-            if (beanDefinitionClass.isPresent()) {
+            if (beanDefinitionClass.isEnabled(this)) {
                 String replacesBeanTypeName = beanDefinitionClass.getReplacesBeanTypeName();
                 if (replacesBeanTypeName != null) {
                     replacements.put(replacesBeanTypeName, beanDefinitionClass);

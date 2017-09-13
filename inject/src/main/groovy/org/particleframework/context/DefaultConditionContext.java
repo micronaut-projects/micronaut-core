@@ -1,25 +1,23 @@
 package org.particleframework.context;
 
 import org.particleframework.context.condition.ConditionContext;
-import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.BeanDefinitionClass;
 
 /**
  * A Default context implementation
  */
-class DefaultConditionContext implements ConditionContext{
+class DefaultConditionContext<T> implements ConditionContext<T> {
 
     private final BeanContext beanContext;
-    private final BeanConfiguration beanConfiguration;
+    private final T component;
 
-    public DefaultConditionContext(BeanContext beanContext, BeanConfiguration beanConfiguration) {
+    public DefaultConditionContext(BeanContext beanContext, T component) {
         this.beanContext = beanContext;
-        this.beanConfiguration = beanConfiguration;
+        this.component = component;
     }
 
     @Override
-    public BeanConfiguration getBeanConfiguration() {
-        return beanConfiguration;
+    public T getComponent() {
+        return component;
     }
 
     @Override

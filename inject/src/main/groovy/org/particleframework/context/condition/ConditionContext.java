@@ -10,12 +10,12 @@ import org.particleframework.inject.BeanDefinitionClass;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConditionContext {
+public interface ConditionContext<T> {
 
     /**
-     * @return The bean configuration
+     * @return The component for which the condition is being evaluated
      */
-    BeanConfiguration getBeanConfiguration();
+    T getComponent();
 
     /**
      * @return The bean context

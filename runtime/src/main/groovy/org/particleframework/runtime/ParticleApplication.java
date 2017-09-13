@@ -47,6 +47,7 @@ public class ParticleApplication {
     private String environment;
     private Package defaultPackage;
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    private Collection<Map<String,Object>> propertyMaps = new ArrayList<>();
 
     protected ParticleApplication() {
     }
@@ -79,6 +80,10 @@ public class ParticleApplication {
 
         // add the undeclared options
         environment.addPropertySource(new MapPropertySource(commandLine.getUndeclaredOptions()));
+
+        for (Map<String, Object> propertyMap : propertyMaps) {
+            environment.addPropertySource(new MapPropertySource(propertyMap));
+        }
 
         // TODO: error handling for start()
         applicationContext.start();
@@ -120,6 +125,18 @@ public class ParticleApplication {
         return this;
     }
 
+    /**
+     * Add additional properties to the {@link org.particleframework.context.env.PropertySource} list
+     *
+     * @param properties The properties
+     * @return The properties
+     */
+    public ParticleApplication properties(@Nullable Map<String,Object> properties) {
+        if(properties != null) {
+            this.propertyMaps.add(properties);
+        }
+        return this;
+    }
     /**
      * Set the command line arguments
      *

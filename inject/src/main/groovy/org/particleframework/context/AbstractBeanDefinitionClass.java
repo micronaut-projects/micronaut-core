@@ -1,5 +1,9 @@
 package org.particleframework.context;
 
+import org.particleframework.context.annotation.Requirements;
+import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.condition.Condition;
+import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.context.exceptions.BeanContextException;
@@ -22,7 +26,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private Class beanDefinition;
-    private boolean present;
+    private Boolean present;
 
     public AbstractBeanDefinitionClass(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;
@@ -34,9 +38,9 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
      */
     @Override
     public Class getBeanType() {
-        if(present) {
+        if (isPresent()) {
             return GenericTypeUtils.resolveSuperGenericTypeArgument(beanDefinition)
-                                   .orElse(null);
+                    .orElse(null);
         }
         return null;
     }
@@ -51,15 +55,14 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
      */
     @Override
     public BeanDefinition load() {
-        if(isPresent()) {
+        if (isPresent()) {
             try {
                 return (BeanDefinition) beanDefinition.newInstance();
             } catch (Throwable e) {
-                throw new BeanContextException("Error loading bean definition ["+beanTypeName+"]: " + e.getMessage(), e);
+                throw new BeanContextException("Error loading bean definition [" + beanTypeName + "]: " + e.getMessage(), e);
             }
-        }
-        else {
-            throw new BeanContextException("Cannot load bean for type ["+beanTypeName+"]. The type is not present on the classpath");
+        } else {
+            throw new BeanContextException("Cannot load bean for type [" + beanTypeName + "]. The type is not present on the classpath");
         }
     }
 
@@ -75,22 +78,31 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
 
     @Override
     public boolean isPresent() {
-        loadType();
-        return present && getBeanType() != null;
+        if(present == null) {
+            loadType();
+        }
+        return present;
     }
 
-    private void loadType() {
-        if(beanDefinition == null) {
+    @Override
+    public boolean isEnabled(BeanContext beanContext) {
+        if (isPresent()) {
 
-            try {
-                beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
-                present = true;
-            } catch (ClassNotFoundException e) {
-                if(LOG.isDebugEnabled()) {
-                    LOG.debug("Bean definition for type ["+beanTypeName+"] not loaded since it is not on the classpath", e);
+            Class<?> beanType = getBeanType();
+            if(beanType != null) {
+
+                Requires[] annotations = beanType.getAnnotationsByType(Requires.class);
+                if (annotations.length == 0) {
+                    Requirements requirements = beanType.getAnnotation(Requirements.class);
+                    if (requirements != null) {
+                        annotations = requirements.value();
+                    }
                 }
+                Condition condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
+                return condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
             }
         }
+        return false;
     }
 
     @Override
@@ -106,5 +118,20 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     @Override
     public int hashCode() {
         return beanDefinitionTypeName.hashCode();
+    }
+
+    private void loadType() {
+        if (present == null && beanDefinition == null) {
+
+            try {
+                beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
+                present = true;
+            } catch (ClassNotFoundException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                }
+                present = false;
+            }
+        }
     }
 }

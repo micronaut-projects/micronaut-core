@@ -1,5 +1,6 @@
 package org.particleframework.inject;
 
+import org.particleframework.context.BeanContext;
 import org.particleframework.core.annotation.Internal;
 
 /**
@@ -44,4 +45,12 @@ public interface BeanDefinitionClass<T> {
      * @return Is the underlying bean type present on the classpath
      */
     boolean isPresent();
+
+    /**
+     * Whether the bean is enabled
+     *
+     * @param beanContext The bean context
+     * @return True if it is
+     */
+    boolean isEnabled(BeanContext beanContext);
 }

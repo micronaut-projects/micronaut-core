@@ -93,20 +93,23 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         Map<Class<? extends Annotation>, List<ExecutableMethod>> result = new LinkedHashMap<>();
         for (ExecutableMethod executableMethod : executableMethods) {
             Set<? extends Annotation> annotations = executableMethod.getExecutableAnnotations();
+            Class declaringType = executableMethod.getDeclaringType();
+            if(applicationContext.findBeanDefinition(declaringType).isPresent()) {
 
-            if(annotations.isEmpty()) {
-                Class declaringType = executableMethod.getDeclaringType();
-                Annotation executableType = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
-                if(executableType != null) {
-                    registerExecutableMethod(result, executableType, executableMethod);
+                if(annotations.isEmpty()) {
+                    Annotation executableType = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
+                    if(executableType != null) {
+                        registerExecutableMethod(result, executableType, executableMethod);
+                    }
+                }
+                else {
+
+                    for (Annotation annotation : annotations) {
+                        registerExecutableMethod(result, annotation, executableMethod);
+                    }
                 }
             }
-            else {
 
-                for (Annotation annotation : annotations) {
-                    registerExecutableMethod(result, annotation, executableMethod);
-                }
-            }
         }
         return result;
     }

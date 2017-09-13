@@ -29,10 +29,13 @@ import spock.lang.Specification
  */
 abstract class AbstractParticleSpec extends Specification {
 
+    static final SPEC_NAME_PROPERTY = 'spec.name'
+
     @Shared int serverPort = SocketUtils.findAvailableTcpPort()
     @Shared @AutoCleanup ApplicationContext applicationContext =
                             ParticleApplication.build('-port',String.valueOf(serverPort))
                                                .include(configurationNames() as String[])
+                                               .properties((SPEC_NAME_PROPERTY):getClass().simpleName)
                                                .run()
 
     @Shared String server = "http://localhost:$serverPort"

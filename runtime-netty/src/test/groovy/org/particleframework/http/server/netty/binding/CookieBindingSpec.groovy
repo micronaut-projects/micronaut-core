@@ -1,6 +1,7 @@
 package org.particleframework.http.server.netty.binding
 
 import okhttp3.Request
+import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.MediaType
 import org.particleframework.http.binding.annotation.Cookie
@@ -14,7 +15,7 @@ import spock.lang.Unroll
 /**
  * Created by graemerocher on 25/07/2017.
  */
-class CookingBindingSpec extends AbstractParticleSpec {
+class CookieBindingSpec extends AbstractParticleSpec {
 
 
     @Unroll
@@ -42,6 +43,7 @@ class CookingBindingSpec extends AbstractParticleSpec {
     }
 
     @Controller
+    @Requires(property = 'spec.name', value = 'CookieBindingSpec')
     static class CookieController {
 
         @Get
