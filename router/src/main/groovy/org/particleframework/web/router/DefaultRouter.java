@@ -18,6 +18,7 @@ package org.particleframework.web.router;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpStatus;
 
+import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Stream;
@@ -28,6 +29,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class DefaultRouter implements Router {
 
     private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];

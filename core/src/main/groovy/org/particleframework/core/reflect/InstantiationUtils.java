@@ -2,6 +2,7 @@ package org.particleframework.core.reflect;
 
 import org.particleframework.core.reflect.exception.InstantiationException;
 
+import java.lang.reflect.Constructor;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -37,6 +38,21 @@ public class InstantiationUtils {
     public static <T> Optional<T> tryInstantiate(Class<T> type) {
         try {
             return Optional.of(type.newInstance());
+        } catch (Throwable e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Try to instantiate the given class
+     *
+     * @param type The type
+     * @param <T> The generic type
+     * @return The instantiated instance or {@link Optional#empty()}
+     */
+    public static <T> Optional<T> tryInstantiate(Constructor<T> type, Object... args) {
+        try {
+            return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
             return Optional.empty();
         }

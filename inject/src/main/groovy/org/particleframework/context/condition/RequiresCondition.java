@@ -6,11 +6,15 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.reflect.InstantiationUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -98,18 +102,29 @@ public class RequiresCondition implements Condition<ConditionContext> {
     }
 
     private boolean matchesConditions(ConditionContext context, Requires annotation) {
-        Class<? extends Condition> condition = annotation.condition();
-        if(condition == TrueCondition.class) {
+        Class<? extends Condition> conditionClass = annotation.condition();
+        if(conditionClass == TrueCondition.class) {
             return true;
         }
         else {
             try {
                 return condition.newInstance().matches(context);
             } catch (Throwable e) {
-                if(LOG.isErrorEnabled()) {
-                    LOG.error("Error instantiating condition ["+condition.getName()+"]: " + e.getMessage(), e);
-                }
-                return false;
+                // maybe a Groovy closure
+                Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class)conditionClass, Object.class, Object.class);
+                return constructor.flatMap(ctor ->
+                    InstantiationUtils.tryInstantiate(ctor, null, null)
+                ).flatMap(obj -> {
+                    Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
+                    if (method.isPresent()) {
+                        Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
+                        if (result instanceof Boolean) {
+                            return Optional.of((Boolean) result);
+                        }
+                    }
+                    return Optional.empty();
+                }).orElse(false);
+
             }
         }
     }

@@ -5,7 +5,6 @@ import org.particleframework.config.PropertyResolver;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
@@ -45,11 +44,11 @@ public class DefaultEnvironment implements Environment {
 
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
-        this(name,classLoader, DefaultConversionService.SHARED_INSTANCE);
+        this(name,classLoader, ConversionService.SHARED);
     }
 
     public DefaultEnvironment(String name) {
-        this(name,DefaultEnvironment.class.getClassLoader(), DefaultConversionService.SHARED_INSTANCE);
+        this(name,DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED);
     }
 
     public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {

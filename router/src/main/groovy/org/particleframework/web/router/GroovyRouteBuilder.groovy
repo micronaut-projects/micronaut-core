@@ -15,9 +15,11 @@
  */
 package org.particleframework.web.router
 
+import groovy.transform.CompileStatic
 import groovy.transform.InheritConstructors
 import org.codehaus.groovy.runtime.MethodClosure
 import org.particleframework.core.naming.conventions.PropertyConvention
+import org.particleframework.http.HttpStatus
 
 /**
  * <p>Enhancements to {@link DefaultRouteBuilder} for Groovy</p>
@@ -27,6 +29,11 @@ import org.particleframework.core.naming.conventions.PropertyConvention
  */
 @InheritConstructors
 class GroovyRouteBuilder extends DefaultRouteBuilder {
+
+    // status handlers
+    StatusRoute status(HttpStatus httpStatus, MethodClosure methodClosure) {
+        status(httpStatus, methodClosure.owner.getClass(), methodClosure.method, methodClosure.parameterTypes)
+    }
 
     ResourceRoute resources(Object target, @DelegatesTo(GroovyRouteBuilder) Closure nested) {
         resources(target).nest(nested)

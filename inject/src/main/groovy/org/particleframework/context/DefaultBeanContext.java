@@ -713,10 +713,14 @@ public class DefaultBeanContext implements BeanContext {
             if (beanType.isAssignableFrom(candidateType)) {
                 // load it
                 BeanDefinitionClass beanDefinitionClass = beanDefinitionClassEntry.getValue();
-                BeanDefinition<T> beanDefinition = beanDefinitionClass.load();
-                if (beanDefinition != null) {
+                try {
+                    BeanDefinition<T> beanDefinition = beanDefinitionClass.load();
+                    if (beanDefinition != null) {
 
-                    candidates.add(beanDefinition);
+                        candidates.add(beanDefinition);
+                    }
+                } catch (NoClassDefFoundError noClassDefFoundError) {
+                    throw new BeanInstantiationException("Bean definition ["+beanDefinitionClass.getBeanTypeName()+"] could not be loaded due to missing dependencies: " + noClassDefFoundError.getMessage(), noClassDefFoundError);
                 }
             }
         }

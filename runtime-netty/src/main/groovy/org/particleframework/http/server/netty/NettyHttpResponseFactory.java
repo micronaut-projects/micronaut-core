@@ -18,7 +18,7 @@ package org.particleframework.http.server.netty;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import org.particleframework.core.convert.DefaultConversionService;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpResponseFactory;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpResponse;
@@ -32,7 +32,7 @@ import org.particleframework.http.MutableHttpResponse;
 public class NettyHttpResponseFactory implements HttpResponseFactory {
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        MutableHttpResponse<T> ok = new NettyHttpResponse<>(DefaultConversionService.SHARED_INSTANCE);
+        MutableHttpResponse<T> ok = new NettyHttpResponse<>(ConversionService.SHARED);
 
         return body != null ? ok.setBody(body) : ok;
     }
@@ -48,6 +48,6 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
         }
 
         DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, nettyStatus);
-        return new NettyHttpResponse(fullHttpResponse, DefaultConversionService.SHARED_INSTANCE);
+        return new NettyHttpResponse(fullHttpResponse, ConversionService.SHARED);
     }
 }

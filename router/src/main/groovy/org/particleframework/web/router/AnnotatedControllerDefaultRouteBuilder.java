@@ -15,9 +15,10 @@
  */
 package org.particleframework.web.router;
 
-import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.http.HttpMethod;
@@ -25,10 +26,11 @@ import org.particleframework.http.MediaType;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
+import org.particleframework.web.router.annotation.Consumes;
 
+import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * <p>This {@link RouteBuilder} will handle public methods of {@link Controller} instances that are mapped by convention</p>
@@ -36,18 +38,19 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
 
-    public AnnotatedControllerDefaultRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy) {
-        super(beanContext, uriNamingStrategy);
+    public AnnotatedControllerDefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+        super(executionHandleLocator, uriNamingStrategy, conversionService);
     }
 
     @Override
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
         Controller controllerAnn = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
-        if(controllerAnn != null ) {
-            if(!controllerAnn.value().isEmpty()) {
+        if (controllerAnn != null) {
+            if (!controllerAnn.value().isEmpty()) {
 
                 String methodName = method.getMethodName();
                 Optional<MethodConvention> methodConvention = MethodConvention.forMethod(methodName);
@@ -58,7 +61,7 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
                                 .equals(PropertyConvention.ID.lowerCaseName())))
                         .findFirst();
 
-                String id = idArg.map((arg)-> "{/id}").orElse("");
+                String id = idArg.map((arg) -> "{/id}").orElse("");
                 methodConvention.ifPresent((convention) -> {
                     UriRoute uriRoute = buildRoute(HttpMethod.valueOf(convention.httpMethod()),
                             controllerAnn.value() + id,
@@ -66,23 +69,37 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
                             methodName,
                             method.getArgumentTypes()
                     );
-                    processAccepts(controllerAnn, uriRoute);
+                    uriRoute = (UriRoute) processAccepts(controllerAnn, uriRoute);
+                    processAccepts(declaringType.getAnnotation(Consumes.class), uriRoute);
                 });
-            }
-            else {
+            } else {
                 Class[] argumentTypes = method.getArgumentTypes();
-                if(argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
+                if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
                     Class argumentType = argumentTypes[0];
                     ErrorRoute errorRoute = error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                    processAccepts(controllerAnn, errorRoute);
+                    errorRoute = (ErrorRoute) processAccepts(controllerAnn, errorRoute);
+                    processAccepts(declaringType.getAnnotation(Consumes.class), errorRoute);
                 }
             }
         }
     }
 
-    protected void processAccepts(Controller controllerAnn, Route route) {
+    protected Route processAccepts(Controller controllerAnn, Route route) {
         String[] consumes = controllerAnn.consumes();
-        MediaType[] accepts = Arrays.asList(consumes).stream().map(MediaType::new).toArray(MediaType[]::new);
-        route.accept(accepts);
+        return processConsumes(route, consumes);
+    }
+
+    protected Route processAccepts(Consumes consumesAnn, Route route) {
+        if(consumesAnn != null) {
+            String[] consumes = consumesAnn.value();
+            return processConsumes(route, consumes);
+        }
+        return route;
+    }
+
+
+    private Route processConsumes(Route route, String... consumes) {
+        MediaType[] accepts = Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new);
+        return route.accept(accepts);
     }
 }

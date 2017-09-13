@@ -2,7 +2,6 @@ package org.particleframework.config;
 
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.DefaultConversionService;
 
 import java.util.Map;
 import java.util.Optional;
@@ -19,7 +18,7 @@ public class MapPropertyResolver implements PropertyResolver {
 
     public MapPropertyResolver(Map<String, Object> map) {
         this.map = map;
-        this.conversionService = DefaultConversionService.SHARED_INSTANCE;
+        this.conversionService = ConversionService.SHARED;
     }
 
     public MapPropertyResolver(Map<String, Object> map, ConversionService conversionService) {

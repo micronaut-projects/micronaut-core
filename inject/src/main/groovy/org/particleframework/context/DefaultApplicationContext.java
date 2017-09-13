@@ -3,7 +3,6 @@ package org.particleframework.context;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.DefaultConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanConfiguration;
@@ -95,7 +94,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @return The conversion service
      */
     protected ConversionService createConversionService() {
-        return DefaultConversionService.SHARED_INSTANCE;
+        return ConversionService.SHARED;
     }
 
     @Override

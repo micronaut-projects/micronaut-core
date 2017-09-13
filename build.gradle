@@ -66,6 +66,10 @@ subprojects { subproject ->
             exceptionFormat = 'full'
         }
     }
+
+    dependencies {
+        testRuntime "ch.qos.logback:logback-classic:1.2.3"
+    }
 }
 
 apply from:"${commonBuild}/common-docs.gradle"
