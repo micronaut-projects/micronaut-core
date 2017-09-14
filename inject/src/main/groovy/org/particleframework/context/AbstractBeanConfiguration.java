@@ -5,6 +5,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinitionClass;
 
@@ -70,8 +71,14 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     }
 
     @Override
+    public String toString() {
+        return "Configuration: " + getPackage().getName();
+    }
+
+    @Override
     public boolean isWithin(String className) {
-        return className.startsWith(packageName);
+        String pkgName = NameUtils.getPackageName(className);
+        return pkgName.equals(this.packageName) || pkgName.startsWith(this.packageName + '.');
     }
 
     Collection<BeanDefinitionClass> getBeanDefinitionClasses() {

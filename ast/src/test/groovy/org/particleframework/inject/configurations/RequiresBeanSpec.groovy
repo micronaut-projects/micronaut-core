@@ -20,7 +20,6 @@ import spock.lang.Specification
  */
 class RequiresBeanSpec extends Specification {
 
-    @Ignore("it doesn't matter whether condition (class or lambda returns true or false, context never has TrueBean, TrueLambdaBean")
     void "test that a configuration can require a bean"() {
         given:
         BeanContext context = new DefaultBeanContext()
@@ -47,7 +46,7 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(TravisBean2)
     }
 
-    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueBean")
+//    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueBean")
     void "test that a condition can be required for a bean when true"() {
         given:
         BeanContext context = new DefaultBeanContext()
@@ -58,7 +57,6 @@ class RequiresBeanSpec extends Specification {
         context.containsBean(TrueBean)
     }
 
-    @Ignore("it doesn't matter whether TrueEnvCondition returns true or false, context never has TrueLambdaBean")
     void "test that a lambda condition can be required for a bean when true"() {
         given:
         BeanContext context = new DefaultBeanContext()
