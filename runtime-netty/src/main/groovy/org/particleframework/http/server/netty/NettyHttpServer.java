@@ -302,11 +302,20 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {
-        return new NioEventLoopGroup();
+        return newEventLoopGroup(serverConfiguration.getParent());
     }
 
     protected NioEventLoopGroup createWorkerEventLoopGroup() {
-        return new NioEventLoopGroup();
+        return newEventLoopGroup(serverConfiguration.getWorker());
+    }
+
+    private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
+        if(config != null) {
+            return new NioEventLoopGroup(config.getNumOfThreads());
+        }
+        else {
+            return new NioEventLoopGroup();
+        }
     }
 
     private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
