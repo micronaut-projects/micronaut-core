@@ -13,27 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.convert;
+package org.particleframework.core.convert.format;
+
+import org.particleframework.core.convert.Format;
 
 import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation used to describe the format in the case where the format needs to be altered for the purposes of conversion. Commonly use to alter the formatting of {@link java.time.ZonedDateTime} instances.
+ * Used by {@link ReadableBytesTypeConverter} to parse strings in the form 1MB to numbers
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
+@Format("KB")
 @Retention(RUNTIME)
-public @interface Format {
-
-    /**
-     * @return The format to use
-     */
-    String value();
+@Documented
+public @interface ReadableBytes {
 }

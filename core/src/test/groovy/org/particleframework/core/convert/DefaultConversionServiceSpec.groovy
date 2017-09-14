@@ -1,7 +1,10 @@
 package org.particleframework.core.convert
 
+import org.particleframework.core.convert.format.ReadableBytes
 import spock.lang.Specification
 
+import java.lang.reflect.Field
+import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 
 /**
@@ -52,5 +55,36 @@ class DefaultConversionServiceSpec extends Specification {
         "1,2"        | Iterable   | [T: Long]     | [1l, 2l]
         "1"          | Optional   | [T: Long]     | Optional.of(1L)
 
+    }
+
+    @Format('yyyy/mm/dd')
+    private Date today
+
+    void "test conversion service with formatting and date"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        Field field = getClass().getDeclaredField("today")
+        expect:
+        conversionService.convert(sourceObject, targetType, ConversionContext.of(field, Locale.ENGLISH)).get() == result
+
+        where:
+        sourceObject | targetType | result
+        "1999/01/01" | Date       | Date.parse("yyyy/mm/dd", "1999/01/01")
+    }
+
+
+    @ReadableBytes
+    private int maxSize
+
+    void "test conversion service with formatting for bytes"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        Field field = getClass().getDeclaredField("maxSize")
+        expect:
+        conversionService.convert(sourceObject, targetType, ConversionContext.of(field, Locale.ENGLISH)).get() == result
+
+        where:
+        sourceObject | targetType | result
+        "1MB"        | Integer    | 1048576
     }
 }

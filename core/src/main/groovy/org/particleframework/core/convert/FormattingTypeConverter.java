@@ -15,25 +15,16 @@
  */
 package org.particleframework.core.convert;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Annotation;
 
 /**
- * Annotation used to describe the format in the case where the format needs to be altered for the purposes of conversion. Commonly use to alter the formatting of {@link java.time.ZonedDateTime} instances.
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-public @interface Format {
+public interface FormattingTypeConverter<S, T, A extends Annotation> extends TypeConverter<S, T> {
 
     /**
-     * @return The format to use
+     * @return The annotation type for this formatter
      */
-    String value();
+    Class<A> annotationType();
 }

@@ -2,10 +2,13 @@ package org.particleframework.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.CollectionUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
@@ -17,6 +20,8 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -50,18 +55,24 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (object == null) {
             return Optional.empty();
         }
-        if(targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
+        if (targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
         Class<?> sourceType = ReflectionUtils.getWrapperType(object.getClass());
         targetType = ReflectionUtils.getWrapperType(targetType);
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
+        Annotation formattingAnnotation = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations());
+
+        Class<? extends Annotation> formattingType = formattingAnnotation != null ? formattingAnnotation.annotationType() : null;
+        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingType);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
         if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType);
+            typeConverter = findTypeConverter(sourceType, targetType, formattingType);
             if (typeConverter == null) {
                 return Optional.empty();
+            }
+            else {
+                converterCache.put(pair, typeConverter);
             }
         }
         return typeConverter.convert(object, targetType, context);
@@ -69,7 +80,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
     @Override
     public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
+        ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
         return this;
@@ -78,13 +89,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     @Override
     public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
-        TypeConverter<S,T> typeConverter = TypeConverter.of(sourceType, targetType, function);
+        TypeConverter<S, T> typeConverter = TypeConverter.of(sourceType, targetType, function);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
         return this;
     }
 
     protected void registerDefaultConverters() {
+        // CharSequence -> Long for bytes
+        addConverter(CharSequence.class, Number.class, new ReadableBytesTypeConverter());
 
         // CharSequence -> ZonedDateTime
         addConverter(
@@ -96,6 +109,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         ZonedDateTime result = ZonedDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        // CharSequence -> Date
+        addConverter(
+                CharSequence.class,
+                Date.class,
+                (object, targetType, context) -> {
+                    try {
+                        SimpleDateFormat format = resolveFormat(context);
+                        return Optional.of(format.parse(object.toString()));
+                    } catch (ParseException e) {
                         return Optional.empty();
                     }
                 }
@@ -323,7 +350,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
             Class targetComponentType = context.getTypeVariables().get(name);
-            if(targetComponentType == null) {
+            if (targetComponentType == null) {
                 targetComponentType = Object.class;
             }
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
@@ -331,7 +358,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             List list = new ArrayList();
             for (String string : strings) {
                 Optional converted = convert(string, targetComponentType);
-                if(converted.isPresent()) {
+                if (converted.isPresent()) {
                     list.add(converted.get());
                 }
             }
@@ -342,13 +369,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             TypeVariable<Class<Optional>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
             Class targetComponentType = context.getTypeVariables().get(name);
-            if(targetComponentType == null) targetComponentType = Object.class;
+            if (targetComponentType == null) targetComponentType = Object.class;
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             Optional converted = convert(object, targetComponentType);
-            if(converted.isPresent()) {
+            if (converted.isPresent()) {
                 return Optional.of(converted);
-            }
-            else {
+            } else {
                 return Optional.of(Optional.empty());
             }
         });
@@ -356,28 +382,26 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
             Class targetComponentType = resolveComponentTypeForIterable(targetType, context);
-            if(targetType.isInstance(object)) {
-                if(targetComponentType == null) {
+            if (targetType.isInstance(object)) {
+                if (targetComponentType == null) {
                     return Optional.of(object);
-                }
-                else {
+                } else {
                     List list = new ArrayList();
                     for (Object o : object) {
                         Optional converted = convert(o, targetComponentType);
-                        if(converted.isPresent()) {
+                        if (converted.isPresent()) {
                             list.add(converted.get());
                         }
                     }
-                    return CollectionUtils.convertCollection((Class)targetType, list);
+                    return CollectionUtils.convertCollection((Class) targetType, list);
                 }
-            }
-            else {
+            } else {
                 targetComponentType = Object.class;
                 List list = new ArrayList();
                 for (Object o : object) {
                     list.add(convert(o, targetComponentType));
                 }
-                return CollectionUtils.convertCollection((Class)targetType, list);
+                return CollectionUtils.convertCollection((Class) targetType, list);
             }
         });
 
@@ -387,41 +411,38 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Class keyType = String.class;
             Class valueType = Object.class;
             boolean isProperties = false;
-            if(targetType.equals(Properties.class)) {
+            if (targetType.equals(Properties.class)) {
                 valueType = String.class;
                 isProperties = true;
-            }
-            else if(typeParameters.length == 2) {
+            } else if (typeParameters.length == 2) {
 
                 keyType = context.getTypeVariables().get(typeParameters[0].getName());
-                if(keyType == null) {
+                if (keyType == null) {
                     keyType = String.class;
                 }
                 valueType = context.getTypeVariables().get(typeParameters[1].getName());
-                if(valueType == null) {
+                if (valueType == null) {
                     valueType = Object.class;
                 }
             }
-            Map newMap = isProperties ? new Properties() :  new LinkedHashMap();
+            Map newMap = isProperties ? new Properties() : new LinkedHashMap();
             for (Object o : object.entrySet()) {
                 Map.Entry entry = (Map.Entry) o;
                 Object key = entry.getKey();
                 Object value = entry.getValue();
-                if(!keyType.isInstance(key)) {
+                if (!keyType.isInstance(key)) {
                     Optional convertedKey = convert(key, keyType);
-                    if(convertedKey.isPresent()) {
+                    if (convertedKey.isPresent()) {
                         key = convertedKey.get();
-                    }
-                    else {
+                    } else {
                         continue;
                     }
                 }
-                if(!valueType.isInstance(value)) {
+                if (!valueType.isInstance(value)) {
                     Optional converted = convert(value, valueType);
-                    if(converted.isPresent()) {
+                    if (converted.isPresent()) {
                         value = converted.get();
-                    }
-                    else {
+                    } else {
                         continue;
                     }
                 }
@@ -436,13 +457,32 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         Format ann = context.getAnnotation(Format.class);
         Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
         return format
-                .map((pattern)-> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
+                .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
                 .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+    }
+
+    private SimpleDateFormat resolveFormat(ConversionContext context) {
+        Format ann = context.getAnnotation(Format.class);
+        Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
+        return format
+                .map((pattern) -> new SimpleDateFormat(pattern, context.getLocale()))
+                .orElse(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+    }
+
+    private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        ConvertiblePair pair;
+        if(typeConverter instanceof FormattingTypeConverter) {
+            pair = new ConvertiblePair(sourceType, targetType, ((FormattingTypeConverter) typeConverter).annotationType());
+        }
+        else {
+            pair = new ConvertiblePair(sourceType, targetType);
+        }
+        return pair;
     }
 
     private Class resolveComponentTypeForIterable(Class<Iterable> targetType, ConversionContext context) {
         TypeVariable<Class<Iterable>>[] typeParameters = targetType.getTypeParameters();
-        if(typeParameters != null && typeParameters.length > 0) {
+        if (typeParameters != null && typeParameters.length > 0) {
 
             TypeVariable<Class<Iterable>> typeVariable = typeParameters[0];
             String name = typeVariable != null ? typeVariable.getName() : null;
@@ -451,17 +491,30 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return null;
     }
 
-    protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType) {
+    protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, Class<? extends Annotation> formattingAnnotation) {
         TypeConverter typeConverter = null;
         List<Class> sourceHierarchy = resolveHierarchy(sourceType);
         List<Class> targetHierarchy = resolveHierarchy(targetType);
+        boolean hasFormatting = formattingAnnotation != null;
         for (Class sourceSuperType : sourceHierarchy) {
             for (Class targetSuperType : targetHierarchy) {
-                ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
                 typeConverter = typeConverters.get(pair);
                 if (typeConverter != null) {
                     converterCache.put(pair, typeConverter);
                     return typeConverter;
+                }
+            }
+        }
+        if(hasFormatting) {
+            for (Class sourceSuperType : sourceHierarchy) {
+                for (Class targetSuperType : targetHierarchy) {
+                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                    typeConverter = typeConverters.get(pair);
+                    if (typeConverter != null) {
+                        converterCache.put(pair, typeConverter);
+                        return typeConverter;
+                    }
                 }
             }
         }
@@ -490,8 +543,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 populateHierarchyInterfaces(superclass, hierarchy);
                 superclass = superclass.getSuperclass();
             }
-        }
-        else if(type.isInterface()) {
+        } else if (type.isInterface()) {
             populateHierarchyInterfaces(type, hierarchy);
         }
 
@@ -507,10 +559,16 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     private class ConvertiblePair {
         final Class source;
         final Class target;
+        final Class<? extends Annotation> formattingAnnotation;
 
         ConvertiblePair(Class source, Class target) {
+            this(source, target, null);
+        }
+
+        public ConvertiblePair(Class source, Class target, Class<? extends Annotation> formattingAnnotation) {
             this.source = source;
             this.target = target;
+            this.formattingAnnotation = formattingAnnotation;
         }
 
         @Override
@@ -521,13 +579,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             ConvertiblePair pair = (ConvertiblePair) o;
 
             if (!source.equals(pair.source)) return false;
-            return target.equals(pair.target);
+            if (!target.equals(pair.target)) return false;
+            return formattingAnnotation != null ? formattingAnnotation.equals(pair.formattingAnnotation) : pair.formattingAnnotation == null;
         }
 
         @Override
         public int hashCode() {
             int result = source.hashCode();
             result = 31 * result + target.hashCode();
+            result = 31 * result + (formattingAnnotation != null ? formattingAnnotation.hashCode() : 0);
             return result;
         }
     }

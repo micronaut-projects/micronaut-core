@@ -324,6 +324,24 @@ public class NettyHttpServer implements EmbeddedServer {
         return newEventLoopGroup(serverConfiguration.getWorker());
     }
 
+    protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+        Optional<Router> routerBean = beanLocator.findBean(Router.class);
+        try {
+            return routerBean.flatMap(router ->
+                    router.route(HttpStatus.BAD_REQUEST)
+                            .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
+                            .filter(match -> match.isExecutable())
+                            .map(match -> match.execute())
+            ).orElse(HttpResponse.badRequest());
+        } catch (Exception e) {
+            throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
+        }
+    }
+
+    protected ServerBootstrap createServerBootstrap() {
+        return new ServerBootstrap();
+    }
+
     private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
             return new NioEventLoopGroup(config.getNumOfThreads());
@@ -460,20 +478,6 @@ public class NettyHttpServer implements EmbeddedServer {
                 .filter(RouteMatch::isExecutable);
     }
 
-    protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
-        Optional<Router> routerBean = beanLocator.findBean(Router.class);
-        try {
-            return routerBean.flatMap(router ->
-                    router.route(HttpStatus.BAD_REQUEST)
-                            .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
-                            .filter(match -> match.isExecutable())
-                            .map(match -> match.execute())
-            ).orElse(HttpResponse.badRequest());
-        } catch (Exception e) {
-            throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
-        }
-    }
-
     private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
@@ -525,10 +529,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
         route = route.fulfill(argumentValues);
         return route;
-    }
-
-    protected ServerBootstrap createServerBootstrap() {
-        return new ServerBootstrap();
     }
 
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {

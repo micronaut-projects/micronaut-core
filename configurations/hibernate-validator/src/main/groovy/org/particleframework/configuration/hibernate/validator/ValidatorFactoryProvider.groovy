@@ -2,6 +2,7 @@ package org.particleframework.configuration.hibernate.validator
 
 import groovy.transform.CompileStatic
 import org.particleframework.context.env.Environment
+import org.particleframework.core.convert.ConversionContext
 
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -32,7 +33,9 @@ class ValidatorFactoryProvider implements Provider<ValidatorFactory> {
         validatorConfiguration = validatorConfiguration.ignoreXmlConfiguration()
         if(environment.isPresent()) {
             Environment env = environment.get()
-            Optional<Map<String,String>> config = env.getProperty("hibernate.validator", Map, [K:String, V:String])
+            Optional<Map<String,String>> config = env.getProperty("hibernate.validator", Map,
+                    ConversionContext.of([K:String, V:String])
+            )
             if(config.isPresent()) {
                 for(entry in config.get()) {
                     validatorConfiguration = validatorConfiguration.addProperty(

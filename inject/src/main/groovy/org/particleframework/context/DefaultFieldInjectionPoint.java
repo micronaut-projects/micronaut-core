@@ -69,4 +69,19 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
             throw new BeanInstantiationException("Exception occured injecting field ["+field+"]: " + e.getMessage(), e);
         }
     }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return field.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return field.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return field.getDeclaredAnnotations();
+    }
 }

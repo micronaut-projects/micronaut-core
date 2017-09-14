@@ -1,5 +1,6 @@
 package org.particleframework.inject;
 
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 
 /**
@@ -8,7 +9,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint extends CallableInjectionPoint, Executable {
+public interface MethodInjectionPoint extends CallableInjectionPoint, Executable, AnnotatedElement {
 
     /**
      * @return The setter to invoke to set said property

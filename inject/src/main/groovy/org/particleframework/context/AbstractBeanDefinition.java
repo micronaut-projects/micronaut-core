@@ -13,6 +13,7 @@ import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.CollectionUtils;
@@ -560,7 +561,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, argumentType, valString, genericTypes);
+                    Optional value = resolveValue(applicationContext, injectionPoint, argumentType, valString, genericTypes);
                     if (!value.isPresent() && argumentType == Optional.class) {
                         return value;
                     } else {
@@ -569,6 +570,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                                 String cliOption = resolveCliOption(declaringClass, argumentName);
                                 if (cliOption != null) {
                                     return resolveValue(applicationContext,
+                                            injectionPoint,
                                             argumentType,
                                             cliOption,
                                             genericTypes)
@@ -890,7 +892,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 Class<?> beanType = injectionPoint.getDeclaringBean().getType();
                 Class<?> declaringClass = field.getDeclaringClass();
                 String valString = resolveValueString(declaringClass, beanType, injectionPoint.getName(), valueAnn);
-                Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
+                Optional value = resolveValue((ApplicationContext) context, injectionPoint, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
                 } else {
@@ -899,6 +901,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                             String cliOption = resolveCliOption(declaringClass, field.getName());
                             if (cliOption != null) {
                                 return resolveValue((ApplicationContext) context,
+                                        injectionPoint,
                                         fieldType,
                                         cliOption,
                                         GenericTypeUtils.resolveGenericTypeArguments(field))
@@ -1015,7 +1018,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, Class type, String valString, Class... genericTypes) {
+    private Optional resolveValue(ApplicationContext context, AnnotatedElement annotatedElement, Class type, String valString, Class... genericTypes) {
 
         int i = valString.indexOf(':');
         Object defaultValue = null;
@@ -1034,7 +1037,13 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 typeParameterMap.put(typeParameter.getName(), genericTypes[j]);
             }
         }
-        value = context.getProperty(valString, (Class<?>) type, typeParameterMap);
+
+        ConversionContext conversionContext = ConversionContext.of(
+                annotatedElement,
+                typeParameterMap,
+                Locale.ENGLISH
+        );
+        value = context.getProperty(valString, (Class<?>) type, conversionContext);
 
         if (defaultValue != null && !value.isPresent()) {
             value = Optional.of(defaultValue);

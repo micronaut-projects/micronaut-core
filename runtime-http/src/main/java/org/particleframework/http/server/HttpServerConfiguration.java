@@ -17,6 +17,7 @@ package org.particleframework.http.server;
 
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.Configuration;
+import org.particleframework.core.convert.format.ReadableBytes;
 import org.particleframework.core.util.Toggleable;
 
 import java.io.File;
@@ -37,7 +38,8 @@ public class HttpServerConfiguration {
     protected String host = "localhost";
     protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;
-    protected int maxRequestSize = 1024 * 10; // 10MB
+    @ReadableBytes
+    protected long maxRequestSize = 1024 * 10; // 10MB
     protected SslConfiguration ssl;
     protected MultipartConfiguration multipart;
     /**
@@ -85,7 +87,7 @@ public class HttpServerConfiguration {
     /**
      * @return The maximum request body size
      */
-    public int getMaxRequestSize() {
+    public long getMaxRequestSize() {
         return maxRequestSize;
     }
 

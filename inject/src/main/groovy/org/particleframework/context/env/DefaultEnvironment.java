@@ -129,7 +129,7 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments) {
+    public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         if(name.length() == 0) {
             return Optional.empty();
         }
@@ -138,11 +138,11 @@ public class DefaultEnvironment implements Environment {
             if(entries != null) {
                 Object value = entries.get(name);
                 if(value != null) {
-                    return conversionService.convert(value, requiredType, ConversionContext.of(typeArguments));
+                    return conversionService.convert(value, requiredType, context);
                 }
                 else if(Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return conversionService.convert(subMap, requiredType, ConversionContext.of(typeArguments));
+                    return conversionService.convert(subMap, requiredType, context);
                 }
                 else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);

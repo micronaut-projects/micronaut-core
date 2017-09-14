@@ -137,4 +137,19 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     public String toString() {
         return "Injection Point: " + method.toGenericString();
     }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return method.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return method.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return method.getDeclaredAnnotations();
+    }
 }

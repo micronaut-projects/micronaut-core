@@ -1,5 +1,6 @@
 package org.particleframework.config;
 
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ValueResolver;
 
 import java.util.Collections;
@@ -39,11 +40,11 @@ public interface PropertyResolver extends ValueResolver {
      *
      * @param name The name
      * @param requiredType The required type
-     * @param typeArguments The generic type arguments.
+     * @param context The {@link ConversionContext} to apply  to any conversion
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists
      */
-    <T> Optional<T> getProperty(String name, Class<T> requiredType, Map<String, Class> typeArguments);
+    <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context);
 
     /**
      * Resolve the given property for the given name
@@ -54,7 +55,7 @@ public interface PropertyResolver extends ValueResolver {
      * @return An optional containing the property value if it exists
      */
     default <T> Optional<T> getProperty(String name, Class<T> requiredType) {
-        return getProperty(name, requiredType, Collections.emptyMap());
+        return getProperty(name, requiredType, ConversionContext.DEFAULT);
     }
 
     /**

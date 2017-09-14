@@ -33,20 +33,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface ConversionContext extends AnnotatedElement {
-    @Override
-    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return null;
-    }
 
-    @Override
-    default Annotation[] getAnnotations() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
-    @Override
-    default Annotation[] getDeclaredAnnotations() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
 
     /**
      * The default conversion context
@@ -70,13 +57,27 @@ public interface ConversionContext extends AnnotatedElement {
         return Locale.getDefault();
     }
 
-
     /**
      * @return The standard charset used in conversion
      */
     default Charset getCharset() {
         return StandardCharsets.UTF_8;
-    };
+    }
+
+    @Override
+    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return null;
+    }
+
+    @Override
+    default Annotation[] getAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    @Override
+    default Annotation[] getDeclaredAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables

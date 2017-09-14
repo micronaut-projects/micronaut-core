@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 
 /**
@@ -11,7 +12,7 @@ import java.lang.reflect.Field;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FieldInjectionPoint<T> extends InjectionPoint {
+public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement {
 
     /**
      * @return The name of the field

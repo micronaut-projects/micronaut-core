@@ -35,6 +35,16 @@ public interface TypeConverter<S, T> {
      */
     Optional<T> convert(S object, Class<T> targetType, ConversionContext context);
 
+    /**
+     * Creates a new {@link TypeConverter} for the give source type, target type and conversion function
+     *
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param converter The converter function
+     * @param <ST> The source generic type
+     * @param <TT> The target generic type
+     * @return The converter instance
+     */
     static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
         return (object, targetType1, context) -> Optional.of(converter.apply(object));
     }
