@@ -15,8 +15,8 @@
  */
 package org.particleframework.configuration.jackson.server.http;
 
-import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.HttpContentSubscriber;
 import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
 import org.particleframework.http.server.netty.NettyHttpRequest;
@@ -34,8 +34,15 @@ import javax.inject.Singleton;
 @Consumes(MediaType.APPLICATION_JSON)
 @Singleton
 public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
+
+    private final HttpServerConfiguration httpServerConfiguration;
+
+    public JsonHttpContentSubscriberFactory(HttpServerConfiguration httpServerConfiguration) {
+        this.httpServerConfiguration = httpServerConfiguration;
+    }
+
     @Override
     public HttpContentSubscriber build(NettyHttpRequest request) {
-        return new JsonContentSubscriber(request);
+        return new JsonContentSubscriber(request, httpServerConfiguration);
     }
 }

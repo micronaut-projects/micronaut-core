@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.HttpContentSubscriber;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpServer;
@@ -39,12 +40,14 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
     private final NettyHttpRequest nettyHttpRequest;
     private final RouteMatch<Object> route;
     private final long advertisedLength;
+    private final long requestMaxSize;
     private long accumulatedLength = 0;
     private Subscription subscription;
     private Consumer<JsonNode> completionHandler;
 
-    public JsonContentSubscriber(NettyHttpRequest request) {
+    public JsonContentSubscriber(NettyHttpRequest request, HttpServerConfiguration httpServerConfiguration) {
         this.nettyHttpRequest = request;
+        this.requestMaxSize = httpServerConfiguration.getMaxRequestSize();
         this.advertisedLength = request.getContentLength();
         this.route = request.getMatchedRoute();
         this.ctx = request.getChannelHandlerContext();
@@ -110,7 +113,7 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
             if (len > 0) {
                 byte[] bytes;
                 accumulatedLength += (long) len;
-                if(advertisedLength != -1 && accumulatedLength > advertisedLength) {
+                if((advertisedLength != -1 && accumulatedLength > advertisedLength) || (accumulatedLength > requestMaxSize)) {
                     if(subscription != null) {
                         subscription.cancel();
                     }
