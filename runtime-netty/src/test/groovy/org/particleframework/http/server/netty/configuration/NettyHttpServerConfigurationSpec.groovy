@@ -44,10 +44,11 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         server != null
+        config.worker.threads == 8
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption
         config.host == 'localhost'
-//        config.worker.threads == 8
+
 
         cleanup:
         beanContext.close()

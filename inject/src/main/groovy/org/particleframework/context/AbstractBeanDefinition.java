@@ -28,6 +28,7 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -61,7 +62,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> invocableMethodMap = new LinkedHashMap<>(3);
-
+    private final WeakHashMap<Class, String> valuePrefixes = new WeakHashMap<>();
     /**
      * Constructs a bean definition that is produced from a method call on another type
      *
@@ -149,25 +150,24 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         } else {
             Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
             return method.map(theMethod -> {
-                    ReflectionExecutableMethod<T, Object> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
-                    invocableMethodMap.put(methodKey, reflectionMethod);
-                    return reflectionMethod;
-                }
+                        ReflectionExecutableMethod<T, Object> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
+                        invocableMethodMap.put(methodKey, reflectionMethod);
+                        return reflectionMethod;
+                    }
             );
         }
     }
 
     @Override
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if(invocableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+        if (invocableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
             return invocableMethodMap
                     .values()
                     .stream()
                     .filter((method) -> method.getMethodName().equals(name));
-        }
-        else {
+        } else {
             return ReflectionUtils.findMethodsByName(type, name)
-                                    .map((method)-> new ReflectionExecutableMethod<>(this, method));
+                    .map((method) -> new ReflectionExecutableMethod<>(this, method));
         }
     }
 
@@ -254,10 +254,10 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     /**
      * Adds a new {@link ExecutableMethod}
      *
-     * @param  executableMethod The method
+     * @param executableMethod The method
      * @return The bean definition
      */
-    protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T,?> executableMethod) {
+    protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
         MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
         invocableMethodMap.put(key, executableMethod);
         return this;
@@ -492,20 +492,18 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()) != null;
                 try {
                     Object value;
-                    if(isInject) {
+                    if (isInject) {
                         value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
-                    }
-                    else {
+                    } else {
                         value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
                     }
-                    if(value != null) {
+                    if (value != null) {
                         fieldInjectionPoint.set(bean, value);
                     }
                 } catch (Throwable e) {
-                    if(e instanceof BeanContextException) {
-                        throw (BeanContextException)e;
-                    }
-                    else {
+                    if (e instanceof BeanContextException) {
+                        throw (BeanContextException) e;
+                    } else {
                         throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
                     }
                 }
@@ -569,14 +567,13 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                         return value.orElseGet(() -> {
                             if (valAnn == null && isConfigurationProperties) {
                                 String cliOption = resolveCliOption(declaringClass, argumentName);
-                                if(cliOption != null) {
+                                if (cliOption != null) {
                                     return resolveValue(applicationContext,
                                             argumentType,
                                             cliOption,
                                             genericTypes)
                                             .orElse(defaultValue);
-                                }
-                                else {
+                                } else {
                                     return defaultValue;
                                 }
                             } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
@@ -594,8 +591,6 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
         }
     }
-
-
 
 
     /**
@@ -892,23 +887,22 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             if (isInnerConfiguration(fieldType)) {
                 return context.createBean(fieldType);
             } else {
-                Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
+                Class<?> declaringClass = injectionPoint.getDeclaringBean().getType();
                 String valString = resolveValueString(declaringClass, injectionPoint.getName(), valueAnn);
                 Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
                 } else {
                     if (isConfigurationProperties && valueAnn == null) {
-                        return value.orElseGet(()->{
+                        return value.orElseGet(() -> {
                             String cliOption = resolveCliOption(declaringClass, field.getName());
-                            if(cliOption != null) {
+                            if (cliOption != null) {
                                 return resolveValue((ApplicationContext) context,
                                         fieldType,
                                         cliOption,
                                         GenericTypeUtils.resolveGenericTypeArguments(field))
                                         .orElse(defaultValue);
-                            }
-                            else {
+                            } else {
                                 return defaultValue;
                             }
                         });
@@ -1048,6 +1042,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     private String resolveValueString(Class<?> declaringClass, String name, Value val) {
+
         String valString;
         if (val == null) {
             if (isConfigurationProperties) {
@@ -1064,9 +1059,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
 
     private String resolveCliOption(Class<?> declaringClass, String name) {
         ConfigurationProperties configurationProperties = declaringClass.getAnnotation(ConfigurationProperties.class);
-        if(configurationProperties != null ) {
+        if (configurationProperties != null) {
             String[] prefix = configurationProperties.cliPrefix();
-            if(prefix.length == 1) {
+            if (prefix.length == 1) {
                 return prefix[0] + name;
             }
         }
@@ -1081,41 +1076,47 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     private String resolvePrefix(Class<?> declaringClass) {
-        Class<?> type = declaringClass;
-        ConfigurationProperties configurationProperties = type.getAnnotation(ConfigurationProperties.class);
-        StringBuilder prefix = null;
-        if (configurationProperties != null) {
-            prefix = new StringBuilder(configurationProperties.value());
-            while(type != null) {
-                type = type.getSuperclass();
-                if(type != null) {
-                    configurationProperties = type.getAnnotation(ConfigurationProperties.class);
-                    if(configurationProperties != null) {
-                        prefix.insert(0, configurationProperties.value() + '.');
+        return valuePrefixes.computeIfAbsent(declaringClass, aClass -> {
+            Class<?> type = declaringClass;
+            ConfigurationProperties configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+            StringBuilder prefix = new StringBuilder();
+            if (type.getDeclaringClass() != null) {
+                // must be an inner class
+                while (type != null) {
+                    String name = type.getName();
+                    int i = name.lastIndexOf('$');
+                    if (i > -1) {
+                        name = name.substring(i + 1, name.length());
+                    }
+                    prefix.append('.').append(Introspector.decapitalize(name));
+
+                    type = type.getDeclaringClass();
+                    if (type != null) {
+                        configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+                        if (configurationProperties != null) {
+                            prefix.insert(0, configurationProperties.value());
+                            break;
+                        }
                     }
                 }
             }
-        } else {
-            prefix = new StringBuilder();
-            while (type != null) {
-                String name = type.getName();
-                int i = name.lastIndexOf('$');
-                if (i > -1) {
-                    name = name.substring(i + 1, name.length());
-                }
-                prefix.append('.').append(Introspector.decapitalize(name));
+            else if(configurationProperties != null) {
+                prefix.append(configurationProperties.value());
+            }
 
-                type = type.getDeclaringClass();
-                if(type != null) {
+            if(type != null) {
+                type = type.getSuperclass();
+                while (type != null) {
                     configurationProperties = type.getAnnotation(ConfigurationProperties.class);
                     if (configurationProperties != null) {
-                        prefix.insert(0, configurationProperties.value());
-                        break;
+                        prefix.insert(0, configurationProperties.value() + '.');
                     }
+                    type = type.getSuperclass();
                 }
             }
-        }
-        return prefix.toString();
+            return prefix.toString();
+        });
+
     }
 
     private AbstractBeanDefinition addMethodInjectionPointInternal(
@@ -1343,6 +1344,6 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     }
 
     protected interface MethodExecutor {
-        Object invoke(Object target, Object...arguments);
+        Object invoke(Object target, Object... arguments);
     }
 }
