@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.web.router.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 
@@ -32,8 +33,15 @@ import javax.inject.Singleton;
 @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA})
 @Singleton
 public class FormDataHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
+
+    private final NettyHttpServerConfiguration configuration;
+
+    public FormDataHttpContentSubscriberFactory(NettyHttpServerConfiguration configuration) {
+        this.configuration = configuration;
+    }
+
     @Override
     public HttpContentSubscriber<ByteBuf> build(NettyHttpRequest request) {
-        return new FormDataHttpContentSubscriber(request);
+        return new FormDataHttpContentSubscriber(request, configuration);
     }
 }

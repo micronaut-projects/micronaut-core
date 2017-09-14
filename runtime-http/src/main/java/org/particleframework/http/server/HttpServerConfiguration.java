@@ -126,7 +126,7 @@ public class HttpServerConfiguration {
      */
     @ConfigurationProperties("multipart")
     public static class MultipartConfiguration {
-        protected Optional<File> location;
+        protected Optional<File> location = Optional.empty();
         protected long maxFileSize = 1024;
         protected boolean enabled = true;
         protected boolean disk = false;

@@ -24,6 +24,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
@@ -53,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.Executor;
@@ -85,6 +87,10 @@ public class NettyHttpServer implements EmbeddedServer {
             BeanLocator beanLocator,
             ChannelOutboundHandlerAdapter[] outboundHandlerAdapters
     ) {
+        Optional<File> location = serverConfiguration.getMultipart().getLocation();
+        location.ifPresent(dir ->
+                DiskFileUpload.baseDirectory = dir.getAbsolutePath()
+        );
         this.environment = environment;
         this.serverConfiguration = serverConfiguration;
         this.beanLocator = beanLocator;
@@ -135,6 +141,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());
                                 }
+
+                                // find a matching route
                                 Optional<UriRouteMatch<Object>> routeMatch = routerBean.flatMap((router) ->
                                         router.find(nettyHttpRequest.getMethod(), nettyHttpRequest.getPath())
                                                 .filter((match) -> match.test(nettyHttpRequest))
@@ -143,14 +151,17 @@ public class NettyHttpServer implements EmbeddedServer {
 
 
                                 routeMatch.ifPresent((route -> {
+                                    // Check that the route is an accepted content type
                                     if (!route.accept(nettyHttpRequest.getContentType())) {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Matched route is not a supported media type: {}", nettyHttpRequest.getContentType());
                                         }
+
+                                        // if the content type is not accepted send by 415 - UNSUPPORTED MEDIA TYPE
                                         Object unsupportedResult =
                                                 findStatusRoute(HttpStatus.UNSUPPORTED_MEDIA_TYPE, nettyHttpRequest, binderRegistry)
-                                                .map(RouteMatch::execute)
-                                                .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
+                                                        .map(RouteMatch::execute)
+                                                        .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
 
                                         ctx.writeAndFlush(unsupportedResult)
                                                 .addListener(ChannelFutureListener.CLOSE);
@@ -158,6 +169,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
                                         }
+                                        // all ok proceed to try and execute the route
                                         handleRouteMatch(route, nettyHttpRequest, binderRegistry, ctx);
                                     }
                                 }));
@@ -167,6 +179,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         LOG.debug("No matching route found for URI {} and method {}", nettyHttpRequest.getUri(), nettyHttpRequest.getMethod());
                                     }
 
+                                    // if there is no route present try to locate a route that matches a different HTTP method
                                     Set<HttpMethod> existingRoutes = routerBean
                                             .map(router ->
                                                     router.findAny(nettyHttpRequest.getUri().toString())
@@ -175,6 +188,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                             .collect(Collectors.toSet());
 
                                     if (!existingRoutes.isEmpty()) {
+                                        // if there are other routes that match send back 405 - METHOD_NOT_ALLOWED
                                         Object notAllowedResponse =
                                                 findStatusRoute(HttpStatus.METHOD_NOT_ALLOWED, nettyHttpRequest, binderRegistry)
                                                         .map(RouteMatch::execute)
@@ -185,6 +199,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         ctx.writeAndFlush(notAllowedResponse)
                                                 .addListener(ChannelFutureListener.CLOSE);
                                     } else {
+                                        // if no alternative route was found send back 404 - NOT_FOUND
                                         Object notFoundResponse =
                                                 findStatusRoute(HttpStatus.NOT_FOUND, nettyHttpRequest, binderRegistry)
                                                         .map(RouteMatch::execute)
@@ -310,20 +325,22 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
-        if(config != null) {
+        if (config != null) {
             return new NioEventLoopGroup(config.getNumOfThreads());
-        }
-        else {
+        } else {
             return new NioEventLoopGroup();
         }
     }
 
     private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
+        // Set the matched route on the request
         request.setMatchedRoute(route);
+
+        // try to fulfill the argument requirements of the route
         route = fulfillArgumentRequirements(route, request, binderRegistry);
 
+        // If it is not executable and the body is not required send back 400 - BAD REQUEST
         if (!route.isExecutable() && !request.isBodyRequired()) {
-            // if we arrived here the request is not processable
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Bad request: Unbindable arguments for route: " + route);
             }
@@ -338,8 +355,11 @@ public class NettyHttpServer implements EmbeddedServer {
             request.setMatchedRoute(route);
 
             if (!request.isBodyRequired()) {
+                // The request body is not required so simply execute the route
                 route.execute();
             } else {
+
+                // The request body is required, so at this point we must have a StreamedHttpRequest
                 HttpRequest nativeRequest = request.getNativeRequest();
                 if (nativeRequest instanceof StreamedHttpRequest) {
                     MediaType contentType = request.getContentType();

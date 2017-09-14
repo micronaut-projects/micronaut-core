@@ -16,7 +16,11 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+
+import java.nio.charset.Charset;
 
 /**
  * @author Graeme Rocher
@@ -26,9 +30,12 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
 
     private final HttpPostRequestDecoder decoder;
 
-    public FormDataHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest) {
+    public FormDataHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest);
-        this.decoder = new HttpPostRequestDecoder(nettyHttpRequest.getNativeRequest());
+        Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
+        DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
+        factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
+        this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
 
     }
 
