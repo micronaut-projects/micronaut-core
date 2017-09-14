@@ -17,6 +17,7 @@ package org.particleframework.http.server;
 
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.Configuration;
+import org.particleframework.core.util.Toggleable;
 
 import java.io.File;
 import java.nio.charset.Charset;
@@ -33,7 +34,6 @@ import java.util.Optional;
 public class HttpServerConfiguration {
 
     protected int port = 8080;
-    protected int securePort = 8443;
     protected String host = "localhost";
     protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;
@@ -45,13 +45,6 @@ public class HttpServerConfiguration {
      */
     public int getPort() {
         return port;
-    }
-
-    /**
-     * The default secure (normally HTTPS) port
-     */
-    public int getSecurePort() {
-        return securePort;
     }
 
     /**
@@ -102,13 +95,14 @@ public class HttpServerConfiguration {
      * TODO
      */
     @ConfigurationProperties("ssl")
-    public static class SslConfiguration {
+    public static class SslConfiguration implements Toggleable{
         protected boolean enabled = false;
         protected int port = 8443;
 
         /**
          * @return Whether SSL is enabled
          */
+        @Override
         public boolean isEnabled() {
             return enabled;
         }
@@ -125,7 +119,7 @@ public class HttpServerConfiguration {
      * Configuration for multipart handling
      */
     @ConfigurationProperties("multipart")
-    public static class MultipartConfiguration {
+    public static class MultipartConfiguration implements Toggleable{
         protected Optional<File> location = Optional.empty();
         protected long maxFileSize = 1024;
         protected boolean enabled = true;
@@ -148,6 +142,7 @@ public class HttpServerConfiguration {
         /**
          * @return Whether file uploads are enabled. Defaults to true.
          */
+        @Override
         public boolean isEnabled() {
             return enabled;
         }

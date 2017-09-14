@@ -369,7 +369,18 @@ public class NettyHttpServer implements EmbeddedServer {
 
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
-                        streamedHttpRequest.subscribe(factory.build(request));
+                        HttpContentSubscriber subscriber = factory.build(request);
+                        if(subscriber.isEnabled()) {
+                            streamedHttpRequest.subscribe(subscriber);
+                        }
+                        else {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Request body parsing not enabled for subscriber: " + subscriber.getClass().getSimpleName());
+                            }
+                            context.writeAndFlush(handleBadRequest(request, binderRegistry))
+                                    .addListener(ChannelFutureListener.CLOSE);
+
+                        }
                     } else {
                         Subscriber<HttpContent> contentSubscriber = new DefaultHttpContentSubscriber(request);
                         streamedHttpRequest.subscribe(contentSubscriber);

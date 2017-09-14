@@ -13,25 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
-
-import io.netty.handler.codec.http.HttpContent;
-import org.particleframework.core.util.Toggleable;
-import org.reactivestreams.Subscriber;
-
-import java.util.function.Consumer;
+package org.particleframework.core.util;
 
 /**
+ * An interface for components or configurations that can be toggled on or off
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpContentSubscriber<T> extends Subscriber<HttpContent>, Toggleable {
+public interface Toggleable {
 
     /**
-     * Allows overriding the default completion handler
-     *
-     * @param consumer The consumer
-     * @return This HttpContentSubscriber
+     * @return Whether the component is enabled
      */
-    HttpContentSubscriber onComplete(Consumer<T> consumer);
+    default boolean isEnabled() {
+        return true;
+    }
 }

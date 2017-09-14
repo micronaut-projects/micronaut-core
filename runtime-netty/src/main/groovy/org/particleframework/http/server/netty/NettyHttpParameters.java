@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpParameters;
 
@@ -74,6 +75,7 @@ public class NettyHttpParameters implements HttpParameters {
         return all.get(0);
     }
 
+    @Internal
     void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
         if(postRequestDecoder != null) {
 

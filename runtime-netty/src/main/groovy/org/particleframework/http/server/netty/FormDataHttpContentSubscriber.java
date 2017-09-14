@@ -18,17 +18,21 @@ package org.particleframework.http.server.netty;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 
 import java.nio.charset.Charset;
 
 /**
+ * Decodes {@link org.particleframework.http.MediaType#MULTIPART_FORM_DATA} in a non-blocking manner
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber {
 
     private final HttpPostRequestDecoder decoder;
+    private final boolean enabled;
 
     public FormDataHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest);
@@ -36,7 +40,13 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
         DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
         factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
+        this.enabled = nettyHttpRequest.getContentType() == MediaType.APPLICATION_FORM_URLENCODED_TYPE ||
+                                configuration.getMultipart().isEnabled();
+    }
 
+    @Override
+    public boolean isEnabled() {
+        return enabled;
     }
 
     @Override

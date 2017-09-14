@@ -61,7 +61,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private MediaType mediaType;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
-    private HttpPostRequestDecoder postRequestDecoder;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -271,7 +270,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     @Internal
     void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
-        this.postRequestDecoder = postRequestDecoder;
         NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
         parameters.setPostRequestDecoder(postRequestDecoder);
     }
