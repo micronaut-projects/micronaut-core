@@ -519,10 +519,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     classNode.getInnerClasses().each { InnerClassNode inner->
                         if(Modifier.isStatic(inner.getModifiers()) && Modifier.isPublic(inner.getModifiers()) && inner.getDeclaredConstructors().size() == 0) {
                             def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
-                            AnnotationNode parentAnn = AstAnnotationUtils.findAnnotation(classNode, ConfigurationProperties)
                             String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()
                             innerClassName = innerClassName.substring(1) // remove starting dollar
-                            String newPath = parentAnn.getMember("value").text + ".${Introspector.decapitalize(innerClassName)}"
+                            String newPath = Introspector.decapitalize(innerClassName)
                             innerAnnotation.setMember("value", constX(newPath))
                             inner.addAnnotation(innerAnnotation)
                             new InjectVisitor(su, inner,true).visitClass(inner)

@@ -16,9 +16,12 @@
 package org.particleframework.http.server;
 
 import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.Configuration;
 
+import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
  * <p>A base {@link ConfigurationProperties} for servers</p>
@@ -33,7 +36,10 @@ public class HttpServerConfiguration {
     protected int securePort = 8443;
     protected String host = "localhost";
     protected Charset defaultCharset = StandardCharsets.UTF_8;
-
+    protected Optional<Integer> readTimeout;
+    protected int maxRequestSize = 1024 * 10; // 10MB
+    protected SslConfiguration ssl;
+    protected MultipartConfiguration multipart;
     /**
      * The default server port
      */
@@ -60,5 +66,97 @@ public class HttpServerConfiguration {
      */
     public Charset getDefaultCharset() {
         return defaultCharset;
+    }
+
+    /**
+     * @return The read timeout setting for the server
+     */
+    public Optional<Integer> getReadTimeout() {
+        return readTimeout;
+    }
+
+    /**
+     * @return The HTTPS/SSL configuration
+     */
+    public SslConfiguration getSsl() {
+        return ssl;
+    }
+
+    /**
+     * @return Configuration for multipart / file uploads
+     */
+    public MultipartConfiguration getMultipart() {
+        return multipart;
+    }
+
+    /**
+     * @return The maximum request body size
+     */
+    public int getMaxRequestSize() {
+        return maxRequestSize;
+    }
+
+    /**
+     * Configuration properties for SSL handling
+     *
+     * TODO
+     */
+    @ConfigurationProperties("ssl")
+    public static class SslConfiguration {
+        protected boolean enabled = false;
+        protected int port = 8443;
+
+        /**
+         * @return Whether SSL is enabled
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * @return The default SSL port
+         */
+        public int getPort() {
+            return port;
+        }
+    }
+
+    /**
+     * Configuration for multipart handling
+     */
+    @ConfigurationProperties("multipart")
+    public static class MultipartConfiguration {
+        protected Optional<File> location;
+        protected long maxFileSize = 1024;
+        protected boolean enabled = true;
+        protected boolean disk = false;
+
+        /**
+         * @return The location to store temporary files
+         */
+        public Optional<File> getLocation() {
+            return location;
+        }
+
+        /**
+         * @return The max file size. Defaults to 1MB
+         */
+        public long getMaxFileSize() {
+            return maxFileSize;
+        }
+
+        /**
+         * @return Whether file uploads are enabled. Defaults to true.
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * @return Whether to use disk. Defaults to false.
+         */
+        public boolean isDisk() {
+            return disk;
+        }
     }
 }

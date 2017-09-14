@@ -2,6 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.config.PropertyResolver;
+import org.particleframework.context.annotation.Configuration;
 import org.particleframework.context.annotation.Provided;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.context.event.BeanInitializedEventListener;
@@ -28,7 +29,6 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -558,7 +558,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                     String argumentName = argument.getName();
                     Class[] genericTypes = argument.getGenericTypes();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
-                    String valString = resolveValueString(declaringClass, argumentName, valAnn);
+                    String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argumentType, valString, genericTypes);
                     if (!value.isPresent() && argumentType == Optional.class) {
@@ -887,8 +887,9 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
             if (isInnerConfiguration(fieldType)) {
                 return context.createBean(fieldType);
             } else {
-                Class<?> declaringClass = injectionPoint.getDeclaringBean().getType();
-                String valString = resolveValueString(declaringClass, injectionPoint.getName(), valueAnn);
+                Class<?> beanType = injectionPoint.getDeclaringBean().getType();
+                Class<?> declaringClass = field.getDeclaringClass();
+                String valString = resolveValueString(declaringClass, beanType, injectionPoint.getName(), valueAnn);
                 Optional value = resolveValue((ApplicationContext) context, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
@@ -1041,12 +1042,12 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         return value;
     }
 
-    private String resolveValueString(Class<?> declaringClass, String name, Value val) {
+    private String resolveValueString(Class<?> declaringClass, Class<?> beanType, String name, Value val) {
 
         String valString;
         if (val == null) {
             if (isConfigurationProperties) {
-                String prefix = resolvePrefix(declaringClass);
+                String prefix = resolvePrefix(declaringClass,beanType);
                 valString = prefix + "." + name;
             } else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");
@@ -1075,48 +1076,70 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
-    private String resolvePrefix(Class<?> declaringClass) {
+    private String resolvePrefix(Class<?> declaringClass, Class<?> beanType) {
         return valuePrefixes.computeIfAbsent(declaringClass, aClass -> {
             Class<?> type = declaringClass;
             ConfigurationProperties configurationProperties = type.getAnnotation(ConfigurationProperties.class);
             StringBuilder prefix = new StringBuilder();
-            if (type.getDeclaringClass() != null) {
+            boolean isInner = type.getDeclaringClass() != null;
+            if (isInner) {
                 // must be an inner class
-                while (type != null) {
-                    String name = type.getName();
-                    int i = name.lastIndexOf('$');
-                    if (i > -1) {
-                        name = name.substring(i + 1, name.length());
-                    }
-                    prefix.append('.').append(Introspector.decapitalize(name));
+                String name;
 
-                    type = type.getDeclaringClass();
-                    if (type != null) {
-                        configurationProperties = type.getAnnotation(ConfigurationProperties.class);
-                        if (configurationProperties != null) {
-                            prefix.insert(0, configurationProperties.value());
-                            break;
-                        }
+                if(configurationProperties != null) {
+                    prefix.append(configurationProperties.value());
+                }
+                else {
+                    ConfigurationProperties annotation = beanType.getAnnotation(ConfigurationProperties.class);
+                    if(annotation != null) {
+                        prefix.append(annotation.value());
                     }
+                    else {
+
+                        name = beanType.getName();
+                        int i = name.lastIndexOf('$');
+                        if (i > -1) {
+                            name = name.substring(i + 1, name.length());
+                        }
+                        prefix.append(Introspector.decapitalize(name));
+                    }
+                }
+
+                Class<?> nestedType = type.getDeclaringClass();
+                while (nestedType != null) {
+                    configurationProperties = nestedType.getAnnotation(ConfigurationProperties.class);
+                    if (configurationProperties != null) {
+                        prefix.insert(0, '.')
+                              .insert(0, configurationProperties.value());
+                        prependSuperClasses(prefix, nestedType);
+                    }
+                    else {
+                        break;
+                    }
+                    nestedType = nestedType.getDeclaringClass();
+
                 }
             }
             else if(configurationProperties != null) {
                 prefix.append(configurationProperties.value());
             }
 
-            if(type != null) {
-                type = type.getSuperclass();
-                while (type != null) {
-                    configurationProperties = type.getAnnotation(ConfigurationProperties.class);
-                    if (configurationProperties != null) {
-                        prefix.insert(0, configurationProperties.value() + '.');
-                    }
-                    type = type.getSuperclass();
-                }
-            }
+            prependSuperClasses(prefix, type);
             return prefix.toString();
         });
 
+    }
+
+    private void prependSuperClasses(StringBuilder prefix, Class<?> nestedType) {
+        ConfigurationProperties configurationProperties;
+        Class<?> supertype = nestedType.getSuperclass();
+        while (supertype != null) {
+            configurationProperties = supertype.getAnnotation(ConfigurationProperties.class);
+            if (configurationProperties != null) {
+                prefix.insert(0, configurationProperties.value() + '.');
+            }
+            supertype = supertype.getSuperclass();
+        }
     }
 
     private AbstractBeanDefinition addMethodInjectionPointInternal(

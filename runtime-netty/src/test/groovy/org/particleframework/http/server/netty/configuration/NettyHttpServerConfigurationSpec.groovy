@@ -33,7 +33,12 @@ class NettyHttpServerConfigurationSpec extends Specification {
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(new MapPropertySource(
                 'particle.server.netty.childOptions.autoRead':'true',
-                'particle.server.netty.worker.threads':8
+                'particle.server.netty.worker.threads':8,
+                'particle.server.netty.parent.threads':8,
+                'particle.server.multipart.maxFileSize':2048,
+                'particle.server.maxRequestSize':2048,
+                'particle.server.ssl.port':8888,
+
         ))
         beanContext.start()
 
@@ -44,11 +49,14 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         server != null
-        config.worker.threads == 8
+        config.maxRequestSize == 2048
+        config.ssl.port == 8888
+        config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption
         config.host == 'localhost'
-
+        config.parent.threads == 8
+        config.worker.threads == 8
 
         cleanup:
         beanContext.close()

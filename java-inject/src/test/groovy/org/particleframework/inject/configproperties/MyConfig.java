@@ -32,7 +32,7 @@ public class MyConfig {
         return defaultPort;
     }
 
-    @ConfigurationProperties("foo.bar.inner")
+    @ConfigurationProperties("inner")
     public static class Inner {
         boolean enabled;
 
