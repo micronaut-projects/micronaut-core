@@ -67,7 +67,7 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
         if(msg instanceof Event) {
             Event event = (Event) msg;
             byte[] bytes = objectMapper.writeValueAsBytes(event.getData());
-            out.add(Event.of((Event)msg, bytes));
+            out.add(Event.of((Event)msg, Unpooled.copiedBuffer(bytes)));
         }
         else {
             byte[] bytes = objectMapper.writeValueAsBytes(msg);

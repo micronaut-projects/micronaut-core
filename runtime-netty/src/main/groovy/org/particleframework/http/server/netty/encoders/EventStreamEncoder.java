@@ -17,6 +17,8 @@ package org.particleframework.http.server.netty.encoders;
 
 import com.typesafe.netty.HandlerSubscriber;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
@@ -46,8 +48,6 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
         NettyHttpRequest request = NettyHttpRequest.lookup(ctx);
         if (msg instanceof EventStream) {
             EventStream stream = (EventStream) msg;
-
-
             HttpResponse streamResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
             streamResponse.headers().add(HttpHeaderNames.CONTENT_TYPE, MediaType.TEXT_EVENT_STREAM);
             ctx.writeAndFlush(streamResponse, promise)
@@ -56,7 +56,6 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
                                 if (future.isSuccess()) {
 
                                     Channel channel = writePromise.channel();
-                                    channel.pipeline().remove(NettyHttpServer.HTTP_CODEC);
                                     HandlerSubscriber handlerSubscriber = new HandlerSubscriber(ctx.executor()) {
                                         @Override
                                         protected void complete() {
@@ -69,7 +68,7 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
                                         }
                                     };
                                     channel.pipeline().addLast(handlerSubscriber);
-                                    // feed subscription
+                                    // feed dummy subscription
                                     handlerSubscriber.onSubscribe(new Subscription() {
                                         @Override
                                         public void request(long n) {
@@ -86,21 +85,20 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
         } else if (msg instanceof Event) {
             Event event = (Event) msg;
             Object data = event.getData();
-            if (data instanceof byte[]) {
-                byte[] bytes = (byte[]) data;
-                int len = 12 + bytes.length;
-                ByteBuf content = Unpooled.buffer(len, len);
-                content.writeCharSequence("data: ", Charset.defaultCharset());
-                content.writeBytes(bytes);
-                content.writeCharSequence("\n\n", Charset.defaultCharset());
-                content.retain();
-                ctx.writeAndFlush(content, promise)
+            if (data instanceof ByteBuf) {
+                ByteBuf bytes = (ByteBuf) data;
+                ByteBuf eventData = Unpooled.wrappedBuffer(
+                        Unpooled.copiedBuffer("data: ", Charset.defaultCharset()),
+                        bytes,
+                        Unpooled.copiedBuffer("\n\n", Charset.defaultCharset())
+                );
+                eventData.retain();
+                ctx.writeAndFlush(eventData, promise)
                         .addListener(future -> {
-                            content.release();
+                            eventData.release();
                         });
             } else {
                 ChannelPipeline pipeline = ctx.pipeline();
-                pipeline.remove(this);
                 pipeline.addFirst(this);
                 ctx.write(event, promise);
             }
