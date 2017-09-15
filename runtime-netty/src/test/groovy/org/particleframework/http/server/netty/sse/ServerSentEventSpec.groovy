@@ -19,21 +19,16 @@ import com.launchdarkly.eventsource.EventHandler
 import com.launchdarkly.eventsource.EventSource
 import com.launchdarkly.eventsource.MessageEvent
 import org.particleframework.context.annotation.Requires
-import org.particleframework.http.HttpResponse
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.sse.Event
 import org.particleframework.http.sse.EventStream
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
-import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
-import spock.lang.Specification
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
