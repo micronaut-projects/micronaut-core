@@ -240,6 +240,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // String -> Locale
+        addConverter(CharSequence.class, Locale.class,(CharSequence object, Class<Locale> targetType, ConversionContext context) -> {
+            try {
+                return Optional.of(Locale.forLanguageTag(object.toString().replace('_','-')));
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
+        });
+
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
             try {
