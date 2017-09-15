@@ -1,4 +1,5 @@
 dependencies {
+    compile 'org.reactivestreams:reactive-streams:1.0.1'
     compile project(":runtime")
     compile project(":http")
     compile project(":inject")

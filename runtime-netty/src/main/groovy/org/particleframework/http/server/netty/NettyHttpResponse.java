@@ -15,13 +15,14 @@
  */
 package org.particleframework.http.server.netty;
 
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
+import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpHeaders;
 import org.particleframework.http.MutableHttpResponse;
@@ -37,7 +38,7 @@ import org.particleframework.http.server.netty.cookies.NettyCookies;
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     public static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
-    final DefaultFullHttpResponse nettyResponse;
+    protected FullHttpResponse nettyResponse;
     final NettyHttpRequestHeaders headers;
     private B body;
 
@@ -51,6 +52,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
     }
 
+
     @Override
     public MutableHttpHeaders getHeaders() {
         return headers;
@@ -63,12 +65,11 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        if(cookie instanceof NettyCookies.NettyCookie) {
+        if (cookie instanceof NettyCookies.NettyCookie) {
             NettyCookies.NettyCookie nettyCookie = (NettyCookies.NettyCookie) cookie;
             String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
         return this;
@@ -86,13 +87,36 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
-    public DefaultFullHttpResponse getNativeResponse() {
+    public FullHttpResponse getNativeResponse() {
         return nettyResponse;
     }
 
     @Override
     public MutableHttpResponse<B> setBody(B body) {
         this.body = body;
+        return this;
+    }
+
+    /**
+     * Lookup the response from the context
+     *
+     * @param ctx The response
+     * @return
+     */
+    public static NettyHttpResponse getOrCreate(ChannelHandlerContext ctx) {
+        Attribute<NettyHttpResponse> attr = ctx
+                .channel()
+                .attr(KEY);
+        NettyHttpResponse nettyHttpResponse = attr.get();
+        if(nettyHttpResponse == null) {
+            nettyHttpResponse = (NettyHttpResponse)HttpResponse.ok();
+            attr.set(nettyHttpResponse);
+        }
+        return nettyHttpResponse;
+    }
+
+    public NettyHttpResponse replace(ByteBuf body) {
+        this.nettyResponse = this.nettyResponse.replace(body);
         return this;
     }
 }

@@ -414,4 +414,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
                 .distinct()
                 .collect(Collectors.toList());
     }
+
+    /**
+     * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
+     */
+    default boolean isKeepAlive() {
+        return getFirst(CONNECTION, String.class).map(val-> val.equalsIgnoreCase("keep-alive") ).orElse(false);
+    }
 }

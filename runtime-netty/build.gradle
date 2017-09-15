@@ -15,5 +15,6 @@ dependencies {
     testCompile project(":ast")
     testCompile project(":java-inject")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+    testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
 
 }

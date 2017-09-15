@@ -2,16 +2,14 @@
  
 * CORS Support
 * Session Support
-* Exception / Error Handling
+* HTTP Support
 * File Uploads
-* Form Data
 * Tests for javax.validation
 * HttpRequest attributes
+* RxJava 1/2 Support
 * Server Sent Events (SSE)
 * WebSockets
 * Channel Options Config
-* Pluggable Encoders
 * Rename Binder -> Decoder
-* RxJava 1/2 Support
 * JSON Array Decoding via Stream
 * Support for Functions (Serverless)

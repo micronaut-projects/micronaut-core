@@ -134,6 +134,16 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType APPLICATION_VND_ERROR_TYPE = new MediaType(APPLICATION_VND_ERROR);
 
+    /**
+     * Server Sent Event: text/event-stream
+     */
+    public final static String TEXT_EVENT_STREAM = "text/event-stream";
+
+    /**
+     * Server Sent Event: text/event-stream
+     */
+    public static final MediaType TEXT_EVENT_STREAM_TYPE = new MediaType(TEXT_EVENT_STREAM);
+
     public static final String CHARSET_PARAMETER = "charset";
     public static final String Q_PARAMETER = "q";
     public static final String V_PARAMETER = "v";

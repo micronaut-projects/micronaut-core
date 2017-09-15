@@ -84,20 +84,11 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return nettyRequest;
     }
 
+    /**
+     * @return The {@link ChannelHandlerContext}
+     */
     public ChannelHandlerContext getChannelHandlerContext() {
         return channelHandlerContext;
-    }
-
-    void addContent(HttpContent httpContent) {
-        ByteBuf byteBuf = httpContent
-                            .content()
-                            .touch();
-        int contentBytes = byteBuf.readableBytes();
-        if (contentBytes == 0) {
-            byteBuf.release();
-        } else {
-            receivedContent.add(byteBuf);
-        }
     }
 
     public ByteBuf[] getReceivedContent() {
@@ -216,7 +207,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         }
     }
 
-
     /**
      * Sets the body
      *
@@ -227,12 +217,26 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         this.body = body;
     }
 
+
     /**
      * @return Obtains the matched route
      */
     @Internal
     public RouteMatch<Object> getMatchedRoute() {
         return matchedRoute;
+    }
+
+    @Internal
+    void addContent(HttpContent httpContent) {
+        ByteBuf byteBuf = httpContent
+                .content()
+                .touch();
+        int contentBytes = byteBuf.readableBytes();
+        if (contentBytes == 0) {
+            byteBuf.release();
+        } else {
+            receivedContent.add(byteBuf);
+        }
     }
 
     private URI decodePath(String uri) {
@@ -272,5 +276,9 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
         NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
         parameters.setPostRequestDecoder(postRequestDecoder);
+    }
+
+    public static NettyHttpRequest lookup(ChannelHandlerContext ctx) {
+        return ctx.channel().attr(NettyHttpRequest.KEY).get();
     }
 }

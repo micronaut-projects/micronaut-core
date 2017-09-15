@@ -17,12 +17,15 @@ package org.particleframework.http.server.netty.encoders;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.server.netty.NettyHttpResponse;
+import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.sse.Event;
 
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +38,6 @@ import java.util.List;
  * @since 1.0
  */
 @ChannelHandler.Sharable
-@Singleton
 public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Object> implements Ordered {
 
     public static final int ORDER = Ordered.LOWEST_PRECEDENCE;
@@ -47,7 +49,7 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     public boolean acceptOutboundMessage(Object msg) throws Exception {
-        return !(msg instanceof FullHttpResponse);
+        return  !(msg instanceof HttpContent) && !(msg instanceof ByteBuf) && !(msg instanceof Event) && !(msg instanceof HttpObject);
     }
 
     @Override
@@ -72,5 +74,15 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
                     .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
         }
         out.add(httpResponse);
+    }
+
+    @Singleton
+    public static class ObjectToStringFallbackEncoderFactory implements ChannelHandlerFactory {
+        private final ObjectToStringFallbackEncoder objectToStringFallbackEncoder = new ObjectToStringFallbackEncoder();
+
+        @Override
+        public ChannelHandler build(Channel channel) {
+            return objectToStringFallbackEncoder;
+        }
     }
 }

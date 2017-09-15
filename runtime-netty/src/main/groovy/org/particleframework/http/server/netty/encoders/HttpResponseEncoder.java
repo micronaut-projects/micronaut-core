@@ -15,15 +15,15 @@
  */
 package org.particleframework.http.server.netty.encoders;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.FullHttpResponse;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.server.netty.NettyHttpResponse;
+import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 
 import javax.inject.Singleton;
 import java.util.List;
@@ -36,7 +36,6 @@ import java.util.List;
  */
 
 @ChannelHandler.Sharable
-@Singleton
 public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> implements Ordered {
 
     @Override
@@ -47,7 +46,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
     @Override
     protected void encode(ChannelHandlerContext ctx, HttpResponse msg, List<Object> out) throws Exception {
         NettyHttpResponse res = (NettyHttpResponse) msg;
-        DefaultFullHttpResponse nativeResponse = res.getNativeResponse();
+        FullHttpResponse nativeResponse = res.getNativeResponse();
                 ctx.channel()
                 .attr(NettyHttpResponse.KEY)
                 .set(res);
@@ -58,6 +57,16 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
         }
         else {
             out.add(nativeResponse);
+        }
+    }
+
+    @Singleton
+    public static class HttpResponseEncoderFactory implements ChannelHandlerFactory {
+        private final HttpResponseEncoder httpResponseEncoder = new HttpResponseEncoder();
+
+        @Override
+        public ChannelHandler build(Channel channel) {
+            return httpResponseEncoder;
         }
     }
 }

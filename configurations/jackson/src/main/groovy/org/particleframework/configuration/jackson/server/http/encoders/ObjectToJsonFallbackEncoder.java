@@ -18,6 +18,7 @@ package org.particleframework.configuration.jackson.server.http.encoders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
@@ -26,6 +27,8 @@ import org.particleframework.core.order.Ordered;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.encoders.ObjectToStringFallbackEncoder;
+import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.sse.Event;
 
 import javax.inject.Singleton;
 import java.util.List;
@@ -35,7 +38,6 @@ import java.util.List;
  * @since 1.0
  */
 @ChannelHandler.Sharable
-@Singleton
 public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object> implements Ordered {
 
     public static final int ORDER = ObjectToStringFallbackEncoder.ORDER - 50;
@@ -53,32 +55,47 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
 
     @Override
     public boolean acceptOutboundMessage(Object msg) throws Exception {
-        return !(msg instanceof CharSequence) && !(msg instanceof HttpResponse);
+        return !(msg instanceof CharSequence) && !(msg instanceof ByteBuf) && !(msg instanceof HttpContent) && !(msg instanceof HttpObject) ;
     }
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-        NettyHttpResponse res = ctx
-                                    .channel()
-                                    .attr(NettyHttpResponse.KEY)
-                                    .get();
+        NettyHttpResponse res = NettyHttpResponse.getOrCreate(ctx);
+        FullHttpResponse httpResponse = res.getNativeResponse();
 
 
-        DefaultFullHttpResponse httpResponse = res != null ? res.getNativeResponse() : new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-
-        byte[] bytes = objectMapper.writeValueAsBytes(msg);
-
-        ByteBuf content = Unpooled.copiedBuffer(bytes);
-        int len = bytes.length;
-        HttpHeaders headers = httpResponse.headers();
-        if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
-            headers
-                    .add(HttpHeaderNames.CONTENT_LENGTH, len);
+        if(msg instanceof Event) {
+            Event event = (Event) msg;
+            byte[] bytes = objectMapper.writeValueAsBytes(event.getData());
+            out.add(Event.of((Event)msg, bytes));
         }
-        if(headers.get(HttpHeaderNames.CONTENT_TYPE) == null) {
-            headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.APPLICATION_JSON_TYPE );
+        else {
+            byte[] bytes = objectMapper.writeValueAsBytes(msg);
+            ByteBuf content = Unpooled.copiedBuffer(bytes);
+            int len = bytes.length;
+            HttpHeaders headers = httpResponse.headers();
+            if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+                headers
+                        .add(HttpHeaderNames.CONTENT_LENGTH, len);
+            }
+            if(headers.get(HttpHeaderNames.CONTENT_TYPE) == null) {
+                headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.APPLICATION_JSON_TYPE );
+            }
+            out.add(httpResponse.replace(content));
         }
-        out.add(httpResponse.replace(content));
     }
 
+    @Singleton
+    public static class Factory implements ChannelHandlerFactory {
+        private final ObjectToJsonFallbackEncoder objectToJsonFallbackEncoder;
+
+        public Factory(ObjectMapper objectMapper) {
+            this.objectToJsonFallbackEncoder = new ObjectToJsonFallbackEncoder(objectMapper);
+        }
+
+        @Override
+        public ChannelHandler build(Channel channel) {
+            return objectToJsonFallbackEncoder;
+        }
+    }
 }

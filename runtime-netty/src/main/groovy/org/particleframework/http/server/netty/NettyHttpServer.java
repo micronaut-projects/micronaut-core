@@ -39,6 +39,7 @@ import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumen
 import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.qualifiers.Qualifiers;
@@ -77,7 +78,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final BeanLocator beanLocator;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private final ChannelOutboundHandlerAdapter[] outboundHandlerAdapters;
+    private final ChannelHandlerFactory[] channelHandlerFactories;
     private final Environment environment;
 
     @Inject
@@ -85,7 +86,7 @@ public class NettyHttpServer implements EmbeddedServer {
             NettyHttpServerConfiguration serverConfiguration,
             Environment environment,
             BeanLocator beanLocator,
-            ChannelOutboundHandlerAdapter[] outboundHandlerAdapters
+            ChannelHandlerFactory[] channelHandlerFactories
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir ->
@@ -94,7 +95,7 @@ public class NettyHttpServer implements EmbeddedServer {
         this.environment = environment;
         this.serverConfiguration = serverConfiguration;
         this.beanLocator = beanLocator;
-        this.outboundHandlerAdapters = outboundHandlerAdapters;
+        this.channelHandlerFactories = channelHandlerFactories;
     }
 
     @Override
@@ -120,9 +121,14 @@ public class NettyHttpServer implements EmbeddedServer {
                         RequestBinderRegistry binderRegistry = beanLocator.getBean(RequestBinderRegistry.class);
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
-                        List<ChannelOutboundHandlerAdapter> channelOutboundHandlerAdapters = Arrays.asList(outboundHandlerAdapters);
-                        OrderUtil.reverseSort(channelOutboundHandlerAdapters);
-                        for (ChannelOutboundHandlerAdapter outboundHandlerAdapter : outboundHandlerAdapters) {
+                        List<ChannelHandler> channelHandlers = new ArrayList<>();
+                        for (ChannelHandlerFactory channelHandlerFactory : channelHandlerFactories) {
+                            ChannelHandler channelHandler = channelHandlerFactory.build(ch);
+                            channelHandlers.add(channelHandler);
+                        }
+                        OrderUtil.reverseSort(channelHandlers);
+
+                        for (ChannelHandler outboundHandlerAdapter : channelHandlers) {
                             pipeline.addLast(outboundHandlerAdapter);
                         }
 
