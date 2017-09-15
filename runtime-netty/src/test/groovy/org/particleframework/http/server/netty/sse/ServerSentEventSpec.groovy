@@ -41,6 +41,7 @@ class ServerSentEventSpec extends AbstractParticleSpec {
 
     void "test consume event stream"() {
         given:
+        SseController.complete.set(false)
         MyEventHandler eventHandler = new MyEventHandler()
         EventSource eventSource = new EventSource.Builder(
             eventHandler, new URI("$server/sse/stream")

@@ -22,8 +22,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpResponse;
 import org.particleframework.core.order.Ordered;
-import org.particleframework.http.MediaType;
+import org.particleframework.http.*;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
@@ -61,7 +62,11 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
                                         protected void complete() {
                                             channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(future -> {
                                                         if (request == null || !request.getHeaders().isKeepAlive()) {
-                                                            super.complete();
+                                                            channel.pipeline()
+                                                                    .writeAndFlush(org.particleframework.http.HttpResponse.noContent())
+                                                                    .addListener(f ->
+                                                                            super.complete()
+                                                                    );
                                                         }
                                                     }
                                             );
