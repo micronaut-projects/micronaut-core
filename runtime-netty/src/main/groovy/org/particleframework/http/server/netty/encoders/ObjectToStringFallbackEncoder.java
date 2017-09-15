@@ -54,26 +54,26 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-        NettyHttpResponse res = ctx
-                .channel()
-                .attr(NettyHttpResponse.KEY)
-                .get();
+        NettyHttpResponse res = NettyHttpResponse.getOrCreate(ctx);
+
 
         String string = msg.toString();
         ByteBuf content = Unpooled.copiedBuffer(string, StandardCharsets.UTF_8);
-        FullHttpResponse httpResponse;
-        if(res != null) {
-            httpResponse = res.getNativeResponse().replace(content);
+        if(msg instanceof Event) {
+            Event event = (Event) msg;
+            out.add(Event.of(event, content));
         }
         else {
-            httpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+
+            res = res.replace(content);
+            FullHttpResponse httpResponse = res.getNativeResponse();
+            if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+                httpResponse
+                        .headers()
+                        .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
+            }
+            out.add(httpResponse);
         }
-        if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
-            httpResponse
-                    .headers()
-                    .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
-        }
-        out.add(httpResponse);
     }
 
     @Singleton

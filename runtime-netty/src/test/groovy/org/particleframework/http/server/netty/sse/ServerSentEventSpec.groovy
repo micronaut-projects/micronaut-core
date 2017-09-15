@@ -29,6 +29,9 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import spock.lang.Specification
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 
@@ -39,12 +42,12 @@ import java.util.function.Consumer
 class ServerSentEventSpec extends AbstractParticleSpec {
 
 
-    void "test consume event stream"() {
+    void "test consume event stream object"() {
         given:
         SseController.complete.set(false)
         MyEventHandler eventHandler = new MyEventHandler()
         EventSource eventSource = new EventSource.Builder(
-            eventHandler, new URI("$server/sse/stream")
+                eventHandler, new URI("$server/sse/object")
         ).reconnectTimeMs(1000*100).build()
 
         eventSource.start()
@@ -57,15 +60,87 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         eventHandler.events.first().data.data == '{"name":"Foo 1","age":11}'
     }
 
+    void "test consume event stream string"() {
+        given:
+        SseController.complete.set(false)
+        MyEventHandler eventHandler = new MyEventHandler()
+        EventSource eventSource = new EventSource.Builder(
+                eventHandler, new URI("$server/sse/string")
+        ).reconnectTimeMs(1000*100).build()
+
+        eventSource.start()
+        while(!SseController.complete.get()) {
+            sleep 100
+        }
+
+        expect:
+        eventHandler.events.size() == 4
+        eventHandler.events.first().data.data == 'Foo 1'
+    }
+
+    void "test consume rich event stream string"() {
+        given:
+        SseController.complete.set(false)
+        MyEventHandler eventHandler = new MyEventHandler()
+        EventSource eventSource = new EventSource.Builder(
+                eventHandler, new URI("$server/sse/rich")
+        ).reconnectTimeMs(1000*100).build()
+
+        when:
+        eventSource.start()
+        while(!SseController.complete.get()) {
+            sleep 100
+        }
+
+        then:
+        eventHandler.events.size() == 4
+        eventHandler.comments.size() == 4
+
+        when:
+        Event event = eventHandler.events.first()
+
+        then:
+        event.name == 'foo'
+
+    }
+
     @Controller
     @Requires(property = 'spec.name', value = 'ServerSentEventSpec')
     static class SseController {
         static AtomicBoolean complete = new AtomicBoolean(false)
         @Get
-        EventStream stream() {
+        EventStream object() {
             EventStream.of { Subscriber<Event> eventSubscriber ->
                 for(i in 1..4) {
                     eventSubscriber.onNext(Event.of(new Foo(name: "Foo $i", age: i + 10)))
+                }
+                eventSubscriber.onComplete()
+                complete.set(true)
+            }
+        }
+
+        @Get
+        EventStream rich() {
+            EventStream.of { Subscriber<Event> eventSubscriber ->
+                for(i in 1..4) {
+                    eventSubscriber.onNext(
+                            Event.of(new Foo(name: "Foo $i", age: i + 10))
+                                 .name('foo')
+                                 .id(i.toString())
+                                 .comment("Foo Comment $i")
+                                 .retry(Duration.of(2, ChronoUnit.MINUTES))
+                    )
+                }
+                eventSubscriber.onComplete()
+                complete.set(true)
+            }
+        }
+
+        @Get
+        EventStream string() {
+            EventStream.of { Subscriber<Event> eventSubscriber ->
+                for(i in 1..4) {
+                    eventSubscriber.onNext(Event.of("Foo $i"))
                 }
                 eventSubscriber.onComplete()
                 complete.set(true)

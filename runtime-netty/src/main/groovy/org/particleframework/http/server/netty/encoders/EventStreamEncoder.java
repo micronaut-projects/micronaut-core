@@ -17,16 +17,14 @@ package org.particleframework.http.server.netty.encoders;
 
 import com.typesafe.netty.HandlerSubscriber;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpResponse;
+import io.netty.util.AsciiString;
 import org.particleframework.core.order.Ordered;
-import org.particleframework.http.*;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.NettyHttpRequest;
-import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.sse.Event;
 import org.particleframework.http.sse.EventStream;
@@ -34,6 +32,8 @@ import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 /**
  * Encodes a Server Sent Event {@link EventStream}
@@ -43,6 +43,13 @@ import java.nio.charset.Charset;
  */
 @ChannelHandler.Sharable
 public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
+
+    public static final AsciiString DATA_PREFIX = new AsciiString("data: ", StandardCharsets.UTF_8);
+    public static final AsciiString EVENT_PREFIX = new AsciiString("event: ", StandardCharsets.UTF_8);
+    public static final AsciiString ID_PREFIX = new AsciiString("id: ", StandardCharsets.UTF_8);
+    public static final AsciiString RETRY_PREFIX = new AsciiString("retry: ", StandardCharsets.UTF_8);
+    public static final AsciiString COMMENT_PREFIX = new AsciiString(": ", StandardCharsets.UTF_8);
+    public static final AsciiString NEWLINE = new AsciiString("\n", StandardCharsets.UTF_8);
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -90,18 +97,31 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
         } else if (msg instanceof Event) {
             Event event = (Event) msg;
             Object data = event.getData();
+            if(data instanceof CharSequence) {
+                data = Unpooled.copiedBuffer((CharSequence)data, request.getCharacterEncoding());
+            }
+
             if (data instanceof ByteBuf) {
-                ByteBuf bytes = (ByteBuf) data;
-                ByteBuf eventData = Unpooled.wrappedBuffer(
-                        Unpooled.copiedBuffer("data: ", Charset.defaultCharset()),
-                        bytes,
-                        Unpooled.copiedBuffer("\n\n", Charset.defaultCharset())
-                );
+                ByteBuf body = (ByteBuf) data;
+                ByteBuf eventData = Unpooled.buffer(body.readableBytes() + 10);
+
+                writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
+                writeAttribute(eventData, ID_PREFIX, event.getId());
+                writeAttribute(eventData, EVENT_PREFIX, event.getName());
+                Duration retry = event.getRetry();
+                if(retry != null) {
+                    writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
+                }
+                // Write the data: prefix
+                ByteBufUtil.writeAscii(eventData, DATA_PREFIX);
+                eventData.writeBytes(body);
+
+                // Write new lines for event separation
+                ByteBufUtil.writeAscii(eventData, NEWLINE);
+                ByteBufUtil.writeAscii(eventData, NEWLINE);
                 eventData.retain();
                 ctx.writeAndFlush(eventData, promise)
-                        .addListener(future -> {
-                            eventData.release();
-                        });
+                        .addListener(future -> eventData.release());
             } else {
                 ChannelPipeline pipeline = ctx.pipeline();
                 pipeline.addFirst(this);
@@ -109,6 +129,14 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
             }
         } else {
             ctx.write(msg, promise);
+        }
+    }
+
+    protected void writeAttribute(ByteBuf eventData, AsciiString prefix, String value) {
+        if(value != null) {
+            ByteBufUtil.writeAscii(eventData, prefix);
+            eventData.writeCharSequence(value, StandardCharsets.UTF_8);
+            ByteBufUtil.writeAscii(eventData, NEWLINE);
         }
     }
 
