@@ -18,7 +18,9 @@ package org.particleframework.aop;
 import org.particleframework.core.order.Ordered;
 
 /**
- * An Interceptor intercepts the execution of a method allowing cross cutting behaviour to be applied to a method's execution.
+ * <p>An Interceptor intercepts the execution of a method allowing cross cutting behaviour to be applied to a method's execution.</p>
+ *
+ * <p>All implementations should be thread safe and {@link javax.inject.Singleton} scoped beans</p>
  *
  * @author Graeme Rocher
  * @since 1.0

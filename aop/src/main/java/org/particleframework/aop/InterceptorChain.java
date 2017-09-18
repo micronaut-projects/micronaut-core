@@ -27,6 +27,9 @@ import org.particleframework.inject.MutableArgumentValue;
 import java.util.*;
 
 /**
+ * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
+ * consumed by the framework itself and should not be used directly in application code.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -48,7 +51,7 @@ public class InterceptorChain<R> implements InvocationContext<R> {
         OrderUtil.sort(interceptors);
         this.interceptors = new Interceptor[interceptors.length+1];
         System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
-        this.interceptors[interceptors.length-1] = context -> executionHandle.invoke(
+        this.interceptors[this.interceptors.length-1] = context -> executionHandle.invoke(
                 getParameterValues()
         );
         Argument[] arguments = executionHandle.getArguments();
