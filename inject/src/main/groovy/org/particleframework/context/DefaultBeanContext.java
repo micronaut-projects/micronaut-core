@@ -846,6 +846,11 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
+        public String getMethodName() {
+            return this.method.getMethodName();
+        }
+
+        @Override
         public ReturnType<R> getReturnType() {
             return method.getReturnType();
         }

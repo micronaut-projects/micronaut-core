@@ -1,3 +1,4 @@
 dependencies {
     compile group: 'javax.interceptor', name: 'javax.interceptor-api', version: '3.1'
+    compile project(":inject")
 }

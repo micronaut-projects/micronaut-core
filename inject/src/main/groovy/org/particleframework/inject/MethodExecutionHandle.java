@@ -9,6 +9,10 @@ package org.particleframework.inject;
 public interface MethodExecutionHandle<R> extends ExecutionHandle<R> {
 
     /**
+     * @return The name of the method
+     */
+    String getMethodName();
+    /**
      * @return Return the return type
      */
     ReturnType<R> getReturnType();

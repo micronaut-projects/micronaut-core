@@ -45,6 +45,11 @@ abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
     }
 
     @Override
+    public String getMethodName() {
+        return this.executableMethod.getMethodName();
+    }
+
+    @Override
     public Class getDeclaringType() {
         return executableMethod.getDeclaringType();
     }
