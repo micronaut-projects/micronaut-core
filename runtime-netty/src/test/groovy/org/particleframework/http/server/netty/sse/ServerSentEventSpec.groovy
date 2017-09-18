@@ -43,10 +43,10 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         MyEventHandler eventHandler = new MyEventHandler()
         EventSource eventSource = new EventSource.Builder(
                 eventHandler, new URI("$server/sse/object")
-        ).reconnectTimeMs(1000*100).build()
+        ).reconnectTimeMs(1000 * 100).build()
 
         eventSource.start()
-        while(!SseController.complete.get()) {
+        while (!SseController.complete.get()) {
             sleep 100
         }
 
@@ -61,10 +61,10 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         MyEventHandler eventHandler = new MyEventHandler()
         EventSource eventSource = new EventSource.Builder(
                 eventHandler, new URI("$server/sse/string")
-        ).reconnectTimeMs(1000*100).build()
+        ).reconnectTimeMs(1000 * 100).build()
 
         eventSource.start()
-        while(!SseController.complete.get()) {
+        while (!SseController.complete.get()) {
             sleep 100
         }
 
@@ -73,17 +73,17 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         eventHandler.events.first().data.data == 'Foo 1'
     }
 
-    void "test consume rich event stream string"() {
+    void "test consume rich event stream object"() {
         given:
         SseController.complete.set(false)
         MyEventHandler eventHandler = new MyEventHandler()
         EventSource eventSource = new EventSource.Builder(
                 eventHandler, new URI("$server/sse/rich")
-        ).reconnectTimeMs(1000*100).build()
+        ).reconnectTimeMs(1000 * 100).build()
 
         when:
         eventSource.start()
-        while(!SseController.complete.get()) {
+        while (!SseController.complete.get()) {
             sleep 100
         }
 
@@ -99,14 +99,56 @@ class ServerSentEventSpec extends AbstractParticleSpec {
 
     }
 
+    void "test receive error from supplier"() {
+        given:
+        SseController.complete.set(false)
+        MyEventHandler eventHandler = new MyEventHandler()
+        EventSource eventSource = new EventSource.Builder(
+                eventHandler, new URI("$server/sse/exception")
+        ).reconnectTimeMs(1000 * 100).build()
+
+        when:
+        eventSource.start()
+        while (!SseController.complete.get()) {
+            sleep 100
+        }
+
+        then:
+        eventHandler.events.size() == 0
+        eventHandler.comments.size() == 0
+
+
+    }
+
+    void "test receive error from onError"() {
+        given:
+        SseController.complete.set(false)
+        MyEventHandler eventHandler = new MyEventHandler()
+        EventSource eventSource = new EventSource.Builder(
+                eventHandler, new URI("$server/sse/onError")
+        ).reconnectTimeMs(1000 * 100).build()
+
+        when:
+        eventSource.start()
+        while (!SseController.complete.get()) {
+            sleep 100
+        }
+
+        then:
+        eventHandler.events.size() == 0
+        eventHandler.comments.size() == 0
+
+    }
+
     @Controller
     @Requires(property = 'spec.name', value = 'ServerSentEventSpec')
     static class SseController {
         static AtomicBoolean complete = new AtomicBoolean(false)
+
         @Get
         EventStream object() {
             EventStream.of { Subscriber<Event> eventSubscriber ->
-                for(i in 1..4) {
+                for (i in 1..4) {
                     eventSubscriber.onNext(Event.of(new Foo(name: "Foo $i", age: i + 10)))
                 }
                 eventSubscriber.onComplete()
@@ -117,13 +159,13 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         @Get
         EventStream rich() {
             EventStream.of { Subscriber<Event> eventSubscriber ->
-                for(i in 1..4) {
+                for (i in 1..4) {
                     eventSubscriber.onNext(
                             Event.of(new Foo(name: "Foo $i", age: i + 10))
-                                 .name('foo')
-                                 .id(i.toString())
-                                 .comment("Foo Comment $i")
-                                 .retry(Duration.of(2, ChronoUnit.MINUTES))
+                                    .name('foo')
+                                    .id(i.toString())
+                                    .comment("Foo Comment $i")
+                                    .retry(Duration.of(2, ChronoUnit.MINUTES))
                     )
                 }
                 eventSubscriber.onComplete()
@@ -134,10 +176,26 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         @Get
         EventStream string() {
             EventStream.of { Subscriber<Event> eventSubscriber ->
-                for(i in 1..4) {
+                for (i in 1..4) {
                     eventSubscriber.onNext(Event.of("Foo $i"))
                 }
                 eventSubscriber.onComplete()
+                complete.set(true)
+            }
+        }
+
+        @Get
+        EventStream exception() {
+            EventStream.of { Subscriber<Event> eventSubscriber ->
+                complete.set(true)
+                throw new RuntimeException("bad things happened")
+            }
+        }
+
+        @Get
+        EventStream onError() {
+            EventStream.of { Subscriber<Event> eventSubscriber ->
+                eventSubscriber.onError(new RuntimeException("bad things happened"))
                 complete.set(true)
             }
         }
@@ -148,12 +206,14 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         Integer age
     }
 }
+
 class MyEventHandler implements EventHandler {
     boolean opened = false
     boolean closed = false
     List<String> comments = []
     List<Event<MessageEvent>> events = []
     List<Throwable> errors = []
+
     @Override
     void onOpen() throws Exception {
         opened = true

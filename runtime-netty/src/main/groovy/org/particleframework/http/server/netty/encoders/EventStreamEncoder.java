@@ -29,6 +29,8 @@ import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.sse.Event;
 import org.particleframework.http.sse.EventStream;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.nio.charset.Charset;
@@ -43,6 +45,7 @@ import java.time.Duration;
  */
 @ChannelHandler.Sharable
 public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
+    private static final Logger LOG = LoggerFactory.getLogger(EventStreamEncoder.class);
 
     public static final AsciiString DATA_PREFIX = new AsciiString("data: ", StandardCharsets.UTF_8);
     public static final AsciiString EVENT_PREFIX = new AsciiString("event: ", StandardCharsets.UTF_8);
@@ -58,39 +61,51 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
             EventStream stream = (EventStream) msg;
             HttpResponse streamResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
             streamResponse.headers().add(HttpHeaderNames.CONTENT_TYPE, MediaType.TEXT_EVENT_STREAM);
-            ctx.writeAndFlush(streamResponse, promise)
+            ctx.write(streamResponse, promise)
                     .addListener(future -> {
                                 ChannelPromise writePromise = (ChannelPromise) future;
                                 if (future.isSuccess()) {
 
-                                    Channel channel = writePromise.channel();
-                                    HandlerSubscriber handlerSubscriber = new HandlerSubscriber(ctx.executor()) {
-                                        @Override
-                                        protected void complete() {
-                                            channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(future -> {
-                                                        if (request == null || !request.getHeaders().isKeepAlive()) {
-                                                            channel.pipeline()
-                                                                    .writeAndFlush(org.particleframework.http.HttpResponse.noContent())
-                                                                    .addListener(f ->
-                                                                            super.complete()
-                                                                    );
+                                    try {
+                                        Channel channel = writePromise.channel();
+                                        HandlerSubscriber handlerSubscriber = new HandlerSubscriber(ctx.executor()) {
+                                            @Override
+                                            protected void complete() {
+                                                channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(future -> {
+                                                            if (request == null || !request.getHeaders().isKeepAlive()) {
+                                                                channel.pipeline()
+                                                                        .writeAndFlush(org.particleframework.http.HttpResponse.noContent())
+                                                                        .addListener(f ->
+                                                                                super.complete()
+                                                                        );
+                                                            }
                                                         }
-                                                    }
-                                            );
-                                        }
-                                    };
-                                    channel.pipeline().addLast(handlerSubscriber);
-                                    // feed dummy subscription
-                                    handlerSubscriber.onSubscribe(new Subscription() {
-                                        @Override
-                                        public void request(long n) {
-                                        }
+                                                );
+                                            }
 
-                                        @Override
-                                        public void cancel() {
+                                            @Override
+                                            protected void error(Throwable error) {
+                                                channel.pipeline().fireExceptionCaught(error);
+                                            }
+                                        };
+                                        channel.pipeline().addLast(handlerSubscriber);
+                                        // feed dummy subscription
+                                        handlerSubscriber.onSubscribe(new Subscription() {
+                                            @Override
+                                            public void request(long n) {
+                                            }
+
+                                            @Override
+                                            public void cancel() {
+                                            }
+                                        });
+                                        stream.accept(handlerSubscriber);
+                                    } catch (Throwable e) {
+                                        if(LOG.isErrorEnabled()) {
+                                            LOG.error("Error subscribing to EventStream: " + e.getMessage(), e);
                                         }
-                                    });
-                                    stream.accept(handlerSubscriber);
+                                        writePromise.channel().pipeline().fireExceptionCaught(e);
+                                    }
                                 }
                             }
                     );
