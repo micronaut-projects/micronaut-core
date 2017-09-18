@@ -15,8 +15,15 @@
  */
 package org.particleframework.aop
 
+import groovy.transform.CompileStatic
+import org.particleframework.aop.annotation.Trace
+import org.particleframework.aop.internal.InterceptorChain
+import org.particleframework.aop.internal.InterceptorSupport
+import org.particleframework.aop.internal.Interceptors
+import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.inject.Argument
 import org.particleframework.inject.ExecutionHandle
+import org.particleframework.inject.MethodExecutionHandle
 import spock.lang.Specification
 
 /**
@@ -39,6 +46,34 @@ class InterceptorChainSpec extends Specification {
         then:
         result == "good"
         chain.getAll("invoked") == [1,2,3]
+    }
+
+    void "test interceptor chain interaction with Java code"() {
+        given:
+        Interceptor[] interceptors = [new OneInterceptor(), new ArgMutating()]
+        def executionHandle = Mock(MethodExecutionHandle)
+        def handleLocator = Mock(ExecutionHandleLocator)
+        def arg = Mock(Argument)
+        arg.getName() >> 'name'
+        arg.getType() >> String
+
+        executionHandle.getArguments() >> ([arg] as Argument[])
+
+        handleLocator.getExecutionHandle(*_) >> executionHandle
+
+        FooJava$Intercepted foo  = new FooJava$Intercepted(10, handleLocator, interceptors )
+
+        expect:
+        foo.blah("test") == 'Name is changed'
+    }
+
+    static class ArgMutating implements Interceptor {
+
+        @Override
+        Object intercept(InvocationContext context) {
+            context.getParameters().get("name").setValue("changed")
+            return context.proceed()
+        }
     }
 
     static class OneInterceptor implements Interceptor {
@@ -80,5 +115,49 @@ class InterceptorChainSpec extends Specification {
             context.add("invoked", 3)
             return context.proceed()
         }
+    }
+}
+
+class Foo {
+
+    int c
+
+    Foo(int c) {
+        this.c = c
+    }
+
+    @Trace
+    String blah(String name) {
+        "Name is $name"
+    }
+
+}
+
+@CompileStatic
+class Foo$Intercepted extends Foo {
+
+    private final Interceptor[] interceptors
+    private ExecutionHandle[] executionHandles
+
+    Foo$Intercepted(int c, ExecutionHandleLocator locator, @Interceptors(Trace) Interceptor[] interceptors) {
+        super(c)
+        this.interceptors = interceptors
+        this.executionHandles = new ExecutionHandle[1]
+        this.executionHandles[0] = InterceptorSupport.adapt(
+                locator.getExecutionHandle(this, "blah", String)
+        ) { Object[] args ->
+            super.blah((String)args[0])
+        }
+    }
+
+    @Override
+    String blah(String name) {
+        InterceptorChain chain = new InterceptorChain(
+            interceptors,
+            this,
+            this.executionHandles[0],
+            name
+        )
+        return chain.proceed()
     }
 }

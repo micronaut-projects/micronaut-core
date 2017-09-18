@@ -148,6 +148,32 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
+        if(bean != null) {
+
+            Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(bean.getClass());
+            if (foundBean.isPresent()) {
+                BeanDefinition<?> beanDefinition = foundBean.get();
+                Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
+                if (foundMethod.isPresent()) {
+
+                    Optional<MethodExecutionHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
+                            new ObjectExecutionHandle<>(bean, executableMethod)
+                    );
+                    return executionHandle;
+                } else {
+                    return beanDefinition.findPossibleMethods(method)
+                            .findFirst()
+                            .map((ExecutableMethod executableMethod) ->
+                                    new ObjectExecutionHandle<>(bean, executableMethod)
+                            );
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
         if (singleton == null) {
             throw new IllegalArgumentException("Passed singleton cannot be null");
@@ -814,30 +840,16 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static final class BeanExecutionHandle<T, R> implements MethodExecutionHandle<R> {
-        private final BeanContext beanContext;
-        private final Class<T> beanType;
-        private final ExecutableMethod<T, R> method;
+    private static abstract class AbstractExectionHandle<T, R> implements MethodExecutionHandle<R> {
+        protected final ExecutableMethod<T, R> method;
 
-        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, ExecutableMethod<T, R> method) {
-            this.beanContext = beanContext;
-            this.beanType = beanType;
+        public AbstractExectionHandle(ExecutableMethod<T, R> method) {
             this.method = method;
-        }
-
-        @Override
-        public Class getDeclaringType() {
-            return beanType;
         }
 
         @Override
         public Argument[] getArguments() {
             return method.getArguments();
-        }
-
-        @Override
-        public R invoke(Object... arguments) {
-            return method.invoke(beanContext.getBean(beanType), arguments);
         }
 
         @Override
@@ -854,6 +866,63 @@ public class DefaultBeanContext implements BeanContext {
         public ReturnType<R> getReturnType() {
             return method.getReturnType();
         }
+
+
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return method.getAnnotation(annotationClass);
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return method.getAnnotations();
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return method.getDeclaredAnnotations();
+        }
+    }
+
+    private static final class ObjectExecutionHandle<T, R> extends  AbstractExectionHandle<T,R> {
+        private final T target;
+
+        ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
+            super(method);
+            this.target = target;
+        }
+
+        @Override
+        public R invoke(Object... arguments) {
+            return method.invoke(target, arguments);
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return target.getClass();
+        }
+    }
+
+    private static final class BeanExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {
+        private final BeanContext beanContext;
+        private final Class<T> beanType;
+
+        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, ExecutableMethod<T, R> method) {
+            super(method);
+            this.beanContext = beanContext;
+            this.beanType = beanType;
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return beanType;
+        }
+
+        @Override
+        public R invoke(Object... arguments) {
+            return method.invoke(beanContext.getBean(beanType), arguments);
+        }
+
     }
 
     private static final class BeanRegistration<T> {

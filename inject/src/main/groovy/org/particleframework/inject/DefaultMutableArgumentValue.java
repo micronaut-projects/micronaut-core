@@ -34,6 +34,9 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
 
     @Override
     public void setValue(V value) {
+        if(!getType().isInstance(value)) {
+            throw new IllegalArgumentException("Invalid value ["+value+"] for argument: " + this);
+        }
         this.value = value;
     }
 

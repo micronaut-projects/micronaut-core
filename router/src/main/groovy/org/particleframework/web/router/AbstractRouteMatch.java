@@ -22,6 +22,7 @@ import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.web.router.exceptions.RoutingException;
 
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -32,16 +33,32 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
+abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
 
-    protected final MethodExecutionHandle<T> executableMethod;
+    protected final MethodExecutionHandle<R> executableMethod;
     protected final List<Predicate<HttpRequest>> conditions;
     protected final ConversionService<?> conversionService;
 
-    protected AbstractRouteMatch(List<Predicate<HttpRequest>> conditions, MethodExecutionHandle<T> executableMethod, ConversionService<?> conversionService) {
+    protected AbstractRouteMatch(List<Predicate<HttpRequest>> conditions, MethodExecutionHandle<R> executableMethod, ConversionService<?> conversionService) {
         this.conditions = conditions;
         this.executableMethod = executableMethod;
         this.conversionService = conversionService;
+
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return executableMethod.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return executableMethod.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return executableMethod.getDeclaredAnnotations();
     }
 
     @Override
@@ -70,13 +87,13 @@ abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
     }
 
     @Override
-    public ReturnType<T> getReturnType() {
+    public ReturnType<R> getReturnType() {
         return executableMethod.getReturnType();
     }
 
 
     @Override
-    public T invoke(Object... arguments) {
+    public R invoke(Object... arguments) {
         ConversionService conversionService = this.conversionService;
 
         Argument[] targetArguments = getArguments();
@@ -108,7 +125,7 @@ abstract class AbstractRouteMatch<T> implements RouteMatch<T> {
     }
 
     @Override
-    public T execute(Map argumentValues) {
+    public R execute(Map argumentValues) {
         Argument[] targetArguments = getArguments();
 
         if (targetArguments.length == 0) {

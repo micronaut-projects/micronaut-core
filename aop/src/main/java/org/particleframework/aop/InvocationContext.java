@@ -42,6 +42,9 @@ public interface InvocationContext<T> extends ExecutionHandle<T>, MutableConvert
     Map<String, MutableArgumentValue<?>> getParameters();
 
     /**
+     * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
+     * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
+     *
      * @return The bound {@link ArgumentValue} instances
      */
     Object[] getParameterValues();

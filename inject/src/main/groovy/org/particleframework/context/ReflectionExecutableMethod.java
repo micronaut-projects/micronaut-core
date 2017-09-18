@@ -123,6 +123,21 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
         }
     }
 
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return method.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return method.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return method.getDeclaredAnnotations();
+    }
+
     private class MethodReturnType<MRT> implements ReturnType<MRT> {
         @Override
         public Class<MRT> getType() {

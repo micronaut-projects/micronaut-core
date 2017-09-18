@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject;
 
+import java.lang.reflect.AnnotatedElement;
+
 /**
  * <p>Represents a handle to an executable object. Differs from {@link Executable} in that the first argument to {@link #invoke(Object...)} is
  * not the object instead the object is typically held within the handle itself</p>
@@ -24,7 +26,7 @@ package org.particleframework.inject;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ExecutionHandle<R> {
+public interface ExecutionHandle<R> extends AnnotatedElement {
 
     /**
      * @return The declaring type

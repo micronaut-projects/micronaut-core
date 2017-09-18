@@ -88,4 +88,19 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
             }
         }
     }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return constructor.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return constructor.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return constructor.getDeclaredAnnotations();
+    }
 }

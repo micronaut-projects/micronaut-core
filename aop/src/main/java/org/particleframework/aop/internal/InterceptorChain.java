@@ -13,8 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.internal;
 
+import org.particleframework.aop.Interceptor;
+import org.particleframework.aop.InvocationContext;
+import org.particleframework.context.BeanLocator;
+import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleMultiValues;
 import org.particleframework.core.convert.MutableConvertibleMultiValuesMap;
@@ -24,7 +28,10 @@ import org.particleframework.inject.ArgumentValue;
 import org.particleframework.inject.ExecutionHandle;
 import org.particleframework.inject.MutableArgumentValue;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.IntFunction;
 
 /**
  * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
@@ -61,6 +68,26 @@ public class InterceptorChain<R> implements InvocationContext<R> {
         }
     }
 
+    public InterceptorChain(Class<Interceptor<R>>[] interceptorTypes,
+                            BeanLocator beanLocator,
+                            ExecutionHandleLocator handleLocator,
+                            Object target,
+                            Method method,
+                            Object...originalParameters) {
+        this(InterceptorChain.findInterceptors(interceptorTypes, beanLocator),
+                target,
+                handleLocator.<R>findExecutionHandle(target, method.getName(), method.getParameterTypes())
+                             .orElseThrow(()-> new IllegalStateException("No interceptable method found: " + method)),
+                originalParameters
+        );
+    }
+
+    private static <T> Interceptor<T>[] findInterceptors(Class<Interceptor<T>>[] interceptorTypes, BeanLocator beanLocator) {
+        return Arrays.stream(interceptorTypes)
+                     .map(beanLocator::getBean)
+                     .toArray((IntFunction<Interceptor<T>[]>) Interceptor[]::new);
+    }
+
     @Override
     public Class getDeclaringType() {
         return executionHandle.getDeclaringType();
@@ -72,7 +99,7 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     }
 
     @Override
-    public List getAll(CharSequence name) {
+    public List<Object> getAll(CharSequence name) {
         return attributes.getAll(name);
     }
 
@@ -157,5 +184,20 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     public MutableConvertibleMultiValues<Object> clear() {
         this.attributes.clear();
         return this;
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return executionHandle.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return executionHandle.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return executionHandle.getDeclaredAnnotations();
     }
 }

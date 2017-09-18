@@ -16,6 +16,7 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
@@ -26,7 +27,7 @@ import java.lang.annotation.Annotation;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  */
-public interface Executable<T, R> {
+public interface Executable<T, R> extends AnnotatedElement{
     /**
      * The required argument types
      */
