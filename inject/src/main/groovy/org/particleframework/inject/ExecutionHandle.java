@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 
 /**
@@ -45,4 +46,5 @@ public interface ExecutionHandle<R> extends AnnotatedElement {
      * @return The result
      */
     R invoke(Object... arguments);
+
 }

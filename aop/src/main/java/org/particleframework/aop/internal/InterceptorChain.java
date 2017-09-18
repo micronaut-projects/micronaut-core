@@ -42,11 +42,11 @@ import java.util.function.IntFunction;
  */
 @Internal
 public class InterceptorChain<R> implements InvocationContext<R> {
-    private final Interceptor<R>[] interceptors;
-    private final Object target;
-    private final ExecutionHandle<R> executionHandle;
-    private final MutableConvertibleMultiValues<Object> attributes = new MutableConvertibleMultiValuesMap<>();
-    private final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
+    protected final Interceptor<R>[] interceptors;
+    protected final Object target;
+    protected final ExecutionHandle<R> executionHandle;
+    protected final MutableConvertibleMultiValues<Object> attributes = new MutableConvertibleMultiValuesMap<>();
+    protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
     private int index = 0;
 
     public InterceptorChain(Interceptor<R>[] interceptors,
@@ -126,15 +126,6 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     @Override
     public Map<String, MutableArgumentValue<?>> getParameters() {
         return parameters;
-    }
-
-    @Override
-    public Object[] getParameterValues() {
-        return getParameters()
-                .values()
-                .stream()
-                .map(ArgumentValue::getValue)
-                .toArray();
     }
 
     @Override

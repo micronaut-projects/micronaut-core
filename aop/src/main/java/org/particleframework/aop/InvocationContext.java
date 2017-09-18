@@ -28,7 +28,7 @@ import java.util.Map;
  * <p>An InvocationContext passed to one or many {@link Interceptor} instances. Attributes can be stored within the context and
  * shared between multiple {@link Interceptor} implementations. The {@link #proceed()} method should be called to proceed to
  * the next {@link Interceptor} with the last interceptor in the chain being the original decorated method implementation.</p>
- *
+ * <p>
  * <p>The parameters to pass to the next {@link Interceptor} can be mutated using {@link MutableArgumentValue} interface returned by the {@link #getParameters()} method</p>
  *
  * @author Graeme Rocher
@@ -42,14 +42,6 @@ public interface InvocationContext<T> extends ExecutionHandle<T>, MutableConvert
     Map<String, MutableArgumentValue<?>> getParameters();
 
     /**
-     * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
-     * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
-     *
-     * @return The bound {@link ArgumentValue} instances
-     */
-    Object[] getParameterValues();
-
-    /**
      * @return The target object
      */
     Object getTarget();
@@ -60,4 +52,18 @@ public interface InvocationContext<T> extends ExecutionHandle<T>, MutableConvert
      * @return The return value of the method
      */
     T proceed() throws RuntimeException;
+
+    /**
+     * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
+     * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
+     *
+     * @return The bound {@link ArgumentValue} instances
+     */
+    default Object[] getParameterValues() {
+        return getParameters()
+                .values()
+                .stream()
+                .map(ArgumentValue::getValue)
+                .toArray();
+    }
 }
