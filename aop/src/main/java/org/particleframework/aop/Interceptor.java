@@ -22,15 +22,17 @@ import org.particleframework.core.order.Ordered;
  *
  * <p>All implementations should be thread safe and {@link javax.inject.Singleton} scoped beans</p>
  *
+ * @param <T> The intercepted type
+ * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Interceptor<T> extends Ordered {
+public interface Interceptor<T, R> extends Ordered {
 
     /**
      * Intercepts an execution from a declared {@link Around} advice. The implementation can either call {@link InvocationContext#proceed()} to return the original value or provide a replacement value
      *
      * @param context The interception context
      */
-    T intercept(InvocationContext<T> context);
+    R intercept(InvocationContext<T, R> context);
 }

@@ -148,6 +148,25 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class[] arguments) {
+        if (beanType != null) {
+
+            Optional<BeanDefinition<T>> foundBean = findBeanDefinition(beanType);
+            if (foundBean.isPresent()) {
+                BeanDefinition<T> beanDefinition = foundBean.get();
+                Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
+                if (foundMethod.isPresent()) {
+                    return foundMethod;
+                } else {
+                    return beanDefinition.<R>findPossibleMethods(method)
+                            .findFirst();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
         if (bean != null) {
 

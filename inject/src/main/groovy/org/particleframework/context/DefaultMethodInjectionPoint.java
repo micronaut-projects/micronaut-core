@@ -129,11 +129,6 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public Annotation findAnnotation(Class stereotype) {
-        return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotations());
-    }
-
-    @Override
     public String toString() {
         return "Injection Point: " + method.toGenericString();
     }

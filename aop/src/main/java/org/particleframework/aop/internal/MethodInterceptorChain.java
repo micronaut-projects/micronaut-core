@@ -16,15 +16,15 @@
 package org.particleframework.aop.internal;
 
 import org.particleframework.aop.Interceptor;
-import org.particleframework.aop.InvocationContext;
 import org.particleframework.aop.MethodInvocationContext;
-import org.particleframework.context.BeanLocator;
-import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ReturnType;
 
-import java.lang.reflect.Method;
+import java.lang.annotation.Annotation;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -35,22 +35,75 @@ import java.lang.reflect.Method;
  * @since 1.0
  */
 @Internal
-public class MethodInterceptorChain<R> extends InterceptorChain<R> implements MethodInvocationContext<R> {
-    public MethodInterceptorChain(Interceptor<R>[] interceptors, Object target, MethodExecutionHandle<R> executionHandle, Object... originalParameters) {
-        super(interceptors, target, executionHandle, originalParameters);
-    }
+public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implements MethodInvocationContext<T, R> {
+    private static final ThreadLocal<Map<ExecutableMethod, MethodInterceptorChain>> interceptorChains  = new ThreadLocal<>();
 
-    public MethodInterceptorChain(Class<Interceptor<R>>[] interceptorTypes, BeanLocator beanLocator, ExecutionHandleLocator handleLocator, Object target, Method method, Object... originalParameters) {
-        super(interceptorTypes, beanLocator, handleLocator, target, method, originalParameters);
+    private int nestingCount = 0;
+
+    public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
+        super(interceptors, target, executionHandle, originalParameters);
     }
 
     @Override
     public String getMethodName() {
-        return ((MethodExecutionHandle)executionHandle).getMethodName();
+        return executionHandle.getMethodName();
+    }
+
+    @Override
+    public Class[] getArgumentTypes() {
+        return new Class[0];
+    }
+
+    @Override
+    public Set<? extends Annotation> getExecutableAnnotations() {
+        return null;
     }
 
     @Override
     public ReturnType<R> getReturnType() {
-        return ((MethodExecutionHandle<R>)executionHandle).getReturnType();
+        return executionHandle.getReturnType();
+    }
+
+    @Override
+    public Class<?> getDeclaringType() {
+        return null;
+    }
+
+    @Internal
+    public static InterceptorChain get(Interceptor[] interceptors, Object object, ExecutableMethod method, Object...args) {
+        Map<ExecutableMethod, MethodInterceptorChain> map = interceptorChains.get();
+        if(map == null) {
+            map = new ConcurrentHashMap<>();
+            interceptorChains.set(map);
+        }
+        MethodInterceptorChain methodInterceptorChain = map.get(method);
+        if(methodInterceptorChain == null) {
+            methodInterceptorChain = new MethodInterceptorChain(interceptors, object, method, args);
+            map.put(method, methodInterceptorChain);
+        }
+        else {
+            methodInterceptorChain.nestingCount++;
+        }
+        return methodInterceptorChain;
+    }
+
+    @Internal
+    public static void remove(ExecutableMethod method) {
+        Map<ExecutableMethod, MethodInterceptorChain> map = interceptorChains.get();
+        if(map != null) {
+            MethodInterceptorChain methodInterceptorChain = map.get(method);
+            if(methodInterceptorChain != null) {
+                if(methodInterceptorChain.nestingCount == 0) {
+                    map.remove(methodInterceptorChain);
+                }
+                else {
+                    methodInterceptorChain.nestingCount--;
+                }
+            }
+
+            if(map.isEmpty()) {
+                interceptorChains.remove();
+            }
+        }
     }
 }

@@ -92,5 +92,5 @@ public interface BeanDefinition<T> {
      * @param name The method name
      * @return The possible methods
      */
-    Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name);
+    <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
 }

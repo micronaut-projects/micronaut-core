@@ -15,8 +15,11 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationUtil;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.util.Optional;
 
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
@@ -50,5 +53,8 @@ public interface Executable<T, R> extends AnnotatedElement{
      * @param <A> The annotation generic type
      * @return The Annotation instance
      */
-    <A extends Annotation> A findAnnotation(Class<A> stereotype);
+    default <A extends Annotation> Optional<A> findAnnotation(Class stereotype) {
+        A result = AnnotationUtil.findAnnotationWithStereoType(this, stereotype);
+        return result != null ? Optional.of(result) : Optional.empty();
+    }
 }

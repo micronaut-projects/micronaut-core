@@ -19,7 +19,6 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ReturnType;
 import org.particleframework.inject.annotation.Executable;
@@ -40,18 +39,18 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
-    private final String methodName;
     private final Argument[] arguments;
     private final Class declaringType;
     private final Annotation[] annotations;
     private final ReturnType returnType;
+    private final Method method;
 
     protected AbstractExecutableMethod(Method method,
                                        Class[] genericReturnTypes,
                                        Map<String, Class> arguments,
                                        Map<String, Annotation> qualifiers,
                                        Map<String, List<Class>> genericTypes) {
-        this.methodName = method.getName();
+        this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
@@ -66,6 +65,36 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
         this(method, genericReturnTypes, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return method.getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return method.getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return method.getDeclaredAnnotations();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        AbstractExecutableMethod that = (AbstractExecutableMethod) o;
+
+        return method.equals(that.method);
+    }
+
+    @Override
+    public int hashCode() {
+        return method.hashCode();
     }
 
     @Override
@@ -86,11 +115,6 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     }
 
     @Override
-    public Annotation findAnnotation(Class stereotype) {
-        return AnnotationUtil.findAnnotationWithStereoType(stereotype, annotations);
-    }
-
-    @Override
     public Class[] getArgumentTypes() {
         return Arrays.stream(arguments)
                 .map(Argument::getType)
@@ -104,7 +128,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     @Override
     public String getMethodName() {
-        return methodName;
+        return method.getName();
     }
 
     @Override
@@ -122,7 +146,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
         int requiredCount = this.arguments.length;
         int actualCount = argArray == null ? 0 : argArray.length;
         if(requiredCount != actualCount) {
-            throw new IllegalArgumentException("Wrong number of arguments to method: " + methodName);
+            throw new IllegalArgumentException("Wrong number of arguments to method: " + method.getName());
         }
         if(requiredCount > 0) {
             for (int i = 0; i < arguments.length; i++) {
@@ -130,7 +154,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
                 Class type = ReflectionUtils.getWrapperType(argument.getType());
                 Object value = argArray[i];
                 if(value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type ["+argArray[i].getClass().getName()+"] for argument ["+argument+"] of method: " + methodName);
+                    throw new IllegalArgumentException("Invalid type ["+argArray[i].getClass().getName()+"] for argument ["+argument+"] of method: " + method.getName());
                 }
             }
         }

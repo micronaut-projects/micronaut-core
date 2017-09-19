@@ -21,7 +21,7 @@ package org.particleframework.aop;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInterceptor<T> extends Interceptor<T> {
+public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
 
     /**
      * Extended version of the {@link #intercept(InvocationContext)} method that accepts a {@link MethodInvocationContext}
@@ -29,12 +29,12 @@ public interface MethodInterceptor<T> extends Interceptor<T> {
      * @param context The context
      * @return The result
      */
-    T intercept(MethodInvocationContext<T> context);
+    R intercept(MethodInvocationContext<T, R> context);
 
     @Override
-    default T intercept(InvocationContext<T> context) {
+    default R intercept(InvocationContext<T,R> context) {
         if(context instanceof MethodInvocationContext) {
-            return intercept((MethodInvocationContext<T>)context);
+            return intercept((MethodInvocationContext<T, R>)context);
         }
         throw new IllegalArgumentException("Context must be an instance of MethodInvocationContext");
     }

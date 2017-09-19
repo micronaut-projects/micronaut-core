@@ -61,6 +61,21 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ReflectionExecutableMethod<?, ?> that = (ReflectionExecutableMethod<?, ?>) o;
+
+        return method.equals(that.method);
+    }
+
+    @Override
+    public int hashCode() {
+        return method.hashCode();
+    }
+
+    @Override
     public Class[] getArgumentTypes() {
         return method.getParameterTypes();
     }
@@ -93,11 +108,6 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     @Override
     public R invoke(T instance, Object... arguments) {
         return ReflectionUtils.invokeMethod(instance, method, arguments);
-    }
-
-    @Override
-    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-        return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotations());
     }
 
     @Override

@@ -32,11 +32,11 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-class TraceInterceptor implements Interceptor<Object> {
+class TraceInterceptor implements Interceptor {
     private static final Logger LOG = LoggerFactory.getLogger(TraceInterceptor.class);
 
     @Override
-    public Object intercept(InvocationContext<Object> context) {
+    public Object intercept(InvocationContext context) {
         if (LOG.isTraceEnabled()) {
             if (context instanceof MethodExecutionHandle) {
                 MethodExecutionHandle handle = (MethodExecutionHandle) context;
@@ -44,7 +44,7 @@ class TraceInterceptor implements Interceptor<Object> {
                 Collection<MutableArgumentValue<?>> values = context.getParameters().values();
 
                 LOG.trace("Invoking method {}#{}(..) with arguments {}",
-                        context.getDeclaringType().getName(), handle.getMethodName(),
+                        context.getTarget().getClass().getName(), handle.getMethodName(),
                         values.stream().map(ArgumentValue::getValue).collect(Collectors.toList()));
             }
         }
@@ -53,7 +53,7 @@ class TraceInterceptor implements Interceptor<Object> {
             if (context instanceof MethodExecutionHandle) {
                 MethodExecutionHandle handle = (MethodExecutionHandle) context;
                 LOG.trace("Method {}#{}(..) returned result {}",
-                        context.getDeclaringType().getName(), handle.getMethodName(),
+                        context.getTarget().getClass().getName(), handle.getMethodName(),
                         result);
             }
         }

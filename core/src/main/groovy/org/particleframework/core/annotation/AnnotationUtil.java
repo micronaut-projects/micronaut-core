@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -29,7 +30,7 @@ public class AnnotationUtil {
      * @param stereotype The stereotype
      * @return The annotation
      */
-    public static <T extends Annotation> T findAnnotationWithStereoType(Class cls, Class<T> stereotype) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(AnnotatedElement cls, Class stereotype) {
         Annotation[] annotations = cls.getAnnotations();
         return findAnnotationWithStereoType(stereotype, annotations);
     }
@@ -41,7 +42,7 @@ public class AnnotationUtil {
      * @param annotations The annotations to search
      * @return The annotation
      */
-    public static <T extends Annotation> T findAnnotationWithStereoType(Class<T> stereotype, Annotation... annotations) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {
         for(Annotation ann : annotations) {
             if(stereotype.isInstance(ann)) {
                 return (T) ann;

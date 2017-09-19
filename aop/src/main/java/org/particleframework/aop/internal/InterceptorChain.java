@@ -17,21 +17,17 @@ package org.particleframework.aop.internal;
 
 import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.InvocationContext;
-import org.particleframework.context.BeanLocator;
-import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleMultiValues;
 import org.particleframework.core.convert.MutableConvertibleMultiValuesMap;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.inject.Argument;
-import org.particleframework.inject.ArgumentValue;
-import org.particleframework.inject.ExecutionHandle;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MutableArgumentValue;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
 import java.util.*;
-import java.util.function.IntFunction;
+import java.util.function.Function;
 
 /**
  * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
@@ -41,17 +37,17 @@ import java.util.function.IntFunction;
  * @since 1.0
  */
 @Internal
-public class InterceptorChain<R> implements InvocationContext<R> {
-    protected final Interceptor<R>[] interceptors;
-    protected final Object target;
-    protected final ExecutionHandle<R> executionHandle;
+public class InterceptorChain<B, R> implements InvocationContext<B,R> {
+    protected final Interceptor<B, R>[] interceptors;
+    protected final B target;
+    protected final ExecutableMethod<B, R> executionHandle;
     protected final MutableConvertibleMultiValues<Object> attributes = new MutableConvertibleMultiValuesMap<>();
     protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
     private int index = 0;
 
-    public InterceptorChain(Interceptor<R>[] interceptors,
-                            Object target,
-                            ExecutionHandle<R> executionHandle,
+    public InterceptorChain(Interceptor<B, R>[] interceptors,
+                            B target,
+                            ExecutableMethod<B, R> executionHandle,
                             Object...originalParameters) {
         this.target = target;
         this.executionHandle = executionHandle;
@@ -59,6 +55,7 @@ public class InterceptorChain<R> implements InvocationContext<R> {
         this.interceptors = new Interceptor[interceptors.length+1];
         System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
         this.interceptors[this.interceptors.length-1] = context -> executionHandle.invoke(
+                target,
                 getParameterValues()
         );
         Argument[] arguments = executionHandle.getArguments();
@@ -68,30 +65,6 @@ public class InterceptorChain<R> implements InvocationContext<R> {
         }
     }
 
-    public InterceptorChain(Class<Interceptor<R>>[] interceptorTypes,
-                            BeanLocator beanLocator,
-                            ExecutionHandleLocator handleLocator,
-                            Object target,
-                            Method method,
-                            Object...originalParameters) {
-        this(InterceptorChain.findInterceptors(interceptorTypes, beanLocator),
-                target,
-                handleLocator.<R>findExecutionHandle(target, method.getName(), method.getParameterTypes())
-                             .orElseThrow(()-> new IllegalStateException("No interceptable method found: " + method)),
-                originalParameters
-        );
-    }
-
-    private static <T> Interceptor<T>[] findInterceptors(Class<Interceptor<T>>[] interceptorTypes, BeanLocator beanLocator) {
-        return Arrays.stream(interceptorTypes)
-                     .map(beanLocator::getBean)
-                     .toArray((IntFunction<Interceptor<T>[]>) Interceptor[]::new);
-    }
-
-    @Override
-    public Class getDeclaringType() {
-        return executionHandle.getDeclaringType();
-    }
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
@@ -119,23 +92,23 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     }
 
     @Override
-    public R invoke(Object... arguments) {
-        return proceed();
-    }
-
-    @Override
     public Map<String, MutableArgumentValue<?>> getParameters() {
         return parameters;
     }
 
     @Override
-    public Object getTarget() {
-        return target;
+    public R invoke(B instance, Object... arguments) {
+        return proceed();
+    }
+
+    @Override
+    public B getTarget() {
+        return null;
     }
 
     @Override
     public R proceed() throws RuntimeException {
-        Interceptor<R> interceptor;
+        Interceptor<B, R> interceptor;
         int len = this.interceptors.length;
         if(index == len) {
             interceptor = this.interceptors[len -1];
@@ -148,31 +121,31 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     }
 
     @Override
-    public InvocationContext<R> add(CharSequence key, Object value) {
+    public InvocationContext<B,R> add(CharSequence key, Object value) {
         this.attributes.add(key, value);
         return this;
     }
 
     @Override
-    public MutableConvertibleMultiValues<Object> put(CharSequence key, Object value) {
+    public InvocationContext<B,R> put(CharSequence key, Object value) {
         this.attributes.put(key, value);
         return this;
     }
 
     @Override
-    public MutableConvertibleMultiValues<Object> remove(CharSequence key, Object value) {
+    public InvocationContext<B,R> remove(CharSequence key, Object value) {
         this.attributes.remove(key, value);
         return this;
     }
 
     @Override
-    public MutableConvertibleMultiValues<Object> clear(CharSequence key) {
+    public InvocationContext<B,R> clear(CharSequence key) {
         this.attributes.clear(key);
         return this;
     }
 
     @Override
-    public MutableConvertibleMultiValues<Object> clear() {
+    public InvocationContext<B,R> clear() {
         this.attributes.clear();
         return this;
     }
@@ -190,5 +163,9 @@ public class InterceptorChain<R> implements InvocationContext<R> {
     @Override
     public Annotation[] getDeclaredAnnotations() {
         return executionHandle.getDeclaredAnnotations();
+    }
+
+    public void setLast(Function<Object[], R> proxyHandle) {
+        this.interceptors[this.interceptors.length - 1] = context -> proxyHandle.apply(context.getParameterValues());
     }
 }

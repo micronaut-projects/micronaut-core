@@ -15,13 +15,11 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.convert.MutableConvertibleMultiValues;
 import org.particleframework.inject.ArgumentValue;
-import org.particleframework.inject.ExecutionHandle;
+import org.particleframework.inject.Executable;
 import org.particleframework.inject.MutableArgumentValue;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,7 +32,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InvocationContext<T> extends ExecutionHandle<T>, MutableConvertibleMultiValues<Object> {
+public interface InvocationContext<T, R> extends Executable<T, R>, MutableConvertibleMultiValues<Object> {
 
     /**
      * @return The bound {@link ArgumentValue} instances
@@ -44,14 +42,14 @@ public interface InvocationContext<T> extends ExecutionHandle<T>, MutableConvert
     /**
      * @return The target object
      */
-    Object getTarget();
+    T getTarget();
 
     /**
      * Proceeds with the invocation. If this is the last interceptor in the chain then the final implementation method is invoked
      *
      * @return The return value of the method
      */
-    T proceed() throws RuntimeException;
+    R proceed() throws RuntimeException;
 
     /**
      * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.

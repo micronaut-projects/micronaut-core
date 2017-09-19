@@ -15,13 +15,16 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.inject.ExecutableMethod;
-
 /**
- * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances
+ * An interface implemented by generated proxy classes
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, ExecutableMethod<T, R> {
+public interface Intercepted<T> {
+
+    /**
+     * @return The {@link Interceptor} instances used by this instance
+     */
+    Interceptor<T, Object>[] getInterceptors();
 }

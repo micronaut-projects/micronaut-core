@@ -29,6 +29,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
@@ -117,7 +118,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         );
 
         httpMethodsHandlers.put(Error.class, (Annotation ann, ExecutableMethod method) ->
-                status(((Error)ann).value(), method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes())
+                status(((Error) ann).value(), method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes())
         );
     }
 
@@ -132,26 +133,27 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @Override
-    public void process(ExecutableMethod method) {
-        Annotation annotation = method.findAnnotation(Action.class);
-         if (annotation != null) {
-            Class<? extends Annotation> annotationClass = annotation.annotationType();
-            BiFunction<Annotation, ExecutableMethod, Route> handler = httpMethodsHandlers.get(annotationClass);
-            if (handler != null) {
-                Route route = handler.apply(annotation, method);
-                Class<?> declaringType = method.getDeclaringType();
-                Controller controllerAnn = declaringType.getAnnotation(Controller.class);
-                if (controllerAnn != null) {
-                    String[] consumes = controllerAnn.consumes();
-                    route =processConsumes(route, consumes);
+    public void process(ExecutableMethod<Object, Object> method) {
+        Optional<Annotation> actionAnn = method.findAnnotation(Action.class);
+        actionAnn.ifPresent(annotation -> {
+                    Class<? extends Annotation> annotationClass = annotation.annotationType();
+                    BiFunction<Annotation, ExecutableMethod, Route> handler = httpMethodsHandlers.get(annotationClass);
+                    if (handler != null) {
+                        Route route = handler.apply(annotation, method);
+                        Class<?> declaringType = method.getDeclaringType();
+                        Controller controllerAnn = declaringType.getAnnotation(Controller.class);
+                        if (controllerAnn != null) {
+                            String[] consumes = controllerAnn.consumes();
+                            route = processConsumes(route, consumes);
+                        }
+                        Consumes consumesAnn = declaringType.getAnnotation(Consumes.class);
+                        if (consumesAnn != null) {
+                            String[] consumes = consumesAnn.value();
+                            route = processConsumes(route, consumes);
+                        }
+                    }
                 }
-                Consumes consumesAnn = declaringType.getAnnotation(Consumes.class);
-                if (consumesAnn != null) {
-                    String[] consumes = consumesAnn.value();
-                    route =processConsumes(route, consumes);
-                }
-            }
-        }
+        );
     }
 
     protected Route processConsumes(Route route, String[] consumes) {

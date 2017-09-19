@@ -18,10 +18,10 @@ package org.particleframework.aop
 import groovy.transform.CompileStatic
 import org.particleframework.aop.annotation.Trace
 import org.particleframework.aop.internal.InterceptorChain
-import org.particleframework.aop.internal.InterceptorSupport
 import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Type
 import org.particleframework.inject.Argument
+import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.ExecutionHandle
 import org.particleframework.inject.MethodExecutionHandle
 import spock.lang.Specification
@@ -35,8 +35,8 @@ class InterceptorChainSpec extends Specification {
     void "test invoke interceptor chain"() {
         given:
         Interceptor[] interceptors = [new TwoInterceptor(), new OneInterceptor(), new ThreeInterceptor()]
-        def executionHandle = Mock(ExecutionHandle)
-        executionHandle.invoke() >> "good"
+        def executionHandle = Mock(ExecutableMethod)
+        executionHandle.invoke(_) >> "good"
         executionHandle.getArguments() >> ([] as Argument[])
         InterceptorChain chain = new InterceptorChain(interceptors, this, executionHandle)
 
@@ -51,7 +51,7 @@ class InterceptorChainSpec extends Specification {
     void "test interceptor chain interaction with Java code"() {
         given:
         Interceptor[] interceptors = [new OneInterceptor(), new ArgMutating()]
-        def executionHandle = Mock(MethodExecutionHandle)
+        def executionHandle = Mock(ExecutableMethod)
         def handleLocator = Mock(ExecutionHandleLocator)
         def arg = Mock(Argument)
         arg.getName() >> 'name'
@@ -59,7 +59,7 @@ class InterceptorChainSpec extends Specification {
 
         executionHandle.getArguments() >> ([arg] as Argument[])
 
-        handleLocator.getExecutionHandle(*_) >> executionHandle
+        handleLocator.getExecutableMethod(*_) >> executionHandle
 
         FooJava$Intercepted foo  = new FooJava$Intercepted(10, handleLocator, interceptors )
 
@@ -133,31 +133,3 @@ class Foo {
 
 }
 
-@CompileStatic
-class Foo$Intercepted extends Foo {
-
-    private final Interceptor[] interceptors
-    private ExecutionHandle[] executionHandles
-
-    Foo$Intercepted(int c, ExecutionHandleLocator locator, @Type(Trace) Interceptor[] interceptors) {
-        super(c)
-        this.interceptors = interceptors
-        this.executionHandles = new ExecutionHandle[1]
-        this.executionHandles[0] = InterceptorSupport.adapt(
-                locator.getExecutionHandle(this, "blah", String)
-        ) { Object[] args ->
-            super.blah((String)args[0])
-        }
-    }
-
-    @Override
-    String blah(String name) {
-        InterceptorChain chain = new InterceptorChain(
-            interceptors,
-            this,
-            this.executionHandles[0],
-            name
-        )
-        return chain.proceed()
-    }
-}
