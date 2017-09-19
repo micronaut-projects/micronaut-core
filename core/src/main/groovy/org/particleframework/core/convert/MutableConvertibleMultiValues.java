@@ -21,7 +21,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableConvertibleMultiValues<V> extends ConvertibleMultiValues<V> {
+public interface MutableConvertibleMultiValues<V> extends ConvertibleMultiValues<V>, MutableConvertibleValues<List<V>> {
 
     /**
      * Adds a value for the given key. Note that this method will not remove items currently associated with the key.
@@ -31,17 +31,6 @@ public interface MutableConvertibleMultiValues<V> extends ConvertibleMultiValues
      * @return This instance
      */
     MutableConvertibleMultiValues<V> add(CharSequence key, V value);
-
-    /**
-     * Replaces the value or values at the given key with the specified value. This method will override any previous values.
-     * Use {@link #add(CharSequence, Object)} if you wish to add additional keys
-     *
-     * @param key The key
-     * @param value The value
-     * @return This instance
-     */
-    MutableConvertibleMultiValues<V> put(CharSequence key, V value);
-
     /**
      * Remove the given value from the given key
      *
@@ -50,14 +39,6 @@ public interface MutableConvertibleMultiValues<V> extends ConvertibleMultiValues
      * @return This instance
      */
     MutableConvertibleMultiValues<V> remove(CharSequence key, V value);
-
-    /**
-     * Clear all values associated with the given key
-     *
-     * @param key They key
-     * @return This instance
-     */
-    MutableConvertibleMultiValues<V> clear(CharSequence key);
 
     /**
      * Clear all values

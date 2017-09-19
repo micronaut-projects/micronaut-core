@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.infra
+
+import org.particleframework.context.annotation.Bean
 
 /**
- * An interface implemented by generated proxy classes
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted<T> {
-
+@Bean
+class Bar {
 }

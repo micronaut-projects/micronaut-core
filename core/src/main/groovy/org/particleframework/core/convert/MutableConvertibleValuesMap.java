@@ -13,36 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
-
-import org.particleframework.core.annotation.Internal;
+package org.particleframework.core.convert;
 
 /**
- * Default implementation of {@link MutableArgumentValue}
+ * Mutable version of {@link ConvertibleMultiValuesMap}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Internal
-class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements MutableArgumentValue<V> {
+public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> implements MutableConvertibleValues<V> {
 
-    private V value;
-
-    DefaultMutableArgumentValue(Argument<V> argument, V value) {
-        super(argument, value);
-        this.value = value;
-    }
 
     @Override
-    public void setValue(V value) {
-        if(!getType().isInstance(value)) {
-            throw new IllegalArgumentException("Invalid value ["+value+"] for argument: " + this);
+    public MutableConvertibleValues<V> put(CharSequence key, V value) {
+        if(value == null) {
+            this.map.remove(key);
         }
-        this.value = value;
+        else {
+            this.map.put(key, value);
+        }
+        return this;
     }
 
     @Override
-    public V getValue() {
-        return value;
+    public MutableConvertibleValues<V> remove(CharSequence key) {
+        this.map.remove(key);
+        return this;
+    }
+
+    @Override
+    public MutableConvertibleValues<V> clear() {
+        this.map.clear();
+        return this;
     }
 }

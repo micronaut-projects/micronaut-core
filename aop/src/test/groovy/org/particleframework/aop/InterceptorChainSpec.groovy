@@ -15,16 +15,19 @@
  */
 package org.particleframework.aop
 
-import groovy.transform.CompileStatic
-import org.particleframework.aop.annotation.Trace
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Type
 import org.particleframework.inject.Argument
 import org.particleframework.inject.ExecutableMethod
-import org.particleframework.inject.ExecutionHandle
-import org.particleframework.inject.MethodExecutionHandle
 import spock.lang.Specification
+
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
 
 /**
  * @author Graeme Rocher
@@ -36,16 +39,18 @@ class InterceptorChainSpec extends Specification {
         given:
         Interceptor[] interceptors = [new TwoInterceptor(), new OneInterceptor(), new ThreeInterceptor()]
         def executionHandle = Mock(ExecutableMethod)
+        executionHandle.getDeclaringType() >> InterceptorChainSpec
+        executionHandle.getMethodName() >> "test"
         executionHandle.invoke(_) >> "good"
         executionHandle.getArguments() >> ([] as Argument[])
-        InterceptorChain chain = new InterceptorChain(interceptors, this, executionHandle)
+        InterceptorChain chain = new InterceptorChain(interceptors, this, executionHandle, { "good"})
 
         when:
         def result = chain.proceed()
 
         then:
         result == "good"
-        chain.getAll("invoked") == [1,2,3]
+        chain.get("invoked", List).get() == [1,2,3]
     }
 
     void "test interceptor chain interaction with Java code"() {
@@ -54,6 +59,9 @@ class InterceptorChainSpec extends Specification {
         def executionHandle = Mock(ExecutableMethod)
         def handleLocator = Mock(ExecutionHandleLocator)
         def arg = Mock(Argument)
+        executionHandle.getDeclaringType() >> InterceptorChainSpec
+        executionHandle.getMethodName() >> "test"
+
         arg.getName() >> 'name'
         arg.getType() >> String
 
@@ -61,7 +69,7 @@ class InterceptorChainSpec extends Specification {
 
         handleLocator.getExecutableMethod(*_) >> executionHandle
 
-        FooJava$Intercepted foo  = new FooJava$Intercepted(10, handleLocator, interceptors )
+        FooJava$Intercepted foo  = new FooJava$Intercepted(10,  interceptors )
 
         expect:
         foo.blah("test") == 'Name is changed'
@@ -76,6 +84,9 @@ class InterceptorChainSpec extends Specification {
         }
     }
 
+
+
+
     static class OneInterceptor implements Interceptor {
 
         @Override
@@ -85,7 +96,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.add("invoked", 1)
+            context.put("invoked", [1])
             return context.proceed()
         }
     }
@@ -98,7 +109,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.add("invoked", 2)
+            context.get("invoked", List).get().add(2)
             return context.proceed()
         }
     }
@@ -112,7 +123,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.add("invoked", 3)
+            context.get("invoked", List).get().add(3)
             return context.proceed()
         }
     }
@@ -126,10 +137,17 @@ class Foo {
         this.c = c
     }
 
-    @Trace
+    @Mutating
     String blah(String name) {
         "Name is $name"
     }
 
 }
 
+@Around
+@Type(InterceptorChainSpec.ArgMutating)
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.METHOD])
+@interface Mutating {
+}

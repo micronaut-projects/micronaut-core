@@ -70,7 +70,7 @@ public class AnnotationUtil {
                 annotationSet.add(  ann);
             }
             else if(isNotInternalAnnotation(ann)) {
-                if(findAnnotationWithStereoType(ann.annotationType(), (Class)stereotype) != null) {
+                if(findAnnotationWithStereoType(ann.annotationType(), stereotype) != null) {
                     annotationSet.add( ann);
                 }
             }

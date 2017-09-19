@@ -22,9 +22,8 @@ import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ReturnType;
 
 import java.lang.annotation.Annotation;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  *
@@ -36,9 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implements MethodInvocationContext<T, R> {
-    private static final ThreadLocal<Map<ExecutableMethod, MethodInterceptorChain>> interceptorChains  = new ThreadLocal<>();
-
-    private int nestingCount = 0;
 
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
@@ -69,41 +65,4 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
         return null;
     }
 
-    @Internal
-    public static InterceptorChain get(Interceptor[] interceptors, Object object, ExecutableMethod method, Object...args) {
-        Map<ExecutableMethod, MethodInterceptorChain> map = interceptorChains.get();
-        if(map == null) {
-            map = new ConcurrentHashMap<>();
-            interceptorChains.set(map);
-        }
-        MethodInterceptorChain methodInterceptorChain = map.get(method);
-        if(methodInterceptorChain == null) {
-            methodInterceptorChain = new MethodInterceptorChain(interceptors, object, method, args);
-            map.put(method, methodInterceptorChain);
-        }
-        else {
-            methodInterceptorChain.nestingCount++;
-        }
-        return methodInterceptorChain;
-    }
-
-    @Internal
-    public static void remove(ExecutableMethod method) {
-        Map<ExecutableMethod, MethodInterceptorChain> map = interceptorChains.get();
-        if(map != null) {
-            MethodInterceptorChain methodInterceptorChain = map.get(method);
-            if(methodInterceptorChain != null) {
-                if(methodInterceptorChain.nestingCount == 0) {
-                    map.remove(methodInterceptorChain);
-                }
-                else {
-                    methodInterceptorChain.nestingCount--;
-                }
-            }
-
-            if(map.isEmpty()) {
-                interceptorChains.remove();
-            }
-        }
-    }
 }

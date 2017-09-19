@@ -29,10 +29,11 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     private final ConversionService<?> conversionService;
 
     public ConvertibleMultiValuesMap() {
-        this.values = new LinkedHashMap<>();
-        this.conversionService = ConversionService.SHARED;
+        this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
-
+    public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
+        this(values, ConversionService.SHARED);
+    }
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
         this.values = values;
         this.conversionService = conversionService;

@@ -17,6 +17,7 @@ package org.particleframework.core.convert;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Implementation of {@link MutableConvertibleMultiValues} that operates against a backing {@link java.util.LinkedHashMap}
@@ -25,6 +26,18 @@ import java.util.List;
  * @since 1.0
  */
 public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesMap<V> implements MutableConvertibleMultiValues<V> {
+
+    public MutableConvertibleMultiValuesMap() {
+    }
+
+    public MutableConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
+        super(values, ConversionService.SHARED);
+    }
+
+    public MutableConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
+        super(values, conversionService);
+    }
+
     @Override
     public MutableConvertibleMultiValues<V> add(CharSequence key, V value) {
         this.values.computeIfAbsent(key, k -> new ArrayList<>())
@@ -33,10 +46,16 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
     }
 
     @Override
-    public MutableConvertibleMultiValues<V> put(CharSequence key, V value) {
-        ArrayList<V> values = new ArrayList<>();
-        values.add(value);
-        this.values.put(key , values);
+    public MutableConvertibleValues<List<V>> put(CharSequence key, List<V> value) {
+        if(value != null) {
+            this.values.put(key, value);
+        }
+        return this;
+    }
+
+    @Override
+    public MutableConvertibleValues<List<V>> remove(CharSequence key) {
+        this.values.remove(key);
         return this;
     }
 
@@ -48,11 +67,6 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
         return this;
     }
 
-    @Override
-    public MutableConvertibleMultiValues<V> clear(CharSequence key) {
-        this.values.remove(key);
-        return this;
-    }
 
     @Override
     public MutableConvertibleMultiValues<V> clear() {

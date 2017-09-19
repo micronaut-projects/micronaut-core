@@ -15,59 +15,52 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
-import org.particleframework.context.ExecutionHandleLocator;
+import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.context.annotation.Type;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.function.Function;
+import java.util.Collections;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 public class FooJava$Intercepted extends Foo implements Intercepted<Foo> {
-    private final Interceptor[] interceptors;
-    private ExecutableMethod[] executionHandles;
-    private Function<Object[], Object>[] proxyHandles;
+    private final Interceptor[][] interceptors;
+    private final ExecutableMethod[] proxyMethods;
 
-    FooJava$Intercepted(int c, ExecutionHandleLocator locator, @Type(Trace.class) Interceptor[] interceptors) throws NoSuchMethodException {
+    FooJava$Intercepted(int c, @Type(Mutating.class) Interceptor[] interceptors) throws NoSuchMethodException {
         super(c);
-        this.interceptors = interceptors;
-        this.executionHandles = new ExecutableMethod[1];
-        this.proxyHandles = new Function[1];
-
-        Function<Object[], Object> handle = new Function<Object[], Object>() {
-            @Override
-            public Object apply(Object[] objects) {
-                return FooJava$Intercepted.super.blah((String) objects[0]);
-            }
-        };
-        this.proxyHandles[0] = handle;
-        this.executionHandles[0] = locator.getExecutableMethod(getClass().getSuperclass(), "blah", String.class);
+        this.interceptors = new Interceptor[1][];
+        this.proxyMethods = new ExecutableMethod[1];
+        this.proxyMethods[0] = new $blah0();
+        this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
     }
 
     @Override
     public String blah(String name) {
-        ExecutableMethod executableMethod = this.executionHandles[0];
-        InterceptorChain chain = MethodInterceptorChain.get (
-                interceptors,
-                this,
-                executableMethod,
-                name
-        );
-        chain.setLast(proxyHandles[0]);
-        try {
-            return (String) chain.proceed();
-        } finally {
-            MethodInterceptorChain.remove(executableMethod);
+        ExecutableMethod executableMethod = this.proxyMethods[0];
+        Interceptor[] interceptors = this.interceptors[0];
+        InterceptorChain chain = new MethodInterceptorChain(interceptors, this, executableMethod, name);
+        return (String) chain.proceed();
+    }
+
+    class $blah0 extends AbstractExecutableMethod {
+        protected $blah0() {
+            super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
+                    new Class[0],
+                    Collections.singletonMap("name", String.class),
+                    Collections.emptyMap(),
+                    Collections.emptyMap()
+                    );
+        }
+        @Override
+        protected Object invokeInternal(Object instance, Object[] arguments) {
+            return FooJava$Intercepted.super.blah((String) arguments[0]);
         }
     }
 
-    @Override
-    public Interceptor<Foo, Object>[] getInterceptors() {
-        return this.interceptors;
-    }
 }

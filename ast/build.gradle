@@ -4,6 +4,7 @@ configurations.all {
 dependencies {
     compile project(":inject")
     compileOnly project(":aop")
+    testCompile project(":aop")
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'

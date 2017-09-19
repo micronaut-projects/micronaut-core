@@ -16,6 +16,7 @@
 package org.particleframework.aop;
 
 import org.particleframework.core.convert.MutableConvertibleMultiValues;
+import org.particleframework.core.convert.MutableConvertibleValues;
 import org.particleframework.inject.ArgumentValue;
 import org.particleframework.inject.Executable;
 import org.particleframework.inject.MutableArgumentValue;
@@ -32,7 +33,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InvocationContext<T, R> extends Executable<T, R>, MutableConvertibleMultiValues<Object> {
+public interface InvocationContext<T, R> extends Executable<T, R>, MutableConvertibleValues<Object> {
 
     /**
      * @return The bound {@link ArgumentValue} instances
