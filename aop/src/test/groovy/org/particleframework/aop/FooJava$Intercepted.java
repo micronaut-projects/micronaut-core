@@ -45,7 +45,7 @@ public class FooJava$Intercepted extends Foo {
 
     @Override
     public String blah(String name) {
-        InterceptorChain<String> chain = new MethodIntercep torChain<>(
+        InterceptorChain<String> chain = new MethodInterceptorChain<>(
                 interceptors,
                 this,
                 this.executionHandles[0],
