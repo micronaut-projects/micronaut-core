@@ -36,6 +36,8 @@ public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
         if(context instanceof MethodInvocationContext) {
             return intercept((MethodInvocationContext<T, R>)context);
         }
-        throw new IllegalArgumentException("Context must be an instance of MethodInvocationContext");
+        else {
+            throw new IllegalArgumentException("Context must be an instance of MethodInvocationContext");
+        }
     }
 }

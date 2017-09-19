@@ -32,7 +32,7 @@ public interface ValueResolver {
      * @param name The name
      * @param requiredType The required type
      * @param <T> The concrete type
-     * @return An optional containing the property value if it exists
+     * @return An optional containing the property value if it exists and is able to be converted
      */
     <T> Optional<T> get(CharSequence name, Class<T> requiredType);
 

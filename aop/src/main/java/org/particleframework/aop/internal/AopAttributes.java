@@ -89,7 +89,7 @@ public class AopAttributes {
         private final String method;
         private final Class[] argumentTypes;
 
-        public MethodKey(Class declaringType, String method, Class... argumentTypes) {
+        MethodKey(Class declaringType, String method, Class... argumentTypes) {
             this.declaringType = declaringType;
             this.method = method;
             this.argumentTypes = argumentTypes;

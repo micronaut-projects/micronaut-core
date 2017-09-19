@@ -21,6 +21,6 @@ package org.particleframework.aop;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted<T> {
+public interface Intercepted {
 
 }
