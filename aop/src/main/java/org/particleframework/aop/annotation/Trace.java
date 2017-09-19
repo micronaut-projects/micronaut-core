@@ -16,6 +16,7 @@
 package org.particleframework.aop.annotation;
 
 import org.particleframework.aop.Around;
+import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -30,7 +31,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Around(TraceInterceptor.class)
+@Around
+@Type(TraceInterceptor.class)
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})

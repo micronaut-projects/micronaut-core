@@ -16,18 +16,25 @@
 package org.particleframework.aop.internal;
 
 import org.particleframework.aop.Interceptor;
+import org.particleframework.aop.InvocationContext;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.ExecutionHandleLocator;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.inject.ReturnType;
 
 import java.lang.reflect.Method;
 
 /**
+ *
+ * An internal representation of the {@link Interceptor} chain. This class implements {@link MethodInvocationContext} and is
+ * consumed by the framework itself and should not be used directly in application code.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class MethodInterceptorChain<R> extends InterceptorChain<R> implements MethodInvocationContext<R> {
     public MethodInterceptorChain(Interceptor<R>[] interceptors, Object target, MethodExecutionHandle<R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);

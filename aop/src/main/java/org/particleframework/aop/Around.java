@@ -35,9 +35,4 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE})
 @Executable
 public @interface Around {
-
-    /**
-     * @return The {@link Interceptor} that implements this advice
-     */
-    Class<? extends Interceptor> value();
 }

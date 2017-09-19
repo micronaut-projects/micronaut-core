@@ -29,7 +29,7 @@ public class AnnotationUtil {
      * @param stereotype The stereotype
      * @return The annotation
      */
-    public static <T extends Annotation> T findAnnotationWithStereoType(Class cls, Class stereotype) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(Class cls, Class<T> stereotype) {
         Annotation[] annotations = cls.getAnnotations();
         return findAnnotationWithStereoType(stereotype, annotations);
     }
@@ -41,7 +41,7 @@ public class AnnotationUtil {
      * @param annotations The annotations to search
      * @return The annotation
      */
-    public static <T extends Annotation> T findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {
+    public static <T extends Annotation> T findAnnotationWithStereoType(Class<T> stereotype, Annotation... annotations) {
         for(Annotation ann : annotations) {
             if(stereotype.isInstance(ann)) {
                 return (T) ann;
@@ -69,7 +69,7 @@ public class AnnotationUtil {
                 annotationSet.add(  ann);
             }
             else if(isNotInternalAnnotation(ann)) {
-                if(findAnnotationWithStereoType(ann.annotationType(), stereotype) != null) {
+                if(findAnnotationWithStereoType(ann.annotationType(), (Class)stereotype) != null) {
                     annotationSet.add( ann);
                 }
             }

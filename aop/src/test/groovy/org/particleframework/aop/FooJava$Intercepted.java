@@ -18,10 +18,9 @@ package org.particleframework.aop;
 import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.InterceptorSupport;
-import org.particleframework.aop.internal.Interceptors;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.ExecutionHandleLocator;
-import org.particleframework.inject.ExecutionHandle;
+import org.particleframework.context.annotation.Type;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.function.Function;
@@ -34,7 +33,7 @@ public class FooJava$Intercepted extends Foo {
     private final Interceptor[] interceptors;
     private MethodExecutionHandle[] executionHandles;
 
-    FooJava$Intercepted(int c, ExecutionHandleLocator locator, @Interceptors(Trace.class) Interceptor[] interceptors) throws NoSuchMethodException {
+    FooJava$Intercepted(int c, ExecutionHandleLocator locator, @Type(Trace.class) Interceptor[] interceptors) throws NoSuchMethodException {
         super(c);
         this.interceptors = interceptors;
         this.executionHandles = new MethodExecutionHandle[1];
@@ -46,7 +45,7 @@ public class FooJava$Intercepted extends Foo {
 
     @Override
     public String blah(String name) {
-        InterceptorChain<String> chain = new MethodInterceptorChain<>(
+        InterceptorChain<String> chain = new MethodIntercep torChain<>(
                 interceptors,
                 this,
                 this.executionHandles[0],

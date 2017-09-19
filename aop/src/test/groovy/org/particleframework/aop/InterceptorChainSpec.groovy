@@ -19,8 +19,8 @@ import groovy.transform.CompileStatic
 import org.particleframework.aop.annotation.Trace
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.aop.internal.InterceptorSupport
-import org.particleframework.aop.internal.Interceptors
 import org.particleframework.context.ExecutionHandleLocator
+import org.particleframework.context.annotation.Type
 import org.particleframework.inject.Argument
 import org.particleframework.inject.ExecutionHandle
 import org.particleframework.inject.MethodExecutionHandle
@@ -139,7 +139,7 @@ class Foo$Intercepted extends Foo {
     private final Interceptor[] interceptors
     private ExecutionHandle[] executionHandles
 
-    Foo$Intercepted(int c, ExecutionHandleLocator locator, @Interceptors(Trace) Interceptor[] interceptors) {
+    Foo$Intercepted(int c, ExecutionHandleLocator locator, @Type(Trace) Interceptor[] interceptors) {
         super(c)
         this.interceptors = interceptors
         this.executionHandles = new ExecutionHandle[1]

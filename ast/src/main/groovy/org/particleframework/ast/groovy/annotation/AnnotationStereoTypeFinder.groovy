@@ -4,6 +4,8 @@ import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.MethodNode
+import org.particleframework.aop.Around
 
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
@@ -56,5 +58,31 @@ class AnnotationStereoTypeFinder {
             }
         }
         return null
+    }
+
+    /**
+     * Find all the annotations for the given stereotype
+     *
+     * @param annotatedNode The annotated node
+     * @param stereotype The stereotype
+     * @return A list of annotations
+     */
+    List<AnnotationNode> findAnnotationsWithStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
+        List<AnnotationNode> foundAnnotations = []
+        findAnnotationsInternal(annotatedNode, stereotype, foundAnnotations)
+        return foundAnnotations
+    }
+
+    private void findAnnotationsInternal(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype, List<AnnotationNode>
+            foundAnnotations) {
+        List<AnnotationNode> annotations = annotatedNode.getAnnotations()
+        for (AnnotationNode ann in annotations) {
+            ClassNode annotationClassNode = ann.classNode
+            if (annotationClassNode.name == stereotype.name) {
+                foundAnnotations.add(ann)
+            } else if (!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
+                findAnnotationsInternal(ann.classNode, stereotype, foundAnnotations)
+            }
+        }
     }
 }

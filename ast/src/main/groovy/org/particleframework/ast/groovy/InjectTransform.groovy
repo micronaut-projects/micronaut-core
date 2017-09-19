@@ -11,6 +11,7 @@ import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
+import org.particleframework.aop.Around
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
@@ -217,8 +218,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
             }
-            else if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name)) {
+            else if (stereoTypeFinder.hasStereoType(methodNode, Inject.name, PostConstruct.name, PreDestroy.name, "org.particleframework.aop.Around")) {
                 defineBeanDefinition(concreteClass)
+
+
 
                 if (!isConstructor) {
                     if (!methodNode.isStatic() && !methodNode.isAbstract()) {
@@ -273,6 +276,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
+                        } else if (stereoTypeFinder.hasStereoType(methodNode, "org.particleframework.aop.Around")) {
+                            AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
+                            Object[] annotationTypeReferences = resolveTypeReferences(annotations)
+                            beanWriter.visitMethodProxy(
+                                    annotationTypeReferences,
+                                    resolveTypeReference(declaringClass),
+                                    requiresReflection,
+                                    resolveTypeReference(methodNode.returnType),
+                                    methodNode.name,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap)
                         } else {
                             beanWriter.visitMethodInjectionPoint(
                                     resolveTypeReference(declaringClass),
@@ -313,6 +328,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
 
+        }
+
+        protected Object[] resolveTypeReferences(AnnotationNode[] annotationNodes) {
+            return annotationNodes.collect() { AnnotationNode node -> resolveTypeReference(node.classNode) } as Object[]
         }
 
         protected List<Object> resolveGenericTypes(ClassNode type) {

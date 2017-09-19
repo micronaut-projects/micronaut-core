@@ -43,5 +43,5 @@ public interface Argument<T> extends AnnotatedElement {
      * @param <A> The annotation concrete type
      * @return The annotation or null
      */
-    <A extends Annotation> A findAnnotation(Class<? extends Annotation> stereotype);
+    <A extends Annotation> A findAnnotation(Class<A> stereotype);
 }

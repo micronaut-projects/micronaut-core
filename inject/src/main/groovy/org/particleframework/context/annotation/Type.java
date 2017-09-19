@@ -13,22 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.internal;
+package org.particleframework.context.annotation;
 
 import javax.inject.Qualifier;
-import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
- * A {@link Qualifier} that indicates which {@link org.particleframework.aop.Interceptor} instances should be injected
+ * A {@link Qualifier} that allows restricting injection by type. Useful when injection lists of instances that need to be isolated by type
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
 @Qualifier
-public @interface Interceptors {
+public @interface Type {
     /**
-     *
-     * @return The annotation types of the of the interceptors
+     * @return The types
      */
-    Class<? extends Annotation>[] value();
+    Class[] value();
 }

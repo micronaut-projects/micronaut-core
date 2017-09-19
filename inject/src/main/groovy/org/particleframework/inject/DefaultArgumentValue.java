@@ -62,7 +62,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public <A extends Annotation> A findAnnotation(Class<? extends Annotation> stereotype) {
+    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
         return argument.findAnnotation(stereotype);
     }
 

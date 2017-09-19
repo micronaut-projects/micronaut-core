@@ -104,7 +104,7 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
-    public <A extends Annotation> A findAnnotation(Class<? extends Annotation> stereotype) {
+    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
         return AnnotationUtil.findAnnotationWithStereoType(stereotype, annotations);
     }
 

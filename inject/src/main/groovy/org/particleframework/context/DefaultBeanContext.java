@@ -149,7 +149,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
-        if(bean != null) {
+        if (bean != null) {
 
             Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(bean.getClass());
             if (foundBean.isPresent()) {
@@ -599,7 +599,7 @@ public class DefaultBeanContext implements BeanContext {
                 if (qualifier != null) {
                     Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
                     List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
-                    if(beanDefinitionList.isEmpty()) {
+                    if (beanDefinitionList.isEmpty()) {
                         return null;
                     }
 
@@ -615,8 +615,7 @@ public class DefaultBeanContext implements BeanContext {
                             if (throwNonUnique) {
                                 throw new NonUniqueBeanException(beanType, candidates.iterator());
                             }
-                        }
-                        else {
+                        } else {
                             definition = first.get();
                         }
                     }
@@ -649,12 +648,12 @@ public class DefaultBeanContext implements BeanContext {
             registerConfiguration(configuration);
         }
 
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
             String activeConfigurations = beanConfigurations.values()
-                                                .stream()
-                                                .filter(config -> config.isEnabled(this))
-                                                .map(BeanConfiguration::getName)
-                                                .collect(Collectors.joining(","));
+                    .stream()
+                    .filter(config -> config.isEnabled(this))
+                    .map(BeanConfiguration::getName)
+                    .collect(Collectors.joining(","));
             LOG.debug("Loaded active configurations: {}", activeConfigurations);
         }
     }
@@ -746,7 +745,7 @@ public class DefaultBeanContext implements BeanContext {
                         candidates.add(beanDefinition);
                     }
                 } catch (NoClassDefFoundError noClassDefFoundError) {
-                    throw new BeanInstantiationException("Bean definition ["+beanDefinitionClass.getBeanTypeName()+"] could not be loaded due to missing dependencies: " + noClassDefFoundError.getMessage(), noClassDefFoundError);
+                    throw new BeanInstantiationException("Bean definition [" + beanDefinitionClass.getBeanTypeName() + "] could not be loaded due to missing dependencies: " + noClassDefFoundError.getMessage(), noClassDefFoundError);
                 }
             }
         }
@@ -792,13 +791,15 @@ public class DefaultBeanContext implements BeanContext {
             }
             Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType);
             if (qualifier != null) {
-                Optional<BeanDefinition<T>> qualified = qualifier.qualify(beanType, candidates.stream());
-                if (qualified.isPresent()) {
-                    BeanDefinition<T> definition = qualified.get();
-                    if (definition.isSingleton()) {
-                        allCandidatesAreSingleton = true;
+                List<BeanDefinition<T>> reduced = qualifier.reduce(beanType, candidates.stream())
+                        .collect(Collectors.toList());
+                if (!reduced.isEmpty()) {
+                    for (BeanDefinition<T> definition : reduced) {
+                        if (definition.isSingleton()) {
+                            allCandidatesAreSingleton = true;
+                        }
+                        addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, reduced.size() == 1);
                     }
-                    addCandidateToList(resolutionContext, beanType, definition, beansOfTypeList, qualifier, true);
                     beans = Collections.unmodifiableCollection(beansOfTypeList);
                 } else {
                     beans = Collections.emptyList();
@@ -884,7 +885,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static final class ObjectExecutionHandle<T, R> extends  AbstractExectionHandle<T,R> {
+    private static final class ObjectExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {
         private final T target;
 
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {

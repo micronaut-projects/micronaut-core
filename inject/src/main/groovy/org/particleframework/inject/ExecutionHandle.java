@@ -15,7 +15,6 @@
  */
 package org.particleframework.inject;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 
 /**

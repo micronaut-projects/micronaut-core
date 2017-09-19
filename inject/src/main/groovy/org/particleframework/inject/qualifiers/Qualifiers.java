@@ -1,6 +1,7 @@
 package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
+import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.Annotation;
 
@@ -42,7 +43,13 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(Annotation annotation) {
-        return new AnnotationQualifier<>(annotation);
+        if(annotation.annotationType() == Type.class) {
+            Type typeAnn = (Type) annotation;
+            return byType(typeAnn.value());
+        } else {
+
+            return new AnnotationQualifier<>(annotation);
+        }
     }
 
     /**
@@ -54,5 +61,16 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byTypeArguments(Class...typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
+    }
+
+    /**
+     * Build a qualifier for the given generic type arguments
+     *
+     * @param typeArguments The generic type arguments
+     * @param <T> The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byType(Class...typeArguments) {
+        return new TypeQualifier<>(typeArguments);
     }
 }
