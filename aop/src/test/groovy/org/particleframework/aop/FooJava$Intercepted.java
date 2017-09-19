@@ -28,7 +28,7 @@ import java.util.Collections;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FooJava$Intercepted extends Foo implements Intercepted<Foo> {
+public class FooJava$Intercepted extends Foo implements Intercepted {
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
 

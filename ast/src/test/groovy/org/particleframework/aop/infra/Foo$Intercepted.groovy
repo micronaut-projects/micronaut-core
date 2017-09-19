@@ -21,14 +21,12 @@ import org.particleframework.aop.annotation.Trace
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.aop.internal.MethodInterceptorChain
 import org.particleframework.context.AbstractExecutableMethod
-import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Replaces
 import org.particleframework.context.annotation.Type
 import org.particleframework.core.reflect.ReflectionUtils
 import org.particleframework.inject.ExecutableMethod
 
 import javax.inject.Singleton
-import java.util.function.Function
 
 /**
  * @author Graeme Rocher
@@ -36,7 +34,7 @@ import java.util.function.Function
  */
 @Singleton
 @Replaces(Foo)
-class Foo$Intercepted extends Foo implements Intercepted<Foo> {
+class Foo$Intercepted extends Foo implements Intercepted {
     private final Interceptor[][] interceptors
     private final ExecutableMethod[] proxyMethods
 
