@@ -26,6 +26,7 @@ import org.particleframework.http.MediaType;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
+import org.particleframework.web.router.annotation.Action;
 import org.particleframework.web.router.annotation.Consumes;
 
 import javax.inject.Singleton;
@@ -49,7 +50,7 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
         Controller controllerAnn = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
-        if (controllerAnn != null) {
+        if (controllerAnn != null && AnnotationUtil.findAnnotationWithStereoType(method, Action.class) == null) {
 
 
             Class[] argumentTypes = method.getArgumentTypes();
