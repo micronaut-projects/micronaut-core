@@ -1,8 +1,10 @@
 import org.anarres.gradle.plugin.jarjar.JarjarTask
-
+includePublication = false
 dependencies {
     compile project(":core")
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
+
+    compileOnly "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly 'org.ow2.asm:asm:5.2'
     compileOnly 'org.ow2.asm:asm-commons:5.2'
     ['javax.validation:validation-api:1.1.0.Final',
@@ -18,28 +20,22 @@ dependencies {
 def targetDir = new File(project.buildDir, "jarjar")
 def targetFile = new File(targetDir, "asm.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
-    from(jar.outputs.files)
+    from(project.files(jar.archivePath))
     classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
     destinationDir = targetDir
     destinationName = targetFile.name
 }
-jarjarTask.inputs.files(jar.outputs)
-jarjarTask.outputs.files(targetFile)
+jarjarTask.dependsOn(jar)
 
 def jarjarOutputs = task("jarjarOutputs").doLast {
-    def jar = jar.outputs.files.first()
-
     copy {
-        from(targetFile).into(jar.parentFile)
-        rename { String fileName ->
-            jar.name
-        }
+        from zipTree(jarjarTask.destinationPath)
+        into(targetDir)
     }
-    delete(targetDir)
+    delete(jarjarTask.destinationPath)
 }
 jarjarOutputs.dependsOn(jarjarTask)
-jarjarOutputs.inputs.files(targetFile)
-jarjarOutputs.outputs.files(jar.outputs)
-tasks.withType(AbstractPublishToMaven) {
-    it.finalizedBy(jarjarOutputs)
+task("rejar", type:Jar, dependsOn: jarjarOutputs) {
+    from(targetDir)
+    archiveName = "rejar.jar"
 }

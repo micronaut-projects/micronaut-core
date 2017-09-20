@@ -1,4 +1,5 @@
 dependencies {
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
     compile project(":ast")
     compile 'org.hibernate:hibernate-validator:5.4.1.Final'
     compileOnly 'org.glassfish.web:el-impl:2.2.1-b05'

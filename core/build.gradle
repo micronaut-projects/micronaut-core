@@ -18,26 +18,47 @@ def asmjar = project.fileTree('src/jarjar')
 
 def targetDir = new File(project.buildDir, "jarjar")
 def targetFile = new File(targetDir, "asm.jar")
-def jarjarTask = task("jarjarTask", type: JarjarTask) {
+def asmjarjarTask = task("asmjarjarTask", type: JarjarTask) {
     from(asmjar)
     classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
     destinationDir = targetDir
     destinationName = targetFile.name
 }
-jarjarTask.inputs.files(asmjar)
-jarjarTask.outputs.files(targetDir)
+asmjarjarTask.inputs.files(asmjar)
+asmjarjarTask.outputs.files(targetDir)
 
-def jarjarOutput = task("jarjarOutput")
+def jarjarOutput = task("asmjarjarOutput")
 jarjarOutput.doLast {
     copy {
         from(zipTree(targetFile)) {
             include "org/particleframework/asm/**"
         }
-        into(new File(project.buildDir, "classes/main"))
+        into(new File(project.buildDir, "classes/java/main"))
     }
 }
-jarjarOutput.dependsOn(jarjarTask)
+jarjarOutput.dependsOn(asmjarjarTask)
 classes {
     dependsOn(jarjarOutput)
 }
 
+
+def jarjarTask = task("jarjarTask", type: JarjarTask) {
+    from(project.files(jar.archivePath))
+    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
+    destinationDir = targetDir
+    destinationName = targetFile.name
+}
+jarjarTask.dependsOn(jar)
+
+def jarjarOutputs = task("jarjarOutputs").doLast {
+    copy {
+        from zipTree(jarjarTask.destinationPath)
+        into(targetDir)
+    }
+    delete(jarjarTask.destinationPath)
+}
+jarjarOutputs.dependsOn(jarjarTask)
+task("rejar", type:Jar, dependsOn: jarjarOutputs) {
+    from(targetDir)
+    archiveName = "rejar.jar"
+}

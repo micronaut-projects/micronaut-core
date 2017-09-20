@@ -8,6 +8,7 @@ import org.particleframework.context.env.PropertySourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -33,21 +34,26 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
     }
 
     private void loadProperties(Environment environment, String fileName, Map<String, Object> finalMap) {
-        Optional<InputStream> config = environment.getResourceAsStream(fileName);
+        Optional<URL> config = environment.getResource(fileName);
         ConfigurationEvaluator evaluator = new ConfigurationEvaluator();
-        if(config.isPresent()) {
-            try(InputStream input = config.get()) {
-                Map<String, Object> configurationValues = evaluator.evaluate(input);
-                if(!configurationValues.isEmpty()) {
-                    finalMap.putAll(configurationValues);
+        config.ifPresent(res -> {
+            String path = res.getPath();
+            if(!path.contains("src/main/groovy")) {
+                try(InputStream input = res.openStream()) {
+                    Map<String, Object> configurationValues = evaluator.evaluate(input);
+                    if(!configurationValues.isEmpty()) {
+                        finalMap.putAll(configurationValues);
+                    }
+                }
+                catch (IOException e){
+                    throw new ConfigurationException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
+                }
+                catch (Throwable e) {
+                    throw new ConfigurationException("Exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
                 }
             }
-            catch (IOException e){
-                throw new ConfigurationException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
-            }
-            catch (Throwable e) {
-                throw new ConfigurationException("Exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
-            }
-        }
+
+          }
+        );
     }
 }

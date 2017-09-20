@@ -2,8 +2,11 @@ configurations.all {
     it.exclude(group:"org.slf4j",module:"jcl-over-slf4j")
 }
 dependencies {
-    compile project(":inject")
+    compile project(":core")
+    compile group: 'javax.inject', name: 'javax.inject', version: '1'
 
+    compile project(":inject")
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly project(":aop")
     compileOnly "org.ow2.asm:asm:$asmVersion"
     compileOnly "org.ow2.asm:asm-commons:$asmVersion"

@@ -3,6 +3,9 @@
 //}
 
 dependencies {
+    compile project(":core")
+    compile group: 'javax.inject', name: 'javax.inject', version: '1'
+
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:1.1.0.Final'
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'

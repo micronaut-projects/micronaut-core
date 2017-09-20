@@ -1,4 +1,5 @@
 dependencies {
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly project(":ast")
     compile project(":inject")
     compile project(":spring")

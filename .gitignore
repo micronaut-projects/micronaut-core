@@ -6,3 +6,4 @@ classes/
 out/
 *.db
 *.log
+*.iml

@@ -1,8 +1,8 @@
 import org.anarres.gradle.plugin.jarjar.JarjarTask
-
 dependencies {
     compile project(":inject")
 }
+
 
 def targetDir = new File(project.buildDir, "jarjar")
 def targetFile = new File(targetDir, "asm.jar")
@@ -12,24 +12,16 @@ def jarjarTask = task("jarjarTask", type: JarjarTask) {
     destinationDir = targetDir
     destinationName = targetFile.name
 }
-jarjarTask.inputs.files(jar.outputs)
-jarjarTask.outputs.files(targetFile)
 
 def jarjarOutputs = task("jarjarOutputs").doLast {
-    def jar = jar.outputs.files.first()
-
     copy {
-        from(targetFile).into(jar.parentFile)
-        rename { String fileName ->
-            jar.name
-        }
+        from zipTree(jarjarTask.outputs.files.first())
+        into(targetDir)
     }
-    delete(targetDir)
+    delete(jarjarTask.outputs.files)
 }
 jarjarOutputs.dependsOn(jarjarTask)
-jarjarOutputs.inputs.files(targetFile)
-jarjarOutputs.outputs.files(jar.outputs)
-
-tasks.withType(AbstractPublishToMaven) {
-    it.finalizedBy(jarjarOutputs)
+task("rejar", type:Jar, dependsOn: jarjarOutputs) {
+    from(targetDir)
+    archiveName = "rejar.jar"
 }

@@ -1,0 +1,16 @@
+apply plugin:"groovy"
+apply plugin: 'application'
+mainClassName = "example.Application"
+applicationDefaultJvmArgs = ["-verbose"]
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+dependencies {
+    Properties props = new Properties()
+    new File("../../gradle.properties").withReader { props.load(it) }
+    compileOnly "org.particleframework:ast:${props.projectVersion}"
+    compile "org.codehaus.groovy:groovy:$props.groovyVersion"
+    compile "org.particleframework:runtime-netty:${props.projectVersion}"
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+}
