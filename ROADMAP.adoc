@@ -52,17 +52,10 @@ HTTPS must be supported
 
 Content negotiation must be supported
 
-#### Non-Blocking Request Body
-
-It should be possible to parse and retrieve the Body of a request in non-blocking manner.
-
 #### Compile Time Data Binding
 
 Data binding classes should be generated at compile time to avoid reflection when performing data binding
 
-#### Support for Server Sent Events
-
-It must be possible to stream Server Sent Events to an HTTP client
 
 #### Multi Part Support
 

@@ -215,7 +215,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return newClassName;
     }
 
-    protected String getInternalNameForCast(Object type) {
+    protected static String getInternalNameForCast(Object type) {
         if(type instanceof Class) {
             Class typeClass = (Class) type;
             if(typeClass.isPrimitive()) {

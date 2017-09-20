@@ -1,7 +1,6 @@
 package org.particleframework.inject.writer;
 
 import groovyjarjarasm.asm.*;
-import groovyjarjarasm.asm.commons.GeneratorAdapter;
 import groovyjarjarasm.asm.signature.SignatureVisitor;
 import groovyjarjarasm.asm.signature.SignatureWriter;
 import org.codehaus.groovy.runtime.MetaClassHelper;
@@ -43,6 +42,8 @@ import java.util.*;
  * @since 1.0
  */
 public class BeanDefinitionWriter extends AbstractClassFileWriter {
+    public static final int DEFAULT_MAX_STACK = 13;
+
     private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(CollectionUtils.class, "createMap", Object[].class).orElseThrow(() ->
             new IllegalStateException("CollectionUtils.createMap(..) method not found. Incompatible version of Particle on the classpath?")
     );
@@ -104,10 +105,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
+
+
     private static final Method GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
-
     private final ClassVisitor classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -127,7 +129,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private MethodVisitor preDestroyMethodVisitor;
     private MethodVisitor postConstructMethodVisitor;
     private int methodExecutorIndex = 0;
-    private int defaultMaxStack = 13;
     private int constructorLocalVariableCount = 1;
     private int currentFieldIndex = 0;
     private int currentMethodIndex = 0;
@@ -407,23 +408,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             finalizeInjectMethod();
             finalizeBuildMethod();
             constructorVisitor.visitInsn(RETURN);
-            constructorVisitor.visitMaxs(defaultMaxStack, 1);
+            constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
             if (buildMethodVisitor != null) {
                 buildMethodVisitor.visitInsn(ARETURN);
-                buildMethodVisitor.visitMaxs(defaultMaxStack, buildMethodLocalCount);
+                buildMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, buildMethodLocalCount);
             }
             if (injectMethodVisitor != null) {
-                injectMethodVisitor.visitMaxs(defaultMaxStack, injectMethodLocalCount);
+                injectMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, injectMethodLocalCount);
             }
             if (postConstructMethodVisitor != null) {
                 postConstructMethodVisitor.visitVarInsn(ALOAD, postConstructInstanceIndex);
                 postConstructMethodVisitor.visitInsn(ARETURN);
-                postConstructMethodVisitor.visitMaxs(defaultMaxStack, postConstructMethodLocalCount);
+                postConstructMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, postConstructMethodLocalCount);
             }
             if (preDestroyMethodVisitor != null) {
                 preDestroyMethodVisitor.visitVarInsn(ALOAD, preDestroyInstanceIndex);
                 preDestroyMethodVisitor.visitInsn(ARETURN);
-                preDestroyMethodVisitor.visitMaxs(defaultMaxStack, preDestroyMethodLocalCount);
+                preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
             }
 
             classWriter.visitEnd();
@@ -802,106 +803,29 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                       Map<String, Object> argumentTypes,
                                       Map<String, Object> qualifierTypes,
                                       Map<String, List<Object>> genericTypes) {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
-        Type returnTypeObject = getTypeReference(returnType);
-        Type declaringTypeObject = getTypeReference(declaringType);
-        String methodExecutorShortName = beanSimpleClassName + "Definition" + "$" + ++methodExecutorIndex;
-        String methodExecutorClassName = packageName + ".$" + methodExecutorShortName;
-        String methodExecutorInternalName = getInternalName(methodExecutorClassName);
-        classWriter.visit(V1_8, ACC_PUBLIC,
-                methodExecutorInternalName,
-                null,
-                Type.getInternalName(AbstractExecutableMethod.class),
-                null);
+        String methodExecutorClassName = beanSimpleClassName + "Definition" + "$" + ++methodExecutorIndex;
+        ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
+                beanFullClassName,
+                packageName,
+                methodExecutorClassName
+        );
+        executableMethodWriter.visitMethod(
+                declaringType,
+                returnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                qualifierTypes,
+                genericTypes
+        );
+        ClassWriter classWriter = executableMethodWriter.getClassWriter();
 
-        MethodVisitor executorMethodConstructor = startConstructor(classWriter);
-        GeneratorAdapter generatorAdapter = new GeneratorAdapter(executorMethodConstructor, Opcodes.ACC_PUBLIC, "<init>", "()V");
-        // ALOAD 0
-        generatorAdapter.loadThis();
 
-        // First constructor argument: The factory method
-        boolean hasArgs = !argumentTypes.isEmpty();
-        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
-        // load 'this'
-        generatorAdapter.loadThis();
-
-        // 1st argument Class.getMethod(..)
-        pushGetMethodFromTypeCall(executorMethodConstructor, declaringTypeObject, methodName, argumentTypeClasses);
-
-        // 2nd argument the return types
-        pushNewArrayOfTypes(executorMethodConstructor, returnTypeGenericTypes);
-
-        if (hasArgs) {
-            // 3rd Argument: Create a call to createMap from an argument types
-            pushCreateMapCall(executorMethodConstructor, argumentTypes);
-
-            // 4th Argument: Create a call to createMap from qualifier types
-            if (qualifierTypes != null) {
-                pushCreateMapCall(executorMethodConstructor, qualifierTypes);
-            } else {
-                executorMethodConstructor.visitInsn(ACONST_NULL);
-            }
-
-            // 5th Argument: Create a call to createMap from generic types
-            if (genericTypes != null) {
-                pushCreateGenericsMapCall(executorMethodConstructor, genericTypes);
-            } else {
-                executorMethodConstructor.visitInsn(ACONST_NULL);
-            }
-            // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class, Map.class, Map.class, Map.class);
-        } else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class);
-        }
-        generatorAdapter.visitInsn(RETURN);
-        generatorAdapter.visitMaxs(defaultMaxStack, 1);
-
-        // invoke the methods with the passed arguments
-        String invokeDescriptor = groovyjarjarasm.asm.commons.Method.getMethod(
-                ReflectionUtils.getDeclaredMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class).orElseThrow(() -> new IllegalStateException("AbstractExecutableMethod.invokeInternal(..) method not found. Incompatible version of Particle on the classpath?"))
-        ).getDescriptor();
-        MethodVisitor invokeMethod = classWriter.visitMethod(
-                Opcodes.ACC_PUBLIC,
-                "invokeInternal",
-                invokeDescriptor,
-                null,
-                null);
-
-        invokeMethod.visitVarInsn(ALOAD, 1);
-        pushCastToType(invokeMethod, beanFullClassName);
-
-        String methodDescriptor;
-        if (hasArgs) {
-            int argCount = argumentTypes.size();
-            methodDescriptor = getMethodDescriptor(returnType, argumentTypeClasses);
-            Iterator<Object> argIterator = argumentTypeClasses.iterator();
-            for (int i = 0; i < argCount; i++) {
-                invokeMethod.visitVarInsn(ALOAD, 2);
-                pushIntegerConstant(invokeMethod, i);
-                invokeMethod.visitInsn(AALOAD);
-                // cast the return value to the correct type
-                pushCastToType(invokeMethod, argIterator.next());
-            }
-        } else {
-            methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
-        }
-        invokeMethod.visitMethodInsn(INVOKEVIRTUAL,
-                declaringTypeObject.getInternalName(), methodName,
-                methodDescriptor, false);
-
-        if (returnTypeObject.equals(Type.VOID_TYPE)) {
-            invokeMethod.visitInsn(ACONST_NULL);
-        } else {
-            pushBoxPrimitiveIfNecessary(returnType, invokeMethod);
-        }
-        invokeMethod.visitInsn(ARETURN);
-
-        invokeMethod.visitMaxs(defaultMaxStack, 1);
-        invokeMethod.visitEnd();
         methodExecutors.put(methodExecutorClassName, classWriter);
 
         constructorVisitor.visitVarInsn(ALOAD, 0);
+        String methodExecutorInternalName = executableMethodWriter.getInternalName();
         constructorVisitor.visitTypeInsn(NEW, methodExecutorInternalName);
         constructorVisitor.visitInsn(DUP);
         constructorVisitor.visitMethodInsn(INVOKESPECIAL,
@@ -1003,7 +927,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         currentMethodIndex++;
     }
 
-    private void pushGetMethodFromTypeCall(MethodVisitor methodVisitor, Type declaringType, String methodName, Collection<Object> argumentTypes) {
+    static void pushGetMethodFromTypeCall(MethodVisitor methodVisitor, Type declaringType, String methodName, Collection<Object> argumentTypes) {
         int argTypeCount = argumentTypes.size();
         // lookup the Method instance from the declaring type
         methodVisitor.visitLdcInsn(declaringType);
@@ -1161,7 +1085,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         currentFieldIndex++;
     }
 
-    private void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
+    static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
         Class wrapperType = getWrapperType(fieldType);
         if (wrapperType != null) {
             Class primitiveType = (Class) fieldType;
@@ -1173,7 +1097,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private Class getWrapperType(Object type) {
+    static Class getWrapperType(Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
             if (typeClass.isPrimitive()) {
@@ -1201,7 +1125,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 false);
     }
 
-    private void pushInvokeMethodOnClass(MethodVisitor methodVisitor, String classMethodName, Class... classMethodArgs) {
+    static void pushInvokeMethodOnClass(MethodVisitor methodVisitor, String classMethodName, Class... classMethodArgs) {
         Method method = ReflectionUtils.getDeclaredMethod(Class.class, classMethodName, classMethodArgs)
                 .orElseThrow(() ->
                         new IllegalStateException("Class." + classMethodName + "(..) method not found")
@@ -1442,7 +1366,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     }
 
-    private void pushCastToType(MethodVisitor methodVisitor, Object type) {
+    static void pushCastToType(MethodVisitor methodVisitor, Object type) {
         String internalName = getInternalNameForCast(type);
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
         if (type instanceof Class) {
@@ -1572,7 +1496,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushCreateMapCall(MethodVisitor methodVisitor, Map<String, Object> argumentTypes) {
+    static void pushCreateMapCall(MethodVisitor methodVisitor, Map<String, Object> argumentTypes) {
         int totalSize = argumentTypes.size() * 2;
         if (totalSize > 0) {
 
@@ -1592,7 +1516,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushCreateGenericsMapCall(MethodVisitor methodVisitor, Map<String, List<Object>> genericTypes) {
+    static void pushCreateGenericsMapCall(MethodVisitor methodVisitor, Map<String, List<Object>> genericTypes) {
         int totalSize = genericTypes.size() * 2;
         if (totalSize > 0) {
             // start a new array
@@ -1621,13 +1545,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushNewListOfTypes(MethodVisitor methodVisitor, List<Object> types) {
+    static void pushNewListOfTypes(MethodVisitor methodVisitor, List<Object> types) {
         pushNewArrayOfTypes(methodVisitor, types);
         // invoke the Arrays.asList() method
         methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arrays.class), "asList", Type.getMethodDescriptor(CREATE_LIST_METHOD), false);
     }
 
-    private void pushNewArrayOfTypes(MethodVisitor methodVisitor, List<Object> types) {
+    static void pushNewArrayOfTypes(MethodVisitor methodVisitor, List<Object> types) {
         int genericTypeCount = types.size();
 
         pushNewArray(methodVisitor, Class.class, genericTypeCount);
@@ -1636,7 +1560,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushGetConstructorForType(MethodVisitor methodVisitor, Type beanType, Collection<Object> argumentClassNames) {
+    static void pushGetConstructorForType(MethodVisitor methodVisitor, Type beanType, Collection<Object> argumentClassNames) {
         methodVisitor.visitLdcInsn(beanType);
 
         int argCount = argumentClassNames.size();
@@ -1659,7 +1583,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 false);
     }
 
-    private void pushStoreTypeInArray(MethodVisitor methodVisitor, int index, int size, Object type) {
+    static void pushStoreTypeInArray(MethodVisitor methodVisitor, int index, int size, Object type) {
         // the array index position
         pushIntegerConstant(methodVisitor, index);
         // the type reference
@@ -1683,7 +1607,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushStoreStringInArray(MethodVisitor methodVisitor, int index, int size, String string) {
+    static void pushStoreStringInArray(MethodVisitor methodVisitor, int index, int size, String string) {
         // the array index position
         pushIntegerConstant(methodVisitor, index);
         // load the constant string
@@ -1696,7 +1620,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushNewArray(MethodVisitor methodVisitor, Class arrayType, int size) {
+    static void pushNewArray(MethodVisitor methodVisitor, Class arrayType, int size) {
         // the size of the array
         pushIntegerConstant(methodVisitor, size);
         // define the array
@@ -1707,7 +1631,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         }
     }
 
-    private void pushIntegerConstant(MethodVisitor methodVisitor, int value) {
+    static void pushIntegerConstant(MethodVisitor methodVisitor, int value) {
         if (value == 0) {
             // push empty class array
             methodVisitor.visitInsn(ICONST_0);
