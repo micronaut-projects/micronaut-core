@@ -3,7 +3,12 @@ configurations.all {
 }
 dependencies {
     compile project(":inject")
+
     compileOnly project(":aop")
+    compileOnly "org.ow2.asm:asm:$asmVersion"
+    compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+
+
     testCompile project(":aop")
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'

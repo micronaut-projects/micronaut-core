@@ -1,11 +1,14 @@
 package org.particleframework.inject.writer;
 
-import groovyjarjarasm.asm.*;
-import groovyjarjarasm.asm.signature.SignatureVisitor;
-import groovyjarjarasm.asm.signature.SignatureWriter;
-import org.codehaus.groovy.runtime.MetaClassHelper;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.signature.SignatureVisitor;
+import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
@@ -388,7 +391,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     /**
      * Finalize the bean definition to the given output stream
      */
-    public void visitBeanDefinitionEnd() throws IOException {
+    public void visitBeanDefinitionEnd()  {
         if (classWriter instanceof ClassWriter) {
             String[] interfaceInternalNames = new String[interfaceTypes.size()];
             Iterator<Class> j = interfaceTypes.iterator();
@@ -474,7 +477,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
                 methodExecutors.forEach((className, classWriter) -> {
                     try {
-                        visitor.visitClass(className).write(classWriter.toByteArray());
+                        try(OutputStream outputStream = visitor.visitClass(className)) {
+                            outputStream.write(classWriter.toByteArray());
+                        }
                         serviceDescriptorGenerator.generate(
                                 visitor.visitServiceDescriptor(className),
                                 className,
@@ -598,7 +603,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         pushIntegerConstant(injectMethodVisitor, 0);
         if (resolveMethod == GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT) {
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
-            String getterName = "get" + MetaClassHelper.capitalize(fieldName);
+            String getterName = "get" + NameUtils.capitalize(fieldName);
             groovyjarjarasm.asm.commons.Method getterMethod = groovyjarjarasm.asm.commons.Method.getMethod(getTypeReference(fieldType).getClassName() + " " + getterName + "()");
             injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL, declaringTypeRef.getInternalName(), getterName, getterMethod.getDescriptor(), false);
             pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
@@ -761,32 +766,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Visits a method that is a candidate for advice
-     *
-     * @param adviceTypes        The annotation types for each advice applied
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
-     * @param genericTypes       The generic types of each argument. Can be null.
-     */
-    public void visitMethodProxy(Object[] adviceTypes,
-                                 Object declaringType,
-                                 boolean requiresReflection,
-                                 Object returnType,
-                                 String methodName,
-                                 Map<String, Object> argumentTypes,
-                                 Map<String, Object> qualifierTypes,
-                                 Map<String, List<Object>> genericTypes) {
-        // TODO...
-        // Create proxying subclass of actual class
-
-        // Set BeanDefinition type to proxy type
-    }
-
-    /**
      * Visit a method that is to be made executable allow invocation of said method without reflection
      *
      * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
@@ -807,7 +786,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         String methodExecutorClassName = beanSimpleClassName + "Definition" + "$" + ++methodExecutorIndex;
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 beanFullClassName,
-                packageName,
                 methodExecutorClassName
         );
         executableMethodWriter.visitMethod(

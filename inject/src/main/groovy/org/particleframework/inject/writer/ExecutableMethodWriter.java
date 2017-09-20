@@ -15,11 +15,11 @@
  */
 package org.particleframework.inject.writer;
 
-import groovyjarjarasm.asm.ClassWriter;
-import groovyjarjarasm.asm.MethodVisitor;
-import groovyjarjarasm.asm.Opcodes;
-import groovyjarjarasm.asm.Type;
-import groovyjarjarasm.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.core.reflect.ReflectionUtils;
 
@@ -37,14 +37,12 @@ import static org.particleframework.inject.writer.BeanDefinitionWriter.*;
 public class ExecutableMethodWriter extends AbstractClassFileWriter implements Opcodes
 {
     private final ClassWriter classWriter;
-    private final String packageName;
     private final String className;
     private final String internalName;
     private final String beanFullClassName;
 
-    public ExecutableMethodWriter(String beanFullClassName, String packageName, String methodClassName) {
+    public ExecutableMethodWriter(String beanFullClassName, String methodClassName) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        this.packageName = packageName;
         this.beanFullClassName = beanFullClassName;
         this.className = methodClassName;
         this.internalName = getInternalName(methodClassName);
@@ -71,8 +69,6 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                             Map<String, List<Object>> genericTypes) {
         Type returnTypeObject = getTypeReference(returnType);
         Type declaringTypeObject = getTypeReference(declaringType);
-        String methodExecutorShortName = className;
-        String methodExecutorClassName = packageName + ".$" + methodExecutorShortName;
 
         classWriter.visit(V1_8, ACC_PUBLIC,
                 internalName,
@@ -138,8 +134,8 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
 
         String methodDescriptor;
         if (hasArgs) {
-            int argCount = argumentTypes.size();
             methodDescriptor = getMethodDescriptor(returnType, argumentTypeClasses);
+            int argCount = argumentTypes.size();
             Iterator<Object> argIterator = argumentTypeClasses.iterator();
             for (int i = 0; i < argCount; i++) {
                 invokeMethod.visitVarInsn(ALOAD, 2);

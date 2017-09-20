@@ -15,9 +15,12 @@
  */
 package org.particleframework.aop.infra
 
+import org.particleframework.aop.Intercepted
 import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.inject.BeanDefinition
+import spock.lang.Ignore
 import spock.lang.Specification
 
 /**
@@ -26,17 +29,31 @@ import spock.lang.Specification
  */
 class AopSetupSpec extends Specification {
 
+    @Ignore
     void "test AOP setup"() {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
 
+        when:"the bean definition is obtained"
+        BeanDefinition<Foo> beanDefinition = beanContext.findBeanDefinition(Foo).get()
+
+        then:
+        beanDefinition.findMethod("blah", String).isPresent()
+        // should not be a reflection based method
+        beanDefinition.findMethod("blah", String).get().getClass().getName().contains("Reflection")
+
         when:
         Foo foo = beanContext.getBean(Foo)
 
+
         then:
-        foo instanceof Foo$Intercepted
+        foo instanceof Intercepted
+        beanContext.findExecutableMethod(Foo, "blah", String).isPresent()
+        // should not be a reflection based method
+        !beanContext.findExecutableMethod(Foo, "blah", String).get().getClass().getName().contains("Reflection")
         foo.blah("test") == "Name is test"
         AopAttributes.@attributes.get() == null
+
     }
 
     void "test AOP setup attributes"() {
@@ -47,7 +64,7 @@ class AopSetupSpec extends Specification {
         Foo foo = beanContext.getBean(Foo)
         def attrs = AopAttributes.get(Foo, "blah", String)
         then:
-        foo instanceof Foo$Intercepted
+        foo instanceof Intercepted
         foo.blah("test") == "Name is test"
         AopAttributes.@attributes.get().values().first().values == attrs
 

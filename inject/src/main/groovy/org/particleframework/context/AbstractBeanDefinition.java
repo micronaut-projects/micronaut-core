@@ -1249,12 +1249,17 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this, argument);
         try {
-            Class[] genericTypes = argument.getGenericTypes();
+            Class argumentType = argument.getType();
             Class genericType;
-            if (genericTypes.length != 1) {
-                throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+            if (argumentType.isArray()) {
+                genericType = argumentType.getComponentType();
             } else {
-                genericType = genericTypes[0];
+                Class[] genericTypes = argument.getGenericTypes();
+                if (genericTypes.length != 1) {
+                    throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
+                } else {
+                    genericType = genericTypes[0];
+                }
             }
             Qualifier qualifier = resolveQualifier(argument);
             B bean = (B) beanResolver.resolveBean(genericType, qualifier);

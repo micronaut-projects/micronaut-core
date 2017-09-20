@@ -9,9 +9,9 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
+        classpath "org.anarres.jarjar:jarjar-gradle:1.0.0"
     }
 }
-
 repositories {
     mavenLocal()
     maven { url "https://repo.grails.org/grails/core" }
@@ -69,6 +69,12 @@ subprojects { subproject ->
 
     dependencies {
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
+        compileOnly 'org.ow2.asm:asm:5.2'
+        compileOnly 'org.ow2.asm:asm-commons:5.2'
+
+        testCompile "org.ow2.asm:asm:$asmVersion"
+        testCompile "org.ow2.asm:asm-commons:$asmVersion"
+
     }
 }
 

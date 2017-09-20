@@ -1,3 +1,43 @@
+import org.anarres.gradle.plugin.jarjar.JarjarTask
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.anarres.jarjar:jarjar-gradle:1.0.0"
+    }
+}
+apply plugin: 'org.anarres.jarjar'
+
 dependencies {
     compile 'com.github.ben-manes.caffeine:caffeine:2.5.0'
 }
+
+def asmjar = project.fileTree('src/jarjar')
+
+def targetDir = new File(project.buildDir, "jarjar")
+def targetFile = new File(targetDir, "asm.jar")
+def jarjarTask = task("jarjarTask", type: JarjarTask) {
+    from(asmjar)
+    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
+    destinationDir = targetDir
+    destinationName = targetFile.name
+}
+jarjarTask.inputs.files(asmjar)
+jarjarTask.outputs.files(targetDir)
+
+def jarjarOutput = task("jarjarOutput")
+jarjarOutput.doLast {
+    copy {
+        from(zipTree(targetFile)) {
+            include "org/particleframework/asm/**"
+        }
+        into(new File(project.buildDir, "classes/main"))
+    }
+}
+jarjarOutput.dependsOn(jarjarTask)
+classes {
+    dependsOn(jarjarOutput)
+}
+

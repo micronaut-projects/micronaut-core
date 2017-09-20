@@ -1,8 +1,8 @@
 package org.particleframework.inject.writer;
 
-import groovyjarjarasm.asm.ClassWriter;
-import groovyjarjarasm.asm.MethodVisitor;
-import groovyjarjarasm.asm.Type;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
 import org.particleframework.context.AbstractBeanConfiguration;
 import org.particleframework.core.annotation.Internal;
 

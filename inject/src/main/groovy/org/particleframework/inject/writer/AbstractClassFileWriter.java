@@ -1,6 +1,6 @@
 package org.particleframework.inject.writer;
 
-import groovyjarjarasm.asm.*;
+import org.objectweb.asm.*;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.io.File;
