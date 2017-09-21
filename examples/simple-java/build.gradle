@@ -17,8 +17,10 @@ repositories {
 dependencies {
     Properties props = new Properties()
     new File("../../gradle.properties").withReader { props.load(it) }
-    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly "org.particleframework:java-inject:${props.projectVersion}"
     compile "org.particleframework:runtime-netty:${props.projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+}
+shadowJar {
+    mergeServiceFiles()
 }

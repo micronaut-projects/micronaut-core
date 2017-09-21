@@ -4,7 +4,6 @@ plugins {
     id "application"
 }
 mainClassName = "example.Application"
-applicationDefaultJvmArgs = ["-verbose"]
 jar {
     manifest {
         attributes 'Main-Class': "example.Application"
@@ -21,4 +20,7 @@ dependencies {
     compile "org.codehaus.groovy:groovy:$props.groovyVersion"
     compile "org.particleframework:runtime-netty:${props.projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+}
+shadowJar {
+    mergeServiceFiles()
 }
