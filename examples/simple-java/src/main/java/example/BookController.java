@@ -18,6 +18,9 @@ package example;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Get;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -26,7 +29,7 @@ import org.particleframework.web.router.annotation.Get;
 public class BookController {
 
     @Get
-    String index() {
-        return "Welcome!";
+    List<Book> index() {
+        return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
     }
 }

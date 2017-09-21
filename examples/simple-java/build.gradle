@@ -19,6 +19,7 @@ dependencies {
     new File("../../gradle.properties").withReader { props.load(it) }
     compileOnly "org.particleframework:java-inject:${props.projectVersion}"
     compile "org.particleframework:runtime-netty:${props.projectVersion}"
+    compile "org.particleframework.configuration:jackson:${props.projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 shadowJar {
