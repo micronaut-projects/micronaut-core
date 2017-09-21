@@ -1,8 +1,55 @@
 import org.anarres.gradle.plugin.jarjar.JarjarTask
-includePublication = false
+
+// this is a hack because of how we replace jarjar'ed JAR need to manually supply dependencies to POM
+// Declare all dependencies in this map and not with the dependencies block!
+
+def deps = [
+    compile: [
+            [group: 'javax.inject', name: 'javax.inject', version: '1'],
+            project(":core")
+    ]
+]
+ext.extraPomInfo = {
+    delegate.dependencies {
+        for(entry in deps) {
+            def scope = entry.key
+            def values = entry.value
+            for(dep in values) {
+                delegate.dependency {
+                    def groupId
+                    def artifactId
+                    def artifactVersion
+
+                    if(dep instanceof Project) {
+                        groupId = projectGroupId
+                        artifactId = dep.name
+                        artifactVersion = version
+                    }
+                    else {
+
+                        groupId = dep.group
+                        artifactId = dep.name
+                        artifactVersion = dep.version
+                    }
+
+                    delegate.groupId groupId
+                    delegate.artifactId artifactId
+                    delegate.version artifactVersion
+                    delegate.scope scope
+                }
+            }
+        }
+    }
+
+}
+
 dependencies {
-    compile project(":core")
-    compile group: 'javax.inject', name: 'javax.inject', version: '1'
+    for(entry in deps) {
+        def scope = entry.key
+        for(dep in entry.value) {
+            "$scope"(dep)
+        }
+    }
 
     compileOnly "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly 'org.ow2.asm:asm:5.2'

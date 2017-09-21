@@ -15,7 +15,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 apply plugin: 'com.bmuschko.nexus'
 
-
+ext.extraPomInfo = {}
 ext.pomInfo = {
     delegate.name project.title
     delegate.description project.projectDesc
@@ -45,6 +45,8 @@ ext.pomInfo = {
             }
         }
     }
+    ext.extraPomInfo.delegate = delegate
+    ext.extraPomInfo.call()
 }
 
 modifyPom {

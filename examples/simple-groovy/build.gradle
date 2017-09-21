@@ -1,7 +1,15 @@
-apply plugin:"groovy"
-apply plugin: 'application'
+plugins {
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id 'groovy'
+    id "application"
+}
 mainClassName = "example.Application"
 applicationDefaultJvmArgs = ["-verbose"]
+jar {
+    manifest {
+        attributes 'Main-Class': "example.Application"
+    }
+}
 repositories {
     mavenLocal()
     mavenCentral()

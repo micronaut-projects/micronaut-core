@@ -1,18 +1,59 @@
 import org.anarres.gradle.plugin.jarjar.JarjarTask
 
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.anarres.jarjar:jarjar-gradle:1.0.0"
+// this is a hack because of how we replace jarjar'ed JAR need to manually supply dependencies to POM
+// Declare all dependencies in this map and not with the dependencies block!
+def deps = [
+        compile: [
+                [group:'com.github.ben-manes.caffeine',name:'caffeine', version:'2.5.0']
+        ]
+]
+
+ext.extraPomInfo = {
+    delegate.dependencies {
+        for(entry in deps) {
+            def scope = entry.key
+            def values = entry.value
+            for(dep in values) {
+                delegate.dependency {
+                    def groupId
+                    def artifactId
+                    def artifactVersion
+
+                    if(dep instanceof Project) {
+                        groupId = projectGroupId
+                        artifactId = dep.name
+                        artifactVersion = version
+                    }
+                    else {
+
+                        groupId = dep.group
+                        artifactId = dep.name
+                        artifactVersion = dep.version
+                    }
+
+                    delegate.groupId groupId
+                    delegate.artifactId artifactId
+                    delegate.version artifactVersion
+                    delegate.scope scope
+                }
+            }
+        }
     }
 }
-apply plugin: 'org.anarres.jarjar'
+
 
 dependencies {
-    compile 'com.github.ben-manes.caffeine:caffeine:2.5.0'
+    for(entry in deps) {
+        def scope = entry.key
+        for(dep in entry.value) {
+            "$scope"(dep)
+        }
+    }
 }
+
+
+// ##########################
+// JARJAR handling
 
 def asmjar = project.fileTree('src/jarjar')
 

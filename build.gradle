@@ -29,7 +29,6 @@ subprojects { subproject ->
     version project.projectVersion
 
     ext {
-        includePublication = true
         userOrg = "grails"
         isGrailsPlugin = false
         isConfiguration = subproject.name.startsWith('configurations')
@@ -40,7 +39,7 @@ subprojects { subproject ->
         group "org.particleframework.configuration"
     }
     else {
-        group "org.particleframework"
+        group projectGroupId
     }
 
 
