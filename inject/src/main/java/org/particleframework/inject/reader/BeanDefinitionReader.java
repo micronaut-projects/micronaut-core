@@ -76,7 +76,6 @@ public class BeanDefinitionReader {
                             String desc = methodNode.desc;
                             String genericSignature = methodNode.signature;
                             Type[] argumentTypes = Type.getArgumentTypes(desc);
-                            System.out.println("genericSignature = " + genericSignature);
                             List[] visibleParameterAnnotations = methodNode.visibleParameterAnnotations;
                             Map<String, Object> argMap = new LinkedHashMap<>();
                             Map<String, Object> qualifierMap = new LinkedHashMap<>();

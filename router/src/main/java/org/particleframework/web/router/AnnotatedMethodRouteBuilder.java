@@ -18,6 +18,7 @@ package org.particleframework.web.router;
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.http.MediaType;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
@@ -128,7 +129,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         if (value != null && value.length() > 0) {
             return rootUri + value;
         } else {
-            return rootUri + "/" + method.getMethodName();
+            Optional<MethodConvention> convention = MethodConvention.forMethod(method.getMethodName());
+            return rootUri + convention.map(MethodConvention::uri).orElse("/" + method.getMethodName());
         }
     }
 

@@ -783,7 +783,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                       Map<String, Object> qualifierTypes,
                                       Map<String, List<Object>> genericTypes) {
 
-        String methodExecutorClassName = beanSimpleClassName + "Definition" + "$" + ++methodExecutorIndex;
+        String methodExecutorClassName = beanFullClassName + "Definition" + "$" + ++methodExecutorIndex;
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 beanFullClassName,
                 methodExecutorClassName

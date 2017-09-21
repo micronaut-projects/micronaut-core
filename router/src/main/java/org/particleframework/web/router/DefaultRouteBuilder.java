@@ -27,9 +27,12 @@ import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.http.uri.UriMatchTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots
@@ -39,6 +42,7 @@ import java.util.function.Predicate;
  */
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
     /**
      * A {@link org.particleframework.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used
      */
@@ -283,7 +287,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception) {
-            if(originatingClass == this.originatingClass) {
+            if (originatingClass == this.originatingClass) {
                 return match(exception);
             }
             return Optional.empty();
@@ -291,7 +295,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public <T> Optional<RouteMatch<T>> match(Throwable exception) {
-            if(error.isInstance(exception)) {
+            if (error.isInstance(exception)) {
                 return Optional.of(new ErrorRouteMatch(exception, targetMethod, conditions, conversionService));
             }
             return Optional.empty();
@@ -309,7 +313,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ErrorRoute where(Predicate<HttpRequest> condition) {
-            if(condition != null) {
+            if (condition != null) {
                 conditions.add(condition);
             }
             return this;
@@ -335,19 +339,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public int compareTo(ErrorRoute o) {
-            if(o == this) {
+            if (o == this) {
                 return 0;
             }
             Class<? extends Throwable> thatExceptionType = o.exceptionType();
             Class<? extends Throwable> thisExceptionType = this.error;
 
-            if(thisExceptionType == thatExceptionType) {
+            if (thisExceptionType == thatExceptionType) {
                 return 0;
-            }
-            else if(thisExceptionType.isAssignableFrom(thatExceptionType)) {
+            } else if (thisExceptionType.isAssignableFrom(thatExceptionType)) {
                 return 1;
-            }
-            else if(thatExceptionType.isAssignableFrom(thisExceptionType)) {
+            } else if (thatExceptionType.isAssignableFrom(thisExceptionType)) {
                 return -1;
             }
             return -1;
@@ -377,7 +379,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
-            if( this.status == status ) {
+            if (this.status == status) {
                 return Optional.of(new StatusRouteMatch(status, targetMethod, conditions, conversionService));
             }
             return Optional.empty();
@@ -396,7 +398,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public StatusRoute where(Predicate<HttpRequest> condition) {
-            if(condition != null) {
+            if (condition != null) {
                 conditions.add(condition);
             }
             return this;
@@ -451,12 +453,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.uriMatchTemplate = uriTemplate;
             this.acceptedMediaTypes = mediaTypes;
             this.targetMethod = targetMethod;
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Created Route: {}", this);
+            }
         }
 
 
         @Override
         public String toString() {
-            return httpMethod + " " + uriMatchTemplate + " -> " + targetMethod;
+            StringBuilder builder = new StringBuilder(httpMethod);
+            return builder.append(' ')
+                    .append(uriMatchTemplate)
+                    .append(" -> ")
+                    .append(targetMethod.getDeclaringType().getSimpleName())
+                    .append('#')
+                    .append(targetMethod)
+                    .append(" (")
+                    .append(acceptedMediaTypes.stream().collect(Collectors.joining(",")))
+                    .append(" )")
+                    .toString();
+
         }
 
         @Override

@@ -29,56 +29,66 @@ public enum MethodConvention {
     /**
      * The index method of controllers
      */
-    INDEX("GET"),
+    INDEX("","GET"),
 
     /**
      * The show method of controllers
      */
-    SHOW("GET"),
+    SHOW(MethodConvention.ID_PATH,"GET"),
 
     /**
      * The show method of controllers
      */
-    SAVE("POST"),
+    SAVE("","POST"),
 
     /**
      * The default update method of controllers
      */
-    UPDATE("PUT"),
+    UPDATE(MethodConvention.ID_PATH,"PUT"),
 
     /**
      * The default delete method of controllers
      */
-    DELETE,
+    DELETE(MethodConvention.ID_PATH),
 
     /**
      * The default options method of controllers
      */
-    OPTIONS,
+    OPTIONS(""),
 
     /**
      * The default head method of controllers
      */
-    HEAD,
+    HEAD(""),
 
     /**
      * The default trace method of controllers
      */
-    TRACE;
+    TRACE("");
 
+    public static final String ID_PATH = "{/id}";
     private final String lowerCase;
     private final String httpMethod;
+    private final String uri;
 
-    MethodConvention(String httpMethod) {
+    MethodConvention(String uri, String httpMethod) {
+        this.uri = uri;
         this.httpMethod = httpMethod;
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
-    MethodConvention() {
+    MethodConvention(String uri) {
+        this.uri = uri;
         this.httpMethod = name();
         this.lowerCase = name().toLowerCase(Locale.ENGLISH);
     }
 
+    /**
+     * @return The default URI to map to if non is specified
+     */
+    public String uri() {
+        return this.uri;
+    }
     /**
      * The HTTP method name for this convention
      */
