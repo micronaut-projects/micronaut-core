@@ -1,0 +1,24 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id 'java'
+    id "application"
+}
+mainClassName = "example.Application"
+applicationDefaultJvmArgs = ["-verbose"]
+jar {
+    manifest {
+        attributes 'Main-Class': "example.Application"
+    }
+}
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+dependencies {
+    Properties props = new Properties()
+    new File("../../gradle.properties").withReader { props.load(it) }
+    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    compileOnly "org.particleframework:java-inject:${props.projectVersion}"
+    compile "org.particleframework:runtime-netty:${props.projectVersion}"
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+}

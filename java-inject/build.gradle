@@ -3,14 +3,12 @@
 //}
 
 dependencies {
-    compile project(":core")
-    compile group: 'javax.inject', name: 'javax.inject', version: '1'
+    compile project(":inject")
 
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:1.1.0.Final'
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    compile project(":inject")
     testCompile "junit:junit:4.7"
 }
 
@@ -22,5 +20,3 @@ test {
         }
     }
 }
-
-//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

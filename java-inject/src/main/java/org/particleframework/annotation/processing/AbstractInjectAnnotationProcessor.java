@@ -12,7 +12,10 @@ import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.StandardLocation;
 import java.io.File;
+import java.io.IOException;
+import java.net.URI;
 
 abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
@@ -37,7 +40,30 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.genericUtils = new GenericUtils(elementUtils,typeUtils);
 
         Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
-        this.targetDirectory = new File(javacOptions.get(Option.D));
+        URI baseDir = null;
+        try {
+            baseDir = filer.getResource(StandardLocation.CLASS_OUTPUT, "", "").toUri();
+        } catch (Exception e) {
+            // ignore
+        }
+        if(baseDir != null) {
+            try {
+                this.targetDirectory = new File(baseDir);
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+        else {
+
+            String javacDirectoryOption = javacOptions.get(Option.D);
+            if(javacDirectoryOption != null) {
+
+                this.targetDirectory = new File(javacDirectoryOption);
+            }
+        }
+        if(this.targetDirectory == null) {
+            messager.printMessage(Diagnostic.Kind.ERROR, "Compilation target directory cannot be established");
+        }
     }
 
     // error will produce a "compile error"

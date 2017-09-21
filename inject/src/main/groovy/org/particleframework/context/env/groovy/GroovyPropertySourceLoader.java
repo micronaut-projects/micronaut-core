@@ -35,8 +35,9 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
 
     private void loadProperties(Environment environment, String fileName, Map<String, Object> finalMap) {
         Optional<URL> config = environment.getResource(fileName);
-        ConfigurationEvaluator evaluator = new ConfigurationEvaluator();
+
         config.ifPresent(res -> {
+            ConfigurationEvaluator evaluator = new ConfigurationEvaluator();
             String path = res.getPath();
             if(!path.contains("src/main/groovy")) {
                 try(InputStream input = res.openStream()) {
