@@ -15,6 +15,7 @@
  */
 package org.particleframework.aop;
 
+import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.AbstractExecutableMethod;
@@ -32,7 +33,7 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
 
-    FooJava$Intercepted(int c, @Type(Mutating.class) Interceptor[] interceptors) throws NoSuchMethodException {
+    FooJava$Intercepted(int c, @Type({Mutating.class, Trace.class}) Interceptor[] interceptors) throws NoSuchMethodException {
         super(c);
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];

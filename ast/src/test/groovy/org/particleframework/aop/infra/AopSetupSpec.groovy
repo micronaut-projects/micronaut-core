@@ -65,7 +65,7 @@ class AopSetupSpec extends Specification {
         def attrs = AopAttributes.get(Foo, "blah", String)
         then:
         foo instanceof Intercepted
-        foo.blah("test") == "Name is test"
+        foo.blah("test") == "Name is changed"
         AopAttributes.@attributes.get().values().first().values == attrs
 
         when:

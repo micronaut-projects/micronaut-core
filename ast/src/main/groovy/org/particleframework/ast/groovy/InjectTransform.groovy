@@ -338,7 +338,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                             constructorQualifierTypes,
                                             constructorGenericTypeMap)
                                     aopProxyWriter.visitConstructor( constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
-                                    aopProxyWriter.visitProxyEnd()
+
 
                                 } else {
                                     addError("Class must have at least one public constructor in order to be a candidate for dependency injection", concreteClass)
@@ -347,6 +347,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                             }
+                            aopProxyWriter.visitMethod(
+                                    resolveTypeReference(concreteClass),
+                                    resolveTypeReference(methodNode.returnType),
+                                    returnTypeGenerics,
+                                    methodNode.name,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap
+                            )
+                            aopProxyWriter.visitProxyEnd()
                             aopProxyWriter.writeTo(sourceUnit.configuration.targetDirectory)
                             def node = new AnnotatedNode()
                             def replaces = new AnnotationNode(makeCached(Replaces))

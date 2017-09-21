@@ -14,7 +14,6 @@ import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
@@ -276,10 +275,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         return getClassFileName(className);
     }
 
-    protected String getClassFileName(String className) {
-        return className.replace('.', File.separatorChar) + ".class";
-    }
-
     /**
      * <p>In the case where the produced class is produced by a factory method annotated with {@link org.particleframework.context.annotation.Bean} this method should be called</p>
      *
@@ -446,22 +441,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     }
 
     public void writeTo(File compilationDir) throws IOException {
-        accept(new ClassWriterOutputVisitor() {
-            @Override
-            public OutputStream visitClass(String className) throws IOException {
-                File targetFile = new File(compilationDir, getClassFileName(className)).getCanonicalFile();
-                File parentDir = targetFile.getParentFile();
-                if (!parentDir.exists() && !parentDir.mkdirs()) {
-                    throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
-                }
-                return new FileOutputStream(targetFile);
-            }
-
-            @Override
-            public File visitServiceDescriptor(String classname) {
-                return compilationDir;
-            }
-        });
+        accept(newClassWriterOutputVisitor(compilationDir));
     }
 
     /**
@@ -783,11 +763,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                                       Map<String, Object> qualifierTypes,
                                       Map<String, List<Object>> genericTypes) {
 
-        String methodExecutorClassName = beanFullClassName + "Definition" + "$" + ++methodExecutorIndex;
+        String methodProxyShortName = "$exec" + ++methodExecutorIndex;
+        String methodExecutorClassName = beanFullClassName + "Definition" + "$" + methodProxyShortName;
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 beanFullClassName,
-                methodExecutorClassName
-        );
+                methodExecutorClassName,
+                methodProxyShortName);
         executableMethodWriter.visitMethod(
                 declaringType,
                 returnType,
@@ -1063,18 +1044,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         currentFieldIndex++;
     }
 
-    static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
-        Class wrapperType = getWrapperType(fieldType);
-        if (wrapperType != null) {
-            Class primitiveType = (Class) fieldType;
-            Type wrapper = Type.getType(wrapperType);
-            String primitiveName = primitiveType.getName();
-            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
-            org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
-            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
-        }
-    }
-
     static Class getWrapperType(Object type) {
         if (type instanceof Class) {
             Class typeClass = (Class) type;
@@ -1342,48 +1311,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 Type.getMethodDescriptor(Type.getType(Object.class), Type.getType(BeanResolutionContext.class), Type.getType(BeanContext.class), Type.getType(Object.class)),
                 false);
 
-    }
-
-    static void pushCastToType(MethodVisitor methodVisitor, Object type) {
-        String internalName = getInternalNameForCast(type);
-        methodVisitor.visitTypeInsn(CHECKCAST, internalName);
-        if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                Type primitiveType = Type.getType(typeClass);
-                org.objectweb.asm.commons.Method valueMethod = null;
-                switch (primitiveType.getSort()) {
-                    case Type.BOOLEAN:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("boolean booleanValue()");
-                        break;
-                    case Type.CHAR:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("char charValue()");
-                        break;
-                    case Type.BYTE:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("byte byteValue()");
-                        break;
-                    case Type.SHORT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("short shortValue()");
-                        break;
-                    case Type.INT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("int intValue()");
-                        break;
-                    case Type.LONG:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("long longValue()");
-                        break;
-                    case Type.DOUBLE:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("double doubleValue()");
-                        break;
-                    case Type.FLOAT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
-                        break;
-                }
-
-                if (valueMethod != null) {
-                    methodVisitor.visitMethodInsn(INVOKEVIRTUAL, internalName, valueMethod.getName(), valueMethod.getDescriptor(), false);
-                }
-            }
-        }
     }
 
     private int pushNewBuildLocalVariable() {

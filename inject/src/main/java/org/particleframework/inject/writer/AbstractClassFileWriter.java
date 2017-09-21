@@ -18,6 +18,9 @@ import java.util.Collection;
  */
 public abstract class AbstractClassFileWriter implements Opcodes {
 
+    public static final String CONSTRUCTOR_NAME = "<init>";
+    public static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
+
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
         return Type.getType(referenceString);
@@ -46,6 +49,69 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         else {
             throw new IllegalArgumentException("Type reference should be a Class or a String representing the class name");
         }
+    }
+
+    protected static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
+        Class wrapperType = BeanDefinitionWriter.getWrapperType(fieldType);
+        if (wrapperType != null) {
+            Class primitiveType = (Class) fieldType;
+            Type wrapper = Type.getType(wrapperType);
+            String primitiveName = primitiveType.getName();
+            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
+            org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
+            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+        }
+    }
+
+    protected static void pushCastToType(MethodVisitor methodVisitor, Object type) {
+        String internalName = getInternalNameForCast(type);
+        methodVisitor.visitTypeInsn(CHECKCAST, internalName);
+        if (type instanceof Class) {
+            Class typeClass = (Class) type;
+            if (typeClass.isPrimitive()) {
+                Type primitiveType = Type.getType(typeClass);
+                org.objectweb.asm.commons.Method valueMethod = null;
+                switch (primitiveType.getSort()) {
+                    case Type.BOOLEAN:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("boolean booleanValue()");
+                        break;
+                    case Type.CHAR:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("char charValue()");
+                        break;
+                    case Type.BYTE:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("byte byteValue()");
+                        break;
+                    case Type.SHORT:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("short shortValue()");
+                        break;
+                    case Type.INT:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("int intValue()");
+                        break;
+                    case Type.LONG:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("long longValue()");
+                        break;
+                    case Type.DOUBLE:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("double doubleValue()");
+                        break;
+                    case Type.FLOAT:
+                        valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
+                        break;
+                }
+
+                if (valueMethod != null) {
+                    methodVisitor.visitMethodInsn(INVOKEVIRTUAL, internalName, valueMethod.getName(), valueMethod.getDescriptor(), false);
+                }
+            }
+        }
+    }
+
+    protected Type[] getObjectTypes(Object... types) {
+        Type[] converted = new Type[types.length];
+        for (int i = 0; i < types.length; i++) {
+            Object type = types[i];
+            converted[i] = getObjectType(type);
+        }
+        return converted;
     }
 
     protected static Type getObjectType(Object type) {
@@ -131,6 +197,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return getConstructorDescriptor(Arrays.asList(argumentTypes));
     }
 
+
     protected static String getConstructorDescriptor(Collection<Object> argList) {
         StringBuilder builder = new StringBuilder();
         builder.append('(');
@@ -168,7 +235,13 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected MethodVisitor startConstructor(ClassVisitor classWriter) {
-        return classWriter.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+        return classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
+    }
+
+    protected MethodVisitor startConstructor(ClassVisitor classWriter, Object...argumentTypes
+    ) {
+        String descriptor = getConstructorDescriptor(argumentTypes);
+        return classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null);
     }
 
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
@@ -232,5 +305,29 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 return getInternalName(className);
             }
         }
+    }
+
+
+    protected String getClassFileName(String className) {
+        return className.replace('.', File.separatorChar) + ".class";
+    }
+
+    protected ClassWriterOutputVisitor newClassWriterOutputVisitor(File compilationDir) {
+        return new ClassWriterOutputVisitor() {
+            @Override
+            public OutputStream visitClass(String className) throws IOException {
+                File targetFile = new File(compilationDir, getClassFileName(className)).getCanonicalFile();
+                File parentDir = targetFile.getParentFile();
+                if (!parentDir.exists() && !parentDir.mkdirs()) {
+                    throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
+                }
+                return new FileOutputStream(targetFile);
+            }
+
+            @Override
+            public File visitServiceDescriptor(String classname) {
+                return compilationDir;
+            }
+        };
     }
 }

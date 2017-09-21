@@ -70,15 +70,19 @@ class AnnotationStereoTypeFinder {
     List<AnnotationNode> findAnnotationsWithStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
         List<AnnotationNode> foundAnnotations = []
         findAnnotationsInternal(annotatedNode, stereotype, foundAnnotations)
-        return foundAnnotations
+        return foundAnnotations.unique()
     }
 
     private void findAnnotationsInternal(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype, List<AnnotationNode>
             foundAnnotations) {
+        AnnotationNode foundAnn = findAnnotationWithStereoType(annotatedNode, stereotype)
+        if(foundAnn != null) {
+            foundAnnotations.add(foundAnn)
+        }
         List<AnnotationNode> annotations = annotatedNode.getAnnotations()
         for (AnnotationNode ann in annotations) {
             ClassNode annotationClassNode = ann.classNode
-            if (annotationClassNode.name == stereotype.name) {
+            if (findAnnotationWithStereoType(ann.classNode, stereotype) != null) {
                 foundAnnotations.add(ann)
             } else if (!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
                 findAnnotationsInternal(ann.classNode, stereotype, foundAnnotations)

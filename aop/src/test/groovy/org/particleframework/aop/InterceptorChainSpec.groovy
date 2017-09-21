@@ -15,6 +15,10 @@
  */
 package org.particleframework.aop
 
+import groovyjarjarasm.asm.ClassReader
+import groovyjarjarasm.asm.ClassVisitor
+import groovyjarjarasm.asm.util.ASMifier
+import groovyjarjarasm.asm.util.TraceClassVisitor
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Type
@@ -34,6 +38,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
  * @since 1.0
  */
 class InterceptorChainSpec extends Specification {
+
+
 
     void "test invoke interceptor chain"() {
         given:
@@ -55,6 +61,12 @@ class InterceptorChainSpec extends Specification {
 
     void "test interceptor chain interaction with Java code"() {
         given:
+//        String className = FooJava$Intercepted.getName();
+//        String classAsPath = className.replace('.', '/') + ".class";
+//        InputStream stream = FooJava$Intercepted.getClassLoader().getResourceAsStream(classAsPath);
+//        ClassReader reader = new ClassReader(stream)
+//        reader.accept(new TraceClassVisitor((ClassVisitor)null, new ASMifier(), new PrintWriter(System.out)), 0);
+
         Interceptor[] interceptors = [new OneInterceptor(), new ArgMutating()]
         def executionHandle = Mock(ExecutableMethod)
         def handleLocator = Mock(ExecutionHandleLocator)
