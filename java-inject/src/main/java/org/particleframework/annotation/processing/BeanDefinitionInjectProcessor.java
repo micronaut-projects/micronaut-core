@@ -38,24 +38,22 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.DECLARED;
 
-@SupportedAnnotationTypes({
-    "javax.annotation.PostConstruct",
-    "javax.annotation.PreDestroy",
-    "javax.inject.Inject",
-    "javax.inject.Qualifier",
-    "javax.inject.Singleton",
-    "org.particleframework.config.ConfigurationProperties",
-    "org.particleframework.context.annotation.Bean",
-    "org.particleframework.context.annotation.Context",
-    "org.particleframework.context.annotation.Factory",
-    "org.particleframework.context.annotation.Replaces",
-    "org.particleframework.context.annotation.Value",
-    "org.particleframework.inject.annotation.Executable",
-    "org.particleframework.inject.qualifiers.primary.Primary",
-    "org.particleframework.stereotype.Controller"
-})
+@SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
+
+    private static final String[] ANNOTATION_STEREOTYPES = new String[] {
+            "javax.annotation.PostConstruct",
+            "javax.annotation.PreDestroy",
+            "javax.inject.Inject",
+            "javax.inject.Qualifier",
+            "javax.inject.Singleton",
+            "org.particleframework.context.annotation.Bean",
+            "org.particleframework.context.annotation.Replaces",
+            "org.particleframework.context.annotation.Value",
+            "org.particleframework.inject.annotation.Executable"
+
+    };
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private ServiceDescriptorGenerator serviceDescriptorGenerator;
@@ -72,27 +70,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
-        // accumulate all the class elements for all annotated elements
-        annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
-            .stream()
-            // filtering annotation definitions, which are not processed
-            .filter(element -> element.getKind() != ANNOTATION_TYPE)
-            .forEach(element -> {
-                TypeElement typeElement = modelUtils.classElementFor(element);
-                AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
-                beanDefinitionWriters.put(typeElement.getQualifiedName().toString(), visitor);
-            }));
-
-        // process the annotations
-        if (roundEnv.processingOver()) {
-            note("Creating bean classes for %s type elements", beanDefinitionWriters.size());
-            beanDefinitionWriters.values().forEach(visitor -> {
-                TypeElement classElement = visitor.getConcreteClass();
-                classElement.accept(visitor, classElement.getQualifiedName().toString());
-                visitor.getBeanDefinitionWriters().values().forEach(writer -> processBeanDefinitions(classElement, writer));
-            });
+        if(annotations.isEmpty()) {
+            return false;
         }
-        return true;
+        annotations = annotations.stream().filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES)).collect(Collectors.toSet());
+        if(!annotations.isEmpty()) {
+
+            // accumulate all the class elements for all annotated elements
+            annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
+                    .stream()
+                    // filtering annotation definitions, which are not processed
+                    .filter(element -> element.getKind() != ANNOTATION_TYPE)
+                    .forEach(element -> {
+                        TypeElement typeElement = modelUtils.classElementFor(element);
+                        AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
+                        beanDefinitionWriters.put(typeElement.getQualifiedName().toString(), visitor);
+                    }));
+
+            // process the annotations
+            int count = beanDefinitionWriters.size();
+            if(count > 0) {
+                note("Creating bean classes for %s type elements", count);
+                beanDefinitionWriters.values().forEach(visitor -> {
+                    TypeElement classElement = visitor.getConcreteClass();
+                    classElement.accept(visitor, classElement.getQualifiedName().toString());
+                    visitor.getBeanDefinitionWriters().values().forEach(writer -> processBeanDefinitions(classElement, writer));
+                });
+                return true;
+            }
+        }
+        return false;
     }
 
     private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionWriter beanDefinitionWriter) {

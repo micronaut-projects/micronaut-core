@@ -15,6 +15,8 @@ import java.util.Optional;
 
 class AnnotationUtils {
 
+    private static final List<String> IGNORED_ANNOTATIONS = Arrays.asList("Retention", "Documented", "Target");
+
     private final Elements elementUtils;
 
     AnnotationUtils(Elements elementUtils) {
@@ -30,12 +32,19 @@ class AnnotationUtils {
     }
 
     boolean hasStereotype(Element classElement, List<String> stereotypes) {
+        if(classElement == null) {
+            return false;
+        }
+        if(stereotypes.contains(classElement.toString())) {
+            return true;
+        }
         List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(classElement);
         for (AnnotationMirror ann: annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
-            if (stereotypes.contains(annotationType.toString())) {
+            String annotationTypeString = annotationType.toString();
+            if (stereotypes.contains(annotationTypeString)) {
                 return true;
-            } else if (!Arrays.asList("Retention", "Documented", "Target").contains(
+            } else if (!IGNORED_ANNOTATIONS.contains(
                 annotationType.asElement().getSimpleName().toString())) {
                 if (hasStereotype(annotationType.asElement(), stereotypes)) {
                     return true;
