@@ -71,7 +71,7 @@ public class ReflectionUtils {
      */
     public static <T> Optional<Constructor<T>> findConstructor(Class<T> type, Class... argTypes) {
         try {
-            return Optional.of(type.getConstructor(argTypes));
+            return Optional.of(type.getDeclaredConstructor(argTypes));
         } catch (NoSuchMethodException e) {
             return Optional.empty();
         }

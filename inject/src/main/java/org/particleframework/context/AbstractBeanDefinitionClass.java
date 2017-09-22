@@ -10,6 +10,7 @@ import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Context;
+import org.particleframework.inject.BeanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     @Override
     public Class getBeanType() {
         if (isPresent()) {
-            return GenericTypeUtils.resolveSuperGenericTypeArgument(beanDefinition)
+            return GenericTypeUtils.resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
                     .orElse(null);
         }
         return null;

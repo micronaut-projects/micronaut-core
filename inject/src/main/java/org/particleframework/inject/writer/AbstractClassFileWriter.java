@@ -1,6 +1,7 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.*;
+import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.io.File;
@@ -52,7 +53,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     protected static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
-        Class wrapperType = BeanDefinitionWriter.getWrapperType(fieldType);
+        Class wrapperType = AbstractClassFileWriter.getWrapperType(fieldType);
         if (wrapperType != null) {
             Class primitiveType = (Class) fieldType;
             Type wrapper = Type.getType(wrapperType);
@@ -103,6 +104,59 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 }
             }
         }
+    }
+
+
+    protected static void pushReturnValue(MethodVisitor methodVisitor, Object type) {
+        if (type instanceof Class) {
+            Class typeClass = (Class) type;
+            if (typeClass.isPrimitive()) {
+                Type primitiveType = Type.getType(typeClass);
+                switch (primitiveType.getSort()) {
+                    case Type.BOOLEAN:
+                    case Type.INT:
+                    case Type.CHAR:
+                    case Type.BYTE:
+                    case Type.SHORT:
+                        methodVisitor.visitInsn(IRETURN);
+                        break;
+                    case Type.VOID:
+                        methodVisitor.visitInsn(RETURN);
+                        break;
+                    case Type.LONG:
+                        methodVisitor.visitInsn(LRETURN);
+                        break;
+                    case Type.DOUBLE:
+                        methodVisitor.visitInsn(DRETURN);
+                        break;
+                    case Type.FLOAT:
+                        methodVisitor.visitInsn(FRETURN);
+                        break;
+                }
+
+            }
+            else {
+                methodVisitor.visitInsn(ARETURN);
+            }
+        }
+        else {
+            methodVisitor.visitInsn(ARETURN);
+        }
+    }
+
+    protected static Class getWrapperType(Object type) {
+        if (isPrimitive(type)) {
+            return ReflectionUtils.getWrapperType((Class)type);
+        }
+        return null;
+    }
+
+    protected static boolean isPrimitive(Object type) {
+        if (type instanceof Class) {
+            Class typeClass = (Class) type;
+            return typeClass.isPrimitive();
+        }
+        return false;
     }
 
     protected Type[] getObjectTypes(Object... types) {
@@ -258,11 +312,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             Type superConstructor = Type.getType(superClass.getDeclaredConstructor(argumentTypes));
             cv.visitMethodInsn(INVOKESPECIAL,
                     superType.getInternalName(),
-                    "<init>",
+                    CONSTRUCTOR_NAME,
                     superConstructor.getDescriptor(),
                     false);
         } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("Particle version on compile classpath doesn't match", e);
+            throw new ClassGenerationException("Particle version on compile classpath doesn't match", e);
         }
     }
 
@@ -329,5 +383,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 return compilationDir;
             }
         };
+    }
+
+    protected void returnVoid(GeneratorAdapter overriddenMethodGenerator) {
+        overriddenMethodGenerator.pop();
+        overriddenMethodGenerator.visitInsn(RETURN);
     }
 }

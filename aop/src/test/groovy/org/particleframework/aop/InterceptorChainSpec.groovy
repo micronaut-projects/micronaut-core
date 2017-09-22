@@ -154,6 +154,10 @@ class Foo {
         "Name is $name"
     }
 
+    void blahVoid() {
+
+    }
+
 }
 
 @Around

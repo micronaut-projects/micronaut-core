@@ -16,12 +16,8 @@
 package org.particleframework.aop.infra
 
 import org.particleframework.aop.Around
-import org.particleframework.aop.Interceptor
-import org.particleframework.aop.InvocationContext
-import org.particleframework.aop.annotation.Trace
 import org.particleframework.context.annotation.Type
 
-import javax.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
@@ -33,36 +29,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-class Foo {
-
-    Bar bar
-
-    Foo(Bar bar) {
-        this.bar = bar
-    }
-
-    @Mutating
-    String blah(String name) {
-        "Name is $name"
-    }
-
-    @Singleton
-    static class ArgMutating implements Interceptor {
-
-        @Override
-        Object intercept(InvocationContext context) {
-            context.getParameters().get("name").setValue("changed")
-            return context.proceed()
-        }
-    }
-}
 
 @Around
-@Type(Foo.ArgMutating)
+@Type(ArgMutatingInterceptor)
 @Documented
 @Retention(RUNTIME)
 @Target([ElementType.METHOD])
 @interface Mutating {
+    String value()
 }
+
 

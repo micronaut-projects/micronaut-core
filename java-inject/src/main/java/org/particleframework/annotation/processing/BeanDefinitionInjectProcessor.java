@@ -73,17 +73,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
 
         // accumulate all the class elements for all annotated elements
-        annotations.forEach(annotation -> {
-            roundEnv.getElementsAnnotatedWith(annotation)
-                .stream()
-                // filtering annotation definitions, which are not processed
-                .filter(element -> element.getKind() != ANNOTATION_TYPE)
-                .forEach(element -> {
-                    TypeElement typeElement = modelUtils.classElementFor(element);
-                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
-                    beanDefinitionWriters.put(typeElement.getQualifiedName().toString(), visitor);
-                });
-        });
+        annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
+            .stream()
+            // filtering annotation definitions, which are not processed
+            .filter(element -> element.getKind() != ANNOTATION_TYPE)
+            .forEach(element -> {
+                TypeElement typeElement = modelUtils.classElementFor(element);
+                AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
+                beanDefinitionWriters.put(typeElement.getQualifiedName().toString(), visitor);
+            }));
 
         // process the annotations
         if (roundEnv.processingOver()) {

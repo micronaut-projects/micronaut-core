@@ -16,6 +16,7 @@
 package org.particleframework.inject;
 
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionService;
 
 /**
  * Default implementation of {@link MutableArgumentValue}
@@ -36,9 +37,14 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
     @Override
     public void setValue(V value) {
         if(!getType().isInstance(value)) {
-            throw new IllegalArgumentException("Invalid value ["+value+"] for argument: " + this);
+
+            this.value = value;
         }
-        this.value = value;
+        else {
+            this.value = ConversionService.SHARED.convert(value, getType()).orElseThrow(() ->
+                new IllegalArgumentException("Invalid value ["+value+"] for argument: " + this)
+            );
+        }
     }
 
     @Override

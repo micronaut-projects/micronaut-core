@@ -4,6 +4,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
@@ -43,8 +44,10 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class BeanDefinitionWriter extends AbstractClassFileWriter {
+public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
     public static final int DEFAULT_MAX_STACK = 13;
+    public static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Map.class, Map.class, Map.class)
+            .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
 
     private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(CollectionUtils.class, "createMap", Object[].class).orElseThrow(() ->
             new IllegalStateException("CollectionUtils.createMap(..) method not found. Incompatible version of Particle on the classpath?")
@@ -108,10 +111,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     );
 
 
-
     private static final Method GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
+    public static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
+            Annotation.class, boolean.class, Class.class, Constructor.class, Map.class, Map.class, Map.class
+    ));
+    public static final org.objectweb.asm.commons.Method BEAN_DEFINITION_METHOD_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
+            Method.class, Map.class, Map.class, Map.class
+    ));
     private final ClassVisitor classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -125,6 +133,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private final String providedBeanClassName;
     private final String packageName;
     private final String beanSimpleClassName;
+    private final Type beanDefinitionType;
     private MethodVisitor constructorVisitor;
     private MethodVisitor buildMethodVisitor;
     private MethodVisitor injectMethodVisitor;
@@ -153,6 +162,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     private int postConstructInstanceIndex;
     private int preDestroyInstanceIndex;
     private boolean beanFinalized = false;
+    private Type superType = Type.getType(AbstractBeanDefinition.class);
 
     /**
      * Creates a bean definition writer
@@ -224,6 +234,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         this.beanSimpleClassName = className;
         this.providedBeanClassName = providedClassName;
         this.beanDefinitionName = beanDefinitionPackageName + ".$" + className + "Definition";
+        this.beanDefinitionType = getTypeReference(beanDefinitionName);
         this.beanType = getTypeReference(beanFullClassName);
         this.providedType = getTypeReference(providedBeanClassName);
         this.scope = scope != null ? getTypeReference(scope) : null;
@@ -231,6 +242,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         this.isSingleton = isSingleton;
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
+    }
+
+    /**
+     * Alter the super class of this method definition
+     *
+     * @param name The super type
+     */
+    public void visitSuperType(String name) {
+        this.superType = getTypeReference(name);
     }
 
     /**
@@ -307,41 +327,56 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     private void buildFactoryMethodClassConstructor(Object factoryClass, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
         Type factoryTypeRef = getTypeReference(factoryClass);
-        this.constructorVisitor = startConstructor(classWriter);
+        GeneratorAdapter constructorGenerator = new GeneratorAdapter(
+                startConstructor(classWriter),
+                ACC_PUBLIC,
+                CONSTRUCTOR_NAME,
+                DESCRIPTOR_DEFAULT_CONSTRUCTOR
+        );
+        this.constructorVisitor = constructorGenerator;
+
         // ALOAD 0
-        constructorVisitor.visitVarInsn(ALOAD, 0);
+        constructorGenerator.loadThis();
 
         // First constructor argument: The factory method
         boolean hasArgs = !argumentTypes.isEmpty();
         Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
         // load 'this'
-        constructorVisitor.visitVarInsn(ALOAD, 0);
+        constructorGenerator.loadThis();
 
-        pushGetMethodFromTypeCall(constructorVisitor, factoryTypeRef, methodName, argumentTypeClasses);
+        pushGetMethodFromTypeCall(constructorGenerator, factoryTypeRef, methodName, argumentTypeClasses);
 
 
         if (hasArgs) {
             // 2nd Argument: Create a call to createMap from an argument types
-            pushCreateMapCall(this.constructorVisitor, argumentTypes);
+            pushCreateMapCall(constructorGenerator, argumentTypes);
 
             // 3rd Argument: Create a call to createMap from qualifier types
             if (qualifierTypes != null) {
-                pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                pushCreateMapCall(constructorGenerator, qualifierTypes);
             } else {
-                constructorVisitor.visitInsn(ACONST_NULL);
+                constructorGenerator.visitInsn(ACONST_NULL);
             }
 
             // 4th Argument: Create a call to createMap from generic types
             if (genericTypes != null) {
                 pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
             } else {
-                constructorVisitor.visitInsn(ACONST_NULL);
+                constructorGenerator.visitInsn(ACONST_NULL);
             }
             // now invoke super(..) if no arg constructor
-            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class, Map.class, Map.class, Map.class);
         } else {
-            invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Method.class);
+            pushThreeCallsToEmptyMap(constructorGenerator);
         }
+        constructorGenerator.invokeConstructor(superType, BEAN_DEFINITION_METHOD_CONSTRUCTOR);
+    }
+
+    private void pushThreeCallsToEmptyMap(GeneratorAdapter constructorGenerator) {
+        org.objectweb.asm.commons.Method emptyMapMethod = org.objectweb.asm.commons.Method.getMethod("java.util.Map emptyMap()");
+
+        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
+        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
+        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
     }
 
 
@@ -352,6 +387,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param qualifierTypes The qualifier type names for each parameter
      * @param genericTypes   The generic types for each parameter
      */
+    @Override
     public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes,
                                                Map<String, Object> qualifierTypes,
                                                Map<String, List<Object>> genericTypes) {
@@ -386,7 +422,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
     /**
      * Finalize the bean definition to the given output stream
      */
-    public void visitBeanDefinitionEnd()  {
+    @Override
+    public void visitBeanDefinitionEnd() {
         if (classWriter instanceof ClassWriter) {
             String[] interfaceInternalNames = new String[interfaceTypes.size()];
             Iterator<Class> j = interfaceTypes.iterator();
@@ -396,7 +433,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
             classWriter.visit(V1_8, ACC_PUBLIC,
                     beanDefinitionInternalName,
                     generateBeanDefSig(providedType.getInternalName()),
-                    Type.getInternalName(AbstractBeanDefinition.class),
+                    superType.getInternalName(),
                     interfaceInternalNames);
 
             if (buildMethodVisitor == null) {
@@ -440,16 +477,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         return ((ClassWriter) classWriter).toByteArray();
     }
 
+    @Override
     public void writeTo(File compilationDir) throws IOException {
         accept(newClassWriterOutputVisitor(compilationDir));
     }
 
-    /**
-     * Write the class to output via a visitor that manages output destination
-     *
-     * @param visitor the writer output visitor
-     * @throws IOException If an error occurs
-     */
+    @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             out.write(toByteArray());
@@ -457,7 +490,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
                 methodExecutors.forEach((className, classWriter) -> {
                     try {
-                        try(OutputStream outputStream = visitor.visitClass(className)) {
+                        try (OutputStream outputStream = visitor.visitClass(className)) {
                             outputStream.write(classWriter.toByteArray());
                         }
                         serviceDescriptorGenerator.generate(
@@ -789,8 +822,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         constructorVisitor.visitInsn(DUP);
         constructorVisitor.visitMethodInsn(INVOKESPECIAL,
                 methodExecutorInternalName,
-                "<init>",
-                "()V",
+                CONSTRUCTOR_NAME,
+                DESCRIPTOR_DEFAULT_CONSTRUCTOR,
                 false);
 
         pushInvokeMethodOnSuperClass(constructorVisitor, ADD_EXECUTABLE_METHOD);
@@ -1044,16 +1077,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
         currentFieldIndex++;
     }
 
-    static Class getWrapperType(Object type) {
-        if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                return ReflectionUtils.getWrapperType(typeClass);
-            }
-        }
-        return null;
-    }
-
     private int pushGetFieldFromTypeLocalVariable(MethodVisitor methodVisitor, Type declaringType, String fieldName) {
         methodVisitor.visitLdcInsn(declaringType);
         // and the field name
@@ -1066,7 +1089,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, Method methodToInvoke) {
         constructorVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                Type.getInternalName(AbstractBeanDefinition.class),
+                superType.getInternalName(),
                 methodToInvoke.getName(),
                 Type.getMethodDescriptor(methodToInvoke),
                 false);
@@ -1340,64 +1363,92 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     private void visitBeanDefinitionConstructorInternal(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
         if (constructorVisitor == null) {
-            this.constructorVisitor = startConstructor(classWriter);
+            org.objectweb.asm.commons.Method constructorMethod = org.objectweb.asm.commons.Method.getMethod(CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION);
+            this.constructorVisitor = classWriter.visitMethod(ACC_PROTECTED, CONSTRUCTOR_NAME, constructorMethod.getDescriptor(), null, null);
+            GeneratorAdapter protectedConstructor = new GeneratorAdapter(
+                    constructorVisitor,
+                    ACC_PROTECTED,
+                    CONSTRUCTOR_NAME,
+                    constructorMethod.getDescriptor()
+            );
+
+            Type[] arguments = constructorMethod.getArgumentTypes();
+            protectedConstructor.loadThis();
+            for (int i = 0; i < arguments.length; i++) {
+                protectedConstructor.loadArg(i);
+            }
+            protectedConstructor.invokeConstructor(superType, BEAN_DEFINITION_CLASS_CONSTRUCTOR);
+
+            MethodVisitor defaultConstructor = startConstructor(classWriter);
+            GeneratorAdapter defaultConstructorVisitor = new GeneratorAdapter(
+                    defaultConstructor,
+                    ACC_PUBLIC,
+                    CONSTRUCTOR_NAME,
+                    DESCRIPTOR_DEFAULT_CONSTRUCTOR
+            );
             // ALOAD 0
-            constructorVisitor.visitVarInsn(ALOAD, 0);
+            defaultConstructor.visitVarInsn(ALOAD, 0);
 
             // First constructor argument: The Annotation scope
             if (scope != null) {
 
                 // this builds SomeClass.getAnnotation(Scope.class) to be passed to first argument of super(..)
-                pushGetAnnotationForType(this.beanType, this.scope);
+                pushGetAnnotationForType(defaultConstructor, this.beanType, this.scope);
             } else {
                 // pass "null" to first argument of super(..) if no scope is specified
-                constructorVisitor.visitInsn(ACONST_NULL);
+                defaultConstructor.visitInsn(ACONST_NULL);
             }
 
             // Second argument: pass either true or false to second argument of super(..) for singleton status
             if (isSingleton) {
-                constructorVisitor.visitInsn(ICONST_1);
+                defaultConstructor.visitInsn(ICONST_1);
             } else {
-                constructorVisitor.visitInsn(ICONST_0);
+                defaultConstructor.visitInsn(ICONST_0);
             }
 
             // Third argument: pass the bean definition type as the third argument to super(..)
-            constructorVisitor.visitLdcInsn(beanType);
+            defaultConstructor.visitLdcInsn(beanType);
 
             // 4th Argument: pass the constructor used to create the bean as the third argument
 
             Collection<Object> argumentClassNames = argumentTypes.values();
-            pushGetConstructorForType(this.constructorVisitor, this.beanType, argumentClassNames);
+            pushGetConstructorForType(defaultConstructor, this.beanType, argumentClassNames);
 
 
             // now invoke super(..) if no arg constructor
             if (argumentTypes.isEmpty()) {
-
-                invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class);
+                pushThreeCallsToEmptyMap(defaultConstructorVisitor);
             } else {
                 // we have a constructor with arguments
 
                 // 5th Argument: Create a call to createMap from an argument types
-                pushCreateMapCall(this.constructorVisitor, argumentTypes);
+                pushCreateMapCall(defaultConstructor, argumentTypes);
 
                 // 6th Argument: Create a call to createMap from qualifier types
                 if (qualifierTypes != null) {
-                    pushCreateMapCall(this.constructorVisitor, qualifierTypes);
+                    pushCreateMapCall(defaultConstructor, qualifierTypes);
                 } else {
-                    constructorVisitor.visitInsn(ACONST_NULL);
+                    defaultConstructor.visitInsn(ACONST_NULL);
                 }
 
                 // 7th Argument: Create a call to createMap from generic types
                 if (genericTypes != null) {
-                    pushCreateGenericsMapCall(this.constructorVisitor, genericTypes);
+                    pushCreateGenericsMapCall(defaultConstructor, genericTypes);
                 } else {
-                    constructorVisitor.visitInsn(ACONST_NULL);
+                    defaultConstructor.visitInsn(ACONST_NULL);
                 }
-
-
-                invokeConstructor(constructorVisitor, AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Map.class, Map.class, Map.class);
-
             }
+
+
+            defaultConstructorVisitor.invokeConstructor(
+                    beanDefinitionType,
+                    BEAN_DEFINITION_CLASS_CONSTRUCTOR
+            );
+
+            defaultConstructorVisitor.visitInsn(RETURN);
+            defaultConstructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
+            defaultConstructorVisitor.visitEnd();
+
         }
     }
 
@@ -1570,19 +1621,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
      * @param targetClass    The target class
      * @param annotationType The annotation type
      */
-    private void pushGetAnnotationForType(Type targetClass, Type annotationType) {
-        constructorVisitor.visitLdcInsn(targetClass);
-        pushGetAnnotationCall(annotationType);
+    private void pushGetAnnotationForType(MethodVisitor methodVisitor, Type targetClass, Type annotationType) {
+        methodVisitor.visitLdcInsn(targetClass);
+        pushGetAnnotationCall(methodVisitor, annotationType);
     }
 
-    private void pushGetAnnotationCall(Type annotationType) {
-        constructorVisitor.visitLdcInsn(annotationType);
+    private void pushGetAnnotationCall(MethodVisitor methodVisitor, Type annotationType) {
+        methodVisitor.visitLdcInsn(annotationType);
         Method method = ReflectionUtils.getDeclaredMethod(Class.class, "getAnnotation", Class.class)
                 .orElseThrow(() ->
                         new IllegalStateException("Class.getAnnotation(..) method not found")
                 );
         String descriptor = Type.getType(method).getDescriptor();
-        constructorVisitor.visitMethodInsn(INVOKEVIRTUAL,
+        methodVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 Type.getInternalName(Class.class),
                 "getAnnotation",
                 descriptor,
@@ -1629,18 +1680,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter {
 
     private void visitSuperTypeParameters(SignatureVisitor sv, String... typeParameters) {
 
-        // visit super class
-        SignatureVisitor psv = sv.visitSuperclass();
-        psv.visitClassType(Type.getInternalName(AbstractBeanDefinition.class));
-        for (String typeParameter : typeParameters) {
 
-            SignatureVisitor ppsv = psv.visitTypeArgument('=');
-            String beanTypeInternalName = getInternalName(typeParameter);
-            ppsv.visitClassType(beanTypeInternalName);
-            ppsv.visitEnd();
-        }
+            // visit super class
+            SignatureVisitor psv = sv.visitSuperclass();
+            psv.visitClassType(superType.getInternalName());
+            if(superType.getClassName().equals(AbstractBeanDefinition.class.getName())) {
+                for (String typeParameter : typeParameters) {
 
-        psv.visitEnd();
+                    SignatureVisitor ppsv = psv.visitTypeArgument('=');
+                    String beanTypeInternalName = getInternalName(typeParameter);
+                    ppsv.visitClassType(beanTypeInternalName);
+                    ppsv.visitEnd();
+                }
+            }
+
+            psv.visitEnd();
+
     }
 
     @Override

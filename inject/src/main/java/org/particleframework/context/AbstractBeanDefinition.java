@@ -48,7 +48,6 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
 
-    private static final LinkedHashMap<String, Class> EMPTY_MAP = new LinkedHashMap<>(0);
     private final Annotation scope;
     private final boolean singleton;
     private final Class<T> type;
@@ -95,16 +94,6 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                 genericTypes);
     }
 
-    /**
-     * Constructs a bean definition that is produced from a method call on another type
-     *
-     * @param method The method to call
-     */
-    @Internal
-    protected AbstractBeanDefinition(Method method) {
-        this(method, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
-    }
-
     @Internal
     protected AbstractBeanDefinition(Annotation scope,
                                      boolean singleton,
@@ -126,21 +115,6 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments, qualifierMap, genericTypes);
     }
 
-    @Internal
-    protected AbstractBeanDefinition(Annotation scope,
-                                     boolean singleton,
-                                     Class<T> type,
-                                     Constructor<T> constructor) {
-        this(scope, singleton, type, constructor, EMPTY_MAP, null, null);
-    }
-
-    protected AbstractBeanDefinition(Annotation scope,
-                                     boolean singleton,
-                                     Class<T> type,
-                                     Constructor<T> constructor,
-                                     Map<String, Class> arguments) {
-        this(scope, singleton, type, constructor, arguments, null, null);
-    }
 
     @Override
     public Optional<ExecutableMethod<T, ?>> findMethod(String name, Class... argumentTypes) {

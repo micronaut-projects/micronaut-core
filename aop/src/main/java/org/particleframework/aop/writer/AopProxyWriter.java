@@ -42,7 +42,7 @@ import static org.particleframework.inject.writer.BeanDefinitionWriter.DEFAULT_M
  * @author Graeme Rocher
  * @since 1.0
  */
-public class AopProxyWriter extends AbstractClassFileWriter {
+public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
 
     private static final java.lang.reflect.Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
         new IllegalStateException("InterceptorChain.resolveInterceptors(..) method not found. Incompatible version of Particle?")
@@ -113,21 +113,19 @@ public class AopProxyWriter extends AbstractClassFileWriter {
         return proxiedMethods;
     }
 
-    /**
-     * Visits a no arguments constructor. Either this method or {@link #visitConstructor(Map, Map, Map)} should be called at least once
-     */
-    public void visitConstructor() {
-        visitConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    @Override
+    public void visitBeanDefinitionConstructor() {
+        visitBeanDefinitionConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
     /**
-     * Visits a constructor with arguments. Either this method or {@link #visitConstructor()} should be called at least once
+     * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor()} should be called at least once
      *
      * @param argumentTypes  The argument names and types. Should be an ordered map should as {@link LinkedHashMap}
      * @param qualifierTypes The argument names and qualifier types. Should be an ordered map should as {@link LinkedHashMap}
      * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
-    public void visitConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
         this.constructorArgumentCount = argumentTypes.size();
         Map<String, Object> newArgumentTypes = new LinkedHashMap<>(argumentTypes);
         newArgumentTypes.put("interceptors", Interceptor[].class);
@@ -170,13 +168,13 @@ public class AopProxyWriter extends AbstractClassFileWriter {
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
      */
-    public void visitMethod(Object declaringType,
-                            Object returnType,
-                            List<Object> returnTypeGenericTypes,
-                            String methodName,
-                            Map<String, Object> argumentTypes,
-                            Map<String, Object> qualifierTypes,
-                            Map<String, List<Object>> genericTypes) {
+    public void visitAroundMethod(Object declaringType,
+                                  Object returnType,
+                                  List<Object> returnTypeGenericTypes,
+                                  String methodName,
+                                  Map<String, Object> argumentTypes,
+                                  Map<String, Object> qualifierTypes,
+                                  Map<String, List<Object>> genericTypes) {
 
         int index = proxiedMethods.size();
         int argumentCount = argumentTypes.size();
@@ -188,6 +186,9 @@ public class AopProxyWriter extends AbstractClassFileWriter {
         bridgeArguments.add(proxyFullName);
         bridgeArguments.addAll(argumentTypeList);
         String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
+        Type returnTypeObject = getTypeReference(returnType);
+        boolean isPrimitive = isPrimitive(returnType);
+        boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
 
         ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                 proxyFullName, methodExecutorClassName, methodProxyShortName
@@ -207,6 +208,12 @@ public class AopProxyWriter extends AbstractClassFileWriter {
                      AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
                 }
                 invokeMethodGenerator.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
+                if(isVoidReturn) {
+                    invokeMethodGenerator.visitInsn(ACONST_NULL);
+                }
+                else {
+                    AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
+                }
                 invokeMethodGenerator.visitInsn(ARETURN);
                 invokeMethodVisitor.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
                 invokeMethodVisitor.visitEnd();
@@ -258,9 +265,10 @@ public class AopProxyWriter extends AbstractClassFileWriter {
         // fourth argument: array of the argument values
         overriddenMethodGenerator.push(argumentCount);
         overriddenMethodGenerator.newArray(Type.getType(Object.class));
-        overriddenMethodGenerator.dup();
+
         // now pass the remaining arguments from the original method
         for (int i = 0; i < argumentCount; i++) {
+            overriddenMethodGenerator.dup();
             Object argType = argumentTypeList.get(i);
             overriddenMethodGenerator.push(i);
             overriddenMethodGenerator.loadArg(i);
@@ -274,21 +282,27 @@ public class AopProxyWriter extends AbstractClassFileWriter {
         overriddenMethodGenerator.loadLocal(chainVar);
 
         overriddenMethodGenerator.visitMethodInsn(INVOKEVIRTUAL, TYPE_INTERCEPTOR_CHAIN.getInternalName(), "proceed", getMethodDescriptor(Object.class.getName()), false);
-        pushCastToType(overriddenMethodGenerator, returnType);
-        overriddenMethodGenerator.visitInsn(ARETURN);
+        if (isVoidReturn) {
+            returnVoid(overriddenMethodGenerator);
+        }
+        else {
+
+            pushCastToType(overriddenMethodGenerator, returnType);
+            pushReturnValue(overriddenMethodGenerator, returnType);
+        }
         overriddenMethodGenerator.visitMaxs(DEFAULT_MAX_STACK, chainVar);
         overriddenMethodGenerator.visitEnd();
 
         // now build a bridge to invoke the original method
 
-        MethodVisitor bridgeWriter = classWriter.visitMethod(ACC_STATIC + ACC_SYNTHETIC,
+        MethodVisitor bridgeWriter = classWriter.visitMethod(ACC_STATIC | ACC_SYNTHETIC,
                                                                     bridgeName, bridgeDesc, null, null);
         GeneratorAdapter bridgeGenerator = new GeneratorAdapter(bridgeWriter, ACC_STATIC + ACC_SYNTHETIC, bridgeName, bridgeDesc);
         for (int i = 0; i < bridgeArguments.size(); i++) {
             bridgeGenerator.loadArg(i);
         }
         bridgeWriter.visitMethodInsn(INVOKESPECIAL, getInternalName(targetClassFullName), methodName, desc, false);
-        bridgeWriter.visitInsn(ARETURN);
+        pushReturnValue(bridgeWriter, returnType);
         bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
         bridgeWriter.visitEnd();
     }
@@ -296,7 +310,8 @@ public class AopProxyWriter extends AbstractClassFileWriter {
     /**
      * Finalizes the proxy. This method should be called before writing the proxy to disk with {@link #writeTo(File)}
      */
-    public void visitProxyEnd() {
+    @Override
+    public void visitBeanDefinitionEnd() {
         classWriter.visit(V1_8, ACC_PUBLIC,
                 proxyInternalName,
                 null,
@@ -304,7 +319,7 @@ public class AopProxyWriter extends AbstractClassFileWriter {
                 new String[]{Type.getInternalName(Intercepted.class)});
 
         if (constructorWriter == null) {
-            throw new IllegalStateException("The method visitConstructor(..) should be called at least once");
+            throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
         }
 
         int proxyMethodCount = proxiedMethods.size();
@@ -376,6 +391,7 @@ public class AopProxyWriter extends AbstractClassFileWriter {
      * @param compilationDir The target compilation directory
      * @throws IOException
      */
+    @Override
     public void writeTo(File compilationDir) throws IOException {
         accept(newClassWriterOutputVisitor(compilationDir));
     }
@@ -386,6 +402,7 @@ public class AopProxyWriter extends AbstractClassFileWriter {
      * @param visitor the writer output visitor
      * @throws IOException If an error occurs
      */
+    @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(proxyFullName)) {
             out.write(classWriter.toByteArray());
@@ -401,5 +418,6 @@ public class AopProxyWriter extends AbstractClassFileWriter {
 
         }
     }
+
 
 }
