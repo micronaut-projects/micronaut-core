@@ -42,7 +42,7 @@ import static org.particleframework.inject.writer.BeanDefinitionWriter.DEFAULT_M
  * @author Graeme Rocher
  * @since 1.0
  */
-public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
+public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor {
 
     private static final java.lang.reflect.Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
         new IllegalStateException("InterceptorChain.resolveInterceptors(..) method not found. Incompatible version of Particle?")
@@ -75,6 +75,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
     private List<ExecutableMethodWriter> proxiedMethods = new ArrayList<>();
     private GeneratorAdapter constructorGenerator;
     private int constructorArgumentCount;
+    private Map<String, Object> constructorArgumentTypes;
+    private Map<String, Object> constructorQualfierTypes;
+    private Map<String, List<Object>> constructorGenericTypes;
+    private Map<String, Object> constructorNewArgumentTypes;
 
     public AopProxyWriter(String packageName, String targetClassShortName, Object... interceptorTypes) {
         this.packageName = packageName;
@@ -118,6 +122,26 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
         visitBeanDefinitionConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
+    @Override
+    public String getBeanTypeName() {
+        return proxyBeanDefinitionWriter.getBeanTypeName();
+    }
+
+    @Override
+    public void setValidated(boolean validated) {
+        proxyBeanDefinitionWriter.setValidated(validated);
+    }
+
+    @Override
+    public boolean isValidated() {
+        return proxyBeanDefinitionWriter.isValidated();
+    }
+
+    @Override
+    public String getBeanDefinitionName() {
+        return  proxyBeanDefinitionWriter.getBeanDefinitionName();
+    }
+
     /**
      * Visits a constructor with arguments. Either this method or {@link #visitBeanDefinitionConstructor()} should be called at least once
      *
@@ -126,36 +150,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
      * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
     public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        this.constructorArgumentTypes = argumentTypes;
+        this.constructorQualfierTypes = qualifierTypes;
+        this.constructorGenericTypes = genericTypes;
         this.constructorArgumentCount = argumentTypes.size();
-        Map<String, Object> newArgumentTypes = new LinkedHashMap<>(argumentTypes);
-        newArgumentTypes.put("interceptors", Interceptor[].class);
-        String constructorDescriptor = getConstructorDescriptor(newArgumentTypes.values());
-        this.constructorWriter = classWriter.visitMethod(
-                ACC_PUBLIC,
-                CONSTRUCTOR_NAME,
-                constructorDescriptor,
-                null,
-                null);
-
-        // Add the interceptor @Type(..) annotation
-        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
-        AnnotationVisitor interceptorTypeAnn = constructorWriter.visitParameterAnnotation(
-                argumentTypes.size(), Type.getDescriptor(org.particleframework.context.annotation.Type.class), true
-        ).visitArray("value");
-        for (Type interceptorType : interceptorTypes) {
-            interceptorTypeAnn.visit(null, interceptorType);
-        }
-        interceptorTypeAnn.visitEnd();
-
-        this.constructorGenerator = new GeneratorAdapter(constructorWriter, Opcodes.ACC_PUBLIC, CONSTRUCTOR_NAME, constructorDescriptor);
-        constructorGenerator.loadThis();
-        Collection<Object> existingArguments = argumentTypes.values();
-        for (int i = 0; i < existingArguments.size(); i++) {
-            constructorGenerator.loadArg(i);
-        }
-        String superConstructorDescriptor = getConstructorDescriptor(existingArguments);
-        constructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
-        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(newArgumentTypes, qualifierTypes, genericTypes);
+        this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
+        constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
     }
 
     /**
@@ -312,15 +312,44 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
      */
     @Override
     public void visitBeanDefinitionEnd() {
+        if (constructorArgumentTypes == null) {
+            throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
+        }
+        String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
+        this.constructorWriter = classWriter.visitMethod(
+                ACC_PUBLIC,
+                CONSTRUCTOR_NAME,
+                constructorDescriptor,
+                null,
+                null);
+
+        // Add the interceptor @Type(..) annotation
+        Type[] interceptorTypes = getObjectTypes(this.interceptorTypes);
+        AnnotationVisitor interceptorTypeAnn = constructorWriter.visitParameterAnnotation(
+                constructorArgumentTypes.size(), Type.getDescriptor(org.particleframework.context.annotation.Type.class), true
+        ).visitArray("value");
+        for (Type interceptorType : interceptorTypes) {
+            interceptorTypeAnn.visit(null, interceptorType);
+        }
+        interceptorTypeAnn.visitEnd();
+
+        this.constructorGenerator = new GeneratorAdapter(constructorWriter, Opcodes.ACC_PUBLIC, CONSTRUCTOR_NAME, constructorDescriptor);
+        constructorGenerator.loadThis();
+        Collection<Object> existingArguments = constructorArgumentTypes.values();
+        for (int i = 0; i < existingArguments.size(); i++) {
+            constructorGenerator.loadArg(i);
+        }
+        String superConstructorDescriptor = getConstructorDescriptor(existingArguments);
+        constructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
+        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
+
         classWriter.visit(V1_8, ACC_PUBLIC,
                 proxyInternalName,
                 null,
                 getTypeReference(targetClassFullName).getInternalName(),
                 new String[]{Type.getInternalName(Intercepted.class)});
 
-        if (constructorWriter == null) {
-            throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
-        }
+
 
         int proxyMethodCount = proxiedMethods.size();
         // set $proxyMethods field
@@ -404,6 +433,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
      */
     @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
+        proxyBeanDefinitionWriter.accept(visitor);
         try (OutputStream out = visitor.visitClass(proxyFullName)) {
             out.write(classWriter.toByteArray());
             proxiedMethods.forEach((writer) -> {
@@ -419,5 +449,78 @@ public class AopProxyWriter extends AbstractClassFileWriter implements BeanDefin
         }
     }
 
+    @Override
+    public void visitSetterInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, String setterName, List<Object> genericTypes) {
+        proxyBeanDefinitionWriter.visitSetterInjectionPoint(
+                declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
+        );
+    }
 
+    @Override
+    public void visitSuperType(String name) {
+        proxyBeanDefinitionWriter.visitSuperType(name);
+    }
+
+    @Override
+    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, String setterName, List<Object> genericTypes, boolean isOptional) {
+        proxyBeanDefinitionWriter.visitSetterValue(
+                declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
+        );
+    }
+
+    @Override
+    public void visitPostConstructMethod(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitPostConstructMethod(
+                declaringType,requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes
+        );
+    }
+
+    @Override
+    public void visitPreDestroyMethod(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
+    }
+
+    @Override
+    public void visitMethodInjectionPoint(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
+    }
+
+    @Override
+    public void visitExecutableMethod(Object declaringType, Object returnType, List<Object> returnTypeGenericTypes, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitExecutableMethod(
+                declaringType,
+                returnType,
+                returnTypeGenericTypes,
+                methodName,
+                argumentTypes,
+                qualifierTypes,
+                genericTypes
+        );
+    }
+
+    @Override
+    public void visitFieldInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName) {
+        proxyBeanDefinitionWriter.visitFieldInjectionPoint(declaringType, qualifierType, requiresReflection, fieldType, fieldName);
+    }
+
+    @Override
+    public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
+        proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional);
+    }
+
+    @Override
+    public String getPackageName() {
+        return proxyBeanDefinitionWriter.getPackageName();
+    }
+
+    @Override
+    public String getBeanSimpleName() {
+        return proxyBeanDefinitionWriter.getBeanSimpleName();
+    }
+
+
+    @Override
+    public String getProxiedTypeName() {
+        return targetClassFullName;
+    }
 }

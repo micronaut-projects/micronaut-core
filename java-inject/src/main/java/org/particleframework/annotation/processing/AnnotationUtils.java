@@ -8,10 +8,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 class AnnotationUtils {
 
@@ -52,6 +49,31 @@ class AnnotationUtils {
             }
         }
         return false;
+    }
+
+    AnnotationMirror[] findAnnotationsWithStereotype(Element classElement, String...stereotypes) {
+        if(classElement == null) {
+            return new AnnotationMirror[0];
+        }
+        List<String> stereoTypeList = Arrays.asList(stereotypes);
+        List<AnnotationMirror> annotationMirrorList = new ArrayList<>();
+        List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(classElement);
+        for (AnnotationMirror ann: annotationMirrors) {
+            DeclaredType annotationType = ann.getAnnotationType();
+            String annotationTypeString = annotationType.toString();
+            if (stereoTypeList.contains(annotationTypeString)) {
+                annotationMirrorList.add(ann);
+            } else {
+                Element element = annotationType.asElement();
+                if (!IGNORED_ANNOTATIONS.contains(
+                        element.getSimpleName().toString())) {
+                    if (hasStereotype(element, stereotypes)) {
+                        annotationMirrorList.add(ann);
+                    }
+                }
+            }
+        }
+        return annotationMirrorList.toArray(new AnnotationMirror[annotationMirrorList.size()]);
     }
 
     AnnotationMirror findAnnotationWithStereotype(Element classElement, Class<? extends Annotation> stereotype) {

@@ -1,0 +1,152 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package org.particleframework.aop;
+
+import javax.inject.Singleton;
+
+/**
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Singleton
+public class AopTargetClass {
+
+    private Bar bar;
+
+    public AopTargetClass(Bar bar) {
+        this.bar = bar;
+        assert bar != null;
+    }
+
+    @Mutating("name")
+    public String test(String name) {
+        return "Name is " + name;
+    }
+
+    @Mutating("age")
+    public String test(int age) {
+        return "Age is " + age;
+    }
+
+    @Mutating("name")
+    public String test(String name, int age) {
+        return "Name is "+name+" and age is " + age;
+    }
+
+    @Mutating("name")
+    public String test() {
+        return "noargs";
+    }
+
+    @Mutating("name")
+    public void testVoid(String name) {
+        assert name.equals("changed");
+    }
+
+    @Mutating("name")
+    public void testVoid(String name, int age) {
+        assert name.equals("changed");
+        assert age == 10;
+    }
+
+    @Mutating("name")
+    boolean testBoolean(String name) {
+        return name.equals("changed");
+    }
+
+    @Mutating("name")
+    boolean testBoolean(String name, int age) {
+        assert age == 10;
+        return name.equals("changed");
+    }
+
+    @Mutating("name")
+    int testInt(String name) {
+        return name.equals("changed") ? 1 : 0;
+    }
+
+    @Mutating("age")
+    int testInt(String name, int age) {
+        assert name.equals("test");
+        return age;
+    }
+
+    @Mutating("name")
+    long testLong(String name) {
+        return name.equals("changed") ? 1 : 0;
+    }
+
+    @Mutating("age")
+    long testLong(String name, int age) {
+        assert name.equals("test");
+        return age;
+    }
+
+    @Mutating("name")
+    short testShort(String name) {
+        return (short) (name.equals("changed") ? 1 : 0);
+    }
+
+    @Mutating("age")
+    short testShort(String name, int age) {
+        assert name.equals("test");
+        return (short) age;
+    }
+
+    @Mutating("name")
+    byte testByte(String name) {
+        return (byte) (name.equals("changed") ? 1 : 0);
+    }
+
+    @Mutating("age")
+    byte testByte(String name, int age) {
+        assert name.equals("test");
+        return (byte) age;
+    }
+
+    @Mutating("name")
+    double testDouble(String name) {
+        return name.equals("changed") ? 1 : 0;
+    }
+
+    @Mutating("age")
+    double testDouble(String name, int age) {
+        assert name.equals("test");
+        return age;
+    }
+
+    @Mutating("name")
+    float testFloat(String name) {
+        return name.equals("changed") ? 1 : 0;
+    }
+
+    @Mutating("age")
+    float testFloat(String name, int age) {
+        assert name.equals("test");
+        return age;
+    }
+
+    @Mutating("name")
+    char testChar(String name) {
+        return (char) (name.equals("changed") ? 1 : 0);
+    }
+
+    @Mutating("age")
+    char testChar(String name, int age) {
+        assert name.equals("test");
+        return (char) age;
+    }
+}

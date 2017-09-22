@@ -56,7 +56,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
-        Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
+        Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
 
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
@@ -100,45 +100,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
             injectVisitor.visitClass(classNode)
             beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
-
-            BeanDefinitionVisitor aopProxyWriter = injectVisitor.aopProxyWriter
-            if(aopProxyWriter != null) {
-
-                List<ConstructorNode> constructors = classNode.getDeclaredConstructors()
-                if(constructors.isEmpty()) {
-                    aopProxyWriter.visitBeanDefinitionConstructor()
-                }
-                else {
-                    ConstructorNode constructorNode = injectVisitor.findConcreteConstructor(constructors)
-
-                    if (constructorNode != null) {
-                        Map<String, Object> constructorParamsToType = [:]
-                        Map<String, Object> constructorQualifierTypes = [:]
-                        Map<String, List<Object>> constructorGenericTypeMap = [:]
-                        Parameter[] parameters = constructorNode.parameters
-                        injectVisitor.populateParameterData(parameters,
-                                constructorParamsToType,
-                                constructorQualifierTypes,
-                                constructorGenericTypeMap)
-                        aopProxyWriter.visitBeanDefinitionConstructor( constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
-
-
-                    } else {
-                        injectVisitor.addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
-                        return
-                    }
-
-                }
-                aopProxyWriter.visitBeanDefinitionEnd()
-                aopProxyWriter.writeTo(source.configuration.targetDirectory)
-            }
         }
 
 
 
         ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in beanDefinitionWriters) {
-            BeanDefinitionWriter beanDefWriter = entry.value
+            BeanDefinitionVisitor beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
             String beanDefinitionClassName = null
             String beanTypeName = beanDefWriter.beanTypeName
@@ -190,8 +158,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isConfigurationProperties
         final boolean isFactoryClass
         final boolean isExecutableType
-        final Map<AnnotatedNode, BeanDefinitionWriter> beanDefinitionWriters = [:]
-        BeanDefinitionWriter beanWriter
+        final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
+        BeanDefinitionVisitor beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
         BeanDefinitionVisitor aopProxyWriter
 
@@ -361,16 +329,38 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 AopProxyWriter aopWriter = new AopProxyWriter(concreteClass.packageName, concreteClass.nameWithoutPackage, annotationTypeReferences)
                                 this.aopProxyWriter = aopWriter
 
-                                BeanDefinitionWriter beanDefinitionWriter = aopWriter
-                                        .getProxyBeanDefinitionWriter()
-                                beanDefinitionWriter
-                                        .visitSuperType(beanWriter.getBeanDefinitionName())
+                                List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
+                                if(constructors.isEmpty()) {
+                                    aopProxyWriter.visitBeanDefinitionConstructor()
+                                }
+                                else {
+                                    ConstructorNode constructorNode = findConcreteConstructor(constructors)
+
+                                    if (constructorNode != null) {
+                                        Map<String, Object> constructorParamsToType = [:]
+                                        Map<String, Object> constructorQualifierTypes = [:]
+                                        Map<String, List<Object>> constructorGenericTypeMap = [:]
+                                        Parameter[] parameters = constructorNode.parameters
+                                        populateParameterData(parameters,
+                                                constructorParamsToType,
+                                                constructorQualifierTypes,
+                                                constructorGenericTypeMap)
+                                        aopProxyWriter.visitBeanDefinitionConstructor( constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
+
+
+                                    } else {
+                                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", concreteClass)
+                                        return
+                                    }
+
+                                }
+                                aopWriter.visitSuperType(beanWriter.getBeanDefinitionName())
 
                                 def node = new AnnotatedNode()
                                 def replaces = new AnnotationNode(makeCached(Replaces))
                                 replaces.setMember('value', classX(concreteClass.plainNodeReference))
                                 node.addAnnotation(replaces)
-                                beanDefinitionWriters.put(node, aopWriter.getProxyBeanDefinitionWriter())
+                                beanDefinitionWriters.put(node, aopWriter)
                             }
 
                             ((AopProxyWriter)aopProxyWriter).visitAroundMethod(

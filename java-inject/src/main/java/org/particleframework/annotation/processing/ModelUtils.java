@@ -281,4 +281,11 @@ class ModelUtils {
     boolean isStatic(Element element) {
         return element.getModifiers().contains(STATIC);
     }
+
+    public Object[] resolveTypeReferences(AnnotationMirror[] mirrors) {
+        return Arrays.stream(mirrors)
+              .map(mirror ->
+                resolveTypeReference(mirror.getAnnotationType())
+              ).toArray(Object[]::new);
+    }
 }

@@ -244,27 +244,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes.add(BeanFactory.class);
     }
 
-    /**
-     * Alter the super class of this method definition
-     *
-     * @param name The super type
-     */
+    @Override
     public void visitSuperType(String name) {
         this.superType = getTypeReference(name);
     }
 
-    /**
-     * @return The full class name of the bean
-     */
+    @Override
     public String getBeanTypeName() {
         return beanFullClassName;
     }
 
-    /**
-     * Make the bean definition as validated by javax.validation
-     *
-     * @param validated Whether the bean definition is validated
-     */
+    @Override
     public void setValidated(boolean validated) {
         if (validated) {
             this.interfaceTypes.add(ValidatedBeanDefinition.class);
@@ -273,16 +263,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    /**
-     * @return Return whether the bean definition is validated
-     */
+    @Override
     public boolean isValidated() {
         return this.interfaceTypes.contains(ValidatedBeanDefinition.class);
     }
 
-    /**
-     * @return The name of the bean definition class
-     */
+    @Override
     public String getBeanDefinitionName() {
         return beanDefinitionName;
     }
@@ -512,15 +498,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    /**
-     * Visits an injection point for a field and setter pairing.
-     *
-     * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
-     * @param requiresReflection Whether the setter requires reflection
-     * @param fieldType          The field type
-     * @param fieldName          The field name
-     */
+    @Override
     public void visitSetterInjectionPoint(Object declaringType,
                                           Object qualifierType,
                                           boolean requiresReflection,
@@ -539,15 +517,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         currentMethodIndex++;
     }
 
-    /**
-     * Visits an injection point for a field and setter pairing.
-     *
-     * @param declaringType      The declaring type
-     * @param qualifierType      The qualifier type
-     * @param requiresReflection Whether the setter requires reflection
-     * @param fieldType          The field type
-     * @param fieldName          The field name
-     */
+    @Override
     public void visitSetterValue(Object declaringType,
                                  Object qualifierType,
                                  boolean requiresReflection,
@@ -630,17 +600,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodDescriptor, false);
     }
 
-    /**
-     * Visits a method injection point
-     *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
-     * @param genericTypes       The generic types of each argument. Can be null.
-     */
+    @Override
     public void visitPostConstructMethod(Object declaringType,
                                          boolean requiresReflection,
                                          Object returnType,
@@ -696,17 +656,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitMethodInjectionPointInternal(declaringType, false, Void.TYPE, methodName, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), constructorVisitor, preDestroyMethodVisitor, preDestroyInstanceIndex);
     }
 
-    /**
-     * Visits a method injection point
-     *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
-     * @param genericTypes       The generic types of each argument. Can be null.
-     */
+    @Override
     public void visitPreDestroyMethod(Object declaringType,
                                       boolean requiresReflection,
                                       Object returnType,
@@ -753,17 +703,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
 
-    /**
-     * Visits a method injection point
-     *
-     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether the method requires reflection
-     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName         The method name
-     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes     The qualifier types of each argument. Can be null.
-     * @param genericTypes       The generic types of each argument. Can be null.
-     */
+    @Override
     public void visitMethodInjectionPoint(Object declaringType,
                                           boolean requiresReflection,
                                           Object returnType,
@@ -778,16 +718,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitMethodInjectionPointInternal(declaringType, requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes, constructorVisitor, injectMethodVisitor, injectInstanceIndex);
     }
 
-    /**
-     * Visit a method that is to be made executable allow invocation of said method without reflection
-     *
-     * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType     The return type of the method. Either a Class or a string representing the name of the type
-     * @param methodName     The method name
-     * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
-     * @param qualifierTypes The qualifier types of each argument. Can be null.
-     * @param genericTypes   The generic types of each argument. Can be null.
-     */
+    @Override
     public void visitExecutableMethod(Object declaringType,
                                       Object returnType,
                                       List<Object> returnTypeGenericTypes,
@@ -971,15 +902,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitFieldInjectionPoint(beanFullClassName, null, requiresReflection, fieldType, fieldName);
     }
 
-    /**
-     * Visits a field injection point
-     *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
+    @Override
     public void visitFieldInjectionPoint(Object declaringType,
                                          Object qualifierType,
                                          boolean requiresReflection,
@@ -993,15 +916,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_BEAN_FOR_FIELD, false);
     }
 
-    /**
-     * Visits a field injection point
-     *
-     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
-     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
-     * @param requiresReflection Whether accessing the field requires reflection
-     * @param fieldType          The type of the field
-     * @param fieldName          The name of the field
-     */
+    @Override
     public void visitFieldValue(Object declaringType,
                                 Object qualifierType,
                                 boolean requiresReflection,
@@ -1703,5 +1618,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return "BeanDefinitionWriter{" +
                 "beanFullClassName='" + beanFullClassName + '\'' +
                 '}';
+    }
+
+    @Override
+    public String getPackageName() {
+        return packageName;
+    }
+
+    @Override
+    public String getBeanSimpleName() {
+        return beanSimpleClassName;
     }
 }

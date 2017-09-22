@@ -33,6 +33,35 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionConstructor();
 
     /**
+     * Alter the super class of this method definition
+     *
+     * @param name The super type
+     */
+    void visitSuperType(String name);
+
+    /**
+     * @return The full class name of the bean
+     */
+    String getBeanTypeName();
+
+    /**
+     * Make the bean definition as validated by javax.validation
+     *
+     * @param validated Whether the bean definition is validated
+     */
+    void setValidated(boolean validated);
+
+    /**
+     * @return Return whether the bean definition is validated
+     */
+    boolean isValidated();
+
+    /**
+     * @return The name of the bean definition class
+     */
+    String getBeanDefinitionName();
+
+    /**
      * Visits the constructor used to create the bean definition.
      *
      * @param argumentTypes  The argument type names for each parameter
@@ -57,4 +86,155 @@ public interface BeanDefinitionVisitor {
      * @throws IOException If an error occurs
      */
     void accept(ClassWriterOutputVisitor visitor) throws IOException;
+
+    /**
+     * Visits an injection point for a field and setter pairing.
+     *
+     * @param declaringType      The declaring type
+     * @param qualifierType      The qualifier type
+     * @param requiresReflection Whether the setter requires reflection
+     * @param fieldType          The field type
+     * @param fieldName          The field name
+     */
+    void visitSetterInjectionPoint(Object declaringType,
+                                   Object qualifierType,
+                                   boolean requiresReflection,
+                                   Object fieldType,
+                                   String fieldName,
+                                   String setterName,
+                                   List<Object> genericTypes);
+
+    /**
+     * Visits an injection point for a field and setter pairing.
+     *
+     * @param declaringType      The declaring type
+     * @param qualifierType      The qualifier type
+     * @param requiresReflection Whether the setter requires reflection
+     * @param fieldType          The field type
+     * @param fieldName          The field name
+     */
+    void visitSetterValue(Object declaringType,
+                          Object qualifierType,
+                          boolean requiresReflection,
+                          Object fieldType,
+                          String fieldName,
+                          String setterName,
+                          List<Object> genericTypes,
+                          boolean isOptional);
+
+    /**
+     * Visits a method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     */
+    void visitPostConstructMethod(Object declaringType,
+                                  boolean requiresReflection,
+                                  Object returnType,
+                                  String methodName,
+                                  Map<String, Object> argumentTypes,
+                                  Map<String, Object> qualifierTypes,
+                                  Map<String, List<Object>> genericTypes);
+
+    /**
+     * Visits a method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     */
+    void visitPreDestroyMethod(Object declaringType,
+                               boolean requiresReflection,
+                               Object returnType,
+                               String methodName,
+                               Map<String, Object> argumentTypes,
+                               Map<String, Object> qualifierTypes,
+                               Map<String, List<Object>> genericTypes);
+
+    /**
+     * Visits a method injection point
+     *
+     * @param declaringType      The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether the method requires reflection
+     * @param returnType         The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName         The method name
+     * @param argumentTypes      The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes     The qualifier types of each argument. Can be null.
+     * @param genericTypes       The generic types of each argument. Can be null.
+     */
+    void visitMethodInjectionPoint(Object declaringType,
+                                   boolean requiresReflection,
+                                   Object returnType,
+                                   String methodName,
+                                   Map<String, Object> argumentTypes,
+                                   Map<String, Object> qualifierTypes,
+                                   Map<String, List<Object>> genericTypes);
+
+    /**
+     * Visit a method that is to be made executable allow invocation of said method without reflection
+     *
+     * @param declaringType  The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType     The return type of the method. Either a Class or a string representing the name of the type
+     * @param methodName     The method name
+     * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param qualifierTypes The qualifier types of each argument. Can be null.
+     * @param genericTypes   The generic types of each argument. Can be null.
+     */
+    void visitExecutableMethod(Object declaringType,
+                               Object returnType,
+                               List<Object> returnTypeGenericTypes,
+                               String methodName,
+                               Map<String, Object> argumentTypes,
+                               Map<String, Object> qualifierTypes,
+                               Map<String, List<Object>> genericTypes);
+
+    /**
+     * Visits a field injection point
+     *
+     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
+     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    void visitFieldInjectionPoint(Object declaringType,
+                                  Object qualifierType,
+                                  boolean requiresReflection,
+                                  Object fieldType,
+                                  String fieldName);
+
+    /**
+     * Visits a field injection point
+     *
+     * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
+     * @param qualifierType      The qualifier type. Either a Class or a string representing the name of the type
+     * @param requiresReflection Whether accessing the field requires reflection
+     * @param fieldType          The type of the field
+     * @param fieldName          The name of the field
+     */
+    void visitFieldValue(Object declaringType,
+                         Object qualifierType,
+                         boolean requiresReflection,
+                         Object fieldType,
+                         String fieldName,
+                         boolean isOptional);
+
+    /**
+     * @return The package name of the bean
+     */
+    String getPackageName();
+
+    /**
+     * @return The short name of the bean
+     */
+    String getBeanSimpleName();
 }
