@@ -39,6 +39,7 @@ import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumen
 import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+import org.particleframework.http.server.netty.cors.NettyCorsInterceptor;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.Argument;
@@ -121,6 +122,11 @@ public class NettyHttpServer implements EmbeddedServer {
                         RequestBinderRegistry binderRegistry = beanLocator.getBean(RequestBinderRegistry.class);
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
+
+                        if (serverConfiguration.getCors().isEnabled()) {
+                            pipeline.addLast(new NettyCorsInterceptor(serverConfiguration.getCors()));
+                        }
+
                         List<ChannelHandler> channelHandlers = new ArrayList<>();
                         for (ChannelHandlerFactory channelHandlerFactory : channelHandlerFactories) {
                             ChannelHandler channelHandler = channelHandlerFactory.build(ch);

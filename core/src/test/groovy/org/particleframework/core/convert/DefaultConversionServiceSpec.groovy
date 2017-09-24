@@ -2,9 +2,8 @@ package org.particleframework.core.convert
 
 import org.particleframework.core.convert.format.ReadableBytes
 import spock.lang.Specification
-
+import spock.lang.Unroll
 import java.lang.reflect.Field
-import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 
 /**
@@ -12,7 +11,8 @@ import java.time.DayOfWeek
  */
 class DefaultConversionServiceSpec extends Specification {
 
-    void "test default conversion service"() {
+    @Unroll
+    void "test default conversion service converts a #sourceObject.class.name to a #targetType.name"() {
         given:
         ConversionService conversionService = new DefaultConversionService()
 
@@ -34,6 +34,7 @@ class DefaultConversionServiceSpec extends Specification {
         "off"             | boolean    | false
         "false"           | boolean    | false
         "n"               | boolean    | false
+        Boolean.TRUE      | boolean    | true
         "USD"             | Currency   | Currency.getInstance("USD")
         "CET"             | TimeZone   | TimeZone.getTimeZone("CET")
         "http://test.com" | URL        | new URL("http://test.com")

@@ -55,12 +55,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (object == null) {
             return Optional.empty();
         }
+        Class<?> sourceType = object.getClass();
+        targetType = ReflectionUtils.getWrapperType(targetType);
+
         if (targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
             return Optional.of((T) object);
         }
 
-        Class<?> sourceType = ReflectionUtils.getWrapperType(object.getClass());
-        targetType = ReflectionUtils.getWrapperType(targetType);
         Annotation formattingAnnotation = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations());
 
         Class<? extends Annotation> formattingType = formattingAnnotation != null ? formattingAnnotation.annotationType() : null;

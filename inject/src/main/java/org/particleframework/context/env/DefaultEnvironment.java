@@ -215,10 +215,25 @@ public class DefaultEnvironment implements Environment {
 
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries) {
         // special handling for maps for resolving sub keys
+        Map<String, Object> subMap = new LinkedHashMap<>();
         String prefix = name + '.';
-        return entries.entrySet().stream()
-                .filter(map -> map.getKey().startsWith(prefix))
-                .collect(Collectors.toMap(entry -> entry.getKey().substring(prefix.length()), Map.Entry::getValue));
+        for (Map.Entry<String, Object> map : entries.entrySet()) {
+            if (map.getKey().startsWith(prefix)) {
+                String subMapKey = map.getKey().substring(prefix.length());
+                int index = subMapKey.indexOf('.');
+                if (index == -1) {
+                    subMap.put(subMapKey, map.getValue());
+                } else {
+                    String mapKey = subMapKey.substring(0, index);
+                    if (!subMap.containsKey(mapKey)) {
+                        subMap.put(mapKey, new LinkedHashMap<>());
+                    }
+                    Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
+                    nestedMap.put(subMapKey.substring(index + 1), map.getValue());
+                }
+            }
+        }
+        return subMap;
     }
 
     protected void processPropertySource(PropertySource properties, boolean upperCaseUnderscoreSeperated) {
