@@ -19,6 +19,12 @@ dependencies {
     compileOnly "org.particleframework:ast:${props.projectVersion}"
     compile "org.codehaus.groovy:groovy:$props.groovyVersion"
     compile "org.particleframework:runtime-netty:${props.projectVersion}"
+    compile "org.particleframework.configuration:jackson:${props.projectVersion}"
+    compile "org.particleframework.configuration:hibernate-gorm:${props.projectVersion}"
+
+    runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
+    runtime 'com.h2database:h2:1.4.196'
+
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 shadowJar {

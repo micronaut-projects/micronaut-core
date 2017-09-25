@@ -37,7 +37,7 @@ import java.util.*;
 import static org.particleframework.inject.writer.BeanDefinitionWriter.DEFAULT_MAX_STACK;
 
 /**
- * A class that generates AOP classes at compile time
+ * A class that generates AOP proxy classes at compile time
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -80,9 +80,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private Map<String, List<Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
 
-    public AopProxyWriter(String packageName, String targetClassShortName, Object... interceptorTypes) {
-        this.packageName = packageName;
-        this.targetClassShortName = targetClassShortName;
+    /**
+     * Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.
+     *
+     * Additional {@link Interceptor} types can be added downstream with
+     *
+     * @param parent The parent {@link BeanDefinitionWriter}
+     * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
+     */
+    public AopProxyWriter(BeanDefinitionVisitor parent, Object... interceptorTypes) {
+        this.packageName = parent.getPackageName();
+        this.targetClassShortName = parent.getBeanSimpleName();
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         String proxyShortName = targetClassShortName + "$Intercepted";
@@ -90,8 +98,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = interceptorTypes;
-        // TODO: propagate scopes
-        this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(packageName, proxyShortName, null, true);
+        Type scope = parent.getScope();
+        String scopeClassName = scope != null ? scope.getClassName() : null;
+        this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(packageName, proxyShortName, scopeClassName, parent.isSingleton());
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
 
@@ -120,6 +129,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitBeanDefinitionConstructor() {
         visitBeanDefinitionConstructor(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return proxyBeanDefinitionWriter.isSingleton();
+    }
+
+    @Override
+    public Type getScope() {
+        return proxyBeanDefinitionWriter.getScope();
     }
 
     @Override

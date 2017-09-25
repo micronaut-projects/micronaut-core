@@ -245,6 +245,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
+    public boolean isSingleton() {
+        return isSingleton;
+    }
+
+    @Override
+    public Type getScope() {
+        return scope;
+    }
+
+    @Override
     public void visitSuperType(String name) {
         this.superType = getTypeReference(name);
     }

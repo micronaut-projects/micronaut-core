@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject.writer;
 
+import org.objectweb.asm.Type;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -31,6 +33,16 @@ public interface BeanDefinitionVisitor {
      * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(Map, Map, Map)} should be called at least once
      */
     void visitBeanDefinitionConstructor();
+
+    /**
+     * @return Is the bean singleton
+     */
+    boolean isSingleton();
+
+    /**
+     * @return The scope type
+     */
+    Type getScope();
 
     /**
      * Alter the super class of this method definition

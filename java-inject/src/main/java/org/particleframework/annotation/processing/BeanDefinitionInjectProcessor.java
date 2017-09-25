@@ -337,8 +337,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if(aopWriter == null) {
                     aopProxyWriter
                             = new org.particleframework.aop.writer.AopProxyWriter(
-                            beanWriter.getPackageName(),
-                            beanWriter.getBeanSimpleName(),
+                            beanWriter,
                             interceptorTypes
 
                     );

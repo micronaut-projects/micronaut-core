@@ -326,7 +326,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             if(aopProxyWriter == null) {
 
-                                AopProxyWriter aopWriter = new AopProxyWriter(concreteClass.packageName, concreteClass.nameWithoutPackage, annotationTypeReferences)
+                                AopProxyWriter aopWriter = new AopProxyWriter(beanWriter, annotationTypeReferences)
                                 this.aopProxyWriter = aopWriter
 
                                 List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
