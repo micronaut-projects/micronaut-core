@@ -16,13 +16,16 @@
 package org.particleframework.aop;
 
 import javax.inject.Singleton;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class AopTargetClass {
+public class AopTargetClass<A extends CharSequence> {
 
     private Bar bar;
 
@@ -148,5 +151,31 @@ public class AopTargetClass {
     char testChar(String name, int age) {
         assert name.equals("test");
         return (char) age;
+    }
+
+    @Mutating("name")
+    byte[] testByteArray(String name, byte[] data) {
+        assert name.equals("changed");
+        return data;
+    }
+
+    @Mutating("name")
+    <T extends CharSequence> T testGenericsWithExtends(T name, int age) {
+        return (T) ("Name is " + name);
+    }
+
+    @Mutating("name")
+    <T> List<? super String> testListWithWildCardSuper(T name, List<? super String> p2) {
+        return Collections.singletonList(name.toString());
+    }
+
+    @Mutating("name")
+    <T> List<? extends String> testListWithWildCardExtends(T name, List<? extends String> p2) {
+        return Collections.singletonList(name.toString());
+    }
+
+    @Mutating("name")
+    A testGenericsFromType(A name, int age) {
+        return (A) ("Name is " + name);
     }
 }

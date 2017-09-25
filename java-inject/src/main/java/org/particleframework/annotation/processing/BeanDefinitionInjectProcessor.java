@@ -21,10 +21,7 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import javax.tools.JavaFileObject;
@@ -671,28 +668,48 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     params.addQualifierType(argName, qualifier);
                 }
 
-                if (kind == ARRAY) {
-                    ArrayType arrayType = (ArrayType) typeMirror;
-                    TypeMirror componentType = arrayType.getComponentType();
-                    params.addParameter(argName, modelUtils.resolveTypeReference(arrayType));
-                    params.addGenericTypes(argName, Collections.singletonList(modelUtils.resolveTypeReference(componentType)));
-                } else if (kind == DECLARED) {
-                    DeclaredType declaredType = (DeclaredType) typeMirror;
+                switch (kind) {
+                    case ARRAY:
+                        ArrayType arrayType = (ArrayType) typeMirror;
+                        TypeMirror componentType = arrayType.getComponentType();
+                        params.addParameter(argName, modelUtils.resolveTypeReference(arrayType));
+                        params.addGenericTypes(argName, Collections.singletonList(modelUtils.resolveTypeReference(componentType)));
 
-                    TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
-                    assert (typeElement != null) : "typeElement cannot be null";
+                    break;
+                    case TYPEVAR:
+                        TypeVariable typeVariable = (TypeVariable) typeMirror;
 
-                    params.addParameter(argName, modelUtils.resolveTypeReference(typeElement));
-                    List<Object> typeParams = genericUtils.resolveGenericTypes(declaredType);
-                    if (!typeParams.isEmpty()) {
-                        params.addGenericTypes(argName, typeParams);
-                    }
-                } else if (kind.isPrimitive()) {
-                    String typeName = typeMirror.toString();
-                    Object argType = modelUtils.classOfPrimitiveFor(typeName);
-                    params.addParameter(argName, argType);
-                } else {
-                    error(element, "Unexpected kind %s for param %s of element %s", kind, typeMirror, element);
+                        DeclaredType parameterType = genericUtils.resolveTypeVariable(paramElement, typeVariable);
+                        if(parameterType != null) {
+
+                            params.addParameter(argName, modelUtils.resolveTypeReference(parameterType));
+                            params.addGenericTypes(argName, Collections.singletonList(modelUtils.resolveTypeReference(parameterType)));
+                        }
+                        else {
+                            error(element, "Unprocessable generic type %s for param %s of element %s", typeVariable, paramElement, element);
+                        }
+
+                        break;
+                    case DECLARED:
+                        DeclaredType declaredType = (DeclaredType) typeMirror;
+
+                        TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
+                        assert (typeElement != null) : "typeElement cannot be null";
+
+                        params.addParameter(argName, modelUtils.resolveTypeReference(typeElement));
+                        List<Object> typeParams = genericUtils.resolveGenericTypes(declaredType);
+                        if (!typeParams.isEmpty()) {
+                            params.addGenericTypes(argName, typeParams);
+                        }
+                    break;
+                    default:
+                        if (kind.isPrimitive()) {
+                            String typeName = typeMirror.toString();
+                            Object argType = modelUtils.classOfPrimitiveFor(typeName);
+                            params.addParameter(argName, argType);
+                        } else {
+                            error(element, "Unexpected kind %s for param %s of element %s", kind, typeMirror, element);
+                        }
                 }
             });
 
