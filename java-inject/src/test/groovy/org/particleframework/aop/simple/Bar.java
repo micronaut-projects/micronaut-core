@@ -13,30 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.simple;
 
-import org.particleframework.aop.Around;
-import org.particleframework.context.annotation.Type;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import javax.inject.Singleton;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-
-@Around
-@Type(ArgMutatingInterceptor.class)
-@Documented
-@Retention(RUNTIME)
-@Target(ElementType.METHOD)
-@interface Mutating {
-    String value();
+@Singleton
+public class Bar {
 }
-
-

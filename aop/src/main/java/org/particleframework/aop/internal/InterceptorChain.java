@@ -24,6 +24,7 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleValues;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.inject.Argument;
+import org.particleframework.inject.Executable;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MutableArgumentValue;
 
@@ -121,7 +122,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
 
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return executionHandle.getAnnotation(annotationClass);
+        T annotation = executionHandle.getAnnotation(annotationClass);
+        if(annotation == null) {
+            return executionHandle.getDeclaringType().getAnnotation(annotationClass);
+        }
+        return annotation;
     }
 
     @Override
@@ -166,7 +171,13 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     public static Interceptor[] resolveInterceptors(AnnotatedElement method, Interceptor...interceptors) {
-        Set<? extends Annotation> annotations = AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations());
+        Set<Annotation> annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations()));
+
+        if(method instanceof ExecutableMethod) {
+            Class typeLevelAnnotations = ((ExecutableMethod) method).getDeclaringType();
+            annotations.addAll(AnnotationUtil.findAnnotationsWithStereoType(Around.class, typeLevelAnnotations.getAnnotations()));
+        }
+
         Set<Class> applicableClasses = annotations.stream()
                 .map((Annotation ann) -> ann.annotationType().getAnnotation(Type.class))
                 .filter(Objects::nonNull)

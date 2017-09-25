@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop
+package org.particleframework.aop.simple
 
-import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -26,19 +24,19 @@ import spock.lang.Unroll
  * @author Graeme Rocher
  * @since 1.0
  */
-class AopSetupSpec extends Specification {
+class SimpleClassTypeLevelAopSpec extends Specification {
 
     @Unroll
     void "test AOP method invocation for method #method"() {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
+        AnotherClass foo = beanContext.getBean(AnotherClass)
 
         expect:
-        args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+        args.isEmpty() ? foo."$method"() : foo."$method"(*args) == expected
 
         where:
-        method                        | args                   | result
+        method                        | args                   | expected
         'test'                        | ['test']               | "Name is changed"                   // test for single string arg
         'test'                        | [10]                   | "Age is 20"                   // test for single primitive
         'test'                        | ['test', 10]           | "Name is changed and age is 10"    // test for multiple args, one primitive
@@ -66,49 +64,4 @@ class AopSetupSpec extends Specification {
         'testListWithWildCardExtends' | ['test', []]           | ['changed']        // test for generics
     }
 
-
-    void "test AOP setup"() {
-        given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-
-        when: "the bean definition is obtained"
-        BeanDefinition<AopTargetClass> beanDefinition = beanContext.findBeanDefinition(AopTargetClass).get()
-
-        then:
-        beanDefinition.findMethod("test", String).isPresent()
-        // should not be a reflection based method
-        !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
-
-        when:
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
-
-
-        then:
-        foo instanceof Intercepted
-        beanContext.findExecutableMethod(AopTargetClass, "test", String).isPresent()
-        // should not be a reflection based method
-        !beanContext.findExecutableMethod(AopTargetClass, "test", String).get().getClass().getName().contains("Reflection")
-        foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get() == null
-
-    }
-
-    void "test AOP setup attributes"() {
-        given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-
-        when:
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
-        def attrs = AopAttributes.get(AopTargetClass, "test", String)
-        then:
-        foo instanceof Intercepted
-        foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get().values().first().values == attrs
-
-        when:
-        AopAttributes.remove(AopTargetClass, "test", String)
-
-        then:
-        AopAttributes.@attributes.get() == null
-    }
 }

@@ -81,9 +81,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private Map<String, Object> constructorNewArgumentTypes;
 
     /**
-     * Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.
+     * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
      *
-     * Additional {@link Interceptor} types can be added downstream with
+     * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorTypes(Object...)}.</p>
      *
      * @param parent The parent {@link BeanDefinitionWriter}
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected

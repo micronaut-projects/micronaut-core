@@ -63,7 +63,7 @@ public class AnnotationUtil {
      * @param annotations The annotations to search
      * @return The annotation
      */
-    public static Set<? extends Annotation> findAnnotationsWithStereoType(Class<?> stereotype, Annotation... annotations) {
+    public static Set<Annotation> findAnnotationsWithStereoType(Class<?> stereotype, Annotation... annotations) {
         Set<Annotation> annotationSet = new HashSet<>();
         for(Annotation ann : annotations) {
             if(stereotype.isInstance(ann)) {
