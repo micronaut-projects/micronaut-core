@@ -620,14 +620,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
 
+            String scopeType = scopeAnn.map(ann -> ann.getAnnotationType().toString()).orElse(null);
+            boolean isSingleton = singletonAnn.isPresent();
             return new BeanDefinitionWriter(
                 packageElement.getQualifiedName().toString(),
                 beanClassName,
                 providerTypeParam == null
                     ? elementUtils.getBinaryName(typeElement).toString()
                     : providerTypeParam.toString(),
-                scopeAnn.map(ann -> ann.getAnnotationType().toString()).orElse(null),
-                singletonAnn.isPresent());
+                    scopeType,
+                    isSingleton);
         }
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType) {

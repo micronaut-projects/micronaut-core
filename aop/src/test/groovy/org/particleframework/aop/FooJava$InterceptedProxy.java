@@ -18,30 +18,26 @@ package org.particleframework.aop;
 import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
-import org.particleframework.context.AbstractBeanDefinition;
+import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Type;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanFactory;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.Optional;
+import java.util.Collections;
 
 /**
  *
- * This class is what the final compiled byte code for a proxy generated with @Around(proxyTarget=true) looks like when decompiled
+ * This class is what the final compiled byte code for a proxy generated with @Around() looks like when decompiled
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class FooJava$InterceptedProxy extends Foo implements InterceptedProxy {
 
-    private static final BeanDefinition<Foo> PARENT = new AbstractBeanDefinition<Foo>(null,false, Foo.class, null, null, null, null) {
-        @Override
-        public Optional<ExecutableMethod<Foo, ?>> findMethod(String name, Class[] argumentTypes) {
-            return super.findMethod(name, argumentTypes);
-        }
-    };
+    private static final BeanDefinition<Foo> PARENT = null;
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
     private final Object target;
@@ -65,7 +61,7 @@ public class FooJava$InterceptedProxy extends Foo implements InterceptedProxy {
     }
 
     @Override
-    public Object getTarget() {
+    public Object interceptedTarget() {
         return target;
     }
 }

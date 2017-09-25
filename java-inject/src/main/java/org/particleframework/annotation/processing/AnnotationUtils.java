@@ -105,7 +105,7 @@ class AnnotationUtils {
             if (stereotype.equals(annotationType.toString())) {
                 return Optional.of(ann);
             } else if (!Arrays.asList("Retention", "Documented", "Target").contains(annotationType.asElement().getSimpleName().toString())) {
-                if (findAnnotationWithStereotype(annotationType.asElement(), stereotype) != null) {
+                if (findAnnotationWithStereotype(annotationType.asElement(), stereotype).isPresent()) {
                     return Optional.of(ann);
                 }
             }
