@@ -13,30 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.infra
+package org.particleframework.aop.simple
 
-import org.particleframework.aop.Around
-import org.particleframework.context.annotation.Type
-
-import java.lang.annotation.Documented
-import java.lang.annotation.ElementType
-import java.lang.annotation.Retention
-import java.lang.annotation.Target
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME
+import org.particleframework.context.annotation.Bean
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-
-@Around
-@Type(ArgMutatingInterceptor)
-@Documented
-@Retention(RUNTIME)
-@Target([ElementType.METHOD])
-@interface Mutating {
-    String value()
+@Bean
+class Bar {
 }
-
-

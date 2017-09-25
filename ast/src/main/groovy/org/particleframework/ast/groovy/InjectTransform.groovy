@@ -31,6 +31,7 @@ import org.particleframework.inject.writer.BeanDefinitionWriter
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 import javax.inject.*
+import javax.lang.model.element.AnnotationMirror
 import java.beans.Introspector
 import java.lang.reflect.Modifier
 
@@ -158,6 +159,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isConfigurationProperties
         final boolean isFactoryClass
         final boolean isExecutableType
+        final boolean isAopProxyType
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         BeanDefinitionVisitor beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -171,7 +173,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
-            this.isExecutableType = stereoTypeFinder.hasStereoType(targetClassNode, Executable)
+            this.isAopProxyType = stereoTypeFinder.hasStereoType(targetClassNode, "org.particleframework.aop.Around");
+            this.isExecutableType = isAopProxyType || stereoTypeFinder.hasStereoType(targetClassNode, Executable)
             this.isConfigurationProperties = isConfigurationProperties
             if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope) || stereoTypeFinder.hasStereoType(concreteClass, Bean)) {
                 defineBeanDefinition(concreteClass)
@@ -298,8 +301,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
             else if(!isConstructor) {
-
-                if((isExecutableType && methodNode.isPublic() && !methodNode.isStatic()) && !methodNode.isAbstract() || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
+                if((isExecutableType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
                     if(methodNode.declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
@@ -319,66 +322,73 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 qualifierTypes,
                                 genericTypeMap)
 
-                        if(stereoTypeFinder.hasStereoType(methodNode, "org.particleframework.aop.Around")) {
+                        if((isAopProxyType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, "org.particleframework.aop.Around")) {
 
                             AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                             Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
 
-                            if(aopProxyWriter == null) {
-
-                                AopProxyWriter aopWriter = new AopProxyWriter(beanWriter, interceptorTypeReferences)
-                                this.aopProxyWriter = aopWriter
-
-                                List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
-                                if(constructors.isEmpty()) {
-                                    aopProxyWriter.visitBeanDefinitionConstructor()
-                                }
-                                else {
-                                    ConstructorNode constructorNode = findConcreteConstructor(constructors)
-
-                                    if (constructorNode != null) {
-                                        Map<String, Object> constructorParamsToType = [:]
-                                        Map<String, Object> constructorQualifierTypes = [:]
-                                        Map<String, List<Object>> constructorGenericTypeMap = [:]
-                                        Parameter[] parameters = constructorNode.parameters
-                                        populateParameterData(parameters,
-                                                constructorParamsToType,
-                                                constructorQualifierTypes,
-                                                constructorGenericTypeMap)
-                                        aopProxyWriter.visitBeanDefinitionConstructor( constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
+                            AopProxyWriter proxyWriter = resolveProxyWriter(interceptorTypeReferences)
 
 
-                                    } else {
-                                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", concreteClass)
-                                        return
-                                    }
+                            if(proxyWriter != null) {
 
-                                }
-                                aopWriter.visitSuperType(beanWriter.getBeanDefinitionName())
-
-                                def node = new AnnotatedNode()
-                                def replaces = new AnnotationNode(makeCached(Replaces))
-                                replaces.setMember('value', classX(concreteClass.plainNodeReference))
-                                node.addAnnotation(replaces)
-                                beanDefinitionWriters.put(node, aopWriter)
+                                proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
+                                proxyWriter.visitAroundMethod(
+                                        resolveTypeReference(concreteClass),
+                                        resolveTypeReference(methodNode.returnType),
+                                        returnTypeGenerics,
+                                        methodNode.name,
+                                        paramsToType,
+                                        qualifierTypes,
+                                        genericTypeMap
+                                )
                             }
-
-                            AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
-                            proxyWriter.visitInterceptorTypes(interceptorTypeReferences);
-                            proxyWriter.visitAroundMethod(
-                                    resolveTypeReference(concreteClass),
-                                    resolveTypeReference(methodNode.returnType),
-                                    returnTypeGenerics,
-                                    methodNode.name,
-                                    paramsToType,
-                                    qualifierTypes,
-                                    genericTypeMap
-                            )
                         }
                     }
                 }
             }
 
+        }
+
+        private AopProxyWriter resolveProxyWriter(Object[] interceptorTypeReferences) {
+            AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
+            if (proxyWriter == null) {
+
+                proxyWriter = new AopProxyWriter(beanWriter, interceptorTypeReferences)
+                this.aopProxyWriter = proxyWriter
+
+                List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
+                if (constructors.isEmpty()) {
+                    aopProxyWriter.visitBeanDefinitionConstructor()
+                } else {
+                    ConstructorNode constructorNode = findConcreteConstructor(constructors)
+
+                    if (constructorNode != null) {
+                        Map<String, Object> constructorParamsToType = [:]
+                        Map<String, Object> constructorQualifierTypes = [:]
+                        Map<String, List<Object>> constructorGenericTypeMap = [:]
+                        Parameter[] parameters = constructorNode.parameters
+                        populateParameterData(parameters,
+                                constructorParamsToType,
+                                constructorQualifierTypes,
+                                constructorGenericTypeMap)
+                        aopProxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
+
+
+                    } else {
+                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", concreteClass)
+                    }
+
+                }
+                proxyWriter.visitSuperType(beanWriter.getBeanDefinitionName())
+
+                def node = new AnnotatedNode()
+                def replaces = new AnnotationNode(makeCached(Replaces))
+                replaces.setMember('value', classX(concreteClass.plainNodeReference))
+                node.addAnnotation(replaces)
+                beanDefinitionWriters.put(node, proxyWriter)
+            }
+            proxyWriter
         }
 
         protected Object[] resolveTypeReferences(AnnotationNode[] annotationNodes) {
@@ -590,6 +600,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             new InjectVisitor(su, inner,true).visitClass(inner)
                         }
                     }
+                }
+
+
+                if(isAopProxyType) {
+                    AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(classNode, Around)
+                    Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
+                    resolveProxyWriter(interceptorTypeReferences)
                 }
 
             } else if (!classNode.isAbstract()) {

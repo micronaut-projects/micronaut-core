@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.infra
+package org.particleframework.aop.simple
+
+import org.particleframework.aop.interceptors.Mutating
 
 import javax.inject.Singleton
 
@@ -22,11 +24,11 @@ import javax.inject.Singleton
  * @since 1.0
  */
 @Singleton
-class AopTargetClass<A extends CharSequence> {
+class SimpleGroovyClass<A extends CharSequence> {
 
     Bar bar
 
-    AopTargetClass(Bar bar) {
+    SimpleGroovyClass(Bar bar) {
         this.bar = bar
         assert bar != null
     }

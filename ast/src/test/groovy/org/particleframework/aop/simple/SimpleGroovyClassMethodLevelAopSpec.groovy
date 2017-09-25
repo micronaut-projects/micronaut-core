@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.infra
+package org.particleframework.aop.simple
 
 import org.particleframework.aop.Intercepted
 import org.particleframework.aop.internal.AopAttributes
@@ -26,12 +26,12 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class AopSetupSpec extends Specification {
+class SimpleGroovyClassMethodLevelAopSpec extends Specification {
 
     void "test AOP method invocation"() {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
+        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
@@ -71,7 +71,7 @@ class AopSetupSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when: "the bean definition is obtained"
-        BeanDefinition<AopTargetClass> beanDefinition = beanContext.findBeanDefinition(AopTargetClass).get()
+        BeanDefinition<SimpleGroovyClass> beanDefinition = beanContext.findBeanDefinition(SimpleGroovyClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()
@@ -79,14 +79,14 @@ class AopSetupSpec extends Specification {
         !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
 
         when:
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
+        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
 
 
         then:
         foo instanceof Intercepted
-        beanContext.findExecutableMethod(AopTargetClass, "test", String).isPresent()
+        beanContext.findExecutableMethod(SimpleGroovyClass, "test", String).isPresent()
         // should not be a reflection based method
-        !beanContext.findExecutableMethod(AopTargetClass, "test", String).get().getClass().getName().contains("Reflection")
+        !beanContext.findExecutableMethod(SimpleGroovyClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
         AopAttributes.@attributes.get() == null
 
@@ -97,15 +97,15 @@ class AopSetupSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when:
-        AopTargetClass foo = beanContext.getBean(AopTargetClass)
-        def attrs = AopAttributes.get(AopTargetClass, "test", String)
+        SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
+        def attrs = AopAttributes.get(SimpleGroovyClass, "test", String)
         then:
         foo instanceof Intercepted
         foo.test("test") == "Name is changed"
         AopAttributes.@attributes.get().values().first().values == attrs
 
         when:
-        AopAttributes.remove(AopTargetClass, "test", String)
+        AopAttributes.remove(SimpleGroovyClass, "test", String)
 
         then:
         AopAttributes.@attributes.get() == null
