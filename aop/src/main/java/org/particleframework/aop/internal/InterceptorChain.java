@@ -174,9 +174,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
                         Arrays.stream(type.value())
                 ).collect(Collectors.toSet());
 
-        Interceptor[] resolved = Arrays.stream(interceptors)
+        return Arrays.stream(interceptors)
                 .filter(i -> applicableClasses.contains(i.getClass()))
                 .toArray(Interceptor[]::new);
-        return resolved;
     }
 }

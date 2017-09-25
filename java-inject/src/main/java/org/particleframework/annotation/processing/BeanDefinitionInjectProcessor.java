@@ -367,7 +367,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
 
-
+                aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                 aopProxyWriter.visitAroundMethod(
                         modelUtils.resolveTypeReference(concreteClass),
                         modelUtils.resolveTypeReference(returnType),

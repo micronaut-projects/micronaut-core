@@ -322,11 +322,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if(stereoTypeFinder.hasStereoType(methodNode, "org.particleframework.aop.Around")) {
 
                             AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
-                            Object[] annotationTypeReferences = resolveTypeReferences(annotations)
+                            Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
 
                             if(aopProxyWriter == null) {
 
-                                AopProxyWriter aopWriter = new AopProxyWriter(beanWriter, annotationTypeReferences)
+                                AopProxyWriter aopWriter = new AopProxyWriter(beanWriter, interceptorTypeReferences)
                                 this.aopProxyWriter = aopWriter
 
                                 List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
@@ -363,7 +363,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 beanDefinitionWriters.put(node, aopWriter)
                             }
 
-                            ((AopProxyWriter)aopProxyWriter).visitAroundMethod(
+                            AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
+                            proxyWriter.visitInterceptorTypes(interceptorTypeReferences);
+                            proxyWriter.visitAroundMethod(
                                     resolveTypeReference(concreteClass),
                                     resolveTypeReference(methodNode.returnType),
                                     returnTypeGenerics,

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -157,6 +158,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return typeClass.isPrimitive();
         }
         return false;
+    }
+
+    protected Type[] getObjectTypes(Collection types) {
+        Type[] converted = new Type[types.size()];
+        Iterator iter = types.iterator();
+        for (int i = 0; i < converted.length; i++) {
+            Object type = iter.next();
+            converted[i] = getObjectType(type);
+        }
+        return converted;
     }
 
     protected Type[] getObjectTypes(Object... types) {

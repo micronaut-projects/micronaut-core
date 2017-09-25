@@ -35,4 +35,27 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE})
 @Executable
 public @interface Around {
+
+    /**
+     * <p>By default Particle will compile subclasses of the target class and call super.foo(..) to invoke the original method since
+     * this is more efficient and allows proxied methods to work for calls from within the class.</p>
+     *
+     * <p>However certain cases it may be useful to be able to to instead proxy all public methods of the original implementation.
+     * By setting the value here to <code>true</code> the {@link Interceptor} can specify that it requires proxying of the class</p>
+     *
+     * <p>Generated subclasses will implement {@link InterceptedProxy} if this attribute is set to true</p>
+     *
+     * @see InterceptedProxy
+     * @return True if the original implementation should be proxied. Defaults to false.
+     */
+    boolean proxyTarget() default false;
+
+    /**
+     * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the of <code>hotswap</code> to true
+     * in which case the proxy will implement the {@link HotSwappableInterceptedProxy} interface</p>
+     *
+     * @see HotSwappableInterceptedProxy
+     * @return True if the proxy should allow hotswap
+     */
+    boolean hotswap() default false;
 }

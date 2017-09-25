@@ -68,7 +68,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final String proxyFullName;
     private final BeanDefinitionWriter proxyBeanDefinitionWriter;
     private final String proxyInternalName;
-    private final Object[] interceptorTypes;
+    private final Set<Object> interceptorTypes;
     private final Type proxyType;
 
     private MethodVisitor constructorWriter;
@@ -97,7 +97,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyFullName = packageName + '.' + proxyShortName;
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
-        this.interceptorTypes = interceptorTypes;
+        this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
         Type scope = parent.getScope();
         String scopeClassName = scope != null ? scope.getClassName() : null;
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(packageName, proxyShortName, scopeClassName, parent.isSingleton());
@@ -541,5 +541,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public String getProxiedTypeName() {
         return targetClassFullName;
+    }
+
+    public void visitInterceptorTypes(Object... interceptorTypes) {
+        if(interceptorTypes != null) {
+            this.interceptorTypes.addAll(Arrays.asList(interceptorTypes));
+        }
     }
 }
