@@ -1,8 +1,10 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -86,6 +88,25 @@ public interface BeanDefinition<T> {
      */
     <R> Optional<ExecutableMethod<T,R>> findMethod(String name, Class...argumentTypes);
 
+    /**
+     * Finds a single {@link ExecutableMethod} for the given name and argument types
+     *
+     * @param name The method name
+     * @param argumentTypes The argument types
+     * @return An optional {@link ExecutableMethod}
+     * @throws IllegalStateException If the method cannot be found
+     */
+    default <R> ExecutableMethod<T,R> getRequiredMethod(String name, Class...argumentTypes) {
+
+        return (ExecutableMethod<T,R>) findMethod(name, argumentTypes)
+                .orElseThrow(()-> {
+                    Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
+                    String argsAsText = stringStream.collect(Collectors.joining(","));
+
+            return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + getType().getName());
+
+        });
+    }
     /**
      * Finds possible methods for the given method name
      *

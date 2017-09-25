@@ -2,6 +2,7 @@ package org.particleframework.inject.writer;
 
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.commons.Method;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.io.File;
@@ -22,6 +23,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     public static final String CONSTRUCTOR_NAME = "<init>";
     public static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
+    public static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
+    public static final int MODIFIERS_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
 
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
@@ -158,6 +161,23 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return typeClass.isPrimitive();
         }
         return false;
+    }
+
+    protected static void pushMethodNameAndTypesArguments(MethodVisitor methodVisitor, String methodName, Collection<Object> argumentTypes) {
+        // and the method name
+        methodVisitor.visitLdcInsn(methodName);
+
+        int argTypeCount = argumentTypes.size();
+        if (!argumentTypes.isEmpty()) {
+            BeanDefinitionWriter.pushNewArray(methodVisitor, Class.class, argTypeCount);
+            Iterator<Object> argIterator = argumentTypes.iterator();
+            for (int i = 0; i < argTypeCount; i++) {
+                BeanDefinitionWriter.pushStoreTypeInArray(methodVisitor, i, argTypeCount, argIterator.next());
+            }
+        } else {
+            // no arguments
+            BeanDefinitionWriter.pushNewArray(methodVisitor, Class.class, 0);
+        }
     }
 
     protected Type[] getObjectTypes(Collection types) {
@@ -399,5 +419,22 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected void returnVoid(GeneratorAdapter overriddenMethodGenerator) {
         overriddenMethodGenerator.pop();
         overriddenMethodGenerator.visitInsn(RETURN);
+    }
+
+    protected GeneratorAdapter visitStaticInitializer(ClassWriter classWriter) {
+        MethodVisitor mv = classWriter.visitMethod(ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
+        return new GeneratorAdapter(mv, ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR);
+    }
+
+    protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String...argumentTypes) {
+        return new GeneratorAdapter( writer.visitMethod(
+                        ACC_PUBLIC,
+                        methodName,
+                        getMethodDescriptor(returnType, argumentTypes),
+                        null,
+                        null
+                ), ACC_PUBLIC,
+                        methodName,
+                        getMethodDescriptor(returnType));
     }
 }

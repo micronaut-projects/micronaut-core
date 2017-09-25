@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.interceptors;
-
+package org.particleframework.aop.proxytarget;
 
 import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.InvocationContext;
+import org.particleframework.aop.simple.*;
 import org.particleframework.inject.MutableArgumentValue;
 
 import javax.inject.Singleton;

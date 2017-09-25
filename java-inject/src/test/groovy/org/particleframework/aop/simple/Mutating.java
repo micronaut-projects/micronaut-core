@@ -13,20 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.simple;
+
+import org.particleframework.aop.Around;
+import org.particleframework.context.annotation.Type;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A {@link Intercepted} that proxies another instance
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InterceptedProxy<T> extends Intercepted {
 
-    /**
-     * This method will return the target object being proxied
-     *
-     * @return The proxy target
-     */
-    T interceptedTarget();
+@Around
+@Type(ArgMutatingInterceptor.class)
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface Mutating {
+    String value();
 }
+
+

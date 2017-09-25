@@ -15,8 +15,6 @@
  */
 package org.particleframework.aop.simple;
 
-import org.particleframework.aop.interceptors.Mutating;
-
 import java.util.Collections;
 import java.util.List;
 

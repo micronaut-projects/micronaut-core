@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.simple;
+package org.particleframework.aop.proxytarget;
 
-import javax.inject.Singleton;
+import org.particleframework.aop.simple.*;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -23,12 +24,11 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-public class SimpleClass<A extends CharSequence> {
+public class ProxyingClass<A extends CharSequence> {
 
     private Bar bar;
 
-    public SimpleClass(Bar bar) {
+     public <T extends Bar> ProxyingClass(T bar) {
         this.bar = bar;
         assert bar != null;
     }

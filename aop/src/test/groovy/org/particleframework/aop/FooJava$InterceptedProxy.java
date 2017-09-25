@@ -18,28 +18,41 @@ package org.particleframework.aop;
 import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
-import org.particleframework.context.AbstractExecutableMethod;
+import org.particleframework.context.AbstractBeanDefinition;
+import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanFactory;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.Collections;
+import java.util.Optional;
 
 /**
- * This class is what the final compiled byte code for a proxy generated with @Around looks like when decompiled
+ *
+ * This class is what the final compiled byte code for a proxy generated with @Around(proxyTarget=true) looks like when decompiled
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FooJava$Intercepted extends Foo implements Intercepted {
+public class FooJava$InterceptedProxy extends Foo implements InterceptedProxy {
+
+    private static final BeanDefinition<Foo> PARENT = new AbstractBeanDefinition<Foo>(null,false, Foo.class, null, null, null, null) {
+        @Override
+        public Optional<ExecutableMethod<Foo, ?>> findMethod(String name, Class[] argumentTypes) {
+            return super.findMethod(name, argumentTypes);
+        }
+    };
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
+    private final Object target;
 
-    FooJava$Intercepted(int c, @Type({Mutating.class, Trace.class}) Interceptor[] interceptors) throws NoSuchMethodException {
+
+    FooJava$InterceptedProxy(int c, BeanContext beanContext, @Type({Mutating.class, Trace.class}) Interceptor[] interceptors) throws NoSuchMethodException {
         super(c);
+        this.target = ((BeanFactory)PARENT).build(beanContext, PARENT);
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];
-        this.proxyMethods[0] = new $blah0();
+        this.proxyMethods[0] = PARENT.getRequiredMethod("blah", String.class);
         this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
     }
 
@@ -47,23 +60,12 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
     public String blah(String name) {
         ExecutableMethod executableMethod = this.proxyMethods[0];
         Interceptor[] interceptors = this.interceptors[0];
-        InterceptorChain chain = new MethodInterceptorChain(interceptors, this, executableMethod, name);
+        InterceptorChain chain = new MethodInterceptorChain(interceptors, target, executableMethod, name);
         return (String) chain.proceed();
     }
 
-    class $blah0 extends AbstractExecutableMethod {
-        protected $blah0() {
-            super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
-                    new Class[0],
-                    Collections.singletonMap("name", String.class),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-                    );
-        }
-        @Override
-        protected Object invokeInternal(Object instance, Object[] arguments) {
-            return FooJava$Intercepted.super.blah((String) arguments[0]);
-        }
+    @Override
+    public Object getTarget() {
+        return target;
     }
-
 }

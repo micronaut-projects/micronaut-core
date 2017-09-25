@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.interceptors;
-
+package org.particleframework.aop.proxytarget;
 import org.particleframework.aop.Around;
 import org.particleframework.context.annotation.Type;
 
@@ -30,7 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @since 1.0
  */
 
-@Around
+@Around(proxyTarget = true)
 @Type(ArgMutatingInterceptor.class)
 @Documented
 @Retention(RUNTIME)

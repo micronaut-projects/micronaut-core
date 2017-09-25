@@ -861,25 +861,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     static void pushGetMethodFromTypeCall(MethodVisitor methodVisitor, Type declaringType, String methodName, Collection<Object> argumentTypes) {
-        int argTypeCount = argumentTypes.size();
         // lookup the Method instance from the declaring type
         methodVisitor.visitLdcInsn(declaringType);
-
-        // and the method name
-        methodVisitor.visitLdcInsn(methodName);
-
-
-        if (!argumentTypes.isEmpty()) {
-            pushNewArray(methodVisitor, Class.class, argTypeCount);
-            Iterator<Object> argIterator = argumentTypes.iterator();
-            for (int i = 0; i < argTypeCount; i++) {
-                pushStoreTypeInArray(methodVisitor, i, argTypeCount, argIterator.next());
-            }
-        } else {
-            // no arguments
-            pushNewArray(methodVisitor, Class.class, 0);
-        }
-
+        pushMethodNameAndTypesArguments(methodVisitor, methodName, argumentTypes);
         // 1st argument to addInjectPoint: The Method
         pushInvokeMethodOnClass(methodVisitor, "getDeclaredMethod", String.class, Class[].class);
     }
