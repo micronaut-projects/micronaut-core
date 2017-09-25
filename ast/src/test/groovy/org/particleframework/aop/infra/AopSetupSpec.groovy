@@ -58,7 +58,11 @@ class AopSetupSpec extends Specification {
         'testFloat'   | ['test', 10] | 20                  // test for float return type
         'testDouble'  | ['test']     | 1                   // test for double return type
         'testDouble'  | ['test', 10] | 20                  // test for double return type
-
+        'testByteArray'               | ['test', 'test'.bytes] | 'test'.bytes        // test for byte array
+        'testGenericsWithExtends'     | ['test', 10]           | 'Name is changed'        // test for generics
+        'testGenericsFromType'        | ['test', 10]           | 'Name is changed'        // test for generics
+        'testListWithWildCardSuper'   | ['test', []]           | ['changed']        // test for generics
+        'testListWithWildCardExtends' | ['test', []]           | ['changed']        // test for generics
     }
 
 

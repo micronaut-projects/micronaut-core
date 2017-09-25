@@ -234,7 +234,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 return scan(elements, o);
             } else {
-                note("Visited unexpected classElement %s for %s", classElement.getSimpleName(), o);
+//                note("Visited unexpected classElement %s for %s", classElement.getSimpleName(), o);
                 return null;
             }
         }
