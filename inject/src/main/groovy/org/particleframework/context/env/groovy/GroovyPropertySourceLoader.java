@@ -12,6 +12,7 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Loads properties from a Groovy script
@@ -34,9 +35,9 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
     }
 
     private void loadProperties(Environment environment, String fileName, Map<String, Object> finalMap) {
-        Optional<URL> config = environment.getResource(fileName);
+        Stream<URL> urls = environment.getResources(fileName);
 
-        config.ifPresent(res -> {
+        urls.forEach(res -> {
             ConfigurationEvaluator evaluator = new ConfigurationEvaluator();
             String path = res.getPath();
             if(!path.contains("src/main/groovy")) {

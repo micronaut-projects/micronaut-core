@@ -15,10 +15,13 @@
  */
 package example
 
+import grails.gorm.annotation.Entity
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Entity
 class Book {
     String title
 }

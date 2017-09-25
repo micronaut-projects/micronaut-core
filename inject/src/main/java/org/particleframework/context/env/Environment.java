@@ -9,12 +9,17 @@ import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.inject.BeanConfiguration;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.net.URL;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import static java.util.stream.Stream.builder;
 
 /**
  * The current application environment
@@ -140,4 +145,19 @@ InputStream inputStream = getClassLoader().getResourceAsStream(path);
         }
         return Optional.empty();
     }
+
+    default Stream<URL> getResources(String fileName) {
+        Enumeration<URL> all;
+        try {
+            all = getClassLoader().getResources(fileName);
+        } catch (IOException e) {
+            return Stream.empty();
+        }
+        Stream.Builder<URL> builder = Stream.<URL>builder();
+        while (all.hasMoreElements()) {
+            URL url = all.nextElement();
+            builder.accept(url);
+        }
+        return builder.build();
+    };
 }

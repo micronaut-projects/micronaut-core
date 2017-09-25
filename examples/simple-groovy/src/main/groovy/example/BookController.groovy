@@ -15,16 +15,29 @@
  */
 package example
 
+import grails.gorm.transactions.ReadOnly
+import grails.gorm.transactions.Transactional
 import org.particleframework.stereotype.Controller
+
+import javax.annotation.PostConstruct
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Controller
+@Singleton
 class BookController {
 
-    String index() {
-        "Hello World"
+    @ReadOnly
+    List<Book> index() {
+        Book.list()
+    }
+
+    @Transactional
+    @PostConstruct
+    void setup() {
+        new Book(title: "The Stand").save()
     }
 }
