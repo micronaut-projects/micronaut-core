@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -124,6 +125,57 @@ public class ReflectionUtils {
      *
      * @param type The type
      * @param name The name
+     * @param argumentTypes The argument types
+     * @return An {@link Optional} contains the method or empty
+     */
+    public static Method getRequiredMethod(Class type, String name, Class... argumentTypes) {
+        try {
+            return type.getDeclaredMethod(name, argumentTypes);
+        } catch (NoSuchMethodException e) {
+            return findMethod(type, name, argumentTypes)
+                    .orElseThrow(()-> newNoSuchMethodError(type, name, argumentTypes));
+        }
+    }
+
+    /**
+     * Finds a field on the given type for the given name
+     *
+     * @param type The type
+     * @param name The name
+     * @return An {@link Optional} contains the method or empty
+     */
+    public static Field getRequiredField(Class type, String name) {
+        try {
+            return type.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+            Optional<Field> field = findField(type, name);
+            return field.orElseThrow(()-> new NoSuchFieldError("No field '"+name+"' found for type: " + type.getName()));
+        }
+    }
+
+    /**
+     * Finds a field in the type or super type
+     * @param type The type
+     * @param name The field name
+     * @return An {@link Optional} of field
+     */
+    public static Optional<Field> findField(Class type, String name) {
+        Optional<Field> declaredField = findDeclaredField(type, name);
+        if(!declaredField.isPresent()) {
+            type = type.getSuperclass();
+            while(type != null) {
+                declaredField = findField(type, name);
+                if(declaredField.isPresent()) break;
+            }
+        }
+        return declaredField;
+    }
+
+    /**
+     * Finds a method on the given type for the given name
+     *
+     * @param type The type
+     * @param name The name
      * @return An {@link Optional} contains the method or empty
      */
     public static Stream<Method> findMethodsByName(Class type, String name) {
@@ -169,5 +221,12 @@ public class ReflectionUtils {
             }
         }
         return interfaces;
+    }
+
+    public static NoSuchMethodError newNoSuchMethodError(Class declaringType, String name, Class[] argumentTypes) {
+        Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
+        String argsAsText = stringStream.collect(Collectors.joining(","));
+
+        return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName());
     }
 }

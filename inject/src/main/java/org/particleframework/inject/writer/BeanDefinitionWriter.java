@@ -864,6 +864,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // lookup the Method instance from the declaring type
         methodVisitor.visitLdcInsn(declaringType);
         pushMethodNameAndTypesArguments(methodVisitor, methodName, argumentTypes);
+
+
         // 1st argument to addInjectPoint: The Method
         pushInvokeMethodOnClass(methodVisitor, "getDeclaredMethod", String.class, Class[].class);
     }

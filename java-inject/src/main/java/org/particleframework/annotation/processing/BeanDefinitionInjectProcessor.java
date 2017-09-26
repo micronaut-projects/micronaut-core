@@ -51,7 +51,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             "org.particleframework.inject.annotation.Executable"
 
     };
-    public static final String AROUND_TYPE = "org.particleframework.aop.Around";
+    private static final String AROUND_TYPE = "org.particleframework.aop.Around";
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private ServiceDescriptorGenerator serviceDescriptorGenerator;
@@ -332,8 +332,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             BeanDefinitionVisitor beanWriter = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
 
+
+            Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
+            if(typeRef == null) typeRef = modelUtils.resolveTypeReference(concreteClass);
             beanWriter.visitExecutableMethod(
-                modelUtils.resolveTypeReference(concreteClass),
+                    typeRef,
                 modelUtils.resolveTypeReference(returnType),
                 returnTypeGenerics,
                 method.getSimpleName().toString(),
@@ -357,7 +360,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                 aopProxyWriter.visitAroundMethod(
-                        modelUtils.resolveTypeReference(concreteClass),
+                        typeRef,
                         modelUtils.resolveTypeReference(returnType),
                         returnTypeGenerics,
                         method.getSimpleName().toString(),

@@ -288,4 +288,11 @@ class ModelUtils {
                 resolveTypeReference(mirror.getAnnotationType())
               ).toArray(Object[]::new);
     }
+
+    public Object resolveTypeReference(Element element) {
+        if(element instanceof TypeElement) {
+            return ((TypeElement)element).getQualifiedName().toString();
+        }
+        return null;
+    }
 }

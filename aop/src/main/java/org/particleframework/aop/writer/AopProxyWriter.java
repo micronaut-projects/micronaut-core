@@ -99,6 +99,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private MethodVisitor constructorWriter;
     private List<ExecutableMethodWriter> proxiedMethods = new ArrayList<>();
+    private Set<MethodRef> proxiedMethodsRefSet = new HashSet<>();
     private List<MethodRef> proxyTargetMethods = new ArrayList<>();
     private int proxyMethodCount = 0;
     private GeneratorAdapter constructorGenerator;
@@ -163,13 +164,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public BeanDefinitionWriter getProxyBeanDefinitionWriter() {
         return proxyBeanDefinitionWriter;
-    }
-
-    /**
-     * @return The proxied methods
-     */
-    public List<ExecutableMethodWriter> getProxiedMethods() {
-        return proxiedMethods;
     }
 
     @Override
@@ -244,19 +238,24 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
                                   Map<String, List<Object>> genericTypes) {
-        int index = proxyMethodCount++;
+
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
         Type returnTypeObject = getTypeReference(returnType);
         boolean isPrimitive = isPrimitive(returnType);
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
+        MethodRef methodKey = new MethodRef(methodName, argumentTypeList);
         if(isProxyTarget) {
             // if the target class is being proxied then the method will be looked up from the parent bean definition.
             // Therefore no need to generate a bridge
-            proxyTargetMethods.add(new MethodRef(methodName, argumentTypeList));
-            buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
+            if(!proxyTargetMethods.contains(methodKey)) {
+                int index = proxyMethodCount++;
+                proxyTargetMethods.add(methodKey);
+                buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
+            }
         }
-        else {
+        else if(!proxiedMethodsRefSet.contains(methodKey)){
+            int index = proxyMethodCount++;
             // if the target is not being proxied then we generate a subclass where only the proxied methods are overridden
             // Each overridden method calls super.blah(..) thus maintaining class semantics better and providing smaller more efficient
             // proxies
@@ -303,6 +302,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             executableMethodWriter.visitMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
 
             proxiedMethods.add(executableMethodWriter);
+            proxiedMethodsRefSet.add(methodKey);
             String overrideDescriptor = buildMethodOverride(returnType, methodName, index, argumentTypeList, argumentCount, isVoidReturn);
 
 
@@ -607,6 +607,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         else {
 
             for (int i = 0; i < proxyMethodCount; i++) {
+
                 ExecutableMethodWriter executableMethodWriter = proxiedMethods.get(i);
 
                 // The following will initialize the array of $proxyMethod instances
@@ -621,7 +622,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyConstructorGenerator.invokeConstructor(methodType, new Method(CONSTRUCTOR_NAME, getConstructorDescriptor(proxyFullName)));
                 proxyConstructorGenerator.visitInsn(AASTORE);
                 pushResolveInterceptorsCall(proxyConstructorGenerator, i);
-
 
             }
         }

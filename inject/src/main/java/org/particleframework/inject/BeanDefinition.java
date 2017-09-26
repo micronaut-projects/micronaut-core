@@ -1,10 +1,10 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.reflect.ReflectionUtils;
+
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -99,14 +99,9 @@ public interface BeanDefinition<T> {
     default <R> ExecutableMethod<T,R> getRequiredMethod(String name, Class...argumentTypes) {
 
         return (ExecutableMethod<T,R>) findMethod(name, argumentTypes)
-                .orElseThrow(()-> {
-                    Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
-                    String argsAsText = stringStream.collect(Collectors.joining(","));
-
-            return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + getType().getName());
-
-        });
+                .orElseThrow(()-> ReflectionUtils.newNoSuchMethodError(getType(), name, argumentTypes));
     }
+
     /**
      * Finds possible methods for the given method name
      *

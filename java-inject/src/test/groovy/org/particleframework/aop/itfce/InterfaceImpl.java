@@ -24,7 +24,7 @@ import java.util.List;
  * @since 1.0
  */
 @Singleton
-public class InterfaceImpl<A> implements InterfaceClass<A> {
+public class InterfaceImpl<A> extends AbstractInterfaceImpl<A> {
     @Override
     public String test(String name) {
         return "Name is " + name;
@@ -35,10 +35,6 @@ public class InterfaceImpl<A> implements InterfaceClass<A> {
         return "Age is " + age;
     }
 
-    @Override
-    public String test(String name, int age) {
-        return "Name is "+name+" and age is " + age;
-    }
 
     @Override
     public String test() {

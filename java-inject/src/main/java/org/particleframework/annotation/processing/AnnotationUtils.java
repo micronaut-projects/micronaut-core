@@ -72,6 +72,10 @@ class AnnotationUtils {
                     overridden = result.get();
                     break;
                 }
+                else {
+                    overridden = findOverriddenInterfaceMethod(executableElement, supertype);
+
+                }
                 supertype = (TypeElement) supertype.getSuperclass();
             }
             if (overridden == null) {
@@ -254,8 +258,8 @@ class AnnotationUtils {
                 }
             }
             TypeMirror superMirror = supertype.getSuperclass();
-            if (superMirror instanceof TypeElement) {
-                supertype = (TypeElement) superMirror;
+            if (superMirror instanceof DeclaredType) {
+                supertype = (TypeElement) ((DeclaredType) superMirror).asElement();
             } else {
                 break;
             }
