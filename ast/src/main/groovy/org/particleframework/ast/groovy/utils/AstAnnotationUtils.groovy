@@ -9,6 +9,9 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
 
 import java.lang.annotation.Annotation
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
 
 /**
  * Utility methods for dealing with annotations within the context of AST
@@ -39,10 +42,21 @@ class AstAnnotationUtils {
      * @return The annotation or null
      */
     static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, String annotationName) {
-        List<AnnotationNode> annotations = annotatedNode.getAnnotations()
-        for(ann in annotations) {
-            if(ann.classNode.name == annotationName) {
-                return ann
+        if(annotatedNode != null) {
+
+            List<AnnotationNode> annotations = annotatedNode.getAnnotations()
+            for(ann in annotations) {
+                ClassNode annotationClassNode = ann.classNode
+                if(annotationClassNode.name == annotationName) {
+                    return ann
+                }
+                else if (!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
+
+                    ann = findAnnotation(annotationClassNode, annotationName)
+                    if(ann != null) {
+                        return ann
+                    }
+                }
             }
         }
         return null

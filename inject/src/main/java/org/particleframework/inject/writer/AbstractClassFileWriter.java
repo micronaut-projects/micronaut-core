@@ -435,6 +435,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                         null
                 ), ACC_PUBLIC,
                         methodName,
-                        getMethodDescriptor(returnType));
+                        getMethodDescriptor(returnType, argumentTypes));
     }
 }

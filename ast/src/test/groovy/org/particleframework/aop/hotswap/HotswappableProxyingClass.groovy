@@ -13,24 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.hotswap
 
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.particleframework.aop.Around
+import org.particleframework.aop.proxytarget.Mutating
+import org.particleframework.aop.simple.Bar
+
+import javax.inject.Singleton
 
 /**
- * <p>Extended version of {@link InterceptedProxy} that allows swapping out the previous instance.</p>
- *
- * <p>At compile time an implementation is generated that uses a {@link ReentrantReadWriteLock} to maintain a reference to the target of the proxy</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HotSwappableInterceptedProxy<T> extends InterceptedProxy<T> {
-    /**
-     * Swaps the underlying proxied instance for a new instance
-     *
-     * @param newInstance The new instance
-     * @return The old instance
-     */
-    T swap(T newInstance);
+@Around(proxyTarget = true, hotswap = true)
+@Singleton
+class HotswappableProxyingClass {
+
+    public int invocationCount = 0
+
+
+    @Mutating("name")
+    String test(String name) {
+        invocationCount++
+        return "Name is " + name
+    }
+
+    String test2(String another) {
+        invocationCount++
+        return "Name is " + another
+    }
 }

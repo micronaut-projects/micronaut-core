@@ -154,12 +154,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     }
 
     private static class InjectVisitor extends ClassCodeVisitorSupport {
+        public static final String AROUND_TYPE = "org.particleframework.aop.Around"
         final SourceUnit sourceUnit
         final ClassNode concreteClass
         final boolean isConfigurationProperties
         final boolean isFactoryClass
         final boolean isExecutableType
         final boolean isAopProxyType
+        private final boolean isProxyTargetClass
+        private final boolean isHotSwappable
+
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         BeanDefinitionVisitor beanWriter
         static final AnnotationStereoTypeFinder stereoTypeFinder = new AnnotationStereoTypeFinder()
@@ -173,7 +177,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
-            this.isAopProxyType = stereoTypeFinder.hasStereoType(targetClassNode, "org.particleframework.aop.Around");
+            this.isAopProxyType = stereoTypeFinder.hasStereoType(targetClassNode, AROUND_TYPE)
+            this.isProxyTargetClass = isAopProxyType && stereoTypeFinder.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget")
+            this.isHotSwappable = isProxyTargetClass && stereoTypeFinder.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap")
+
             this.isExecutableType = isAopProxyType || stereoTypeFinder.hasStereoType(targetClassNode, Executable)
             this.isConfigurationProperties = isConfigurationProperties
             if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope) || stereoTypeFinder.hasStereoType(concreteClass, Bean)) {
@@ -322,12 +329,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 qualifierTypes,
                                 genericTypeMap)
 
-                        if((isAopProxyType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, "org.particleframework.aop.Around")) {
+                        if((isAopProxyType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
 
                             AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                             Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-
-                            AopProxyWriter proxyWriter = resolveProxyWriter(interceptorTypeReferences)
+                            boolean isProxyClass = stereoTypeFinder.isAttributeTrue(methodNode, AROUND_TYPE, "proxyTarget")
+                            boolean isHotSwap = isProxyTargetClass && stereoTypeFinder.isAttributeTrue(methodNode, AROUND_TYPE, "hotswap");
+                            AopProxyWriter proxyWriter = resolveProxyWriter(
+                                    isProxyClass,
+                                    isHotSwap,
+                                    interceptorTypeReferences
+                            )
 
 
                             if(proxyWriter != null) {
@@ -350,11 +362,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         }
 
-        private AopProxyWriter resolveProxyWriter(Object[] interceptorTypeReferences) {
+        private AopProxyWriter resolveProxyWriter(boolean isProxyTargetClass, boolean isHotSwappable, Object[] interceptorTypeReferences) {
             AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
             if (proxyWriter == null) {
 
-                proxyWriter = new AopProxyWriter(beanWriter, interceptorTypeReferences)
+                proxyWriter = new AopProxyWriter(beanWriter,isProxyTargetClass, isHotSwappable, interceptorTypeReferences)
                 this.aopProxyWriter = proxyWriter
 
                 List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
@@ -606,7 +618,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(isAopProxyType) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(classNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                    resolveProxyWriter(interceptorTypeReferences)
+                    resolveProxyWriter(isHotSwappable, isProxyTargetClass, interceptorTypeReferences)
                 }
 
             } else if (!classNode.isAbstract()) {

@@ -13,34 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.proxytarget;
+package org.particleframework.aop.proxytarget
 
-import org.particleframework.aop.Interceptor;
-import org.particleframework.aop.InvocationContext;
-import org.particleframework.inject.MutableArgumentValue;
+import org.particleframework.aop.Interceptor
+import org.particleframework.aop.InvocationContext
+import org.particleframework.inject.MutableArgumentValue
 
-import javax.inject.Singleton;
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class ArgMutatingInterceptor implements Interceptor {
+class ArgMutatingInterceptor implements Interceptor {
 
     @Override
-    public Object intercept(InvocationContext context) {
-        Mutating m = context.getAnnotation(Mutating.class);
-        MutableArgumentValue arg = (MutableArgumentValue) context.getParameters().get(m.value());
+    Object intercept(InvocationContext context) {
+        Mutating m = context.getAnnotation(Mutating.class)
+        MutableArgumentValue arg = (MutableArgumentValue) context.getParameters().get(m.value())
         if(arg != null) {
-            Object value = arg.getValue();
+            Object value = arg.getValue()
             if(value instanceof Number) {
-                arg.setValue(((Number)value).intValue()*2);
+                arg.setValue(((Number)value).intValue()*2)
             }
             else {
-                arg.setValue("changed");
+                arg.setValue("changed")
             }
         }
-        return context.proceed();
+        return context.proceed()
     }
 }

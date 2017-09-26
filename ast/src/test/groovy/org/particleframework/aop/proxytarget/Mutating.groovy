@@ -13,24 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.proxytarget;
+import org.particleframework.aop.Around;
+import org.particleframework.context.annotation.Type;
 
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Extended version of {@link InterceptedProxy} that allows swapping out the previous instance.</p>
- *
- * <p>At compile time an implementation is generated that uses a {@link ReentrantReadWriteLock} to maintain a reference to the target of the proxy</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HotSwappableInterceptedProxy<T> extends InterceptedProxy<T> {
-    /**
-     * Swaps the underlying proxied instance for a new instance
-     *
-     * @param newInstance The new instance
-     * @return The old instance
-     */
-    T swap(T newInstance);
+
+@Around(proxyTarget = true)
+@Type(ArgMutatingInterceptor.class)
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+public @interface Mutating {
+    String value();
 }
+
+

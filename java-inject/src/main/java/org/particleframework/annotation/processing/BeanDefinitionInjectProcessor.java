@@ -168,6 +168,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final boolean isExecutableType;
         private final boolean isAopProxyType;
         private final boolean isProxyTargetClass;
+        private final boolean isHotSwappable;
         private ExecutableElementParamInfo constructorParamterInfo;
 
         AnnBeanElementVisitor(TypeElement concreteClass) {
@@ -176,7 +177,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
             this.isConfigurationPropertiesType = annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class);
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE);
-            this.isProxyTargetClass = isAopProxyType && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyClass");
+            this.isProxyTargetClass = isAopProxyType && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget");
+            this.isHotSwappable = isProxyTargetClass && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap");
             this.isExecutableType = isAopProxyType  || annotationUtils.hasStereotype(concreteClass, Executable.class);
         }
 
@@ -222,7 +224,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         AnnotationMirror[] mirrors = annotationUtils
                                 .findAnnotationsWithStereotype(concreteClass, Around.class.getName());
                         Object[] interceptorTypes = modelUtils.resolveTypeReferences(mirrors);
-                        resolveAopProxyWriter(beanDefinitionWriter, isProxyTargetClass,interceptorTypes);
+                        resolveAopProxyWriter(beanDefinitionWriter, isHotSwappable, isProxyTargetClass,interceptorTypes);
                     }
 
                 }
@@ -347,8 +349,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 AnnotationMirror[] mirrors = annotationUtils
                                                 .findAnnotationsWithStereotype(method, Around.class.getName());
                 boolean isProxyClass = annotationUtils.isAttributeTrue(method, Around.class.getName(), "proxyTarget");
+                boolean isHotSwap = isProxyTargetClass && annotationUtils.isAttributeTrue(method, Around.class.getName(), "hotswap");
                 Object[] interceptorTypes = modelUtils.resolveTypeReferences(mirrors);
-                AopProxyWriter aopProxyWriter = resolveAopProxyWriter(beanWriter, isProxyClass, interceptorTypes);
+                AopProxyWriter aopProxyWriter = resolveAopProxyWriter(beanWriter, isProxyClass,isHotSwap, interceptorTypes);
 
                 aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                 aopProxyWriter.visitAroundMethod(
@@ -364,7 +367,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
-        private AopProxyWriter resolveAopProxyWriter(BeanDefinitionVisitor beanWriter, boolean isProxyClass, Object... interceptorTypes) {
+        private AopProxyWriter resolveAopProxyWriter(BeanDefinitionVisitor beanWriter,
+                                                     boolean isProxyClass,
+                                                     boolean isHotSwappable,
+                                                     Object... interceptorTypes) {
             String beanName = beanWriter.getBeanDefinitionName();
             Name proxyKey = createProxyKey(beanName);
             BeanDefinitionVisitor aopWriter = beanDefinitionWriters.get(proxyKey);
@@ -375,6 +381,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         = new AopProxyWriter(
                         beanWriter,
                         isProxyClass,
+                        isHotSwappable,
                         interceptorTypes
 
                 );

@@ -5,7 +5,9 @@ import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.particleframework.aop.Around
+import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
@@ -88,5 +90,19 @@ class AnnotationStereoTypeFinder {
                 findAnnotationsInternal(ann.classNode, stereotype, foundAnnotations)
             }
         }
+    }
+
+    boolean isAttributeTrue(AnnotatedNode node, String annotation, String attribute) {
+        AnnotationNode ann = AstAnnotationUtils.findAnnotation(node, annotation)
+        if(ann != null) {
+            def attr = ann.getMember(attribute)
+            if(attr instanceof ConstantExpression) {
+                ConstantExpression ce = (ConstantExpression)attr
+                if(ce.value instanceof Boolean) {
+                    return ce.value
+                }
+            }
+        }
+        return false
     }
 }

@@ -27,6 +27,8 @@ import org.particleframework.inject.BeanFactory;
 import org.particleframework.inject.ExecutableMethod;
 
 import java.util.Collections;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  *
@@ -35,16 +37,20 @@ import java.util.Collections;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FooJava$InterceptedProxy extends Foo implements InterceptedProxy {
+public class FooJava$InterceptedProxy extends Foo implements HotSwappableInterceptedProxy {
 
     private static final BeanDefinition<Foo> PARENT = null;
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
-    private final Object target;
-
+    private Object target;
+    private final ReentrantReadWriteLock $target_rwl = new ReentrantReadWriteLock();
+    private final Lock $target_rl;
+    private final Lock $target_wl;
 
     FooJava$InterceptedProxy(int c, BeanContext beanContext, @Type({Mutating.class, Trace.class}) Interceptor[] interceptors) throws NoSuchMethodException {
         super(c);
+        this.$target_rl = this.$target_rwl.readLock();
+        this.$target_wl = this.$target_rwl.writeLock();
         this.target = ((BeanFactory)PARENT).build(beanContext, PARENT);
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];
@@ -62,6 +68,23 @@ public class FooJava$InterceptedProxy extends Foo implements InterceptedProxy {
 
     @Override
     public Object interceptedTarget() {
-        return target;
+        $target_rl.lock();
+        try {
+            return target;
+        } finally {
+            $target_rl.unlock();
+        }
+    }
+
+    @Override
+    public Object swap(Object newInstance) {
+        $target_wl.lock();
+        try {
+            Object previous = this.target;
+            target = newInstance;
+            return previous;
+        } finally {
+            $target_wl.unlock();
+        }
     }
 }
