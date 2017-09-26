@@ -16,6 +16,7 @@
 package org.particleframework.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.Set;
 
 /**
@@ -29,6 +30,10 @@ import java.util.Set;
  */
 public interface ExecutableMethod<T, R> extends Executable<T,R> {
 
+    /**
+     * @return The target method
+     */
+    Method getTargetMethod();
     /**
      * @return Return the return type
      */

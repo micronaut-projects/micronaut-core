@@ -68,6 +68,11 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     }
 
     @Override
+    public Method getTargetMethod() {
+        return method;
+    }
+
+    @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         return method.getAnnotation(annotationClass);
     }

@@ -82,10 +82,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     .filter(element -> element.getKind() != ANNOTATION_TYPE)
                     .forEach(element -> {
                         TypeElement typeElement = modelUtils.classElementFor(element);
-                        String name = typeElement.getQualifiedName().toString();
-                        if(!processed.contains(name) && !name.endsWith("$Intercepted")) {
-                            AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
-                            beanDefinitionWriters.put(name, visitor);
+                        if(!modelUtils.isAbstract(typeElement)) {
+                            String name = typeElement.getQualifiedName().toString();
+                            if(!processed.contains(name) && !name.endsWith("$Intercepted")) {
+                                AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
+                                beanDefinitionWriters.put(name, visitor);
+                            }
                         }
                     }));
 

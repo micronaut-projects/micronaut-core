@@ -1,22 +1,29 @@
 package org.particleframework.core.annotation;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.core.reflect.ReflectionUtils;
+
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.lang.reflect.Method;
+import java.util.*;
 
 /**
- * Utility methods for annotations
- *
+ * Utility methods for annotations.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class AnnotationUtil {
+
+    private static final Cache<AnnotationKey, Set<Annotation>> ANNOTATIONS_BY_STEREOTYPE_CACHE = Caffeine.newBuilder()
+            .maximumSize(200)
+            .weakKeys()
+            .build();
 
     /**
      * Constant indicating an zero annotation
@@ -35,6 +42,25 @@ public class AnnotationUtil {
         return findAnnotationWithStereoType(stereotype, annotations);
     }
 
+    /**
+     * Finds an annotation on the given class for the given stereotype
+     *
+     * @param method The method
+     * @param type The stereotype
+     * @return The annotation
+     */
+    public static <T extends Annotation> T findAnnotation(Method method, Class type) {
+        Optional<Annotation> result = findAnnotationsWithStereoType(method, type)
+                .stream()
+                .filter(annotation -> annotation.annotationType() == type)
+                .findFirst();
+        return (T) result.orElseGet(() ->
+            findAnnotationsWithStereoType(method.getDeclaringClass(), type)
+                .stream()
+                .filter(annotation -> annotation.annotationType() == type)
+                .findFirst().orElse(null)
+        );
+    }
     /**
      * Finds an annotation on the given class for the given stereotype
      *
@@ -78,7 +104,100 @@ public class AnnotationUtil {
         return Collections.unmodifiableSet(annotationSet);
     }
 
+    /**
+     * Finds an annotation on the given class for the given stereotype
+     *
+     * @param classToSearch The class to search
+     * @param stereotype The stereotype
+     * @return The annotations
+     */
+    public static Set<Annotation> findAnnotationsWithStereoType(Class classToSearch, Class<?> stereotype) {
+        AnnotationKey key = new AnnotationKey(classToSearch, stereotype);
+        Set<Annotation> annotationSet = ANNOTATIONS_BY_STEREOTYPE_CACHE.getIfPresent(key);
+        if(annotationSet == null) {
+            annotationSet = new HashSet<>();
+            while(classToSearch != Object.class) {
+                Annotation[] annotations = classToSearch.getAnnotations();
+                annotationSet.addAll(findAnnotationsWithStereoType(stereotype, annotations));
+                classToSearch = classToSearch.getSuperclass();
+            }
+            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
+            for (Class itfe : allInterfaces) {
+                annotationSet.addAll(findAnnotationsWithStereoType(stereotype, itfe.getAnnotations()));
+            }
+            annotationSet = Collections.unmodifiableSet(annotationSet);
+            ANNOTATIONS_BY_STEREOTYPE_CACHE.put(key, annotationSet);
+        }
+        return annotationSet;
+    }
+
+    /**
+     * Find annotations for the given stereotype on the given method. The result of this method is cached in a weak hashmap.
+     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
+     * that code that utilizes the method should be executed once upon startup.
+     *
+     *
+     * @param method The method
+     * @param stereotype The stereotype
+     * @return The annotation set
+     */
+    public static Set<Annotation> findAnnotationsWithStereoType(Method method, Class<?> stereotype) {
+        AnnotationKey key = new AnnotationKey(method, stereotype);
+        Set<Annotation> annotationSet = ANNOTATIONS_BY_STEREOTYPE_CACHE.getIfPresent(key);
+        if(annotationSet == null) {
+            annotationSet = new HashSet<>(findAnnotationsWithStereoType(stereotype, method.getAnnotations()));
+            Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
+            while(classToSearch != Object.class && classToSearch != null) {
+                Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
+                Set<Annotation> finalAnnotationSet = annotationSet;
+                declaredMethod.ifPresent(interfaceMethod ->
+                        finalAnnotationSet.addAll( findAnnotationsWithStereoType(interfaceMethod, stereotype))
+                );
+                classToSearch = classToSearch.getSuperclass();
+            }
+            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
+            for (Class itfe : allInterfaces) {
+                Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
+                Set<Annotation> finalAnnotationSet = annotationSet;
+                declaredMethod.ifPresent(interfaceMethod ->
+                    finalAnnotationSet.addAll( findAnnotationsWithStereoType(interfaceMethod, stereotype))
+                );
+            }
+            annotationSet = Collections.unmodifiableSet(annotationSet);
+            ANNOTATIONS_BY_STEREOTYPE_CACHE.put(key, annotationSet);
+        }
+        return annotationSet;
+    }
+
     private static boolean isNotInternalAnnotation(Annotation ann) {
         return !Retention.class.isInstance(ann) && !Documented.class.isInstance(ann) && !Target.class.isInstance(ann);
+    }
+
+    private static class AnnotationKey {
+        private final AnnotatedElement element;
+        private final Class annotationClass;
+
+        public AnnotationKey(AnnotatedElement element, Class annotationClass) {
+            this.element = element;
+            this.annotationClass = annotationClass;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            AnnotationKey that = (AnnotationKey) o;
+
+            if (!element.equals(that.element)) return false;
+            return annotationClass.equals(that.annotationClass);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = element.hashCode();
+            result = 31 * result + annotationClass.hashCode();
+            return result;
+        }
     }
 }

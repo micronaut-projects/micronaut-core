@@ -86,6 +86,11 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
+    public Method getTargetMethod() {
+        return method;
+    }
+
+    @Override
     public ReturnType<R> getReturnType() {
         return new MethodReturnType<>();
     }

@@ -65,7 +65,7 @@ class InterceptorChainSpec extends Specification {
         String classAsPath = className.replace('.', '/') + ".class";
         InputStream stream = FooJava$Intercepted.getClassLoader().getResourceAsStream(classAsPath);
         ClassReader reader = new ClassReader(stream)
-        reader.accept(new TraceClassVisitor((ClassVisitor)null, new ASMifier(), new PrintWriter(System.out)), 0);
+//        reader.accept(new TraceClassVisitor((ClassVisitor)null, new ASMifier(), new PrintWriter(System.out)), 0);
 
         Interceptor[] interceptors = [new OneInterceptor(), new ArgMutating()]
         def executionHandle = Mock(ExecutableMethod)

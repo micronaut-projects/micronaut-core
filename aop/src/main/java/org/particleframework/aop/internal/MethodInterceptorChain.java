@@ -22,6 +22,7 @@ import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ReturnType;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -53,6 +54,11 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
     @Override
     public Set<? extends Annotation> getExecutableAnnotations() {
         return null;
+    }
+
+    @Override
+    public Method getTargetMethod() {
+        return executionHandle.getTargetMethod();
     }
 
     @Override

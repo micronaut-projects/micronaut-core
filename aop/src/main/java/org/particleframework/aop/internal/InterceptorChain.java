@@ -122,11 +122,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
 
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        T annotation = executionHandle.getAnnotation(annotationClass);
-        if(annotation == null) {
-            return executionHandle.getDeclaringType().getAnnotation(annotationClass);
-        }
-        return annotation;
+        return AnnotationUtil.findAnnotation(executionHandle.getTargetMethod(), annotationClass);
     }
 
     @Override
@@ -171,11 +167,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     public static Interceptor[] resolveInterceptors(AnnotatedElement method, Interceptor...interceptors) {
-        Set<Annotation> annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations()));
-
+        Set<Annotation> annotations;
         if(method instanceof ExecutableMethod) {
-            Class typeLevelAnnotations = ((ExecutableMethod) method).getDeclaringType();
-            annotations.addAll(AnnotationUtil.findAnnotationsWithStereoType(Around.class, typeLevelAnnotations.getAnnotations()));
+            ExecutableMethod executableMethod = (ExecutableMethod) method;
+            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(executableMethod.getTargetMethod(), Around.class));
+            Class typeLevelAnnotations = executableMethod.getDeclaringType();
+            annotations.addAll(AnnotationUtil.findAnnotationsWithStereoType(typeLevelAnnotations, Around.class));
+        }
+        else {
+            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations()));
         }
 
         Set<Class> applicableClasses = annotations.stream()
