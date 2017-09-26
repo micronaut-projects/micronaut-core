@@ -178,6 +178,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
             this.isConfigurationPropertiesType = annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class);
+
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE);
             this.isProxyTargetClass = isAopProxyType && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget");
             this.isHotSwappable = isProxyTargetClass && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap");

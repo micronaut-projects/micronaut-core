@@ -119,11 +119,11 @@ public class AnnotationUtil {
             while(classToSearch != Object.class) {
                 Annotation[] annotations = classToSearch.getAnnotations();
                 annotationSet.addAll(findAnnotationsWithStereoType(stereotype, annotations));
+                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
+                for (Class itfe : allInterfaces) {
+                    annotationSet.addAll(findAnnotationsWithStereoType(stereotype, itfe.getAnnotations()));
+                }
                 classToSearch = classToSearch.getSuperclass();
-            }
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
-            for (Class itfe : allInterfaces) {
-                annotationSet.addAll(findAnnotationsWithStereoType(stereotype, itfe.getAnnotations()));
             }
             annotationSet = Collections.unmodifiableSet(annotationSet);
             ANNOTATIONS_BY_STEREOTYPE_CACHE.put(key, annotationSet);

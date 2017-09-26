@@ -1,12 +1,14 @@
 package org.particleframework.annotation.processing;
 
 import javax.inject.Qualifier;
+import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 class AnnotationUtils {
@@ -34,7 +36,7 @@ class AnnotationUtils {
         if (stereotypes.contains(element.toString())) {
             return true;
         }
-        List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(element);
+        Set<? extends AnnotationMirror> annotationMirrors = getAllAnnotationMirrors(element);
         for (AnnotationMirror ann : annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
             String annotationTypeString = annotationType.toString();
@@ -42,7 +44,8 @@ class AnnotationUtils {
                 return true;
             } else if (!IGNORED_ANNOTATIONS.contains(
                     annotationType.asElement().getSimpleName().toString())) {
-                if (hasStereotype(annotationType.asElement(), stereotypes)) {
+                Element annotationTypeElement = annotationType.asElement();
+                if (hasStereotype(annotationTypeElement, stereotypes)) {
                     return true;
                 }
             }
@@ -57,6 +60,40 @@ class AnnotationUtils {
             }
         }
         return false;
+    }
+
+    Set<? extends AnnotationMirror> getAllAnnotationMirrors(Element element) {
+        Set<AnnotationMirror> mirrors = new HashSet<>();
+        mirrors.addAll(elementUtils.getAllAnnotationMirrors(element));
+        populateAnnotationMirrors(element, mirrors);
+        return mirrors;
+    }
+
+    private void populateAnnotationMirrors(Element element, Set<AnnotationMirror> mirrors) {
+        while(element.getKind() == ElementKind.CLASS) {
+            List<? extends AnnotationMirror> elementMirrors = element.getAnnotationMirrors();
+            mirrors.addAll(elementMirrors);
+            TypeElement typeElement = (TypeElement) element;
+            List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
+            for (TypeMirror anInterface : interfaces) {
+                if(anInterface instanceof DeclaredType) {
+
+                    Element interfaceElement = ((DeclaredType) anInterface).asElement();
+
+                    List<? extends AnnotationMirror> interfaceAnnotationMirrors = interfaceElement.getAnnotationMirrors();
+                    mirrors.addAll(interfaceAnnotationMirrors);
+                    populateAnnotationMirrors(interfaceElement, mirrors);
+                }
+            }
+            TypeMirror superMirror = typeElement.getSuperclass();
+            if(superMirror instanceof DeclaredType) {
+                DeclaredType type = (DeclaredType) superMirror;
+                element = type.asElement();
+            }
+            else {
+                break;
+            }
+        }
     }
 
     private ExecutableElement findOverriddenMethod(ExecutableElement executableElement) {
@@ -98,7 +135,7 @@ class AnnotationUtils {
         }
         List<String> stereoTypeList = Arrays.asList(stereotypes);
         List<AnnotationMirror> annotationMirrorList = new ArrayList<>();
-        List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(element);
+        Set<? extends AnnotationMirror> annotationMirrors = getAllAnnotationMirrors(element);
         for (AnnotationMirror ann : annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
             String annotationTypeString = annotationType.toString();
@@ -145,7 +182,7 @@ class AnnotationUtils {
      * @return An array of matching {@link AnnotationMirror}
      */
     Optional<AnnotationMirror> findAnnotationWithStereotype(Element element, String stereotype) {
-        List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(element);
+        Set<? extends AnnotationMirror> annotationMirrors = getAllAnnotationMirrors(element);
         for (AnnotationMirror ann : annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
             if (stereotype.equals(annotationType.toString())) {
@@ -178,7 +215,7 @@ class AnnotationUtils {
      * @return An array of matching {@link AnnotationMirror}
      */
     Optional<AnnotationMirror> findAnnotation(Element element, String stereotype) {
-        List<? extends AnnotationMirror> annotationMirrors = elementUtils.getAllAnnotationMirrors(element);
+        Set<? extends AnnotationMirror> annotationMirrors = getAllAnnotationMirrors(element);
         for (AnnotationMirror ann : annotationMirrors) {
             DeclaredType annotationType = ann.getAnnotationType();
             if (stereotype.equals(annotationType.toString())) {
