@@ -11,6 +11,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Utility methods for annotations.
@@ -61,6 +62,8 @@ public class AnnotationUtil {
                 .findFirst().orElse(null)
         );
     }
+
+
     /**
      * Finds an annotation on the given class for the given stereotype
      *
@@ -112,11 +115,14 @@ public class AnnotationUtil {
      * @return The annotations
      */
     public static Set<Annotation> findAnnotationsWithStereoType(Class classToSearch, Class<?> stereotype) {
+        if(classToSearch == null) {
+            return Collections.emptySet();
+        }
         AnnotationKey key = new AnnotationKey(classToSearch, stereotype);
         Set<Annotation> annotationSet = ANNOTATIONS_BY_STEREOTYPE_CACHE.getIfPresent(key);
         if(annotationSet == null) {
             annotationSet = new HashSet<>();
-            while(classToSearch != Object.class) {
+            while(classToSearch != Object.class && classToSearch != null) {
                 Annotation[] annotations = classToSearch.getAnnotations();
                 annotationSet.addAll(findAnnotationsWithStereoType(stereotype, annotations));
                 Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
@@ -143,30 +149,59 @@ public class AnnotationUtil {
      */
     public static Set<Annotation> findAnnotationsWithStereoType(Method method, Class<?> stereotype) {
         AnnotationKey key = new AnnotationKey(method, stereotype);
-        Set<Annotation> annotationSet = ANNOTATIONS_BY_STEREOTYPE_CACHE.getIfPresent(key);
-        if(annotationSet == null) {
-            annotationSet = new HashSet<>(findAnnotationsWithStereoType(stereotype, method.getAnnotations()));
-            Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
-            while(classToSearch != Object.class && classToSearch != null) {
-                Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
-                Set<Annotation> finalAnnotationSet = annotationSet;
-                declaredMethod.ifPresent(interfaceMethod ->
-                        finalAnnotationSet.addAll( findAnnotationsWithStereoType(interfaceMethod, stereotype))
-                );
-                classToSearch = classToSearch.getSuperclass();
-            }
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
-            for (Class itfe : allInterfaces) {
-                Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
-                Set<Annotation> finalAnnotationSet = annotationSet;
-                declaredMethod.ifPresent(interfaceMethod ->
-                    finalAnnotationSet.addAll( findAnnotationsWithStereoType(interfaceMethod, stereotype))
-                );
-            }
-            annotationSet = Collections.unmodifiableSet(annotationSet);
-            ANNOTATIONS_BY_STEREOTYPE_CACHE.put(key, annotationSet);
+        return ANNOTATIONS_BY_STEREOTYPE_CACHE.get(key, annotationKey -> findAnnotationsWithStereoTypeNoCache(method, stereotype));
+    }
+
+    private static Set<Annotation> findAnnotationsWithStereoTypeNoCache(Method method, Class<?> stereotype) {
+        Set<Annotation> annotationSet = new HashSet<>(findAnnotationsWithStereoType(stereotype, method.getAnnotations()));
+        Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
+        while(classToSearch != Object.class && classToSearch != null) {
+            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
+            declaredMethod.ifPresent(superMethod ->
+                    annotationSet.addAll( findAnnotationsWithStereoTypeNoCache(superMethod, stereotype))
+            );
+            classToSearch = classToSearch.getSuperclass();
         }
-        return annotationSet;
+        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
+        for (Class itfe : allInterfaces) {
+            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
+            declaredMethod.ifPresent(interfaceMethod ->
+                    annotationSet.addAll( findAnnotationsWithStereoTypeNoCache(interfaceMethod, stereotype))
+            );
+        }
+        return Collections.unmodifiableSet(annotationSet);
+    }
+
+    /**
+     * Find all the annotations on the given {@link AnnotatedElement} candidates for the given stereotype
+     *
+     * @param candidates The annotated element
+     * @param stereotype The stereotype
+     * @return The collection of annotations
+     */
+    public static Set<Annotation> findAnnotationsWithStereoType(AnnotatedElement[] candidates, Class<?> stereotype) {
+        Set<Annotation> annotations = new HashSet<>();
+        for (AnnotatedElement candidate : candidates) {
+            annotations.addAll(findAnnotationsWithStereoType(candidate, stereotype));
+        }
+        return annotations;
+    }
+
+    /**
+     * Find all the annotations on the given {@link AnnotatedElement} for the given stereotype
+     *
+     * @param annotatedElement The annotated element
+     * @param stereotype The stereotype
+     * @return The collection of annotations
+     */
+    public static Collection<? extends Annotation> findAnnotationsWithStereoType(AnnotatedElement annotatedElement, Class<?> stereotype) {
+        if(annotatedElement instanceof Method) {
+            return findAnnotationsWithStereoType((Method)annotatedElement, stereotype);
+        }
+        else if(annotatedElement instanceof Class){
+            return findAnnotationsWithStereoType((Class)annotatedElement, stereotype);
+        }
+        return Collections.emptySet();
     }
 
     private static boolean isNotInternalAnnotation(Annotation ann) {

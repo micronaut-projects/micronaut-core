@@ -49,12 +49,12 @@ public interface Executable<T, R> extends AnnotatedElement{
     /**
      * Finds an annotation of the {@link Executable} for the given stereotype
      *
-     * @param stereotype The stereotype class
+     * @param type The type class
      * @param <A> The annotation generic type
      * @return The Annotation instance
      */
-    default <A extends Annotation> Optional<A> findAnnotation(Class stereotype) {
-        A result = AnnotationUtil.findAnnotationWithStereoType(this, stereotype);
+    default <A extends Annotation> Optional<A> findAnnotation(Class type) {
+        A result = AnnotationUtil.findAnnotationWithStereoType(this, type);
         return result != null ? Optional.of(result) : Optional.empty();
     }
 }

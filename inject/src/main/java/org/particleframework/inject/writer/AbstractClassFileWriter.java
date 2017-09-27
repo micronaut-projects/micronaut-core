@@ -25,6 +25,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     public static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
     public static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     public static final int MODIFIERS_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
+    public static final Type TYPE_OBJECT = Type.getType(Object.class);
 
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);

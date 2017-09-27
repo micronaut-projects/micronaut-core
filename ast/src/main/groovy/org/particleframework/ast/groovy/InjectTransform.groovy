@@ -20,6 +20,7 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.annotation.*
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
+import org.particleframework.core.naming.NameUtils
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.annotation.Executable
@@ -212,12 +213,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode producedType = methodNode.returnType
                 AnnotationNode scopeAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Scope.class)
                 AnnotationNode singletonAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Singleton.class)
+                String beanDefinitionPackage = concreteClass.packageName;
+                String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
+                String factoryMethodBeanDefinitionName =
+                        beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + "Definition"
 
-                BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(producedType.packageName,
-                                                                                 producedType.nameWithoutPackage,
-                                                                                 scopeAnn?.classNode?.name,
-                                                                                 singletonAnn != null,
-                                                                                 concreteClass.packageName )
+                BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(
+                        producedType.packageName,
+                        producedType.nameWithoutPackage,
+                        factoryMethodBeanDefinitionName,
+                        producedType.name,
+                        producedType.isInterface(),
+                        scopeAnn?.classNode?.name,
+                        singletonAnn != null)
+
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> qualifierTypes = [:]
                 Map<String, List<Object>> genericTypeMap = [:]
@@ -566,6 +575,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.packageName,
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
+                            classNode.isInterface(),
                             scopeAnn?.classNode?.name,
                             singletonAnn != null)
                 } else {

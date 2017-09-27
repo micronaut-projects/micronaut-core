@@ -3,6 +3,7 @@ package org.particleframework.inject;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -13,7 +14,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> {
+public interface BeanDefinition<T> extends AnnotatedElement {
 
     /**
      * @return The scope of the component
@@ -109,4 +110,19 @@ public interface BeanDefinition<T> {
      * @return The possible methods
      */
     <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
+
+    @Override
+    default <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+        return getType().getAnnotation(annotationClass);
+    }
+
+    @Override
+    default Annotation[] getAnnotations() {
+        return getType().getAnnotations();
+    }
+
+    @Override
+    default Annotation[] getDeclaredAnnotations() {
+        return getType().getDeclaredAnnotations();
+    }
 }

@@ -22,7 +22,9 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.inject.ExecutableMethod;
 
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
 
@@ -46,15 +48,18 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     private final String beanFullClassName;
     private final String methodProxyShortName;
     protected final Type methodType;
+    private final boolean isInterface;
     private String outerClassName = null;
+    private boolean isStatic = false;
 
-    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName) {
+    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;
         this.className = methodClassName;
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
+        this.isInterface = isInterface;
     }
 
     public String getClassName() {
@@ -72,7 +77,10 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     public void makeInner(String outerName, ClassWriter outerClassWriter) {
         outerClassWriter.visitInnerClass(internalName, getInternalName(outerName), methodProxyShortName.substring(1), 0);
         classWriter.visitOuterClass(getInternalName(outerName), null, null);
-        classWriter.visitField(ACC_PRIVATE | ACC_FINAL, FIELD_PARENT, getTypeDescriptor(outerName) , null, null);
+        if(!isStatic) {
+
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL, FIELD_PARENT, getTypeDescriptor(outerName) , null, null);
+        }
         this.outerClassName = outerName;
     }
 
@@ -85,7 +93,8 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                             Map<String, List<Object>> genericTypes) {
         Type declaringTypeObject = getTypeReference(declaringType);
 
-        classWriter.visit(V1_8, ACC_PUBLIC,
+        int modifiers = isStatic ? ACC_PUBLIC | ACC_STATIC : ACC_PUBLIC;
+        classWriter.visit(V1_8, modifiers,
                 internalName,
                 null,
                 Type.getInternalName(AbstractExecutableMethod.class),
@@ -94,7 +103,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         MethodVisitor executorMethodConstructor;
         GeneratorAdapter generatorAdapter;
 
-        boolean hasOuter = outerClassName != null;
+        boolean hasOuter = outerClassName != null && !isStatic;
         String constructorDescriptor;
         if(hasOuter) {
             executorMethodConstructor = startConstructor(classWriter, outerClassName);
@@ -187,9 +196,10 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         } else {
             methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
         }
-        invokeMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+
+        invokeMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                 declaringTypeObject.getInternalName(), methodName,
-                methodDescriptor, false);
+                methodDescriptor, isInterface);
 
         if (returnTypeObject.equals(Type.VOID_TYPE)) {
             invokeMethodVisitor.visitInsn(ACONST_NULL);
@@ -200,5 +210,40 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
 
         invokeMethodVisitor.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
         invokeMethodVisitor.visitEnd();
+    }
+
+    public void makeStaticInner(String parentInternalName, ClassWriter classWriter) {
+        this.isStatic = true;
+        makeInner(parentInternalName, classWriter);
+    }
+
+    /**
+     * Adds a method as a source of annotations
+     *
+     * @param declaringType The declaring type
+     * @param methodName The method name
+     * @param parameters The parameter to the method
+     */
+    public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
+        // override the getAnnotatedElements() method
+        org.objectweb.asm.commons.Method annotationElementsMethod = org.objectweb.asm.commons.Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
+        GeneratorAdapter generator = new GeneratorAdapter(
+                classWriter.visitMethod(ACC_PUBLIC, annotationElementsMethod.getName(), annotationElementsMethod.getDescriptor(), null, null),
+                ACC_PUBLIC,
+                annotationElementsMethod.getName(),
+                annotationElementsMethod.getDescriptor()
+
+        );
+        generator.loadThis(); // arg 1: this
+        pushNewArray(generator, AnnotatedElement.class,1); // arg 2: the additional elements
+        generator.push(0);
+        pushGetMethodFromTypeCall(generator, getTypeReference(declaringType), methodName, parameters.values());
+        generator.arrayStore(Type.getType(AnnotatedElement.class));
+        Method javaMethod = ReflectionUtils.getRequiredMethod(ExecutableMethod.class, "resolveAnnotationElements", ExecutableMethod.class, AnnotatedElement[].class);
+        org.objectweb.asm.commons.Method resolveElements = org.objectweb.asm.commons.Method.getMethod(javaMethod);
+        generator.invokeStatic(Type.getType(ExecutableMethod.class), resolveElements);
+        generator.returnValue();
+        generator.visitMaxs(1,1);
+        generator.endMethod();
     }
 }

@@ -122,8 +122,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
 
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return AnnotationUtil.findAnnotation(executionHandle.getTargetMethod(), annotationClass);
+        Optional<Annotation> annotation = executionHandle.findAnnotation(annotationClass);
+        return (T) annotation.filter(ann -> ann.annotationType() == annotationClass)
+                             .orElse(null);
     }
+
+
 
     @Override
     public Annotation[] getAnnotations() {
@@ -170,9 +174,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         Set<Annotation> annotations;
         if(method instanceof ExecutableMethod) {
             ExecutableMethod executableMethod = (ExecutableMethod) method;
-            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(executableMethod.getTargetMethod(), Around.class));
-            Class typeLevelAnnotations = executableMethod.getDeclaringType();
-            annotations.addAll(AnnotationUtil.findAnnotationsWithStereoType(typeLevelAnnotations, Around.class));
+            annotations = new HashSet<>(executableMethod.findAnnotationsWithStereoType(Around.class));
         }
         else {
             annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations()));

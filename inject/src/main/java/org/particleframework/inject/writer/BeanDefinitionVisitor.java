@@ -35,6 +35,11 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionConstructor();
 
     /**
+     * @return Wetherh the provided type an interface
+     */
+    boolean isInterface();
+
+    /**
      * @return Is the bean singleton
      */
     boolean isSingleton();
@@ -45,16 +50,31 @@ public interface BeanDefinitionVisitor {
     Type getScope();
 
     /**
-     * Alter the super class of this method definition
+     * Alter the super class of this bean definition
      *
      * @param name The super type
      */
     void visitSuperType(String name);
 
     /**
+     * Alter the super class of this bean to use another factory bean
+     *
+     * @param beanName The bean name
+     */
+    void visitSuperFactoryType(String beanName);
+
+    /**
      * @return The full class name of the bean
      */
     String getBeanTypeName();
+
+    /**
+     * The provided type of the bean. Usually this is the same as {@link #getBeanTypeName()}, except in the case of factory beans
+     * which produce a different type
+     *
+     * @return The provided type
+     */
+    Type getProvidedType();
 
     /**
      * Make the bean definition as validated by javax.validation
@@ -201,7 +221,7 @@ public interface BeanDefinitionVisitor {
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
      */
-    void visitExecutableMethod(Object declaringType,
+    ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                Object returnType,
                                List<Object> returnTypeGenericTypes,
                                String methodName,
@@ -249,4 +269,6 @@ public interface BeanDefinitionVisitor {
      * @return The short name of the bean
      */
     String getBeanSimpleName();
+
+
 }
