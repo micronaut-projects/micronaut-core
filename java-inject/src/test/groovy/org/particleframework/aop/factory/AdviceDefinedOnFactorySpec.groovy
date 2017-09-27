@@ -15,10 +15,12 @@
  */
 package org.particleframework.aop.factory
 
+import org.hibernate.SessionFactory
 import org.particleframework.aop.Intercepted
 import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
+import org.particleframework.core.reflect.ReflectionUtils
 import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -60,6 +62,31 @@ class AdviceDefinedOnFactorySpec extends Specification {
         'testListWithWildCardExtends' | ['test', []]           | ['changed']        // test for generics
     }
 
+
+    void "test session factory proxy"() {
+        given:
+        BeanContext beanContext = new DefaultBeanContext().start()
+
+        when:
+        BeanDefinition<SessionFactory> beanDefinition = beanContext.findBeanDefinition(SessionFactory).get()
+        SessionFactory sessionFactory = beanContext.getBean(SessionFactory)
+
+        // make sure all the public method are implemented
+        def clazz = sessionFactory.getClass()
+        int count = 0
+        def interfaces = ReflectionUtils.getAllInterfaces(SessionFactory.class)
+        interfaces += SessionFactory.class
+        for(i in interfaces) {
+            for(m in i.declaredMethods) {
+                count++
+                assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+            }
+        }
+
+        then:
+        count == clazz.declaredMethods.size() + 1 // plus the proxy methods
+        sessionFactory instanceof Intercepted
+    }
 
     void "test AOP setup"() {
         given:

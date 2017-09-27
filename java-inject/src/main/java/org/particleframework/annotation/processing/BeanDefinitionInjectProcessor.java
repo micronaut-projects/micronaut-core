@@ -333,7 +333,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     @Override
                     protected void accept(ExecutableElement method, AopProxyWriter aopProxyWriter) {
                         ExecutableElementParamInfo params = populateParameterData(method);
-                        Object owningType = modelUtils.resolveTypeReference(returnType);
+                        Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
+                        if(owningType == null) {
+                            throw new IllegalStateException("Owning type cannot be null");
+                        }
                         Object resolvedReturnType = modelUtils.resolveTypeReference(method.getReturnType());
                         List<Object> resolvedGenericTypes = genericUtils.resolveGenericTypes(method.getReturnType());
                         String methodName = method.getSimpleName().toString();
