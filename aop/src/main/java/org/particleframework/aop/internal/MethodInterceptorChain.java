@@ -23,6 +23,7 @@ import org.particleframework.inject.ReturnType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -39,6 +40,16 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
 
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
+    }
+
+    @Override
+    public <A extends Annotation> Optional<A> findAnnotation(Class type) {
+        return executionHandle.findAnnotation(type);
+    }
+
+    @Override
+    public Set<Annotation> findAnnotationsWithStereoType(Class<?> stereotype) {
+        return executionHandle.findAnnotationsWithStereoType(stereotype);
     }
 
     @Override
