@@ -82,7 +82,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
             }
             TypeMirror superMirror = typeElement.getSuperclass();
             if(superMirror instanceof DeclaredType) {
-                element = type.asElement();
+                element = ((DeclaredType)superMirror).asElement();
             }
             else {
                 break;

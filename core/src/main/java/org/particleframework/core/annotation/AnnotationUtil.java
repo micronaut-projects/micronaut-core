@@ -32,6 +32,11 @@ public class AnnotationUtil {
     public static final Annotation[] ZERO_ANNOTATIONS = new Annotation[0];
 
     /**
+     * Constant indicating an zero annotation
+     */
+    public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
+
+    /**
      * Finds an annotation on the given class for the given stereotype
      *
      * @param cls The class

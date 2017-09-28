@@ -24,6 +24,7 @@ import org.particleframework.inject.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -44,6 +45,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final Annotation[] annotations;
     private final ReturnType returnType;
     private final Method method;
+    private final AnnotatedElement[] annotationElements;
 
     protected AbstractExecutableMethod(Method method,
                                        Class[] genericReturnTypes,
@@ -52,6 +54,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
                                        Map<String, List<Class>> genericTypes) {
         this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
+        this.annotationElements = new AnnotatedElement[] { method, method.getDeclaringClass() };
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
@@ -68,23 +71,13 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     }
 
     @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return annotationElements;
+    }
+
+    @Override
     public Method getTargetMethod() {
         return method;
-    }
-
-    @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return method.getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return method.getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return method.getDeclaredAnnotations();
     }
 
     @Override

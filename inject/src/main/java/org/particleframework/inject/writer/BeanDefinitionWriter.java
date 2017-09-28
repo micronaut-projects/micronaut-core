@@ -892,42 +892,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        // override the getAnnotatedElements() method
-        org.objectweb.asm.commons.Method annotationElementsMethod =
-                org.objectweb.asm.commons.Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
-        String annotationElementsMethodName = annotationElementsMethod.getName();
-        String annotationElementsMethodDescriptor = annotationElementsMethod.getDescriptor();
-        GeneratorAdapter generator = new GeneratorAdapter(
-                classWriter.visitMethod(ACC_PUBLIC, annotationElementsMethodName, annotationElementsMethodDescriptor, null, null),
-                ACC_PUBLIC,
-                annotationElementsMethodName,
-                annotationElementsMethodDescriptor
-
-        );
-        generator.loadThis(); // load this
-        // 1st arg: call super.getAnnotatedElements()
-        generator.loadThis();
-        generator.visitMethodInsn(
-                INVOKESPECIAL,
-                TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName(),
-                annotationElementsMethodName,
-                annotationElementsMethodDescriptor,
-                false
-        );
-//        generator.(TYPE_ABSTRACT_BEAN_DEFINITION, annotationElementsMethod);
-
-        // 2nd arg: the additional elements
-        pushNewArray(generator, AnnotatedElement.class,1); // arg 2: the additional elements
-        generator.push(0);
-        pushGetMethodFromTypeCall(generator, getTypeReference(declaringType), methodName, parameters.values());
-        generator.arrayStore(Type.getType(AnnotatedElement.class));
-
-        // invoke: ArrayUtils.concat(a1, a2)
-        Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtil.class, "concat", Object[].class, Object[].class);
-        org.objectweb.asm.commons.Method concatMethod = org.objectweb.asm.commons.Method.getMethod(javaMethod);
-        generator.invokeStatic(Type.getType(ArrayUtil.class), concatMethod);
-        generator.returnValue();
-        this.annotationElementsMethod = generator;
+        ClassVisitor classWriter = this.classWriter;
+        this.annotationElementsMethod = writeGetAnnotatedElementsMethod(declaringType, methodName, parameters, classWriter, TYPE_ABSTRACT_BEAN_DEFINITION);
     }
 
     @Override

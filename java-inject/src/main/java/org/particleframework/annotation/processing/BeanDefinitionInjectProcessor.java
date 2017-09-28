@@ -337,11 +337,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         true,
                         false,
                         true, interceptorTypes);
+
                 proxyWriter.visitMethodAnnotationSource(
                         modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
                         beanMethod.getSimpleName().toString(),
                         beanMethodParams.getParameters()
                 );
+
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
                     @Override
                     protected void accept(ExecutableElement method, AopProxyWriter aopProxyWriter) {

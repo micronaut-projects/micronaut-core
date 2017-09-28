@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.util.ArrayUtil;
 
 import java.lang.annotation.Annotation;
@@ -69,23 +70,6 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
      * @return An array of {@link AnnotatedElement} instances
      */
     default AnnotatedElement[] getAnnotatedElements() {
-        return resolveAnnotationElements(this);
-    }
-
-    /**
-     * Resolves {@link AnnotatedElement} instances to use for the method and the given sources
-     *
-     * @param method The method
-     * @param sources The sources
-     * @return An array of elements
-     */
-    static AnnotatedElement[] resolveAnnotationElements(ExecutableMethod method, AnnotatedElement...sources) {
-        AnnotatedElement[] methodAndType = {method.getTargetMethod(), method.getDeclaringType()};
-        if(sources == null || sources.length == 0) {
-            return methodAndType;
-        }
-        else {
-            return ArrayUtil.concat(methodAndType, sources);
-        }
+        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     }
 }
