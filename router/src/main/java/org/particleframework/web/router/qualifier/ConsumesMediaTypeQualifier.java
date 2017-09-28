@@ -43,7 +43,7 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
     @Override
     public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
         return candidates.filter(candidate -> {
-                    Consumes consumes = candidate.getType().getAnnotation(Consumes.class);
+                    Consumes consumes = candidate.getAnnotation(Consumes.class);
                     if (consumes != null) {
                         Set<String> consumedTypes = Arrays.stream(consumes.value()).map(MediaType::new).map(MediaType::getExtension).collect(Collectors.toSet());
                         return consumedTypes.contains(contentType.getExtension());

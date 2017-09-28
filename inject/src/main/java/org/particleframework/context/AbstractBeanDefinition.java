@@ -46,7 +46,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
+public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
 
     private final Annotation scope;
     private final boolean singleton;
@@ -63,6 +63,8 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> invocableMethodMap = new LinkedHashMap<>(3);
     private final WeakHashMap<Class, String> valuePrefixes = new WeakHashMap<>();
+    private final AnnotatedElement[] annotatedElements;
+
     /**
      * Constructs a bean definition that is produced from a method call on another type
      *
@@ -78,6 +80,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations());
         this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()) != null;
         this.type = (Class<T>) method.getReturnType();
+        this.annotatedElements = new AnnotatedElement[] {
+                method.getReturnType(),
+                method,
+                method.getDeclaringClass()
+        };
         this.provided = method.getAnnotation(Provided.class) != null;
         this.isConfigurationProperties = false;
         LinkedHashMap<String, Annotation> qualifierMap = null;
@@ -103,6 +110,7 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
                                      Map<String, Class> qualifiers,
                                      Map<String, List<Class>> genericTypes) {
         this.scope = scope;
+        this.annotatedElements = new AnnotatedElement[] { type };
         this.singleton = singleton;
         this.type = type;
         this.provided = type.getAnnotation(Provided.class) != null;
@@ -1320,6 +1328,11 @@ public abstract class AbstractBeanDefinition<T> implements InjectableBeanDefinit
         } catch (Throwable e) {
             throw new BeanInstantiationException(this, e);
         }
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return annotatedElements;
     }
 
     private class MethodKey {

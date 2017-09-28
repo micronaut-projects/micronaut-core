@@ -13,36 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.aop.introduction;
 
+import org.particleframework.aop.Intercepted;
+import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
-import org.particleframework.context.AbstractExecutableMethod;
+import org.particleframework.aop.simple.Mutating;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.Collections;
-
 /**
- * This class is what the final compiled byte code for a proxy generated with @Around looks like when decompiled
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FooJava$Intercepted extends Foo implements Intercepted {
+public class InterfaceClassImplExample implements Intercepted {
     private final Interceptor[][] interceptors;
     private final ExecutableMethod[] proxyMethods;
 
-    FooJava$Intercepted(int c, @Type({Mutating.class, Trace.class}) Interceptor[] interceptors) throws NoSuchMethodException {
-        super(c);
+    InterfaceClassImplExample(@Type({Mutating.class, Stub.class}) Interceptor[] interceptors) throws NoSuchMethodException {
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];
-        this.proxyMethods[0] = new $blah0();
         this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
     }
 
-    @Override
     public String blah(String name) {
         ExecutableMethod executableMethod = this.proxyMethods[0];
         Interceptor[] interceptors = this.interceptors[0];
@@ -50,19 +44,5 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
         return (String) chain.proceed();
     }
 
-    class $blah0 extends AbstractExecutableMethod {
-        protected $blah0() {
-            super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
-                    new Class[0],
-                    Collections.singletonMap("name", String.class),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            );
-        }
-        @Override
-        protected Object invokeInternal(Object instance, Object[] arguments) {
-            return FooJava$Intercepted.super.blah((String) arguments[0]);
-        }
-    }
 
 }

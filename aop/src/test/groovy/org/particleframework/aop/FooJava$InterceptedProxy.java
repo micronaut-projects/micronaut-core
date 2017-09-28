@@ -15,7 +15,6 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.aop.annotation.Trace;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.AbstractExecutableMethod;

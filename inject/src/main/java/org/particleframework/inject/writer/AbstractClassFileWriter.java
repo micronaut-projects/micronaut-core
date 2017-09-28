@@ -4,14 +4,17 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.ArrayUtil;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -437,5 +440,43 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 ), ACC_PUBLIC,
                         methodName,
                         getMethodDescriptor(returnType, argumentTypes));
+    }
+
+    protected GeneratorAdapter writeGetAnnotatedElementsMethod(Object declaringType, String methodName, Map<String, Object> parameters, ClassVisitor classWriter, Type superType) {
+        // override the getAnnotatedElements() method
+        Method annotationElementsMethod =
+                Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
+        String annotationElementsMethodName = annotationElementsMethod.getName();
+        String annotationElementsMethodDescriptor = annotationElementsMethod.getDescriptor();
+        GeneratorAdapter generator = new GeneratorAdapter(
+                classWriter.visitMethod(ACC_PUBLIC, annotationElementsMethodName, annotationElementsMethodDescriptor, null, null),
+                ACC_PUBLIC,
+                annotationElementsMethodName,
+                annotationElementsMethodDescriptor
+
+        );
+        generator.loadThis(); // load this
+        // 1st arg: call super.getAnnotatedElements()
+        generator.loadThis();
+        generator.visitMethodInsn(
+                INVOKESPECIAL,
+                superType.getInternalName(),
+                annotationElementsMethodName,
+                annotationElementsMethodDescriptor,
+                false
+        );
+
+        // 2nd arg: the additional elements
+        BeanDefinitionWriter.pushNewArray(generator, AnnotatedElement.class,1); // arg 2: the additional elements
+        generator.push(0);
+        BeanDefinitionWriter.pushGetMethodFromTypeCall(generator, getTypeReference(declaringType), methodName, parameters.values());
+        generator.arrayStore(Type.getType(AnnotatedElement.class));
+
+        // invoke: ArrayUtils.concat(a1, a2)
+        java.lang.reflect.Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtil.class, "concat", Object[].class, Object[].class);
+        Method concatMethod = Method.getMethod(javaMethod);
+        generator.invokeStatic(Type.getType(ArrayUtil.class), concatMethod);
+        generator.returnValue();
+        return generator;
     }
 }

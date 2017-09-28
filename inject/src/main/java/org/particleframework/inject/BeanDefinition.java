@@ -14,7 +14,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotatedElement {
+public interface BeanDefinition<T> extends AnnotationSource {
 
     /**
      * @return The scope of the component
@@ -30,6 +30,7 @@ public interface BeanDefinition<T> extends AnnotatedElement {
      * @return Is this definition provided by another bean
      */
     boolean isProvided();
+
     /**
      * @return The component type
      */
@@ -83,24 +84,24 @@ public interface BeanDefinition<T> extends AnnotatedElement {
     /**
      * Finds a single {@link ExecutableMethod} for the given name and argument types
      *
-     * @param name The method name
+     * @param name          The method name
      * @param argumentTypes The argument types
      * @return An optional {@link ExecutableMethod}
      */
-    <R> Optional<ExecutableMethod<T,R>> findMethod(String name, Class...argumentTypes);
+    <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes);
 
     /**
      * Finds a single {@link ExecutableMethod} for the given name and argument types
      *
-     * @param name The method name
+     * @param name          The method name
      * @param argumentTypes The argument types
      * @return An optional {@link ExecutableMethod}
      * @throws IllegalStateException If the method cannot be found
      */
-    default <R> ExecutableMethod<T,R> getRequiredMethod(String name, Class...argumentTypes) {
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
 
-        return (ExecutableMethod<T,R>) findMethod(name, argumentTypes)
-                .orElseThrow(()-> ReflectionUtils.newNoSuchMethodError(getType(), name, argumentTypes));
+        return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
+                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getType(), name, argumentTypes));
     }
 
     /**
@@ -110,19 +111,4 @@ public interface BeanDefinition<T> extends AnnotatedElement {
      * @return The possible methods
      */
     <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
-
-    @Override
-    default <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-        return getType().getAnnotation(annotationClass);
-    }
-
-    @Override
-    default Annotation[] getAnnotations() {
-        return getType().getAnnotations();
-    }
-
-    @Override
-    default Annotation[] getDeclaredAnnotations() {
-        return getType().getDeclaredAnnotations();
-    }
 }

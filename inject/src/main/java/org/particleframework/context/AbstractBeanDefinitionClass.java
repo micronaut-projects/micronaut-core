@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An uninitialized component definition with basic information available regarding its requirements
+ * An uninitialized and unloaded component definition with basic information available regarding its requirements
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -49,6 +49,11 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     @Override
     public String getReplacesBeanTypeName() {
         return null; // no replacement semantics by default
+    }
+
+    @Override
+    public String getReplacesBeanDefinitionName() {
+        return null; // no replacement
     }
 
     /**
@@ -114,6 +119,11 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
         AbstractBeanDefinitionClass that = (AbstractBeanDefinitionClass) o;
 
         return beanDefinitionTypeName.equals(that.beanDefinitionTypeName);
+    }
+
+    @Override
+    public String toString() {
+        return beanDefinitionTypeName;
     }
 
     @Override

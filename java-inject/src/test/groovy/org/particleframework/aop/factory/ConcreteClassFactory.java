@@ -27,20 +27,19 @@ import javax.inject.Named;
  * @since 1.0
  */
 @Factory
-public class InterfaceFactory {
-
+public class ConcreteClassFactory {
     @Bean
     @Mutating("name")
     @Primary
-    InterfaceClass interfaceClass() {
-        return new InterfaceImpl();
+    ConcreteClass concreteClass() {
+        return new ConcreteClass();
     }
 
     @Bean
     @Mutating("name")
     @Named("another")
-    InterfaceClass anotherImpl() {
-        return new InterfaceImpl();
+    ConcreteClass anotherImpl() {
+        return new ConcreteClass();
     }
 
 }

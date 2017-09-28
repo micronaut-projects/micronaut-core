@@ -226,24 +226,8 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
      */
     public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
         // override the getAnnotatedElements() method
-        org.objectweb.asm.commons.Method annotationElementsMethod = org.objectweb.asm.commons.Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
-        GeneratorAdapter generator = new GeneratorAdapter(
-                classWriter.visitMethod(ACC_PUBLIC, annotationElementsMethod.getName(), annotationElementsMethod.getDescriptor(), null, null),
-                ACC_PUBLIC,
-                annotationElementsMethod.getName(),
-                annotationElementsMethod.getDescriptor()
-
-        );
-        generator.loadThis(); // arg 1: this
-        pushNewArray(generator, AnnotatedElement.class,1); // arg 2: the additional elements
-        generator.push(0);
-        pushGetMethodFromTypeCall(generator, getTypeReference(declaringType), methodName, parameters.values());
-        generator.arrayStore(Type.getType(AnnotatedElement.class));
-        Method javaMethod = ReflectionUtils.getRequiredMethod(ExecutableMethod.class, "resolveAnnotationElements", ExecutableMethod.class, AnnotatedElement[].class);
-        org.objectweb.asm.commons.Method resolveElements = org.objectweb.asm.commons.Method.getMethod(javaMethod);
-        generator.invokeStatic(Type.getType(ExecutableMethod.class), resolveElements);
-        generator.returnValue();
-        generator.visitMaxs(1,1);
-        generator.endMethod();
+        GeneratorAdapter generatorAdapter = super.writeGetAnnotatedElementsMethod(declaringType, methodName, parameters, classWriter, Type.getType(AbstractExecutableMethod.class));
+        generatorAdapter.visitMaxs(1,1);
+        generatorAdapter.endMethod();
     }
 }

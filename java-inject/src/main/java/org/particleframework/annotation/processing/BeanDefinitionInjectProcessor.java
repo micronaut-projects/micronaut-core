@@ -136,7 +136,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionClassWriter.setContextScope(
                 annotationUtils.hasStereotype(beanClassElement, Context.class));
             if(beanDefinitionWriter instanceof ProxyingBeanDefinitionVisitor) {
-                beanDefinitionClassWriter.setReplaceBeanName(((ProxyingBeanDefinitionVisitor) beanDefinitionWriter).getProxiedTypeName());
+                beanDefinitionClassWriter.setReplaceBeanDefinitionName(
+                    ((ProxyingBeanDefinitionVisitor) beanDefinitionWriter).getProxiedBeanDefinitionName()
+                );
             }
             else {
 
@@ -313,12 +315,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, returnType);
             beanDefinitionWriters.put(beanMethod.getSimpleName(), beanMethodWriter);
 
+
             beanMethodWriter.visitBeanFactoryMethod(
-                modelUtils.resolveTypeReference(this.concreteClass),
+                modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
                 beanMethod.getSimpleName().toString(),
                 beanMethodParams.getParameters(),
                 beanMethodParams.getQualifierTypes(),
                 beanMethodParams.getGenericTypes()
+            );
+            beanMethodWriter.visitMethodAnnotationSource(
+                    modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
+                    beanMethod.getSimpleName().toString(),
+                    beanMethodParams.getParameters()
             );
 
             if(annotationUtils.hasStereotype(beanMethod,AROUND_TYPE)) {
@@ -329,11 +337,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         true,
                         false,
                         true, interceptorTypes);
+
+                proxyWriter.visitMethodAnnotationSource(
+                        modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
+                        beanMethod.getSimpleName().toString(),
+                        beanMethodParams.getParameters()
+                );
+
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
                     @Override
                     protected void accept(ExecutableElement method, AopProxyWriter aopProxyWriter) {
                         ExecutableElementParamInfo params = populateParameterData(method);
-                        Object owningType = modelUtils.resolveTypeReference(returnType);
+                        Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
+                        if(owningType == null) {
+                            throw new IllegalStateException("Owning type cannot be null");
+                        }
                         Object resolvedReturnType = modelUtils.resolveTypeReference(method.getReturnType());
                         List<Object> resolvedGenericTypes = genericUtils.resolveGenericTypes(method.getReturnType());
                         String methodName = method.getSimpleName().toString();
@@ -350,10 +368,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodQualifier,
                                 methodGenericTypes
                         ).visitMethodAnnotationSource(
-                                modelUtils.resolveTypeReference(concreteClass),
+                                modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
                                 beanMethod.getSimpleName().toString(),
                                 beanMethodParams.getParameters()
                         );
+
 
                         aopProxyWriter.visitAroundMethod(
                                 owningType,

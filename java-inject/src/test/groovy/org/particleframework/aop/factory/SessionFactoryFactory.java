@@ -15,32 +15,22 @@
  */
 package org.particleframework.aop.factory;
 
+import org.hibernate.SessionFactory;
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl;
 import org.particleframework.aop.simple.Mutating;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
-
-import javax.inject.Named;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Factory
-public class InterfaceFactory {
+public class SessionFactoryFactory {
 
-    @Bean
     @Mutating("name")
-    @Primary
-    InterfaceClass interfaceClass() {
-        return new InterfaceImpl();
-    }
-
     @Bean
-    @Mutating("name")
-    @Named("another")
-    InterfaceClass anotherImpl() {
-        return new InterfaceImpl();
+    SessionFactory sessionFactory() {
+        return new SessionFactoryDelegatingImpl(null);
     }
-
 }

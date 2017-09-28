@@ -13,34 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.factory;
+package org.particleframework.aop.introduction;
 
-import org.particleframework.aop.simple.Mutating;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
-
-import javax.inject.Named;
+import org.particleframework.aop.MethodInterceptor;
+import org.particleframework.aop.MethodInvocationContext;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-public class InterfaceFactory {
-
-    @Bean
-    @Mutating("name")
-    @Primary
-    InterfaceClass interfaceClass() {
-        return new InterfaceImpl();
+public class StubIntroducer implements MethodInterceptor<Object,Object> {
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return null;
     }
-
-    @Bean
-    @Mutating("name")
-    @Named("another")
-    InterfaceClass anotherImpl() {
-        return new InterfaceImpl();
-    }
-
 }

@@ -13,22 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject.writer;
+package org.particleframework.core.util;
+
+import java.lang.reflect.Array;
 
 /**
- * Extends {@link BeanDefinitionVisitor} and adds access to the proxied type name
+ * Utility methods for working with arrays
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ProxyingBeanDefinitionVisitor extends BeanDefinitionVisitor {
+public class ArrayUtil {
 
     /**
-     * @return The fully qualified name of the class being proxied
+     * Concatenate two arrays
+     *
+     * @param a The first array
+     * @param b The second array
+     * @param <T> The array type
+     * @return The concatenated array
      */
-    String getProxiedTypeName();
+    public static <T> T[] concat(T[] a, T... b) {
+        int aLen = a.length;
+        int bLen = b.length;
 
-    /**
-     * @return The bean definition that is proxied
-     */
-    String getProxiedBeanDefinitionName();
+        @SuppressWarnings("unchecked")
+        T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen+bLen);
+        System.arraycopy(a, 0, c, 0, aLen);
+        System.arraycopy(b, 0, c, aLen, bLen);
+
+        return c;
+    }
 }

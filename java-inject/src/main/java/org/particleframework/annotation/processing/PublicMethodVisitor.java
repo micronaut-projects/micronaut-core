@@ -18,8 +18,10 @@ package org.particleframework.annotation.processing;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * An adapter that implements all methods of the {@link TypeVisitor} interface. Subclasses can selectively override
@@ -28,6 +30,7 @@ import java.util.Set;
  * @since 1.0
  */
 public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P> {
+    private final Set<String> processed = new HashSet<>();
     @Override
     public R visitIntersection(IntersectionType t, P p) {
         return null;
@@ -58,7 +61,13 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
                 if(enclosedElement.getKind() == ElementKind.METHOD) {
                     Set<Modifier> modifiers = enclosedElement.getModifiers();
                     if(modifiers.contains(Modifier.PUBLIC)) {
-                        accept((ExecutableElement) enclosedElement, p);
+                        ExecutableElement theMethod = (ExecutableElement) enclosedElement;
+                        String qualifiedName = theMethod.toString();
+                        // if the method has already been processed then it is overridden so ignore
+                        if(!processed.contains(qualifiedName)) {
+                            processed.add(qualifiedName);
+                            accept(theMethod, p);
+                        }
                     }
 
                 }
@@ -73,7 +82,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
             }
             TypeMirror superMirror = typeElement.getSuperclass();
             if(superMirror instanceof DeclaredType) {
-                element = type.asElement();
+                element = ((DeclaredType)superMirror).asElement();
             }
             else {
                 break;

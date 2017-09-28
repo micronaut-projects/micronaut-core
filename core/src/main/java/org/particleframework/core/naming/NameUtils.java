@@ -201,4 +201,12 @@ public class NameUtils {
             return newName.toString();
         }
     }
+
+    public static String getSimpleName(String className) {
+        int i = className.lastIndexOf('.');
+        if(i > -1) {
+            return className.substring(i + 1);
+        }
+        return className;
+    }
 }

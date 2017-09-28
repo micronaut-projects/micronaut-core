@@ -13,34 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.factory;
+package org.particleframework.aop;
 
-import org.particleframework.aop.simple.Mutating;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
+import org.particleframework.inject.annotation.Executable;
 
-import javax.inject.Named;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * <p>Introduction advice allows interfaces and abstract classes to be implemented at runtime to
+ * {@link MethodInterceptor} implementations</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-public class InterfaceFactory {
-
-    @Bean
-    @Mutating("name")
-    @Primary
-    InterfaceClass interfaceClass() {
-        return new InterfaceImpl();
-    }
-
-    @Bean
-    @Mutating("name")
-    @Named("another")
-    InterfaceClass anotherImpl() {
-        return new InterfaceImpl();
-    }
-
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Executable
+public @interface Introduction {
 }

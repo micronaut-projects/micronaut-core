@@ -16,13 +16,11 @@
 package org.particleframework.inject;
 
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.util.ArrayUtil;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -64,30 +62,6 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
      */
     Set<? extends Annotation> getExecutableAnnotations();
 
-    @Override
-    default <A extends Annotation> Optional<A> findAnnotation(Class type) {
-        AnnotatedElement[] elements = getAnnotatedElements();
-        for (AnnotatedElement element : elements) {
-            Optional<? extends Annotation> result = AnnotationUtil.findAnnotationsWithStereoType(element, type)
-                    .stream()
-                    .findFirst();
-            if(result.isPresent()) {
-                return (Optional<A>) result;
-            }
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Find all the annotations for the given stereotype on the method
-     * @param stereotype The method
-     * @return The stereotype
-     */
-    default Set<Annotation> findAnnotationsWithStereoType(Class<?> stereotype) {
-        AnnotatedElement[] candidates = getAnnotatedElements();
-        return AnnotationUtil.findAnnotationsWithStereoType(candidates, stereotype);
-    }
-
     /**
      * <p>The annotated elements that this {@link ExecutableMethod} is able to resolve annotations from</p>
      *
@@ -96,26 +70,6 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
      * @return An array of {@link AnnotatedElement} instances
      */
     default AnnotatedElement[] getAnnotatedElements() {
-        return resolveAnnotationElements(this);
-    }
-
-    /**
-     * Resolves {@link AnnotatedElement} instances to use for the method and the given sources
-     *
-     * @param method The method
-     * @param sources The sources
-     * @return An array of elements
-     */
-    static AnnotatedElement[] resolveAnnotationElements(ExecutableMethod method, AnnotatedElement...sources) {
-        if(sources.length == 0) {
-            return new AnnotatedElement[] { method.getTargetMethod(), method.getDeclaringType()};
-        }
-        else {
-            AnnotatedElement[] elements = new AnnotatedElement[sources.length+2];
-            elements[0] = method.getTargetMethod();
-            elements[1] = method.getDeclaringType();
-            System.arraycopy(sources, 0, elements, 2, sources.length);
-            return elements;
-        }
+        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     }
 }
