@@ -261,6 +261,15 @@ public interface BeanDefinitionVisitor {
                          boolean isOptional);
 
     /**
+     * Adds a method as a source of annotations
+     *
+     * @param declaringType The declaring type
+     * @param methodName The method name
+     * @param parameters The parameter to the method
+     */
+    void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters);
+
+    /**
      * @return The package name of the bean
      */
     String getPackageName();

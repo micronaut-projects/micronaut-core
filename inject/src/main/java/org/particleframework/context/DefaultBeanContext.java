@@ -9,6 +9,7 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -18,7 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
+import javax.inject.Scope;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -255,7 +258,8 @@ public class DefaultBeanContext implements BeanContext {
             if (beanCandidates.size() == 1) {
                 return Optional.of(beanCandidates.iterator().next());
             } else {
-                throw new NonUniqueBeanException(beanType, beanCandidates.iterator());
+                BeanDefinition<T> concreteCandidate = findConcreteCandidate(beanType, null, true, true);
+                return Optional.of(concreteCandidate);
             }
         }
     }
@@ -634,7 +638,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
 
                     Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
-                            .filter((candidate) -> candidate.getType().getAnnotation(Primary.class) != null)
+                            .filter((candidate) -> candidate.getAnnotation(Primary.class) != null)
                             .findFirst();
                     if (primary.isPresent()) {
                         return primary.get();
@@ -651,7 +655,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 } else {
                     Optional<BeanDefinition<T>> primary = candidates.stream()
-                            .filter((candidate) -> candidate.getType().getAnnotation(Primary.class) != null)
+                            .filter((candidate) -> candidate.getAnnotation(Primary.class) != null)
                             .findFirst();
                     if (primary.isPresent()) {
                         return primary.get();
@@ -1044,7 +1048,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Annotation getScope() {
-            return null;
+            return AnnotationUtil.findAnnotationWithStereoType(singletonClass, Scope.class);
         }
 
         @Override
@@ -1064,7 +1068,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public ConstructorInjectionPoint getConstructor() {
-            return null;
+            throw new UnsupportedOperationException("Runtime singleton's cannot be constructed at runtime");
         }
 
         @Override
@@ -1123,6 +1127,11 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public int hashCode() {
             return singletonClass.hashCode();
+        }
+
+        @Override
+        public AnnotatedElement[] getAnnotatedElements() {
+            return new AnnotatedElement[] { singletonClass };
         }
     }
 

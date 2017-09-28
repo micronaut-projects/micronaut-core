@@ -809,6 +809,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
+        proxyBeanDefinitionWriter.visitMethodAnnotationSource(declaringType, methodName, parameters);
+    }
+
+    @Override
     public String getPackageName() {
         return proxyBeanDefinitionWriter.getPackageName();
     }

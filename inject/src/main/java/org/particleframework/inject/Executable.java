@@ -30,7 +30,7 @@ import java.util.Optional;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  */
-public interface Executable<T, R> extends AnnotatedElement{
+public interface Executable<T, R> extends AnnotationSource {
     /**
      * The required argument types
      */
@@ -46,15 +46,4 @@ public interface Executable<T, R> extends AnnotatedElement{
      */
     R invoke(T instance, Object... arguments);
 
-    /**
-     * Finds an annotation of the {@link Executable} for the given stereotype
-     *
-     * @param type The type class
-     * @param <A> The annotation generic type
-     * @return The Annotation instance
-     */
-    default <A extends Annotation> Optional<A> findAnnotation(Class type) {
-        A result = AnnotationUtil.findAnnotationWithStereoType(this, type);
-        return result != null ? Optional.of(result) : Optional.empty();
-    }
 }

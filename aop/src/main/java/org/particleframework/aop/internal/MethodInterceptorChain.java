@@ -22,6 +22,7 @@ import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ReturnType;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.Set;
@@ -43,13 +44,8 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
     }
 
     @Override
-    public <A extends Annotation> Optional<A> findAnnotation(Class type) {
-        return executionHandle.findAnnotation(type);
-    }
-
-    @Override
-    public Set<Annotation> findAnnotationsWithStereoType(Class<?> stereotype) {
-        return executionHandle.findAnnotationsWithStereoType(stereotype);
+    public AnnotatedElement[] getAnnotatedElements() {
+        return executionHandle.getAnnotatedElements();
     }
 
     @Override

@@ -119,15 +119,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         }
     }
 
-
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        Optional<Annotation> annotation = executionHandle.findAnnotation(annotationClass);
-        return (T) annotation.filter(ann -> ann.annotationType() == annotationClass)
-                             .orElse(null);
+        return findAnnotation(annotationClass).orElse(null);
     }
 
-
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return executionHandle.getAnnotatedElements();
+    }
 
     @Override
     public Annotation[] getAnnotations() {

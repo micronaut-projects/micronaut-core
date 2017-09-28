@@ -136,7 +136,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     @Override
     public void process(ExecutableMethod<Object, Object> method) {
-        Optional<Annotation> actionAnn = method.findAnnotation(Action.class);
+        Optional<Annotation> actionAnn = method.findAnnotationWithStereoType(Action.class);
         actionAnn.ifPresent(annotation -> {
                     Class<? extends Annotation> annotationClass = annotation.annotationType();
                     BiFunction<Annotation, ExecutableMethod, Route> handler = httpMethodsHandlers.get(annotationClass);

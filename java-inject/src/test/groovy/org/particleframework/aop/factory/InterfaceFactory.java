@@ -18,6 +18,9 @@ package org.particleframework.aop.factory;
 import org.particleframework.aop.simple.Mutating;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
+import org.particleframework.context.annotation.Primary;
+
+import javax.inject.Named;
 
 /**
  * @author Graeme Rocher
@@ -28,7 +31,16 @@ public class InterfaceFactory {
 
     @Bean
     @Mutating("name")
+    @Primary
     InterfaceClass interfaceClass() {
         return new InterfaceImpl();
     }
+
+    @Bean
+    @Mutating("name")
+    @Named("another")
+    InterfaceClass anotherImpl() {
+        return new InterfaceImpl();
+    }
+
 }
