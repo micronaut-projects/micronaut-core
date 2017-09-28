@@ -25,7 +25,9 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice
+ * <p>Annotation stereotype to applied to other annotations to indicate the annotation provides Around advice</p>
+ *
+ * <p>Around advice decorates a method invocation such that the method can be intercepted via a {@link MethodInterceptor}</p>
  *
  * @author Graeme Rocher
  * @since 1.0

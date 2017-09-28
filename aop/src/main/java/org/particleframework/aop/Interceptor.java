@@ -22,6 +22,12 @@ import org.particleframework.core.order.Ordered;
  *
  * <p>All implementations should be thread safe and {@link javax.inject.Singleton} scoped beans</p>
  *
+ * <p>In the case of {@link Around} advice the interceptor should invoke {@link InvocationContext#proceed()} to proceed with the method invocation</p>
+ *
+ * <p>In the case of {@link Introduction} advice the interceptor should invoke {@link InvocationContext#proceed()} if it is unable to implement the method. The last call to  {@link InvocationContext#proceed()} will produce a {@link UnsupportedOperationException} indicating the method cannot be implemented. This mechanism allows multiple possible interceptors to participate in method implementation.</p>
+ *
+ *
+ *
  * @param <T> The intercepted type
  * @param <R> The result type
  * @author Graeme Rocher
