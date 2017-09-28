@@ -17,15 +17,12 @@ package org.particleframework.aop;
 
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
-import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanFactory;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.Collections;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -54,7 +51,7 @@ public class FooJava$InterceptedProxy extends Foo implements HotSwappableInterce
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];
         this.proxyMethods[0] = PARENT.getRequiredMethod("blah", String.class);
-        this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
+        this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(proxyMethods[0], interceptors);
     }
 
     @Override

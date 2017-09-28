@@ -19,10 +19,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
-import org.particleframework.aop.HotSwappableInterceptedProxy;
-import org.particleframework.aop.Intercepted;
-import org.particleframework.aop.InterceptedProxy;
-import org.particleframework.aop.Interceptor;
+import org.particleframework.aop.*;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.BeanContext;
@@ -59,9 +56,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private static final java.lang.reflect.Method METHOD_GET_REQUIRED_METHOD = ReflectionUtils.getDeclaredMethod(BeanDefinition.class, "getRequiredMethod", String.class, Class[].class)
             .orElseThrow(() -> new IllegalStateException("BeanFactory.build(..) method not found. Incompatible version of Particle on the classpath?"));
 
-    private static final java.lang.reflect.Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
-        new IllegalStateException("InterceptorChain.resolveInterceptors(..) method not found. Incompatible version of Particle?")
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveIntroductionInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
+        new IllegalStateException("InterceptorChain.resolveIntroductionInterceptors(..) method not found. Incompatible version of Particle?")
 );
+
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveAroundInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
+            new IllegalStateException("InterceptorChain.resolveAroundInterceptors(..) method not found. Incompatible version of Particle?")
+    );
+
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Particle?")
@@ -96,6 +98,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final boolean hotswap;
     private final boolean isInterface;
     private final BeanDefinitionVisitor parentWriter;
+    private final boolean isIntroduction;
     private boolean isProxyTarget;
     private final String parentBeanDefinitionName;
 
@@ -136,6 +139,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           boolean proxyTarget,
                           boolean isHotswap,
                           Object... interceptorTypes) {
+        this.isIntroduction = false;
         this.parentWriter = parent;
         this.isProxyTarget = proxyTarget || parent.isInterface();
         this.hotswap = isHotswap;
@@ -158,6 +162,34 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyShortName,
                 scopeClassName,
                 parent.isSingleton());
+        startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
+    }
+
+    /**
+     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link org.particleframework.aop.Introduction} advise
+     *
+     * @param interceptorTypes The interceptor types
+     */
+    public AopProxyWriter(String packageName, String className, String scope, boolean isInterface, boolean isSingleton, Object... interceptorTypes) {
+        this.isIntroduction = true;
+        this.packageName = packageName;
+        this.isInterface = isInterface;
+        this.hotswap = false;
+        this.targetClassShortName = className;
+        this.targetClassFullName = packageName + '.' + targetClassShortName;
+        this.parentWriter = null;
+        this.proxyFullName = targetClassFullName + "$Intercepted";
+        this.proxyInternalName = getInternalName(this.proxyFullName);
+        this.proxyType = getTypeReference(proxyFullName);
+        this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
+        this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        this.parentBeanDefinitionName = null;
+        String proxyShortName = NameUtils.getSimpleName(proxyFullName);
+        this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
+                NameUtils.getPackageName(proxyFullName),
+                proxyShortName,
+                scope,
+                isSingleton);
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
 
@@ -462,7 +494,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
 
-        Class interceptedInterface = Intercepted.class;
+        Class interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
         if(isProxyTarget) {
             interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
 
@@ -632,7 +664,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     proxyConstructorGenerator.visitInsn(AASTORE);
 
                     // Step 4: Resolve the interceptors
-                    // this.$interceptors[0] = InterceptorChain.resolveInterceptors(this.$proxyMethods[0], var2);
+                    // this.$interceptors[0] = InterceptorChain.resolveAroundInterceptors(this.$proxyMethods[0], var2);
                     pushResolveInterceptorsCall(proxyConstructorGenerator, i);
                 }
             }
@@ -830,7 +862,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public String getProxiedBeanDefinitionName() {
-        return parentWriter.getBeanDefinitionName();
+        return parentWriter != null ? parentWriter.getBeanDefinitionName() : null;
     }
 
 
@@ -841,6 +873,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     protected void addParentBeanField(ClassWriter proxyClassWriter) {
+        assert parentBeanDefinitionName != null : "Parent bean definition should be set!";
+
         proxyClassWriter.visitField(
                 MODIFIERS_PRIVATE_STATIC_FINAL,
                 FIELD_PARENT_BEAN,
@@ -937,7 +971,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private void pushResolveInterceptorsCall(GeneratorAdapter proxyConstructorGenerator, int i) {
         // The following will initialize the array of interceptor instances
-        // eg. this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
+        // eg. this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(proxyMethods[0], interceptors);
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.getField(proxyType, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS);
         proxyConstructorGenerator.push(i);
@@ -950,7 +984,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         // Second argument ie. interceptors
         proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
-        proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTERCEPTORS_METHOD));
+        if(isIntroduction) {
+            proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD));
+        }
+        else {
+            proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_AROUND_INTERCEPTORS_METHOD));
+        }
         proxyConstructorGenerator.visitInsn(AASTORE);
     }
 

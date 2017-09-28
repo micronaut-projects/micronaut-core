@@ -18,11 +18,18 @@ package org.particleframework.aop.introduction;
 import org.particleframework.aop.Introduction;
 import org.particleframework.context.annotation.Type;
 
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Introduction
 @Type(StubIntroducer.class)
+@Documented
+@Retention(RUNTIME)
 public @interface Stub {
 }

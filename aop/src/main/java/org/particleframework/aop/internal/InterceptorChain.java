@@ -15,14 +15,13 @@
  */
 package org.particleframework.aop.internal;
 
-import org.particleframework.aop.Around;
-import org.particleframework.aop.Interceptor;
-import org.particleframework.aop.InvocationContext;
+import org.particleframework.aop.*;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleValues;
 import org.particleframework.core.order.OrderUtil;
+import org.particleframework.core.util.ArrayUtil;
 import org.particleframework.inject.Argument;
 import org.particleframework.inject.Executable;
 import org.particleframework.inject.ExecutableMethod;
@@ -58,16 +57,20 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         this.attributes = AopAttributes.get(method.getDeclaringType(),
                                             method.getMethodName(),
                                             method.getArgumentTypes());
-        OrderUtil.sort(interceptors);
-        this.interceptors = new Interceptor[interceptors.length+1];
-        System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
+        if(target instanceof Introduced) {
+            this.interceptors = interceptors;
+        }
+        else {
+            this.interceptors = new Interceptor[interceptors.length+1];
+            System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
+            this.interceptors[this.interceptors.length-1] = context -> method.invoke(target, getParameterValues());
+        }
         Argument[] arguments = method.getArguments();
         for (int i = 0; i < arguments.length; i++) {
             Argument argument = method.getArguments()[i];
             Object value = originalParameters[i];
             parameters.put(argument.getName(), MutableArgumentValue.create(argument, value));
         }
-        this.interceptors[this.interceptors.length-1] = context -> method.invoke(target, getParameterValues());
     }
 
 
@@ -100,6 +103,9 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     public R proceed() throws RuntimeException {
         Interceptor<B, R> interceptor;
         int len = this.interceptors.length;
+        if(len == 0) {
+            throw new IllegalStateException("At least one interceptor is required when calling proceed on the interceptor chain!");
+        }
         boolean last = false;
         int size = len - 1;
         if(index == size) {
@@ -107,7 +113,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
             interceptor = this.interceptors[size];
         }
         else {
-
             interceptor = this.interceptors[index++];
         }
         try {
@@ -170,14 +175,37 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @param interceptors The array of interceptors
      * @return The filtered array of interceptors
      */
-    public static Interceptor[] resolveInterceptors(AnnotatedElement method, Interceptor...interceptors) {
+    @Internal
+    public static Interceptor[] resolveAroundInterceptors(AnnotatedElement method, Interceptor...interceptors) {
+        return resolveInterceptorsInternal(method, Around.class, interceptors);
+    }
+
+    /**
+     * Resolves the interceptors for a method
+     *
+     * @param method The method
+     * @param interceptors The array of interceptors
+     * @return The filtered array of interceptors
+     */
+    @Internal
+    public static Interceptor[] resolveIntroductionInterceptors(AnnotatedElement method, Interceptor...interceptors) {
+        Interceptor[] aroundInterceptors = resolveAroundInterceptors(method, interceptors);
+        Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
+        if(introductionInterceptors.length == 0) {
+            throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
+        }
+        return ArrayUtil.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+
+    private static Interceptor[] resolveInterceptorsInternal(AnnotatedElement method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
         Set<Annotation> annotations;
         if(method instanceof ExecutableMethod) {
             ExecutableMethod executableMethod = (ExecutableMethod) method;
-            annotations = new HashSet<>(executableMethod.findAnnotationsWithStereoType(Around.class));
+            annotations = new HashSet<>(executableMethod.findAnnotationsWithStereoType(annotationType));
         }
         else {
-            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(Around.class, method.getAnnotations()));
+            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(annotationType, method.getAnnotations()));
         }
 
         Set<Class> applicableClasses = annotations.stream()
@@ -187,8 +215,10 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
                         Arrays.stream(type.value())
                 ).collect(Collectors.toSet());
 
-        return Arrays.stream(interceptors)
+        Interceptor[] interceptorArray = Arrays.stream(interceptors)
                 .filter(i -> applicableClasses.contains(i.getClass()))
                 .toArray(Interceptor[]::new);
+        OrderUtil.sort(interceptors);
+        return interceptorArray;
     }
 }
