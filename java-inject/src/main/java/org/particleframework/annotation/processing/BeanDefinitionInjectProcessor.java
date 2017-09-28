@@ -136,7 +136,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionClassWriter.setContextScope(
                 annotationUtils.hasStereotype(beanClassElement, Context.class));
             if(beanDefinitionWriter instanceof ProxyingBeanDefinitionVisitor) {
-                beanDefinitionClassWriter.setReplaceBeanName(((ProxyingBeanDefinitionVisitor) beanDefinitionWriter).getProxiedTypeName());
+                beanDefinitionClassWriter.setReplaceBeanDefinitionName(
+                    ((ProxyingBeanDefinitionVisitor) beanDefinitionWriter).getProxiedBeanDefinitionName()
+                );
             }
             else {
 

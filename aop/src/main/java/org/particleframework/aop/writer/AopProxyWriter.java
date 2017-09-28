@@ -26,6 +26,7 @@ import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanFactory;
@@ -94,6 +95,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final Type proxyType;
     private final boolean hotswap;
     private final boolean isInterface;
+    private final BeanDefinitionVisitor parentWriter;
     private boolean isProxyTarget;
     private final String parentBeanDefinitionName;
 
@@ -134,6 +136,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           boolean proxyTarget,
                           boolean isHotswap,
                           Object... interceptorTypes) {
+        this.parentWriter = parent;
         this.isProxyTarget = proxyTarget || parent.isInterface();
         this.hotswap = isHotswap;
         this.isInterface = parent.isInterface();
@@ -142,14 +145,19 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.parentBeanDefinitionName = parent.getBeanDefinitionName();
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        String proxyShortName = '$' + targetClassShortName + "$Intercepted";
-        this.proxyFullName = packageName + '.' + proxyShortName;
+
+        this.proxyFullName = parent.getBeanDefinitionName() + "$Intercepted";
+        String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
         Type scope = parent.getScope();
         String scopeClassName = scope != null ? scope.getClassName() : null;
-        this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(packageName, proxyShortName, scopeClassName, parent.isSingleton());
+        this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
+                NameUtils.getPackageName(proxyFullName),
+                proxyShortName,
+                scopeClassName,
+                parent.isSingleton());
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
 
@@ -813,6 +821,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public String getProxiedTypeName() {
         return targetClassFullName;
+    }
+
+    @Override
+    public String getProxiedBeanDefinitionName() {
+        return parentWriter.getBeanDefinitionName();
     }
 
 

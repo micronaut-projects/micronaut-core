@@ -26,6 +26,7 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
     private final String beanDefinitionClassName;
     private String replaceBeanName;
     private boolean contextScope = false;
+    private String replaceBeanDefinitionName;
 
     public BeanDefinitionClassWriter(String beanTypeName, String beanDefinitionName) {
         this.beanTypeName = beanTypeName;
@@ -49,6 +50,14 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
      */
     public void setReplaceBeanName(String replaceBeanName) {
         this.replaceBeanName = replaceBeanName;
+    }
+
+    /**
+     * The name of the bean this bean replaces
+     * @param replaceBeanName The replace bean name
+     */
+    public void setReplaceBeanDefinitionName(String replaceBeanName) {
+        this.replaceBeanDefinitionName = replaceBeanName;
     }
 
     /**
@@ -159,12 +168,17 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
         }
 
         // start method: getReplacesBeanTypeName()
+        writeReplacementIfNecessary(classWriter, replaceBeanName, "getReplacesBeanTypeName");
+        writeReplacementIfNecessary(classWriter, replaceBeanDefinitionName, "getReplacesBeanDefinitionName");
+        return classWriter;
+    }
+
+    private void writeReplacementIfNecessary(ClassWriter classWriter, String replaceBeanName, String method) {
         if(replaceBeanName != null) {
-            MethodVisitor getReplacesBeanTypeNameMethod = startPublicMethodZeroArgs(classWriter, String.class, "getReplacesBeanTypeName");
+            MethodVisitor getReplacesBeanTypeNameMethod = startPublicMethodZeroArgs(classWriter, String.class, method);
             getReplacesBeanTypeNameMethod.visitLdcInsn(replaceBeanName);
             getReplacesBeanTypeNameMethod.visitInsn(ARETURN);
             getReplacesBeanTypeNameMethod.visitMaxs(1, 1);
         }
-        return classWriter;
     }
 }

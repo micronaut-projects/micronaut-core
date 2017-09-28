@@ -26,4 +26,9 @@ public interface ProxyingBeanDefinitionVisitor extends BeanDefinitionVisitor {
      * @return The fully qualified name of the class being proxied
      */
     String getProxiedTypeName();
+
+    /**
+     * @return The bean definition that is proxied
+     */
+    String getProxiedBeanDefinitionName();
 }

@@ -22,6 +22,16 @@ import spock.lang.Specification
  * @since 1.0
  */
 class NameUtilsSpec extends Specification {
+    void "test simple name"() {
+        expect:
+        NameUtils.getSimpleName(value) == result
+
+        where:
+        value               | result
+        "com.fooBar.FooBar" | "FooBar"
+        "FooBar"            | "FooBar"
+        "com.bar.\$FooBar"    | "\$FooBar"
+    }
 
     void "test hyphenate"() {
         expect:
