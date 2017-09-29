@@ -13,33 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.factory;
+package org.particleframework.aop.factory
 
-import org.particleframework.aop.simple.Mutating;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
-
-import javax.inject.Named;
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Factory
-public class ConcreteClassFactory {
-    @Bean
-    @Mutating("name")
-    @Primary
-    ConcreteClass concreteClass() {
-        return new ConcreteClass(new AnotherClass());
-    }
-
-    @Bean
-    @Mutating("name")
-    @Named("another")
-    ConcreteClass anotherImpl() {
-        return new ConcreteClass(new AnotherClass());
-    }
-
+@Singleton
+class AnotherClass {
 }

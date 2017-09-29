@@ -288,6 +288,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     isHotSwappable,
                                     isProxyTargetClass,
                                     false,
+                                    this.constructorParamterInfo,
                                     interceptorTypes);
                         }
 
@@ -328,7 +329,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             // handle @Bean annotation for @Factory class
-            if (isFactoryType && annotationUtils.hasStereotype(method, Bean.class)) {
+            if (isFactoryType && annotationUtils.hasStereotype(method, Bean.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
                 visitBeanFactoryMethod(method);
                 return null;
             }
@@ -370,34 +371,40 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, returnType);
             beanDefinitionWriters.put(beanMethod.getSimpleName(), beanMethodWriter);
 
-
+            final String beanMethodName = beanMethod.getSimpleName().toString();
+            final Map<String, Object> beanMethodParameters = beanMethodParams.getParameters();
+            final Object beanMethodDeclaringType = modelUtils.resolveTypeReference(beanMethod.getEnclosingElement());
             beanMethodWriter.visitBeanFactoryMethod(
-                modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
-                beanMethod.getSimpleName().toString(),
-                beanMethodParams.getParameters(),
+                beanMethodDeclaringType,
+                beanMethodName,
+                beanMethodParameters,
                 beanMethodParams.getQualifierTypes(),
                 beanMethodParams.getGenericTypes()
             );
             beanMethodWriter.visitMethodAnnotationSource(
-                    modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
-                    beanMethod.getSimpleName().toString(),
-                    beanMethodParams.getParameters()
+                    beanMethodDeclaringType,
+                    beanMethodName,
+                    beanMethodParameters
             );
 
             if(annotationUtils.hasStereotype(beanMethod,AROUND_TYPE)) {
                 AnnotationMirror[] annotationMirrors = annotationUtils.findAnnotationsWithStereotype(beanMethod, AROUND_TYPE);
                 Object[] interceptorTypes = modelUtils.resolveTypeReferences(annotationMirrors);
+                TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
+                ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? publicConstructorFor(returnTypeElement) : null;
+                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
                 AopProxyWriter proxyWriter = resolveAopProxyWriter(
                         beanMethodWriter,
                         true,
                         false,
                         true,
+                        constructorData,
                         interceptorTypes);
 
                 proxyWriter.visitMethodAnnotationSource(
-                        modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
-                        beanMethod.getSimpleName().toString(),
-                        beanMethodParams.getParameters()
+                        beanMethodDeclaringType,
+                        beanMethodName,
+                        beanMethodParameters
                 );
 
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
@@ -424,9 +431,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodQualifier,
                                 methodGenericTypes
                         ).visitMethodAnnotationSource(
-                                modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
-                                beanMethod.getSimpleName().toString(),
-                                beanMethodParams.getParameters()
+                                beanMethodDeclaringType,
+                                beanMethodName,
+                                beanMethodParameters
                         ).visitEnd();
 
 
@@ -491,6 +498,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         isProxyClass,
                         isHotSwap,
                         false,
+                        this.constructorParamterInfo,
                         interceptorTypes
                 );
 
@@ -512,6 +520,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                                      boolean isProxyClass,
                                                      boolean isHotSwappable,
                                                      boolean isFactoryType,
+                                                     ExecutableElementParamInfo constructorParamterInfo,
                                                      Object... interceptorTypes) {
             String beanName = beanWriter.getBeanDefinitionName();
             Name proxyKey = createProxyKey(beanName);
@@ -535,6 +544,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             constructorParamterInfo.getQualifierTypes(),
                             constructorParamterInfo.getGenericTypes()
                     );
+                }
+                else {
+                    aopProxyWriter.visitBeanDefinitionConstructor();
                 }
 
                 if(isFactoryType) {

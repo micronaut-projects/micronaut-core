@@ -53,7 +53,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return Type.getObjectType(internalName);
         }
         else {
-            throw new IllegalArgumentException("Type reference should be a Class or a String representing the class name");
+            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
         }
     }
 
@@ -211,7 +211,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return Type.getType(internalName);
         }
         else {
-            throw new IllegalArgumentException("Type reference should be a Class or a String representing the class name");
+            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
         }
     }
     protected static String getTypeDescriptor(String className, String... genericTypes) {
