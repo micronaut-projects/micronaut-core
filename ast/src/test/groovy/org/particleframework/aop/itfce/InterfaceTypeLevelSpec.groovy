@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop.introduction
+package org.particleframework.aop.itfce
 
 import org.particleframework.aop.Intercepted
+import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
-import spock.lang.Ignore
+import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -26,16 +27,15 @@ import spock.lang.Unroll
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
-class IntroductionAdviceSpec extends Specification {
+class InterfaceTypeLevelSpec extends Specification {
+
     @Unroll
-    void "test AOP method invocation @Named bean for method #method"() {
+    void "test AOP method invocation for method #method"() {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
-        InterfaceClass foo = beanContext.getBean(InterfaceClass)
+        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
 
         expect:
-        foo instanceof Intercepted
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
 
         where:
@@ -59,4 +59,56 @@ class IntroductionAdviceSpec extends Specification {
         'testListWithWildCardSuper'   | ['test', []]           | ['changed']        // test for generics
         'testListWithWildCardExtends' | ['test', []]           | ['changed']        // test for generics
     }
+
+
+    void "test AOP setup"() {
+        given:
+        BeanContext beanContext = new DefaultBeanContext().start()
+
+        when: "the bean definition is obtained"
+        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanDefinition(InterfaceClass).get()
+
+        then:
+        beanDefinition.findMethod("test", String).isPresent()
+        // should not be a reflection based method
+        !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
+
+        when:
+        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
+
+
+        then:
+        foo instanceof Intercepted
+        beanContext.findExecutableMethod(InterfaceTypeLevel, "test", String).isPresent()
+        // should not be a reflection based method
+        !beanContext.findExecutableMethod(InterfaceTypeLevel, "test", String).get().getClass().getName().contains("Reflection")
+        foo.test("test") == "Name is changed"
+        AopAttributes.@attributes.get() == null
+
+        cleanup:
+        AopAttributes.remove(InterfaceTypeLevel, "test", String)
+    }
+
+    void "test AOP setup attributes"() {
+        given:
+        BeanContext beanContext = new DefaultBeanContext().start()
+
+        when:
+        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
+        def attrs = AopAttributes.get(InterfaceTypeLevel, "test", String)
+        then:
+        foo instanceof Intercepted
+        foo.test("test") == "Name is changed"
+        AopAttributes.@attributes.get().values().first().values == attrs
+
+        when:
+        AopAttributes.remove(InterfaceTypeLevel, "test", String)
+
+        then:
+        AopAttributes.@attributes.get() == null
+
+        cleanup:
+        AopAttributes.remove(InterfaceTypeLevel, "test", String)
+    }
 }
+

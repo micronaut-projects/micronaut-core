@@ -27,61 +27,11 @@ import java.util.List;
 @Stub
 @Mutating("name")
 @Singleton
-public interface InterfaceClass <A> {
+public interface InterfaceIntroductionClass<A> extends SuperInterface<A> {
 
 
     String test(String name);
 
     String test(String name, int age);
 
-
-    String test();
-
-
-    void testVoid(String name);
-
-
-    void testVoid(String name, int age);
-
-
-    boolean testBoolean(String name);
-
-
-    boolean testBoolean(String name, int age);
-
-
-    int testInt(String name);
-
-
-    long testLong(String name);
-
-
-    short testShort(String name);
-
-
-    byte testByte(String name);
-
-
-    double testDouble(String name);
-
-
-
-    float testFloat(String name);
-
-    char testChar(String name);
-
-
-    byte[] testByteArray(String name, byte[] data);
-
-
-    <T extends CharSequence> T testGenericsWithExtends(T name, int age);
-
-
-    <T> List<? super String> testListWithWildCardSuper(T name, List<? super String> p2);
-
-
-    <T> List<? extends String> testListWithWildCardExtends(T name, List<? extends String> p2);
-
-
-    A testGenericsFromType(A name, int age);
 }

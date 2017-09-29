@@ -15,6 +15,7 @@
  */
 package org.particleframework.aop
 
+import groovy.transform.CompileStatic
 import groovyjarjarasm.asm.ClassReader
 import groovyjarjarasm.asm.ClassVisitor
 import groovyjarjarasm.asm.util.ASMifier
@@ -22,6 +23,7 @@ import groovyjarjarasm.asm.util.TraceClassVisitor
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Type
+import org.particleframework.core.order.OrderUtil
 import org.particleframework.inject.Argument
 import org.particleframework.inject.ExecutableMethod
 import spock.lang.Specification
@@ -44,6 +46,7 @@ class InterceptorChainSpec extends Specification {
     void "test invoke interceptor chain"() {
         given:
         Interceptor[] interceptors = [new TwoInterceptor(), new OneInterceptor(), new ThreeInterceptor()]
+        sort(interceptors)
         def executionHandle = Mock(ExecutableMethod)
         executionHandle.getDeclaringType() >> InterceptorChainSpec
         executionHandle.getMethodName() >> "test"
@@ -57,6 +60,11 @@ class InterceptorChainSpec extends Specification {
         then:
         result == "good"
         chain.get("invoked", List).get() == [1,2,3]
+    }
+
+    @CompileStatic
+    private sort(Interceptor[] interceptors) {
+        OrderUtil.sort((Interceptor[]) interceptors)
     }
 
     void "test interceptor chain interaction with Java code"() {

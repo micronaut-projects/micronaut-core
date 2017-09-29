@@ -30,6 +30,7 @@ public interface TypeConverter<S, T> {
      *
      * @param object     The object type
      * @param targetType The target type being converted to
+     * @param context The {@link ConversionContext}
      *
      * @return The converted type or empty if the conversion is not possible
      */

@@ -39,7 +39,7 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
         this.interceptors = new Interceptor[1][];
         this.proxyMethods = new ExecutableMethod[1];
         this.proxyMethods[0] = new $blah0();
-        this.interceptors[0] = InterceptorChain.resolveInterceptors(proxyMethods[0], interceptors);
+        this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(proxyMethods[0], interceptors);
     }
 
     @Override

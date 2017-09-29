@@ -17,14 +17,18 @@ package org.particleframework.aop.introduction;
 
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
+import org.particleframework.core.convert.ConversionService;
+
+import javax.inject.Singleton;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
 public class StubIntroducer implements MethodInterceptor<Object,Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        return null;
+        return context.getParameters().values().iterator().next().getValue();
     }
 }

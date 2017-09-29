@@ -41,6 +41,7 @@ public class AnnotationUtil {
      *
      * @param cls The class
      * @param stereotype The stereotype
+     * @param <T> The annotation generic type
      * @return The annotation
      */
     public static <T extends Annotation> T findAnnotationWithStereoType(AnnotatedElement cls, Class stereotype) {
@@ -53,6 +54,7 @@ public class AnnotationUtil {
      *
      * @param method The method
      * @param type The stereotype
+     * @param <T> The annotation generic type
      * @return The annotation
      */
     public static <T extends Annotation> T findAnnotation(Method method, Class type) {
@@ -74,6 +76,7 @@ public class AnnotationUtil {
      *
      * @param stereotype The stereotype
      * @param annotations The annotations to search
+     * @param <T> The annotation generic type
      * @return The annotation
      */
     public static <T extends Annotation> T findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {

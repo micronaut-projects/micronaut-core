@@ -29,6 +29,19 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>Around advice decorates a method invocation such that the method can be intercepted via a {@link MethodInterceptor}</p>
  *
+ * <p>For example:</p>
+ *
+ * <pre><code>
+ *  {@literal @}Around
+ *  {@literal @}Type(ExampleInterceptor.class)
+ *  {@literal @}Documented
+ *  {@literal @}Retention(RUNTIME)
+ *   public @interface Example {
+ *   }
+ * </code></pre>
+ *
+ * <p>Note that the annotation MUST be {@link java.lang.annotation.RetentionPolicy#RUNTIME} and the specified {@link org.particleframework.context.annotation.Type} must implement {@link MethodInterceptor}</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

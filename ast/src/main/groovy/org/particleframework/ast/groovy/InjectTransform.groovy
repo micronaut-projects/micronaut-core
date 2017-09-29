@@ -1,6 +1,7 @@
 package org.particleframework.ast.groovy
 
 import groovy.transform.CompilationUnitAware
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
@@ -12,15 +13,18 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.aop.Around
+import org.particleframework.aop.Introduction
 import org.particleframework.aop.writer.AopProxyWriter
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
+import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.annotation.*
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
+import org.particleframework.core.util.ArrayUtil
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.annotation.Executable
@@ -28,6 +32,7 @@ import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionVisitor
 import org.particleframework.inject.writer.BeanDefinitionWriter
+import org.particleframework.inject.writer.ProxyingBeanDefinitionVisitor
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -96,12 +101,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         for (ClassNode classNode in classes) {
-            if (classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
+            if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             }
-            InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
-            injectVisitor.visitClass(classNode)
-            beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+            else if(classNode.isAbstract()) {
+                if(stereoTypeFinder.hasStereoType(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
+                    InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                    injectVisitor.visitClass(classNode)
+                    beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+                }
+            }
+            else {
+
+                InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                injectVisitor.visitClass(classNode)
+                beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+            }
         }
 
 
@@ -117,9 +132,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String beanDefinitionName = beanDefWriter.beanDefinitionName
                 BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(beanTypeName, beanDefinitionName)
                 beanClassWriter.setContextScope(stereoTypeFinder.hasStereoType(beanClassNode, Context.name))
-                AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
-                if(replacesAnn != null) {
-                    beanClassWriter.setReplaceBeanName(((ClassExpression)replacesAnn.getMember("value")).type.name)
+                if(beanDefWriter instanceof ProxyingBeanDefinitionVisitor) {
+                    String proxiedBeanDefinitionName = ((ProxyingBeanDefinitionVisitor) beanDefWriter).getProxiedBeanDefinitionName();
+                    if(proxiedBeanDefinitionName != null) {
+                        beanClassWriter.setReplaceBeanDefinitionName(
+                                proxiedBeanDefinitionName
+                        )
+                    }
+                }
+                else {
+
+                    AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
+                    if(replacesAnn != null) {
+                        beanClassWriter.setReplaceBeanName(((ClassExpression)replacesAnn.getMember("value")).type.name)
+                    }
                 }
                 beanDefinitionClassName = beanClassWriter.getBeanDefinitionClassName()
                 beanClassWriter.writeTo(classesDir)
@@ -156,6 +182,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         public static final String AROUND_TYPE = "org.particleframework.aop.Around"
+        public static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction"
         final SourceUnit sourceUnit
         final ClassNode concreteClass
         final boolean isConfigurationProperties
@@ -191,23 +218,93 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitClass(ClassNode node) {
+            if(stereoTypeFinder.hasStereoType(node, INTRODUCTION_TYPE)) {
+                AnnotationNode scopeAnn = stereoTypeFinder.findAnnotationWithStereoType(node, Scope)
+                AnnotationNode singletonAnn = stereoTypeFinder.findAnnotationWithStereoType(node, Singleton)
 
-            ClassNode superClass = node.getSuperClass()
-            List<ClassNode> superClasses = []
-            while (superClass != null) {
-                superClasses.add(superClass)
-                superClass = superClass.getSuperClass()
-            }
-            superClasses = superClasses.reverse()
-            for (classNode in superClasses) {
-                classNode.visitContents(this)
-            }
-            super.visitClass(node)
+                String packageName= node.packageName
+                String beanClassName = node.nameWithoutPackage
 
+                AnnotationNode[] aroundMirrors = stereoTypeFinder
+                                            .findAnnotationsWithStereoType(node, Around)
+                AnnotationNode[] introductionMirrors = stereoTypeFinder
+                        .findAnnotationsWithStereoType(node, Introduction)
+
+                AnnotationNode[] annotationMirrors = ArrayUtil.concat(aroundMirrors, introductionMirrors)
+                Object[] interceptorTypes = resolveTypeReferences(annotationMirrors)
+
+                String scopeType = scopeAnn?.classNode?.name
+                boolean isSingleton = singletonAnn != null
+                boolean isInterface = node.isInterface()
+                AopProxyWriter aopProxyWriter = new AopProxyWriter(
+                        packageName,
+                        beanClassName,
+                        scopeType,
+                        isInterface,
+                        isSingleton,
+                        interceptorTypes)
+                populateProxyWriterConstructor(node, aopProxyWriter)
+                beanDefinitionWriters.put(node, aopProxyWriter)
+                visitIntroductionTypePublicMethods(aopProxyWriter, node)
+            }
+            else {
+
+                ClassNode superClass = node.getSuperClass()
+                List<ClassNode> superClasses = []
+                while (superClass != null) {
+                    superClasses.add(superClass)
+                    superClass = superClass.getSuperClass()
+                }
+                superClasses = superClasses.reverse()
+                for (classNode in superClasses) {
+                    classNode.visitContents(this)
+                }
+                super.visitClass(node)
+            }
         }
+
+        protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
+            PublicMethodVisitor publicMethodVisitor = new PublicMethodVisitor(sourceUnit) {
+
+                @Override
+                void accept(MethodNode methodNode) {
+                    Map<String, Object> targetMethodParamsToType = [:]
+                    Map<String, Object> targetMethodQualifierTypes = [:]
+                    Map<String, List<Object>> targetMethodGenericTypeMap = [:]
+                    Object resolvedReturnType = resolveTypeReference(methodNode.returnType)
+                    List<Object> resolvedGenericTypes = resolveGenericTypes(methodNode.returnType)
+                    populateParameterData(
+                            methodNode.parameters,
+                            targetMethodParamsToType,
+                            targetMethodQualifierTypes,
+                            targetMethodGenericTypeMap)
+
+
+                    aopProxyWriter.visitAroundMethod(
+                            resolveTypeReference(methodNode.declaringClass),
+                            resolvedReturnType,
+                            resolvedGenericTypes,
+                            methodNode.name,
+                            targetMethodParamsToType,
+                            targetMethodQualifierTypes,
+                            targetMethodGenericTypeMap
+                    )
+                }
+
+                @Override
+                protected boolean isAcceptable(MethodNode methodNode
+                ) {
+                    return methodNode.isAbstract() && !methodNode.isFinal() && !methodNode.isStatic() && !methodNode.isSynthetic()
+                }
+            }
+            publicMethodVisitor.accept(node)
+        }
+
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
+            String methodName = methodNode.name
+            ClassNode declaringClass = methodNode.declaringClass
             if( isFactoryClass && !isConstructor && stereoTypeFinder.hasStereoType(methodNode, Bean)) {
                 AnnotationNode beanAnn = stereoTypeFinder.findAnnotationWithStereoType(methodNode, Bean)
                 ClassNode producedType = methodNode.returnType
@@ -232,7 +329,78 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Map<String, List<Object>> genericTypeMap = [:]
                 populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodNode.name, paramsToType, qualifierTypes, genericTypeMap)
+                beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
+                String beanMethodDeclaringType = declaringClass.name
+                beanMethodWriter.visitMethodAnnotationSource(
+                        beanMethodDeclaringType,
+                        methodName,
+                        paramsToType
+                )
+
+                if(stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
+                    AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
+                    Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
+                    AopProxyWriter proxyWriter = new AopProxyWriter(
+                            beanMethodWriter,
+                            true,
+                            false,
+                            interceptorTypeReferences)
+                    if(producedType.isInterface()) {
+                        proxyWriter.visitBeanDefinitionConstructor()
+                    }
+                    else {
+                        populateProxyWriterConstructor(producedType, proxyWriter)
+                    }
+                    proxyWriter.visitMethodAnnotationSource(
+                            beanMethodDeclaringType,
+                            methodName,
+                            paramsToType
+                    )
+
+                    new PublicMethodVisitor(sourceUnit) {
+
+
+                        @Override
+                        void accept(MethodNode targetBeanMethodNode) {
+                            Map<String, Object> targetMethodParamsToType = [:]
+                            Map<String, Object> targetMethodQualifierTypes = [:]
+                            Map<String, List<Object>> targetMethodGenericTypeMap = [:]
+                            Object resolvedReturnType = resolveTypeReference(targetBeanMethodNode.returnType)
+                            List<Object> resolvedGenericTypes = resolveGenericTypes(targetBeanMethodNode.returnType)
+                            populateParameterData(
+                                    targetBeanMethodNode.parameters,
+                                    targetMethodParamsToType,
+                                    targetMethodQualifierTypes,
+                                    targetMethodGenericTypeMap )
+                            beanMethodWriter.visitExecutableMethod(
+                                    resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    resolvedReturnType,
+                                    resolvedGenericTypes,
+                                    targetBeanMethodNode.name,
+                                    targetMethodParamsToType,
+                                    targetMethodQualifierTypes,
+                                    targetMethodGenericTypeMap
+                            ).visitMethodAnnotationSource(
+                                    beanMethodDeclaringType,
+                                    methodName,
+                                    paramsToType
+                            ).visitEnd()
+
+
+                            proxyWriter.visitAroundMethod(
+                                    resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    resolvedReturnType,
+                                    resolvedGenericTypes,
+                                    targetBeanMethodNode.name,
+                                    targetMethodParamsToType,
+                                    targetMethodQualifierTypes,
+                                    targetMethodGenericTypeMap
+                            );
+                        }
+                    }.accept(methodNode.getReturnType())
+                    beanDefinitionWriters.put(new AnnotatedNode(), proxyWriter)
+
+                }
                 Expression preDestroy = beanAnn.getMember("preDestroy")
                 if(preDestroy != null) {
                     String destroyMethodName = preDestroy.text
@@ -250,9 +418,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (!isConstructor) {
                     if (!methodNode.isStatic() && !methodNode.isAbstract()) {
-                        boolean isParent = methodNode.declaringClass != concreteClass
-                        MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodNode.name, methodNode.parameters) : methodNode
-                        boolean overridden = isParent && overriddenMethod.declaringClass != methodNode.declaringClass
+                        boolean isParent = declaringClass != concreteClass
+                        MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, methodNode.parameters) : methodNode
+                        boolean overridden = isParent && overriddenMethod.declaringClass != declaringClass
 
                         boolean isPackagePrivate = isPackagePrivate(methodNode, methodNode.modifiers)
                         boolean isPrivate = methodNode.isPrivate()
@@ -264,16 +432,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 return
                             }
                         }
-                        boolean isPackagePrivateAndPackagesDiffer = overridden && (overriddenMethod.declaringClass.packageName != methodNode.declaringClass.packageName) && isPackagePrivate
+                        boolean packagesDiffer = overriddenMethod.declaringClass.packageName != declaringClass.packageName
+                        boolean isPackagePrivateAndPackagesDiffer = overridden && packagesDiffer && isPackagePrivate
                         boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
                         boolean overriddenInjected = overridden && stereoTypeFinder.hasStereoType(overriddenMethod, Inject)
 
-                        if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+                        if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
+                            // bail out if the method has been overridden by another method annotated with @INject
+                            return
+                        }
+                        if(isParent && overridden && !overriddenInjected && !isPackagePrivateAndPackagesDiffer) {
                             // bail out if the overridden method is package private and in the same package
                             // and is not annotated with @Inject
                             return
                         }
-                        if (!requiresReflection && isInheritedAndNotPublic(methodNode, methodNode.declaringClass, methodNode.modifiers)) {
+                        if (!requiresReflection && isInheritedAndNotPublic(methodNode, declaringClass, methodNode.modifiers)) {
                             requiresReflection = true
                         }
 
@@ -281,14 +454,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Object> qualifierTypes = [:]
                         Map<String, List<Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
-                        ClassNode declaringClass = methodNode.declaringClass
 
                         if (stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
                             beanWriter.visitPostConstructMethod(
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     resolveTypeReference(methodNode.returnType),
-                                    methodNode.name,
+                                    methodName,
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
@@ -297,7 +469,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     resolveTypeReference(methodNode.returnType),
-                                    methodNode.name,
+                                    methodName,
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
@@ -306,7 +478,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     resolveTypeReference(methodNode.returnType),
-                                    methodNode.name,
+                                    methodName,
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
@@ -319,7 +491,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             else if(!isConstructor) {
                 boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
                 if((isExecutableType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
-                    if(methodNode.declaringClass != ClassHelper.OBJECT_TYPE) {
+                    if(declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
                         List<Object> returnTypeGenerics = resolveGenericTypes(methodNode.returnType)
@@ -330,13 +502,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         beanWriter.visitExecutableMethod(
-                                resolveTypeReference(concreteClass),
+                                resolveTypeReference(methodNode.declaringClass),
                                 resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
-                                methodNode.name,
+                                methodName,
                                 paramsToType,
                                 qualifierTypes,
                                 genericTypeMap)
+                                .visitEnd()
 
                         if((isAopProxyType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
 
@@ -347,6 +520,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             AopProxyWriter proxyWriter = resolveProxyWriter(
                                     isProxyClass,
                                     isHotSwap,
+                                    false,
                                     interceptorTypeReferences
                             )
 
@@ -355,10 +529,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
-                                        resolveTypeReference(concreteClass),
+                                        resolveTypeReference(methodNode.declaringClass),
                                         resolveTypeReference(methodNode.returnType),
                                         returnTypeGenerics,
-                                        methodNode.name,
+                                        methodName,
                                         paramsToType,
                                         qualifierTypes,
                                         genericTypeMap
@@ -371,45 +545,65 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         }
 
-        private AopProxyWriter resolveProxyWriter(boolean isProxyTargetClass, boolean isHotSwappable, Object[] interceptorTypeReferences) {
+        private AopProxyWriter resolveProxyWriter(
+                boolean isProxyTargetClass,
+                boolean isHotSwappable,
+                boolean isFactoryType,
+                Object[] interceptorTypeReferences) {
             AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
             if (proxyWriter == null) {
 
                 proxyWriter = new AopProxyWriter(beanWriter,isProxyTargetClass, isHotSwappable, interceptorTypeReferences)
-                this.aopProxyWriter = proxyWriter
-
-                List<ConstructorNode> constructors = concreteClass.getDeclaredConstructors()
-                if (constructors.isEmpty()) {
-                    aopProxyWriter.visitBeanDefinitionConstructor()
-                } else {
-                    ConstructorNode constructorNode = findConcreteConstructor(constructors)
-
-                    if (constructorNode != null) {
-                        Map<String, Object> constructorParamsToType = [:]
-                        Map<String, Object> constructorQualifierTypes = [:]
-                        Map<String, List<Object>> constructorGenericTypeMap = [:]
-                        Parameter[] parameters = constructorNode.parameters
-                        populateParameterData(parameters,
-                                constructorParamsToType,
-                                constructorQualifierTypes,
-                                constructorGenericTypeMap)
-                        aopProxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
 
 
-                    } else {
-                        addError("Class must have at least one public constructor in order to be a candidate for dependency injection", concreteClass)
-                    }
-
+                ClassNode targetClass = concreteClass
+                populateProxyWriterConstructor(targetClass, proxyWriter)
+                String beanDefinitionName = beanWriter.getBeanDefinitionName()
+                if(isFactoryType) {
+                    proxyWriter
+                            .visitSuperFactoryType(beanDefinitionName)
                 }
-                proxyWriter.visitSuperType(beanWriter.getBeanDefinitionName())
+                else {
+                    proxyWriter
+                            .visitSuperType(beanDefinitionName)
+                }
+
+
+                this.aopProxyWriter = proxyWriter
 
                 def node = new AnnotatedNode()
                 def replaces = new AnnotationNode(makeCached(Replaces))
-                replaces.setMember('value', classX(concreteClass.plainNodeReference))
+                replaces.setMember('value', classX(targetClass.plainNodeReference))
                 node.addAnnotation(replaces)
                 beanDefinitionWriters.put(node, proxyWriter)
             }
             proxyWriter
+        }
+
+        protected void populateProxyWriterConstructor(ClassNode targetClass, AopProxyWriter proxyWriter) {
+            List<ConstructorNode> constructors = targetClass.getDeclaredConstructors()
+            if (constructors.isEmpty()) {
+                proxyWriter.visitBeanDefinitionConstructor()
+            } else {
+                ConstructorNode constructorNode = findConcreteConstructor(constructors)
+
+                if (constructorNode != null) {
+                    Map<String, Object> constructorParamsToType = [:]
+                    Map<String, Object> constructorQualifierTypes = [:]
+                    Map<String, List<Object>> constructorGenericTypeMap = [:]
+                    Parameter[] parameters = constructorNode.parameters
+                    populateParameterData(parameters,
+                            constructorParamsToType,
+                            constructorQualifierTypes,
+                            constructorGenericTypeMap)
+                    proxyWriter.visitBeanDefinitionConstructor(constructorParamsToType, constructorQualifierTypes, constructorGenericTypeMap)
+
+
+                } else {
+                    addError("Class must have at least one public constructor in order to be a candidate for dependency injection", targetClass)
+                }
+
+            }
         }
 
         protected Object[] resolveTypeReferences(AnnotationNode[] annotationNodes) {
@@ -628,7 +822,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(isAopProxyType) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(classNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                    resolveProxyWriter(isHotSwappable, isProxyTargetClass, interceptorTypeReferences)
+                    resolveProxyWriter(isHotSwappable, isProxyTargetClass, false, interceptorTypeReferences)
                 }
 
             } else if (!classNode.isAbstract()) {

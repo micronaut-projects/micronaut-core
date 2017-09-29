@@ -103,7 +103,7 @@ public interface CommandLine {
     /**
      * A build for constructing a command line parser
      *
-     * @param <T>
+     * @param <T> The concrete type of the builder
      */
     interface Builder<T extends Builder> {
         /**

@@ -22,9 +22,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.inject.ExecutableMethod;
 
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
 
@@ -51,6 +49,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     private final boolean isInterface;
     private String outerClassName = null;
     private boolean isStatic = false;
+    private List<TypeAnnotationSource> annotationSources = new LinkedList<>();
 
     public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -84,6 +83,17 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         this.outerClassName = outerName;
     }
 
+    /**
+     * Write the method
+     *
+     * @param declaringType The declaring type
+     * @param returnType The return type
+     * @param returnTypeGenericTypes The return type generics
+     * @param methodName The method name
+     * @param argumentTypes The argument types
+     * @param qualifierTypes The qualifier types
+     * @param genericTypes The generic types
+     */
     public void visitMethod(Object declaringType,
                             Object returnType,
                             List<Object> returnTypeGenericTypes,
@@ -99,6 +109,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                 null,
                 Type.getInternalName(AbstractExecutableMethod.class),
                 null);
+
 
         MethodVisitor executorMethodConstructor;
         GeneratorAdapter generatorAdapter;
@@ -176,6 +187,19 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
     }
 
+    private void writeMethodAnnotationSources() {
+        if(!annotationSources.isEmpty()) {
+            // override the getAnnotatedElements() method
+            GeneratorAdapter generatorAdapter = super.writeGetAnnotatedElementsMethod(
+                    classWriter,
+                    Type.getType(AbstractExecutableMethod.class),
+                    annotationSources
+            );
+            generatorAdapter.visitMaxs(1,1);
+            generatorAdapter.endMethod();
+        }
+    }
+
     protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, MethodVisitor invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
@@ -218,16 +242,34 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     }
 
     /**
+     * Finalize writing the method
+     */
+    public void visitEnd() {
+        writeMethodAnnotationSources();
+    }
+    /**
      * Adds a method as a source of annotations
      *
      * @param declaringType The declaring type
      * @param methodName The method name
      * @param parameters The parameter to the method
      */
-    public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        // override the getAnnotatedElements() method
-        GeneratorAdapter generatorAdapter = super.writeGetAnnotatedElementsMethod(declaringType, methodName, parameters, classWriter, Type.getType(AbstractExecutableMethod.class));
-        generatorAdapter.visitMaxs(1,1);
-        generatorAdapter.endMethod();
+    public ExecutableMethodWriter visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
+        annotationSources.add(new MethodAnnotationSource(declaringType, methodName, parameters));
+        return this;
     }
+
+    /**
+     * Adds a method as a source of annotations
+     *
+     * @param declaringType The declaring type
+     */
+    public ExecutableMethodWriter visitTypeAnnotationSource(Object declaringType) {
+        TypeAnnotationSource annotationSource = new TypeAnnotationSource(declaringType);
+        if(!this.annotationSources.contains(annotationSource)) {
+            this.annotationSources.add(annotationSource);
+        }
+        return this;
+    }
+
 }

@@ -7,6 +7,7 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
@@ -283,7 +284,12 @@ class ModelUtils {
     }
 
     public Object[] resolveTypeReferences(AnnotationMirror[] mirrors) {
-        return Arrays.stream(mirrors)
+        Stream<AnnotationMirror> mirrorStream = Arrays.stream(mirrors);
+        return resolveTypeReferences(mirrorStream);
+    }
+
+    protected Object[] resolveTypeReferences(Stream<AnnotationMirror> mirrorStream) {
+        return mirrorStream
               .map(mirror ->
                 resolveTypeReference(mirror.getAnnotationType())
               ).toArray(Object[]::new);

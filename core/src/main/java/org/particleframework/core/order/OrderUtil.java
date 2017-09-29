@@ -45,8 +45,10 @@ public class OrderUtil {
      * Sort the given list
      *
      * @param list The list to sort
+     * @param <T> The stream generic type
+     * @return The sorted stream
      */
-    public static Stream sort(Stream<?> list) {
+    public static <T> Stream<T> sort(Stream<T> list) {
         return list.sorted((o1, o2) -> {
             int order1 = getOrder(o1);
             int order2 = getOrder(o2);

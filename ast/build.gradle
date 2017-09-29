@@ -15,6 +15,7 @@ dependencies {
     testCompile project(":aop")
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
+    testCompile "org.hibernate:hibernate-core:5.1.5.Final"
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
 }

@@ -59,6 +59,8 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     /**
      * Creates a new {@link SoftServiceLoader} using the thread context loader by default
      *
+     * @param service The service type
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service) {
@@ -69,6 +71,9 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     /**
      * Creates a new {@link SoftServiceLoader} using the given type and class loader
      *
+     * @param service The service type
+     * @param loader The class loader
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
@@ -83,7 +88,7 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
      * @param service The service type
      * @param loader The class loader to use
      * @param condition A {@link Predicate} to use to conditionally load the service. The predicate is passed the service class name
-     *
+     * @param <S> The service generic type
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
@@ -105,6 +110,9 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     }
 
     /**
+     * @param alternative An alternative type to use if the this type is not present
+     * @param  classLoader The classloader
+     *
      * @return Return the first such instance
      */
     public Optional<Service<S>> firstOr(String alternative, ClassLoader classLoader) {

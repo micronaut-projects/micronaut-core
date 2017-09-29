@@ -18,7 +18,7 @@ public class ClassUtils {
      * <p>ie. ClassUtils.pathToClassName("foo/bar/MyClass.class") == "foo.bar.MyClass"</p>
      *
      * @param path The path name
-     * @return
+     * @return The class name
      */
     public static String pathToClassName(String path) {
         path = path.replace('/','.');

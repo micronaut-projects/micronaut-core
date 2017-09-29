@@ -32,14 +32,14 @@ public class ConcreteClassFactory {
     @Mutating("name")
     @Primary
     ConcreteClass concreteClass() {
-        return new ConcreteClass();
+        return new ConcreteClass(new AnotherClass());
     }
 
     @Bean
     @Mutating("name")
     @Named("another")
     ConcreteClass anotherImpl() {
-        return new ConcreteClass();
+        return new ConcreteClass(new AnotherClass());
     }
 
 }
