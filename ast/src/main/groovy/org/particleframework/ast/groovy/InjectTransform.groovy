@@ -432,11 +432,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 return
                             }
                         }
-                        boolean isPackagePrivateAndPackagesDiffer = overridden && (overriddenMethod.declaringClass.packageName != declaringClass.packageName) && isPackagePrivate
+                        boolean packagesDiffer = overriddenMethod.declaringClass.packageName != declaringClass.packageName
+                        boolean isPackagePrivateAndPackagesDiffer = overridden && packagesDiffer && isPackagePrivate
                         boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
                         boolean overriddenInjected = overridden && stereoTypeFinder.hasStereoType(overriddenMethod, Inject)
 
-                        if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+                        if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
+                            // bail out if the method has been overridden by another method annotated with @INject
+                            return
+                        }
+                        if(isParent && overridden && !overriddenInjected && !isPackagePrivateAndPackagesDiffer) {
                             // bail out if the overridden method is package private and in the same package
                             // and is not annotated with @Inject
                             return

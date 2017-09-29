@@ -22,7 +22,7 @@ class RoundThing {
         return roundThingPackagePrivateMethod3Injected
     }
 
-    @Inject @PackageScope  void injectPackagePrivateMethod3() {
+    @Inject @PackageScope void injectPackagePrivateMethod3() {
         roundThingPackagePrivateMethod3Injected = true
     }
 

@@ -52,7 +52,7 @@ class Tire extends RoundThing {
         this.constructorInjection = constructorInjection
     }
 
-    @Inject void supertypeMethodInjection(FuelTank methodInjection) {
+    @Inject @PackageScope void supertypeMethodInjection(FuelTank methodInjection) {
         if (!hasTireBeenFieldInjected()) {
             methodInjectedBeforeFields = true
         }
@@ -65,7 +65,7 @@ class Tire extends RoundThing {
         this.methodInjection = methodInjection
     }
 
-    @Inject static void supertypeStaticMethodInjection(FuelTank methodInjection) {
+    @Inject @PackageScope static void supertypeStaticMethodInjection(FuelTank methodInjection) {
         if (!Tire.hasBeenStaticFieldInjected()) {
             staticMethodInjectedBeforeStaticFields = true
         }

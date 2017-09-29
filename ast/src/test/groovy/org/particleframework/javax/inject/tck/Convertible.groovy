@@ -1,6 +1,7 @@
 package org.particleframework.javax.inject.tck
 
 import junit.framework.TestCase
+import org.junit.Ignore
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.javax.inject.tck.accessories.Cupholder
@@ -377,10 +378,12 @@ class Convertible implements Car {
             assertFalse(spareTire.methodInjectedBeforeFields)
         }
 
+        // TODO: FIXME
         void testSupertypeMethodsInjectedBeforeSubtypeFields() {
             assertFalse(spareTire.subtypeFieldInjectedBeforeSupertypeMethods)
         }
 
+        // TODO: FIXME
         void testSupertypeMethodInjectedBeforeSubtypeMethods() {
             assertFalse(spareTire.subtypeMethodInjectedBeforeSupertypeMethods)
         }
@@ -481,6 +484,7 @@ class Convertible implements Car {
             assertFalse(engine.superPackagePrivateMethodInjected)
         }
 
+        // TODO: FIXME
         void testPrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
             assertTrue(spareTire.subPrivateMethodForOverrideInjected)
         }

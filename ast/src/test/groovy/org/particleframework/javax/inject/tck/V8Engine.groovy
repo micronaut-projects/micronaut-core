@@ -12,7 +12,7 @@ class V8Engine extends GasEngine {
         publicNoArgsConstructorInjected = true
     }
 
-    @Inject void injectPackagePrivateMethod() {
+    @Inject @PackageScope void injectPackagePrivateMethod() {
         if (subPackagePrivateMethodInjected) {
             overriddenPackagePrivateMethodInjectedTwice = true
         }
