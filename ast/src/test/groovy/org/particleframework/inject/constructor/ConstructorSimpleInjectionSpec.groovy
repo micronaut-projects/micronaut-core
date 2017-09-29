@@ -1,5 +1,6 @@
 package org.particleframework.inject.constructor
 
+import groovy.transform.PackageScope
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
@@ -40,6 +41,7 @@ class ConstructorSimpleInjectionSpec extends Specification {
     static class B {
         private A a
 
+        @PackageScope
         @Inject
         B(A a) {
             this.a = a
