@@ -427,7 +427,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 modelUtils.resolveTypeReference(beanMethod.getEnclosingElement()),
                                 beanMethod.getSimpleName().toString(),
                                 beanMethodParams.getParameters()
-                        );
+                        ).visitEnd();
 
 
                         aopProxyWriter.visitAroundMethod(
@@ -471,7 +471,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 method.getSimpleName().toString(),
                 params.getParameters(),
                 params.getQualifierTypes(),
-                params.getGenericTypes());
+                params.getGenericTypes())
+            .visitEnd();
 
             boolean hasExplicitAround = annotationUtils.hasStereotype(method, AROUND_TYPE);
             if(isAopProxyType || hasExplicitAround) {

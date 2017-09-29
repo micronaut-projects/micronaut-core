@@ -25,7 +25,7 @@ import spock.lang.Unroll
  * @author Graeme Rocher
  * @since 1.0
  */
-class IntroductionAdviceSpec extends Specification {
+class InterfaceIntroductionAdviceSpec extends Specification {
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
@@ -37,8 +37,9 @@ class IntroductionAdviceSpec extends Specification {
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
 
         where:
-        method                        | args                   | result
-        'test'                        | ['test']               | "changed"                   // test for single string arg
-        'test'                        | ['test', 10]           | "changed"    // test for multiple args, one primitive
+        method                 | args         | result
+        'test'                 | ['test']     | "changed"                   // test for single string arg
+        'test'                 | ['test', 10] | "changed"    // test for multiple args, one primitive
+        'testGenericsFromType' | ['test', 10] | "changed"    // test for multiple args, one primitive
     }
 }

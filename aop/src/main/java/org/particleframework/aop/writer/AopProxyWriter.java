@@ -344,7 +344,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
+            String declaringClassName = getTypeReference(declaringType).getClassName();
+            if(!declaringClassName.equals(targetClassFullName)) {
+                executableMethodWriter.visitTypeAnnotationSource(targetClassFullName);
+            }
+
             executableMethodWriter.visitMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
+            executableMethodWriter.visitEnd();
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);

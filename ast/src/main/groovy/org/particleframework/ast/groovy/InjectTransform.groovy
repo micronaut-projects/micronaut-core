@@ -337,6 +337,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 paramsToType,
                                 qualifierTypes,
                                 genericTypeMap)
+                                .visitEnd()
 
                         if((isAopProxyType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
 

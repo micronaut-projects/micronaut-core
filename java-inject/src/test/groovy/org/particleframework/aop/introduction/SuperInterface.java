@@ -15,23 +15,11 @@
  */
 package org.particleframework.aop.introduction;
 
-import org.particleframework.aop.simple.Mutating;
-
-import javax.inject.Singleton;
-import java.util.List;
-
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Stub
-@Mutating("name")
-@Singleton
-public interface InterfaceIntroductionClass<A> extends SuperInterface<A> {
+public interface SuperInterface<A> {
 
-
-    String test(String name);
-
-    String test(String name, int age);
-
+    A testGenericsFromType(A name, int age);
 }

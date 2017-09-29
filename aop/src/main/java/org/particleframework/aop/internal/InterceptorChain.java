@@ -46,6 +46,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     protected final ExecutableMethod<B, R> executionHandle;
     protected final MutableConvertibleValues attributes;
     protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
+    private final boolean isIntroduction;
     private int index = 0;
 
     public InterceptorChain(Interceptor<B, R>[] interceptors,
@@ -57,12 +58,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         this.attributes = AopAttributes.get(method.getDeclaringType(),
                                             method.getMethodName(),
                                             method.getArgumentTypes());
-        if(target instanceof Introduced) {
-            this.interceptors = interceptors;
+        this.interceptors = new Interceptor[interceptors.length+1];
+        System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
+        this.isIntroduction = target instanceof Introduced;
+        if(isIntroduction) {
+            this.interceptors[this.interceptors.length-1] = context -> {
+                throw new UnsupportedOperationException("Introduction advice reached the end of the chain and possible implementations were found");
+            };
         }
         else {
-            this.interceptors = new Interceptor[interceptors.length+1];
-            System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
             this.interceptors[this.interceptors.length-1] = context -> method.invoke(target, getParameterValues());
         }
         Argument[] arguments = method.getArguments();
@@ -113,6 +117,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
             interceptor = this.interceptors[size];
         }
         else {
+            if(isIntroduction && index == size -1) {
+                // the last interceptor in the chain for @Introduction advise throws UnsupportedException, so we consider it the last
+                // this ensures cleanup before the exception is thrown
+                last = true;
+            }
             interceptor = this.interceptors[index++];
         }
         try {
@@ -169,7 +178,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
 
 
     /**
-     * Resolves the interceptors for a method
+     * Resolves the {@link Around} interceptors for a method
      *
      * @param method The method
      * @param interceptors The array of interceptors
@@ -181,7 +190,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     }
 
     /**
-     * Resolves the interceptors for a method
+     * Resolves the interceptors for a method for {@link Introduction} advise. For {@link Introduction} advise
+     * any {@link Around} advise interceptors are applied first
      *
      * @param method The method
      * @param interceptors The array of interceptors

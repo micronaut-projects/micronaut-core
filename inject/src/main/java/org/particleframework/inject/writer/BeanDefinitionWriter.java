@@ -11,7 +11,6 @@ import org.particleframework.context.*;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.core.util.ArrayUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 
@@ -19,7 +18,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -168,7 +166,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private boolean beanFinalized = false;
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
-    private GeneratorAdapter annotationElementsMethod;
+    private List<TypeAnnotationSource> annotationSourceList = new ArrayList<>();
 
     /**
      * Creates a bean definition writer
@@ -475,8 +473,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 preDestroyMethodVisitor.visitInsn(ARETURN);
                 preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
             }
-            if(annotationElementsMethod != null) {
-                annotationElementsMethod.visitMaxs(1,1);
+            if(!annotationSourceList.isEmpty()) {
+                GeneratorAdapter annotatedElementMethod = writeGetAnnotatedElementsMethod(classWriter, TYPE_ABSTRACT_BEAN_DEFINITION, annotationSourceList);
+                annotatedElementMethod.visitMaxs(1,1);
             }
 
             classWriter.visitEnd();
@@ -892,8 +891,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        ClassVisitor classWriter = this.classWriter;
-        this.annotationElementsMethod = writeGetAnnotatedElementsMethod(declaringType, methodName, parameters, classWriter, TYPE_ABSTRACT_BEAN_DEFINITION);
+        this.annotationSourceList.add(new MethodAnnotationSource(declaringType, methodName, parameters));
     }
 
     @Override

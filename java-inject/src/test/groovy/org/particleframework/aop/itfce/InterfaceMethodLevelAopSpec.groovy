@@ -111,5 +111,8 @@ class InterfaceMethodLevelAopSpec extends Specification {
 
         then:
         AopAttributes.@attributes.get() == null
+
+        cleanup:
+        AopAttributes.remove(InterfaceClass, "test", String)
     }
 }
