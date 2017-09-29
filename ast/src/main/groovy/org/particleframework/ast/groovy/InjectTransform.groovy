@@ -415,7 +415,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         beanWriter.visitExecutableMethod(
-                                resolveTypeReference(concreteClass),
+                                resolveTypeReference(methodNode.declaringClass),
                                 resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
                                 methodName,
@@ -442,7 +442,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
-                                        resolveTypeReference(concreteClass),
+                                        resolveTypeReference(methodNode.declaringClass),
                                         resolveTypeReference(methodNode.returnType),
                                         returnTypeGenerics,
                                         methodName,
