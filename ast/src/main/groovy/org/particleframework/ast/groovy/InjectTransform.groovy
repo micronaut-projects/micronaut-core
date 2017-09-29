@@ -1,6 +1,7 @@
 package org.particleframework.ast.groovy
 
 import groovy.transform.CompilationUnitAware
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
@@ -12,6 +13,7 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.aop.Around
+import org.particleframework.aop.Introduction
 import org.particleframework.aop.writer.AopProxyWriter
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
@@ -22,6 +24,7 @@ import org.particleframework.config.ConfigurationProperties
 import org.particleframework.context.annotation.*
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
+import org.particleframework.core.util.ArrayUtil
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.inject.annotation.Executable
@@ -98,12 +101,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         for (ClassNode classNode in classes) {
-            if (classNode.isAbstract() || (classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
+            if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             }
-            InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
-            injectVisitor.visitClass(classNode)
-            beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+            else if(classNode.isAbstract()) {
+                if(stereoTypeFinder.hasStereoType(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
+                    InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                    injectVisitor.visitClass(classNode)
+                    beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+                }
+            }
+            else {
+
+                InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                injectVisitor.visitClass(classNode)
+                beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+            }
         }
 
 
@@ -169,6 +182,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     private static class InjectVisitor extends ClassCodeVisitorSupport {
         public static final String AROUND_TYPE = "org.particleframework.aop.Around"
+        public static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction"
         final SourceUnit sourceUnit
         final ClassNode concreteClass
         final boolean isConfigurationProperties
@@ -204,20 +218,88 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitClass(ClassNode node) {
+            if(stereoTypeFinder.hasStereoType(node, INTRODUCTION_TYPE)) {
+                AnnotationNode scopeAnn = stereoTypeFinder.findAnnotationWithStereoType(node, Scope)
+                AnnotationNode singletonAnn = stereoTypeFinder.findAnnotationWithStereoType(node, Singleton)
 
-            ClassNode superClass = node.getSuperClass()
-            List<ClassNode> superClasses = []
-            while (superClass != null) {
-                superClasses.add(superClass)
-                superClass = superClass.getSuperClass()
-            }
-            superClasses = superClasses.reverse()
-            for (classNode in superClasses) {
-                classNode.visitContents(this)
-            }
-            super.visitClass(node)
+                String packageName= node.packageName
+                String beanClassName = node.nameWithoutPackage
 
+                AnnotationNode[] aroundMirrors = stereoTypeFinder
+                                            .findAnnotationsWithStereoType(node, Around)
+                AnnotationNode[] introductionMirrors = stereoTypeFinder
+                        .findAnnotationsWithStereoType(node, Introduction)
+
+                AnnotationNode[] annotationMirrors = ArrayUtil.concat(aroundMirrors, introductionMirrors)
+                Object[] interceptorTypes = resolveTypeReferences(annotationMirrors)
+
+                String scopeType = scopeAnn?.classNode?.name
+                boolean isSingleton = singletonAnn != null
+                boolean isInterface = node.isInterface()
+                AopProxyWriter aopProxyWriter = new AopProxyWriter(
+                        packageName,
+                        beanClassName,
+                        scopeType,
+                        isInterface,
+                        isSingleton,
+                        interceptorTypes)
+                populateProxyWriterConstructor(node, aopProxyWriter)
+                beanDefinitionWriters.put(node, aopProxyWriter)
+                visitIntroductionTypePublicMethods(aopProxyWriter, node)
+            }
+            else {
+
+                ClassNode superClass = node.getSuperClass()
+                List<ClassNode> superClasses = []
+                while (superClass != null) {
+                    superClasses.add(superClass)
+                    superClass = superClass.getSuperClass()
+                }
+                superClasses = superClasses.reverse()
+                for (classNode in superClasses) {
+                    classNode.visitContents(this)
+                }
+                super.visitClass(node)
+            }
         }
+
+        protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
+            PublicMethodVisitor publicMethodVisitor = new PublicMethodVisitor(sourceUnit) {
+
+                @Override
+                void accept(MethodNode methodNode) {
+                    Map<String, Object> targetMethodParamsToType = [:]
+                    Map<String, Object> targetMethodQualifierTypes = [:]
+                    Map<String, List<Object>> targetMethodGenericTypeMap = [:]
+                    Object resolvedReturnType = resolveTypeReference(methodNode.returnType)
+                    List<Object> resolvedGenericTypes = resolveGenericTypes(methodNode.returnType)
+                    populateParameterData(
+                            methodNode.parameters,
+                            targetMethodParamsToType,
+                            targetMethodQualifierTypes,
+                            targetMethodGenericTypeMap)
+
+
+                    aopProxyWriter.visitAroundMethod(
+                            resolveTypeReference(methodNode.declaringClass),
+                            resolvedReturnType,
+                            resolvedGenericTypes,
+                            methodNode.name,
+                            targetMethodParamsToType,
+                            targetMethodQualifierTypes,
+                            targetMethodGenericTypeMap
+                    )
+                }
+
+                @Override
+                protected boolean isAcceptable(MethodNode methodNode
+                ) {
+                    return methodNode.isAbstract() && !methodNode.isFinal() && !methodNode.isStatic() && !methodNode.isSynthetic()
+                }
+            }
+            publicMethodVisitor.accept(node)
+        }
+
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {

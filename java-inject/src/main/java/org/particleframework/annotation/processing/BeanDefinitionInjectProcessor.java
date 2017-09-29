@@ -54,6 +54,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     };
     private static final String AROUND_TYPE = "org.particleframework.aop.Around";
+    private static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction";
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private ServiceDescriptorGenerator serviceDescriptorGenerator;
@@ -92,7 +93,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                         }
                         else {
-                            if( annotationUtils.hasStereotype(typeElement, "org.particleframework.aop.Introduction") ) {
+                            if( annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) ) {
                                 String name = typeElement.getQualifiedName().toString();
                                 AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
                                 beanDefinitionWriters.put(name, visitor);
@@ -213,7 +214,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if(annotationUtils.hasStereotype(classElement, "org.particleframework.aop.Introduction") && modelUtils.isAbstract(classElement)) {
 
                 AopProxyWriter aopProxyWriter = createAopWriterFor(classElement);
-                aopProxyWriter.visitBeanDefinitionConstructor();
+                ExecutableElement constructor = classElement.getKind() == ElementKind.CLASS ? publicConstructorFor(classElement) : null;
+                ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
+                if(constructorData != null) {
+                    aopProxyWriter.visitBeanDefinitionConstructor(
+                            constructorData.getParameters(),
+                            constructorData.getQualifierTypes(),
+                            constructorData.getGenericTypes()
+                    );
+                }
+                else {
+                    aopProxyWriter.visitBeanDefinitionConstructor();
+                }
                 beanDefinitionWriters.put(classElement.getQualifiedName(), aopProxyWriter);
                 classElement.asType().accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
 
@@ -245,7 +257,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     @Override
                     protected boolean isAcceptable(Element enclosedElement) {
-                        return modelUtils.isAbstract(enclosedElement) && !enclosedElement.getModifiers().contains(Modifier.FINAL);
+                        Set<Modifier> modifiers = enclosedElement.getModifiers();
+                        return modelUtils.isAbstract(enclosedElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
                     }
                 }, aopProxyWriter);
                 return null;

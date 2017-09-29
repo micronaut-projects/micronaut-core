@@ -39,6 +39,7 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
     }
 
     void accept(ClassNode classNode) {
+        println "classNode = $classNode"
         while(classNode.name != Object.class.getName()) {
 
             classNode.visitContents(this)
@@ -55,6 +56,7 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
 
     @Override
     void visitMethod(MethodNode node) {
+        println "node = $node"
         if(isAcceptable(node)) {
             def key = node.getText()
             if(!processed.contains(key)) {
