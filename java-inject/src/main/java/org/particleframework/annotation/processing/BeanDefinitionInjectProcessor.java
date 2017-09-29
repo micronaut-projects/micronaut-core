@@ -245,7 +245,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     @Override
                     protected boolean isAcceptable(Element enclosedElement) {
-                        return super.isAcceptable(enclosedElement) && modelUtils.isAbstract(enclosedElement);
+                        return modelUtils.isAbstract(enclosedElement) && !enclosedElement.getModifiers().contains(Modifier.FINAL);
                     }
                 }, aopProxyWriter);
                 return null;

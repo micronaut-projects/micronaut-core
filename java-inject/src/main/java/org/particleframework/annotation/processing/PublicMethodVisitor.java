@@ -54,14 +54,15 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
     @Override
     public R visitDeclared(DeclaredType type, P p) {
         Element element = type.asElement();
-        while(element.getKind() == ElementKind.CLASS || element.getKind() == ElementKind.INTERFACE) {
+
+        while((element.getKind() == ElementKind.CLASS || element.getKind() == ElementKind.INTERFACE) && !element.toString().equals(Object.class.getName())) {
             TypeElement typeElement = (TypeElement) element;
-            List<? extends Element> enclosedElements = type.asElement().getEnclosedElements();
+            List<? extends Element> enclosedElements = typeElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {
                 if(enclosedElement.getKind() == ElementKind.METHOD) {
                     boolean isAcceptable = isAcceptable(enclosedElement);
+                    ExecutableElement theMethod = (ExecutableElement) enclosedElement;
                     if(isAcceptable) {
-                        ExecutableElement theMethod = (ExecutableElement) enclosedElement;
                         String qualifiedName = theMethod.toString();
                         // if the method has already been processed then it is overridden so ignore
                         if(!processed.contains(qualifiedName)) {
@@ -94,7 +95,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
 
     protected boolean isAcceptable(Element enclosedElement) {
         Set<Modifier> modifiers = enclosedElement.getModifiers();
-        return modifiers.contains(Modifier.PUBLIC);
+        return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL);
     }
 
     protected abstract void accept(ExecutableElement method, P p);
