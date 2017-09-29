@@ -46,6 +46,8 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
 
     /**
      * Clear all values
+     *
+     * @return This values instance
      */
     MutableConvertibleValues<V> clear();
 

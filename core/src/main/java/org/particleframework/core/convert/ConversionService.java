@@ -45,6 +45,8 @@ public interface ConversionService<Impl extends ConversionService> {
      * @param sourceType    The source type
      * @param targetType    The target type
      * @param typeConverter The type converter
+     * @param <S> The source generic type
+     * @param <T> The target generic type
      * @return This conversion service
      */
     <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
@@ -55,6 +57,9 @@ public interface ConversionService<Impl extends ConversionService> {
      * @param sourceType    The source type
      * @param targetType    The target type
      * @param typeConverter The type converter
+     * @param <S> The source generic type
+     * @param <T> The target generic type
+
      * @return This conversion service
      */
     <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter);

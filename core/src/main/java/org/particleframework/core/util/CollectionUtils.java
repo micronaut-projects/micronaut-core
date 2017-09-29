@@ -30,6 +30,7 @@ public class CollectionUtils {
      *
      * @param iterableType The iterable type
      * @param collection The collection
+     * @param <T> The collection generic type
      * @return An {@link Optional} of the converted type
      */
     public static <T> Optional<Iterable<T>> convertCollection(Class<? extends Iterable<T>> iterableType, Collection<T> collection)  {

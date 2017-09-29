@@ -75,6 +75,7 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
      * Returns a submap for all the keys with the given prefix
      *
      * @param prefix The prefix
+     * @param valueType The value type
      * @return The submap
      */
     default Map<String, V> subMap(String prefix, Class<V> valueType) {

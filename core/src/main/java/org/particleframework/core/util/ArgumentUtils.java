@@ -41,10 +41,11 @@ public class ArgumentUtils {
      *
      * @param name The name of the argument
      * @param value The value of the argument
+     * @param <T> The value type
      * @return The {@link ArgumentCheck}
      */
     public static <T> ArgumentCheck check(String name, T value) {
-        return new ArgumentCheck<T>(name, value);
+        return new ArgumentCheck<>(name, value);
     }
     /**
      * Allows producing error messages
