@@ -1,5 +1,6 @@
 package org.particleframework.javax.inject.tck
 
+import groovy.transform.PackageScope
 import junit.framework.TestCase
 import org.junit.Ignore
 import org.particleframework.context.BeanContext
@@ -69,7 +70,7 @@ class Convertible implements Car {
     private static Provider<Tire> staticMethodPlainTireProvider = nullProvider()
     private static Provider<Tire> staticMethodSpareTireProvider = nullProvider()
 
-    @Inject Convertible(
+    @Inject @PackageScope Convertible(
             Seat plainSeat,
             @Drivers Seat driversSeat,
             Tire plainTire,
@@ -88,7 +89,7 @@ class Convertible implements Car {
         constructorSpareTireProvider = spareTireProvider
     }
 
-    Convertible() {
+    @PackageScope Convertible() {
         throw new AssertionError("Unexpected call to non-injectable constructor")
     }
 
