@@ -1524,14 +1524,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // invoke Class.getConstructor()
-        Method getConstructorMethod = ReflectionUtils.getDeclaredMethod(Class.class, "getConstructor", Class[].class)
+        String getDeclaredConstructorMethod = "getDeclaredConstructor";
+        Method getConstructorMethod = ReflectionUtils.getDeclaredMethod(Class.class, getDeclaredConstructorMethod, Class[].class)
                 .orElseThrow(() ->
                         new IllegalStateException("Class.getConstructor(..) method not found")
                 );
         methodVisitor.visitMethodInsn(
                 INVOKEVIRTUAL,
                 Type.getInternalName(Class.class),
-                "getConstructor",
+                getDeclaredConstructorMethod,
                 Type.getType(getConstructorMethod).getDescriptor(),
                 false);
     }
