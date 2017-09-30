@@ -58,6 +58,15 @@ subprojects { subproject ->
         targetCompatibility = '1.8'
         if(!subproject.name.contains('test-suite')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
+            apply plugin: 'checkstyle'
+            
+            checkstyle {
+                toolVersion = 8.2
+                configFile = new File(project.rootDir, 'checkstyle/oracle.xml')
+                ignoreFailures = false
+                maxErrors = 0
+                maxWarnings = 0
+            }
         }
     }
 
