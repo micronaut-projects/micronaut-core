@@ -1,5 +1,6 @@
 package org.particleframework.javax.inject.tck
 
+import groovy.transform.PackageScope
 import org.particleframework.javax.inject.tck.accessories.SpareTire
 
 import javax.inject.Inject
@@ -24,11 +25,11 @@ abstract class Engine {
     public boolean overriddenPackagePrivateMethodInjectedTwice
     public boolean qualifiersInheritedFromOverriddenMethod
 
-    @Inject void injectPackagePrivateMethod() {
+    @PackageScope @Inject void injectPackagePrivateMethod() {
         superPackagePrivateMethodInjected = true
     }
 
-    @Inject void injectPackagePrivateMethodForOverride() {
+    @PackageScope @Inject void injectPackagePrivateMethodForOverride() {
         superPackagePrivateMethodForOverrideInjected = true
     }
 

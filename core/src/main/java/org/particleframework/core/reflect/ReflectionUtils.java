@@ -68,6 +68,7 @@ public class ReflectionUtils {
      *
      * @param type     The type
      * @param argTypes The argument types
+     * @param <T> The generic type
      * @return The method
      */
     public static <T> Optional<Constructor<T>> findConstructor(Class<T> type, Class... argTypes) {

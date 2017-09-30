@@ -27,7 +27,7 @@ import java.util.List;
 @Stub
 @Mutating("name")
 @Singleton
-public interface InterfaceIntroductionClass<A> {
+public interface InterfaceIntroductionClass<A> extends SuperInterface<A> {
 
 
     String test(String name);

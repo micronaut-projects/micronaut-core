@@ -11,10 +11,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes
@@ -56,7 +53,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return Type.getObjectType(internalName);
         }
         else {
-            throw new IllegalArgumentException("Type reference should be a Class or a String representing the class name");
+            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
         }
     }
 
@@ -214,7 +211,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             return Type.getType(internalName);
         }
         else {
-            throw new IllegalArgumentException("Type reference should be a Class or a String representing the class name");
+            throw new IllegalArgumentException("Type reference ["+type+"] should be a Class or a String representing the class name");
         }
     }
     protected static String getTypeDescriptor(String className, String... genericTypes) {
@@ -442,7 +439,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                         getMethodDescriptor(returnType, argumentTypes));
     }
 
-    protected GeneratorAdapter writeGetAnnotatedElementsMethod(Object declaringType, String methodName, Map<String, Object> parameters, ClassVisitor classWriter, Type superType) {
+    protected GeneratorAdapter writeGetAnnotatedElementsMethod(
+            ClassVisitor classWriter,
+            Type superType,
+            List<? extends TypeAnnotationSource> annotationSourceList) {
         // override the getAnnotatedElements() method
         Method annotationElementsMethod =
                 Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
@@ -467,10 +467,24 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         );
 
         // 2nd arg: the additional elements
-        BeanDefinitionWriter.pushNewArray(generator, AnnotatedElement.class,1); // arg 2: the additional elements
-        generator.push(0);
-        BeanDefinitionWriter.pushGetMethodFromTypeCall(generator, getTypeReference(declaringType), methodName, parameters.values());
-        generator.arrayStore(Type.getType(AnnotatedElement.class));
+        int len = annotationSourceList.size();
+        BeanDefinitionWriter.pushNewArray(generator, AnnotatedElement.class, len); // arg 2: the additional elements
+        for (int i = 0; i < len; i++) {
+
+            generator.push(i);
+            TypeAnnotationSource typeAnnotationSource = annotationSourceList.get(i);
+            if(typeAnnotationSource instanceof MethodAnnotationSource) {
+                MethodAnnotationSource methodAnnotationSource = (MethodAnnotationSource) typeAnnotationSource;
+                BeanDefinitionWriter.pushGetMethodFromTypeCall(generator, getTypeReference(methodAnnotationSource.declaringType), methodAnnotationSource.methodName, methodAnnotationSource.parameters.values());
+            }
+            else {
+                generator.push(getTypeReference(typeAnnotationSource.declaringType));
+            }
+            generator.arrayStore(Type.getType(AnnotatedElement.class));
+            if(i != len - 1) {
+                generator.dup();
+            }
+        }
 
         // invoke: ArrayUtils.concat(a1, a2)
         java.lang.reflect.Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtil.class, "concat", Object[].class, Object[].class);
@@ -478,5 +492,64 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         generator.invokeStatic(Type.getType(ArrayUtil.class), concatMethod);
         generator.returnValue();
         return generator;
+    }
+
+    /**
+     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     */
+    protected class TypeAnnotationSource {
+        final Object declaringType;
+
+        public TypeAnnotationSource(Object declaringType) {
+            this.declaringType = declaringType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            TypeAnnotationSource that = (TypeAnnotationSource) o;
+
+            return declaringType.equals(that.declaringType);
+        }
+
+        @Override
+        public int hashCode() {
+            return declaringType.hashCode();
+        }
+    }
+    /**
+     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     */
+    protected class MethodAnnotationSource extends TypeAnnotationSource{
+        final String methodName;
+        final Map<String, Object> parameters;
+
+        public MethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
+            super(declaringType);
+            this.methodName = methodName;
+            this.parameters = parameters;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+
+            MethodAnnotationSource that = (MethodAnnotationSource) o;
+
+            if (!methodName.equals(that.methodName)) return false;
+            return parameters.equals(that.parameters);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + methodName.hashCode();
+            result = 31 * result + parameters.hashCode();
+            return result;
+        }
     }
 }

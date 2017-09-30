@@ -55,7 +55,7 @@ public class GenericTypeUtils {
      * Resolve a single type from the given generic type
      *
      * @param genericType The generic type
-     * @return
+     * @return An {@link Optional} of the type
      */
     public static Optional<Class> resolveSingleTypeArgument(Type genericType) {
         if(genericType instanceof ParameterizedType) {

@@ -220,6 +220,8 @@ public interface BeanDefinitionVisitor {
      * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
+     *
+     * @return The {@link ExecutableMethodWriter}. Calls should call {@link ExecutableMethodWriter#visitEnd()}  to finalize the method
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                Object returnType,

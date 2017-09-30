@@ -48,6 +48,8 @@ public class SocketUtils {
     /**
      * Finds an available TCP port
      *
+     * @param minPortRange The minimum port range
+     * @param maxPortRange The maximum port range
      * @return The available port
      */
     public static int findAvailableTcpPort(int minPortRange, int maxPortRange) {

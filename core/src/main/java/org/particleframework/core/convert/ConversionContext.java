@@ -146,6 +146,8 @@ public interface ConversionContext extends AnnotatedElement {
      *
      * @param annotatedElement The annotated element
      * @param locale The locale
+     * @param typeVariables The type variables
+     *
      * @return The conversion context
      */
     static ConversionContext of(AnnotatedElement annotatedElement,Map<String,Class> typeVariables, Locale locale) {

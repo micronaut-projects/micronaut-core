@@ -101,6 +101,7 @@ public class NameUtils {
      * Converts camel case to hyphenated, lowercase form
      *
      * @param name The name
+     * @param lowerCase Whether the result should be converted to lower case
      * @return The hyphenated string
      *
      */

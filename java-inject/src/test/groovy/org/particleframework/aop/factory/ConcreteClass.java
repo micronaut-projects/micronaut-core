@@ -23,6 +23,11 @@ import java.util.List;
  * @since 1.0
  */
 public class ConcreteClass {
+    private final AnotherClass anotherClass;
+
+    public ConcreteClass(AnotherClass anotherClass) {
+        this.anotherClass = anotherClass;
+    }
 
     public String test(String name) {
         return "Name is " + name;

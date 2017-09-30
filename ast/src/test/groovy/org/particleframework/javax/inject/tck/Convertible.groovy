@@ -1,6 +1,8 @@
 package org.particleframework.javax.inject.tck
 
+import groovy.transform.PackageScope
 import junit.framework.TestCase
+import org.junit.Ignore
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.javax.inject.tck.accessories.Cupholder
@@ -68,7 +70,7 @@ class Convertible implements Car {
     private static Provider<Tire> staticMethodPlainTireProvider = nullProvider()
     private static Provider<Tire> staticMethodSpareTireProvider = nullProvider()
 
-    @Inject Convertible(
+    @Inject @PackageScope Convertible(
             Seat plainSeat,
             @Drivers Seat driversSeat,
             Tire plainTire,
@@ -87,7 +89,7 @@ class Convertible implements Car {
         constructorSpareTireProvider = spareTireProvider
     }
 
-    Convertible() {
+    @PackageScope Convertible() {
         throw new AssertionError("Unexpected call to non-injectable constructor")
     }
 
@@ -377,10 +379,12 @@ class Convertible implements Car {
             assertFalse(spareTire.methodInjectedBeforeFields)
         }
 
+        // TODO: FIXME
         void testSupertypeMethodsInjectedBeforeSubtypeFields() {
             assertFalse(spareTire.subtypeFieldInjectedBeforeSupertypeMethods)
         }
 
+        // TODO: FIXME
         void testSupertypeMethodInjectedBeforeSubtypeMethods() {
             assertFalse(spareTire.subtypeMethodInjectedBeforeSupertypeMethods)
         }
@@ -481,6 +485,7 @@ class Convertible implements Car {
             assertFalse(engine.superPackagePrivateMethodInjected)
         }
 
+        // TODO: FIXME
         void testPrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
             assertTrue(spareTire.subPrivateMethodForOverrideInjected)
         }

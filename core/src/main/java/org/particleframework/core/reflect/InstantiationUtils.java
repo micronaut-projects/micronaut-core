@@ -18,6 +18,7 @@ public class InstantiationUtils {
      * Try to instantiate the given class
      *
      * @param name The class name
+     * @param classLoader The class loader to use
      * @return The instantiated instance or {@link Optional#empty()}
      */
     public static Optional<?> tryInstantiate(String name, ClassLoader classLoader) {
@@ -47,6 +48,7 @@ public class InstantiationUtils {
      * Try to instantiate the given class
      *
      * @param type The type
+     * @param args The arguments to the constructor
      * @param <T> The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
@@ -62,7 +64,7 @@ public class InstantiationUtils {
      * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
      *
      * @param type The type
-     * @param <T>
+     * @param <T> The generic type
      * @return The instantiated instance
      * @throws InstantiationException When an error occurs
      */
