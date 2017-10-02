@@ -483,7 +483,6 @@ class Convertible implements Car {
             assertFalse(engine.superPackagePrivateMethodInjected)
         }
 
-        // TODO: FIXME
         void testPrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
             assertTrue(spareTire.subPrivateMethodForOverrideInjected)
         }

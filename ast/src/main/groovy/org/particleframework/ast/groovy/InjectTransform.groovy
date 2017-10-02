@@ -7,6 +7,7 @@ import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -270,7 +271,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 void accept(MethodNode methodNode) {
                     Map<String, Object> targetMethodParamsToType = [:]
                     Map<String, Object> targetMethodQualifierTypes = [:]
-                    Map<String, List<Object>> targetMethodGenericTypeMap = [:]
+                    Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
                     Object resolvedReturnType = resolveTypeReference(methodNode.returnType)
                     List<Object> resolvedGenericTypes = resolveGenericTypes(methodNode.returnType)
                     populateParameterData(
@@ -326,7 +327,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> qualifierTypes = [:]
-                Map<String, List<Object>> genericTypeMap = [:]
+                Map<String, Map<String,Object>> genericTypeMap = [:]
                 populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                 beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
@@ -364,7 +365,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         void accept(MethodNode targetBeanMethodNode) {
                             Map<String, Object> targetMethodParamsToType = [:]
                             Map<String, Object> targetMethodQualifierTypes = [:]
-                            Map<String, List<Object>> targetMethodGenericTypeMap = [:]
+                            Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
                             Object resolvedReturnType = resolveTypeReference(targetBeanMethodNode.returnType)
                             List<Object> resolvedGenericTypes = resolveGenericTypes(targetBeanMethodNode.returnType)
                             populateParameterData(
@@ -452,7 +453,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]
-                        Map<String, List<Object>> genericTypeMap = [:]
+                        Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         if (stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
@@ -498,7 +499,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]
-                        Map<String, List<Object>> genericTypeMap = [:]
+                        Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         beanWriter.visitExecutableMethod(
@@ -590,7 +591,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (constructorNode != null) {
                     Map<String, Object> constructorParamsToType = [:]
                     Map<String, Object> constructorQualifierTypes = [:]
-                    Map<String, List<Object>> constructorGenericTypeMap = [:]
+                    Map<String, Map<String, Object>> constructorGenericTypeMap = [:]
                     Parameter[] parameters = constructorNode.parameters
                     populateParameterData(parameters,
                             constructorParamsToType,
@@ -690,18 +691,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Object qualifier = resolveQualifier(fieldNode)
 
                 ClassNode fieldType = fieldNode.type
+
                 GenericsType[] genericsTypes = fieldType.genericsTypes
-                List<Object> genericTypeList = null
+                Map<String, Object> genericTypeList = null
                 if (genericsTypes != null && genericsTypes.length > 0) {
-                    genericTypeList = []
-                    for (genericType in genericsTypes) {
-                        if (!genericType.isPlaceholder()) {
-                            genericTypeList.add(resolveTypeReference(genericType.type))
-                        }
-                    }
+                    genericTypeList = buildGenericTypeInfo(fieldType)
                 } else if (fieldType.isArray()) {
-                    genericTypeList = []
-                    genericTypeList.add(resolveTypeReference(fieldType.componentType))
+                    genericTypeList = [:]
+                    genericTypeList.put(fieldNode.name,resolveTypeReference(fieldType.componentType))
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
                 if(!beanWriter.isValidated()) {
@@ -794,7 +791,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if (constructorNode != null) {
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]
-                        Map<String, List<Object>> genericTypeMap = [:]
+                        Map<String, Map<String, Object>> genericTypeMap = [:]
                         Parameter[] parameters = constructorNode.parameters
                         populateParameterData(parameters, paramsToType, qualifierTypes, genericTypeMap)
                         beanWriter.visitBeanDefinitionConstructor(paramsToType, qualifierTypes, genericTypeMap)
@@ -842,7 +839,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             constructorNode
         }
 
-        private void populateParameterData(Parameter[] parameters, Map<String, Object> paramsToType, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypeMap) {
+        private void populateParameterData(Parameter[] parameters, Map<String, Object> paramsToType, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypeMap) {
             for (param in parameters) {
                 ClassNode parameterType = param.type
                 String parameterName = param.name
@@ -859,19 +856,43 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 GenericsType[] genericsTypes = parameterType.genericsTypes
                 if (genericsTypes != null && genericsTypes.length > 0) {
-                    List<Object> genericTypeList = []
-                    genericTypeMap.put(parameterName, genericTypeList)
-                    for (genericType in genericsTypes) {
-                        if (!genericType.isPlaceholder()) {
-                            genericTypeList.add(resolveTypeReference(genericType.type))
-                        }
-                    }
+                    Map<String, Object> resolvedGenericTypes = buildGenericTypeInfo(parameterType)
+                    genericTypeMap.put(parameterName, resolvedGenericTypes)
                 } else if (parameterType.isArray()) {
-                    List<Object> genericTypeList = []
-                    genericTypeList.add(resolveTypeReference(parameterType.componentType))
+                    Map<String, Object> genericTypeList = [:]
+                    genericTypeList.put('E',resolveTypeReference(parameterType.componentType))
                     genericTypeMap.put(parameterName, genericTypeList)
                 }
             }
+        }
+
+        protected Map<String, Object> buildGenericTypeInfo(ClassNode parameterType) {
+            Map<String, Object> resolvedGenericTypes = [:]
+            Map<String, GenericsType> placeholders = GenericsUtils.extractPlaceholders(parameterType)
+            for (entry in placeholders) {
+                GenericsType gt = entry.value
+                if (!gt.isPlaceholder()) {
+                    resolvedGenericTypes.put(entry.key, resolveTypeReference(gt.type))
+                } else if (gt.isWildcard()) {
+                    ClassNode[] upperBounds = gt.upperBounds
+                    if (upperBounds != null && upperBounds.length == 1) {
+                        resolvedGenericTypes.put(entry.key, resolveTypeReference(upperBounds[0]))
+                        continue
+                    }
+
+                    ClassNode lowerBounds = gt.lowerBound
+                    if (lowerBounds != null) {
+                        resolvedGenericTypes.put(entry.key, resolveTypeReference(lowerBounds))
+                        continue
+                    }
+
+                    resolvedGenericTypes.put(entry.key, Object.class)
+                } else {
+                    resolvedGenericTypes.put(entry.key, Object.class)
+                }
+
+            }
+            resolvedGenericTypes
         }
 
 

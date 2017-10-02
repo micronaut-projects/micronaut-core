@@ -16,6 +16,7 @@
 package org.particleframework.core.convert;
 
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.type.Argument;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -46,7 +47,7 @@ public interface ConversionContext extends AnnotatedElement {
      *
      * @return A map of type variables
      */
-    default Map<String, Class> getTypeVariables() {
+    default Map<String, Argument<?>> getTypeVariables() {
         return Collections.emptyMap();
     }
 
@@ -85,10 +86,10 @@ public interface ConversionContext extends AnnotatedElement {
      * @param typeVariables The type variables
      * @return The conversion context
      */
-    static ConversionContext of(Map<String, Class> typeVariables) {
+    static ConversionContext of(Map<String, Argument<?>> typeVariables) {
         return new ConversionContext() {
             @Override
-            public Map<String, Class> getTypeVariables() {
+            public Map<String, Argument<?>> getTypeVariables() {
                 return typeVariables;
             }
         };
@@ -150,7 +151,7 @@ public interface ConversionContext extends AnnotatedElement {
      *
      * @return The conversion context
      */
-    static ConversionContext of(AnnotatedElement annotatedElement,Map<String,Class> typeVariables, Locale locale) {
+    static ConversionContext of(AnnotatedElement annotatedElement,Map<String,Argument<?>> typeVariables, Locale locale) {
         return new ConversionContext() {
             @Override
             public Locale getLocale() {
@@ -158,7 +159,7 @@ public interface ConversionContext extends AnnotatedElement {
             }
 
             @Override
-            public Map<String, Class> getTypeVariables() {
+            public Map<String, Argument<?>> getTypeVariables() {
                 return typeVariables;
             }
 

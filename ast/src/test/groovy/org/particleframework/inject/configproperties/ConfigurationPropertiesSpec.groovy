@@ -34,8 +34,8 @@ class ConfigurationPropertiesSpec extends Specification {
 
         config.anotherPort == 9090
         config.intList == [1,2,3]
-        config.flags == [one:1, two:2]
         config.urlList == [new URL('http://test.com'),new URL('http://test2.com')]
+        config.flags == [one:1, two:2]
         config.urlList2 == [new URL('http://test.com'),new URL('http://test2.com')]
         config.stringList == ["1", "2"]
         config.emptyList == null

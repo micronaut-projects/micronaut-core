@@ -70,13 +70,10 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      *
      * @param method     The method to call
      * @param arguments  The arguments
-     * @param qualifiers The qualifiers
      */
     @Internal
     protected AbstractBeanDefinition(Method method,
-                                     Map<String, Class> arguments,
-                                     Map<String, Class> qualifiers,
-                                     Map<String, List<Class>> genericTypes) {
+                                     Argument...arguments) {
         this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations());
         this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()) != null;
         this.type = (Class<T>) method.getReturnType();
@@ -87,18 +84,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         };
         this.provided = method.getAnnotation(Provided.class) != null;
         this.isConfigurationProperties = false;
-        LinkedHashMap<String, Annotation> qualifierMap = null;
-        if (qualifiers != null) {
-            qualifierMap = new LinkedHashMap<>();
-            populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, method.getParameterAnnotations());
-        }
         this.constructor = new MethodConstructorInjectionPoint(
                 this,
                 method,
                 Modifier.isPrivate(method.getModifiers()),
-                arguments,
-                qualifierMap,
-                genericTypes);
+                arguments);
     }
 
     @Internal
@@ -106,21 +96,14 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                                      boolean singleton,
                                      Class<T> type,
                                      Constructor<T> constructor,
-                                     Map<String, Class> arguments,
-                                     Map<String, Class> qualifiers,
-                                     Map<String, List<Class>> genericTypes) {
+                                     Argument...arguments) {
         this.scope = scope;
         this.annotatedElements = new AnnotatedElement[] { type };
         this.singleton = singleton;
         this.type = type;
         this.provided = type.getAnnotation(Provided.class) != null;
         this.isConfigurationProperties = isConfigurationProperties(type);
-        LinkedHashMap<String, Annotation> qualifierMap = null;
-        if (qualifiers != null) {
-            qualifierMap = new LinkedHashMap<>();
-            populateQualifiersFromParameterAnnotations(arguments, qualifiers, qualifierMap, constructor.getParameterAnnotations());
-        }
-        this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments, qualifierMap, genericTypes);
+        this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
     }
 
 
@@ -286,12 +269,10 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      */
     protected AbstractBeanDefinition addInjectionPoint(
             Method method,
-            Map<String, Class> arguments,
-            Map<String, Class> qualifiers,
-            Map<String, List<Class>> genericTypes,
+            Argument[] arguments,
             boolean requiresReflection) {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, methodInjectionPoints);
+        return addMethodInjectionPointInternal(null, method, arguments, requiresReflection, methodInjectionPoints);
     }
 
 
@@ -304,27 +285,16 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     protected AbstractBeanDefinition addInjectionPoint(
             Field field,
             Method setter,
-            Annotation qualifier,
-            List<Class> genericTypes,
+            Argument argument,
             boolean requiresReflection) {
 
-        Map<String, Annotation> qualifiers = null;
-        Map<String, List<Class>> genericTypeMap = null;
-        String fieldName = field.getName();
-        if (qualifier != null) {
-            qualifiers = Collections.singletonMap(fieldName, qualifier);
-        }
-        if (genericTypes != null) {
-            genericTypeMap = Collections.singletonMap(fieldName, genericTypes);
-        }
         DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(
                 this,
                 field,
                 setter,
                 requiresReflection,
-                Collections.singletonMap(fieldName, field.getType()),
-                qualifiers,
-                genericTypeMap);
+                argument
+                );
         requiredComponents.add(field.getType());
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
@@ -335,18 +305,14 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      *
      * @param method             The method
      * @param arguments          The arguments
-     * @param qualifiers         The qualifiers
-     * @param genericTypes       The generic types
      * @param requiresReflection Whether the method requires reflection
      * @return This bean definition
      */
     @Internal
     protected AbstractBeanDefinition addPostConstruct(Method method,
-                                                      LinkedHashMap<String, Class> arguments,
-                                                      Map<String, Class> qualifiers,
-                                                      Map<String, List<Class>> genericTypes,
+                                                      Argument[] arguments,
                                                       boolean requiresReflection) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, postConstructMethods);
+        return addMethodInjectionPointInternal(null, method, arguments, requiresReflection, postConstructMethods);
     }
 
     /**
@@ -354,18 +320,14 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      *
      * @param method             The method
      * @param arguments          The arguments
-     * @param qualifiers         The qualifiers
-     * @param genericTypes       The generic types
      * @param requiresReflection Whether the method requires reflection
      * @return This bean definition
      */
     @Internal
     protected AbstractBeanDefinition addPreDestroy(Method method,
-                                                   LinkedHashMap<String, Class> arguments,
-                                                   Map<String, Class> qualifiers,
-                                                   Map<String, List<Class>> genericTypes,
+                                                   Argument[] arguments,
                                                    boolean requiresReflection) {
-        return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, preDestroyMethods);
+        return addMethodInjectionPointInternal(null, method, arguments, requiresReflection, preDestroyMethods);
     }
 
     /**
@@ -555,7 +517,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                     return context.createBean(argumentType);
                 } else {
                     String argumentName = argument.getName();
-                    Class[] genericTypes = argument.getGenericTypes();
+                    Map<String,Argument<?>> genericTypes = argument.getTypeVariables();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
@@ -889,11 +851,25 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 Class<?> beanType = injectionPoint.getDeclaringBean().getType();
                 Class<?> declaringClass = field.getDeclaringClass();
                 String valString = resolveValueString(declaringClass, beanType, injectionPoint.getName(), valueAnn);
-                Optional value = resolveValue((ApplicationContext) context, injectionPoint, fieldType, valString, GenericTypeUtils.resolveGenericTypeArguments(field));
+                Class[] typeArguments = GenericTypeUtils.resolveGenericTypeArguments(field);
+                Map<String, Argument<?>> arguments = Collections.emptyMap();
+                if(typeArguments != null && typeArguments.length > 0) {
+                    TypeVariable<? extends Class<?>>[] typeParameters = field.getType().getTypeParameters();
+                    if(typeParameters.length == typeArguments.length) {
+                        arguments = new LinkedHashMap<>();
+                        for (int i = 0; i < typeParameters.length; i++) {
+                            TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
+                            String name = typeParameter.getName();
+                            arguments.put(name, Argument.create(typeArguments[i], name));
+                        }
+                    }
+                }
+                Optional value = resolveValue((ApplicationContext) context, injectionPoint, fieldType, valString, arguments);
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
                 } else {
                     if (isConfigurationProperties && valueAnn == null) {
+                        Map<String, Argument<?>> finalArguments = arguments;
                         return value.orElseGet(() -> {
                             String cliOption = resolveCliOption(declaringClass, field.getName());
                             if (cliOption != null) {
@@ -901,7 +877,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                                         injectionPoint,
                                         fieldType,
                                         cliOption,
-                                        GenericTypeUtils.resolveGenericTypeArguments(field))
+                                        finalArguments)
                                         .orElse(defaultValue);
                             } else {
                                 return defaultValue;
@@ -1015,7 +991,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, AnnotatedElement annotatedElement, Class type, String valString, Class... genericTypes) {
+    private Optional resolveValue(ApplicationContext context, AnnotatedElement annotatedElement, Class type, String valString, Map<String, Argument<?>> genericTypes) {
 
         int i = valString.indexOf(':');
         Object defaultValue = null;
@@ -1026,18 +1002,10 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
         Optional value;
 
-        TypeVariable[] typeParameters = type.getTypeParameters();
-        Map<String, Class> typeParameterMap = new HashMap<>();
-        if (typeParameters.length == genericTypes.length) {
-            for (int j = 0; j < typeParameters.length; j++) {
-                TypeVariable typeParameter = typeParameters[j];
-                typeParameterMap.put(typeParameter.getName(), genericTypes[j]);
-            }
-        }
 
         ConversionContext conversionContext = ConversionContext.of(
                 annotatedElement,
-                typeParameterMap,
+                genericTypes,
                 Locale.ENGLISH
         );
         value = context.getProperty(valString, (Class<?>) type, conversionContext);
@@ -1151,9 +1119,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     private AbstractBeanDefinition addMethodInjectionPointInternal(
             Field field,
             Method method,
-            Map<String, Class> arguments,
-            Map<String, Class> qualifierTypes,
-            Map<String, List<Class>> genericTypes,
+            Argument[] arguments,
             boolean requiresReflection,
             Collection<MethodInjectionPoint> methodInjectionPoints) {
         if (!hasPreDestroyMethods && method.getAnnotation(PreDestroy.class) != null) {
@@ -1163,24 +1129,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             hasPostConstructMethods = true;
         }
 
-        LinkedHashMap<String, Annotation> qualifiers = null;
-        if (qualifierTypes != null && !qualifierTypes.isEmpty()) {
-            qualifiers = new LinkedHashMap<>();
-            if (field != null) {
-                Map.Entry<String, Class> entry = qualifierTypes.entrySet().iterator().next();
-                Annotation matchingAnnotation = findMatchingAnnotation(field.getAnnotations(), entry.getValue());
-                if (matchingAnnotation != null) {
-                    qualifiers.put(entry.getKey(), matchingAnnotation);
-                } else {
-                    qualifiers.put(entry.getKey(), null);
-                }
-            } else {
-                Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-                populateQualifiersFromParameterAnnotations(arguments, qualifierTypes, qualifiers, parameterAnnotations);
-            }
-
-        }
-        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, requiresReflection, arguments, qualifiers, genericTypes);
+        DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, requiresReflection, arguments);
         for (Argument argument : methodInjectionPoint.getArguments()) {
             requiredComponents.add(argument.getType());
         }
@@ -1227,11 +1176,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             if (argumentType.isArray()) {
                 genericType = argumentType.getComponentType();
             } else {
-                Class[] genericTypes = argument.getGenericTypes();
-                if (genericTypes.length != 1) {
+                Map<String,Argument> genericTypes = argument.getTypeVariables();
+                if (genericTypes.size() != 1) {
                     throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type for argument [" + argument + "] of method [" + injectionPoint.getName() + "]");
                 } else {
-                    genericType = genericTypes[0];
+                    genericType = genericTypes.values().iterator().next().getType();
                 }
             }
             B bean = (B) beanResolver.resolveBean(genericType, qualifier);
@@ -1251,11 +1200,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             if (argumentType.isArray()) {
                 genericType = argumentType.getComponentType();
             } else {
-                Class[] genericTypes = argument.getGenericTypes();
-                if (genericTypes.length != 1) {
+                Map<String,Argument> genericTypes = argument.getTypeVariables();
+                if (genericTypes.size() != 1) {
                     throw new DependencyInjectionException(resolutionContext, argument, "Expected exactly 1 generic type argument to constructor");
                 } else {
-                    genericType = genericTypes[0];
+                    genericType = genericTypes.values().iterator().next().getType();
                 }
             }
             Qualifier qualifier = resolveQualifier(argument);

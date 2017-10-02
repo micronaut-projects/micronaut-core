@@ -2,6 +2,7 @@ package org.particleframework.inject.reader.constructor
 
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.reader.BeanDefinitionReader
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -10,6 +11,7 @@ import javax.inject.Named
 /**
  * Created by graemerocher on 26/05/2017.
  */
+@Ignore
 class BeanDefinitionReaderSpec extends Specification {
 
     void "test read simple constructor def"() {

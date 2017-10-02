@@ -19,7 +19,6 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.inject.annotation.Executable;
@@ -50,25 +49,17 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected AbstractExecutableMethod(Method method,
                                        Class[] genericReturnTypes,
-                                       Map<String, Class> arguments,
-                                       Map<String, Annotation> qualifiers,
-                                       Map<String, List<Class>> genericTypes) {
+                                       Argument...arguments) {
         this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
         this.annotationElements = new AnnotatedElement[] { method, method.getDeclaringClass() };
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
-        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if (index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
-            }
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        });
+        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
     }
 
     protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
-        this(method, genericReturnTypes, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+        this(method, genericReturnTypes, Argument.ZERO_ARGUMENTS);
     }
 
     @Override

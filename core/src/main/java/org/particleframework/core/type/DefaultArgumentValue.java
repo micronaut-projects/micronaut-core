@@ -19,6 +19,7 @@ import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Default implementation of {@link ArgumentValue}
@@ -47,13 +48,13 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public Class[] getGenericTypes() {
-        return argument.getGenericTypes();
+    public Optional<Argument<?>> getFirstTypeVariable() {
+        return argument.getFirstTypeVariable();
     }
 
     @Override
-    public Map<String, Class> getTypeParameters() {
-        return argument.getTypeParameters();
+    public Map<String, Argument<?>> getTypeVariables() {
+        return argument.getTypeVariables();
     }
 
     @Override

@@ -6,6 +6,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
 import java.lang.annotation.Annotation;
@@ -358,9 +359,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, ConversionContext context) -> {
             TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
-            Class targetComponentType = context.getTypeVariables().get(name);
-            if (targetComponentType == null) {
+            Argument<?> arg = context.getTypeVariables().get(name);
+            Class targetComponentType;
+            if (arg  == null) {
                 targetComponentType = Object.class;
+            }
+            else {
+                targetComponentType = arg.getType();
             }
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             String[] strings = object.toString().split(",");
@@ -377,8 +382,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Object.class, Optional.class, (object, targetType, context) -> {
             TypeVariable<Class<Optional>> typeVariable = targetType.getTypeParameters()[0];
             String name = typeVariable.getName();
-            Class targetComponentType = context.getTypeVariables().get(name);
-            if (targetComponentType == null) targetComponentType = Object.class;
+            Argument<?> arg = context.getTypeVariables().get(name);
+            Class targetComponentType;
+            if (arg  == null) {
+                targetComponentType = Object.class;
+            }
+            else {
+                targetComponentType = arg.getType();
+            }
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             Optional converted = convert(object, targetComponentType);
             if (converted.isPresent()) {
@@ -425,13 +436,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 isProperties = true;
             } else if (typeParameters.length == 2) {
 
-                keyType = context.getTypeVariables().get(typeParameters[0].getName());
-                if (keyType == null) {
+                Map<String, Argument<?>> typeVariables = context.getTypeVariables();
+                Argument<?> keyArgument = typeVariables.get(typeParameters[0].getName());
+                if (keyArgument == null) {
                     keyType = String.class;
                 }
-                valueType = context.getTypeVariables().get(typeParameters[1].getName());
-                if (valueType == null) {
+                else {
+                    keyType = keyArgument.getType();
+                }
+                Argument<?> valArg = typeVariables.get(typeParameters[1].getName());
+                if (valArg == null) {
                     valueType = Object.class;
+                }
+                else {
+                    valueType = valArg.getType();
                 }
             }
             Map newMap = isProperties ? new Properties() : new LinkedHashMap();
@@ -495,7 +513,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
             TypeVariable<Class<Iterable>> typeVariable = typeParameters[0];
             String name = typeVariable != null ? typeVariable.getName() : null;
-            return name != null ? context.getTypeVariables().get(name) : null;
+            Argument val = name != null ? context.getTypeVariables().get(name) : null;
+            return val != null ? val.getType() : null;
         }
         return null;
     }

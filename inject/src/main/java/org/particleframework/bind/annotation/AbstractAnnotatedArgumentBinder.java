@@ -52,14 +52,8 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        Map<String,Class> typeParameterMap = argument.getTypeParameters();
-        ConversionContext conversionContext;
-        if(typeParameterMap != null) {
-            conversionContext = ConversionContext.of(argument, typeParameterMap, locale);
-        }
-        else {
-            conversionContext = ConversionContext.of(argument, locale);
-        }
+        Map<String, Argument<?>> typeParameters = argument.getTypeVariables();
+        ConversionContext conversionContext = ConversionContext.of(argument, typeParameters, locale);
         return doConvert(value, argumentType, conversionContext);
     }
 
@@ -84,8 +78,16 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         else if(Map.class.isAssignableFrom(argumentType)) {
             if(isConvertibleValues) {
                 ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
-                Class[] genericTypes = argument.getGenericTypes();
-                Class valueType = genericTypes != null && genericTypes.length == 2 ? genericTypes[1] : Object.class;
+                Map<String, Argument<?>> typeParameters = argument.getTypeVariables();
+
+                Class valueType;
+                if(typeParameters.containsKey("V")) {
+                    valueType = typeParameters.get("V").getType();
+                }
+                else {
+                    valueType = Object.class;
+                }
+
                 value = multiValues.subMap(annotationValue, valueType);
             }
             else if(Arrays.asList("parameters", "params").contains(annotationValue)) {

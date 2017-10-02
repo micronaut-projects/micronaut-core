@@ -3,7 +3,6 @@ package org.particleframework.context;
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.*;
 
 import java.util.*;
@@ -179,7 +178,7 @@ public class DefaultBeanResolutionContext implements BeanResolutionContext {
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
-                    new DefaultArgument(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
+                    Argument.create(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
         }
         @Override
         public String toString() {

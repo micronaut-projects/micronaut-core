@@ -35,8 +35,8 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
         Object body = source.getBody();
         return conversionService.convert(body, argument.getType(), new ConversionContext() {
             @Override
-            public Map<String, Class> getTypeVariables() {
-                return argument.getTypeParameters();
+            public Map<String, Argument<?>> getTypeVariables() {
+                return argument.getTypeVariables();
             }
 
             @Override

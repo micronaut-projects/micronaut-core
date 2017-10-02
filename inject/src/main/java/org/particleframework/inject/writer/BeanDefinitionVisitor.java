@@ -102,13 +102,19 @@ public interface BeanDefinitionVisitor {
      */
     void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes,
                                         Map<String, Object> qualifierTypes,
-                                        Map<String, List<Object>> genericTypes);
+                                        Map<String, Map<String, Object>> genericTypes);
 
     /**
      * Finalize the bean definition to the given output stream
      */
     void visitBeanDefinitionEnd();
 
+    /**
+     * Write the state of the writer to the given compilation directory
+     *
+     * @param compilationDir The compilation directory
+     * @throws IOException If an I/O error occurs
+     */
     void writeTo(File compilationDir) throws IOException;
 
     /**
@@ -127,6 +133,8 @@ public interface BeanDefinitionVisitor {
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
      * @param fieldName          The field name
+     * @param setterName         The setter name
+     * @param genericTypes       The generic types
      */
     void visitSetterInjectionPoint(Object declaringType,
                                    Object qualifierType,
@@ -134,7 +142,7 @@ public interface BeanDefinitionVisitor {
                                    Object fieldType,
                                    String fieldName,
                                    String setterName,
-                                   List<Object> genericTypes);
+                                   Map<String, Object> genericTypes);
 
     /**
      * Visits an injection point for a field and setter pairing.
@@ -144,6 +152,9 @@ public interface BeanDefinitionVisitor {
      * @param requiresReflection Whether the setter requires reflection
      * @param fieldType          The field type
      * @param fieldName          The field name
+     * @param setterName         The setter name
+     * @param genericTypes       The generic types
+     * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(Object declaringType,
                           Object qualifierType,
@@ -151,7 +162,7 @@ public interface BeanDefinitionVisitor {
                           Object fieldType,
                           String fieldName,
                           String setterName,
-                          List<Object> genericTypes,
+                          Map<String, Object> genericTypes,
                           boolean isOptional);
 
     /**
@@ -171,7 +182,7 @@ public interface BeanDefinitionVisitor {
                                   String methodName,
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
-                                  Map<String, List<Object>> genericTypes);
+                                  Map<String, Map<String, Object>> genericTypes);
 
     /**
      * Visits a method injection point
@@ -190,7 +201,7 @@ public interface BeanDefinitionVisitor {
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, Object> qualifierTypes,
-                               Map<String, List<Object>> genericTypes);
+                               Map<String, Map<String, Object>> genericTypes);
 
     /**
      * Visits a method injection point
@@ -209,7 +220,7 @@ public interface BeanDefinitionVisitor {
                                    String methodName,
                                    Map<String, Object> argumentTypes,
                                    Map<String, Object> qualifierTypes,
-                                   Map<String, List<Object>> genericTypes);
+                                   Map<String, Map<String, Object>> genericTypes);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection
@@ -229,7 +240,7 @@ public interface BeanDefinitionVisitor {
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, Object> qualifierTypes,
-                               Map<String, List<Object>> genericTypes);
+                               Map<String, Map<String, Object>> genericTypes);
 
     /**
      * Visits a field injection point

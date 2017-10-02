@@ -1,6 +1,7 @@
 package org.particleframework.core.convert
 
 import org.particleframework.core.convert.format.ReadableBytes
+import org.particleframework.core.type.Argument
 import spock.lang.Specification
 
 import java.lang.reflect.Field
@@ -50,10 +51,10 @@ class DefaultConversionServiceSpec extends Specification {
         conversionService.convert(sourceObject, targetType, ConversionContext.of(typeArguments)).get() == result
 
         where:
-        sourceObject | targetType | typeArguments | result
-        "1,2"        | List       | [E: Integer]  | [1, 2]
-        "1,2"        | Iterable   | [T: Long]     | [1l, 2l]
-        "1"          | Optional   | [T: Long]     | Optional.of(1L)
+        sourceObject | targetType | typeArguments                      | result
+        "1,2"        | List       | [E: Argument.create(Integer, 'E')] | [1, 2]
+        "1,2"        | Iterable   | [T: Argument.create(Long, 'T')]    | [1l, 2l]
+        "1"          | Optional   | [T: Argument.create(Long, 'T')]    | Optional.of(1L)
 
     }
 

@@ -3,6 +3,7 @@ package org.particleframework.configuration.hibernate.validator
 import groovy.transform.CompileStatic
 import org.particleframework.context.env.Environment
 import org.particleframework.core.convert.ConversionContext
+import org.particleframework.core.type.Argument
 
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -34,7 +35,7 @@ class ValidatorFactoryProvider implements Provider<ValidatorFactory> {
         if(environment.isPresent()) {
             Environment env = environment.get()
             Optional<Map<String,String>> config = env.getProperty("hibernate.validator", Map,
-                    ConversionContext.of([K:String, V:String])
+                    ConversionContext.of([K:Argument.create(String, "K"), V:Argument.create(String, "V")])
             )
             if(config.isPresent()) {
                 for(entry in config.get()) {

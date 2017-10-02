@@ -2,6 +2,7 @@ package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
@@ -15,6 +16,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 
 import javax.inject.Singleton;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -65,10 +67,13 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                 }
                 subscriber.onComplete((body) -> {
                             if (!future.isCompletedExceptionally()) {
-                                Class[] genericTypes = argument.getGenericTypes();
-                                if (genericTypes != null && genericTypes.length > 0) {
-                                    Class targetType = genericTypes[0];
-                                    Optional converted = conversionService.convert(body, targetType);
+                                Optional<Argument<?>> firstTypeParameter = argument.getFirstTypeVariable();
+                                if (firstTypeParameter.isPresent()) {
+                                    Argument<?> arg = firstTypeParameter.get();
+                                    Class targetType = arg.getType();
+                                    Optional converted = conversionService.convert(body, targetType, ConversionContext.of(
+                                            arg.getTypeVariables()
+                                    ));
                                     if (converted.isPresent()) {
                                         future.complete(converted.get());
                                     } else {

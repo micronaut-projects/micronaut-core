@@ -19,12 +19,12 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
+import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -47,18 +47,27 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
         this.beanDefinition = beanDefinition;
         this.method = method;
         this.method.setAccessible(true);
-        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        Map<String, Class> arguments = new LinkedHashMap<>();
-        Map<String, Annotation> qualifiers = new LinkedHashMap<>();
-        Map<String, List<Class>> genericTypes = new LinkedHashMap<>();
 
-        buildReflectionMetadata(method, arguments, genericTypes);
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if(index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        if(parameterTypes.length > 0) {
+
+            Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+            List<Argument> arguments = new ArrayList<>(parameterTypes.length);
+
+            for (int i = 0; i < parameterTypes.length; i++) {
+                Annotation ann = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i]);
+                arguments.add(Argument.create(
+                        method,
+                        "arg" + i,
+                        i,
+                        ann != null ? ann.annotationType() : null
+                ));
             }
-            return new Annotation[0];
-        });
+            this.arguments = arguments.toArray(new Argument[arguments.size()]);
+        }
+        else {
+            this.arguments =  Argument.ZERO_ARGUMENTS;
+        }
     }
 
     @Override
