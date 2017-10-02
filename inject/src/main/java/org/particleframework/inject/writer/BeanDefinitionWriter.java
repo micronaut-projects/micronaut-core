@@ -52,17 +52,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(CollectionUtils.class, "createMap", Object[].class).orElseThrow(() ->
             new IllegalStateException("CollectionUtils.createMap(..) method not found. Incompatible version of Particle on the classpath?")
     );
-    private static final Method INJECT_BEAN_FIELDS_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBeanFields", BeanResolutionContext.class, DefaultBeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.injectBeanFields(..) method not found. Incompatible version of Particle on the classpath?")
-    );
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
     );
     private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.preDestroy(..) method not found. Incompatible version of Particle on the classpath?")
-    );
-    private static final Method INJECT_BEAN_METHODS_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBeanMethods", BeanResolutionContext.class, DefaultBeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.injectBeanMethods(..) method not found. Incompatible version of Particle on the classpath?")
     );
 
     private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Annotation.class, boolean.class).orElseThrow(() ->
@@ -884,6 +878,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     declaringTypeRef.getInternalName(), methodName,
                     methodDescriptor, false);
         }
+        else {
+            // otherwise use injectBeanMethod instead which triggers reflective injection
+            pushInjectMethodForIndex(injectMethodVisitor, injectInstanceIndex, currentMethodIndex, "injectBeanMethod");
+        }
 
         // increment the method index
         currentMethodIndex++;
@@ -1036,6 +1034,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             injectMethodVisitor.visitFieldInsn(PUTFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
         }
+        else {
+            // if reflection is required at reflective call
+            pushInjectMethodForIndex(injectMethodVisitor, injectInstanceIndex, currentFieldIndex, "injectBeanField");
+        }
         currentFieldIndex++;
     }
 
@@ -1093,7 +1095,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
             injectInstanceIndex = pushNewInjectLocalVariable();
 
-            invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_FIELDS_METHOD);
         }
     }
 
@@ -1117,6 +1118,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             pushCastToType(buildMethodVisitor, beanFullClassName);
             buildMethodVisitor.visitVarInsn(ASTORE, buildInstanceIndex);
         }
+    }
+
+    private void pushInjectMethodForIndex(MethodVisitor methodVisitor, int instanceIndex, int injectIndex, String injectMethodName) {
+        Method injectBeanMethod = ReflectionUtils.getRequiredMethod(AbstractBeanDefinition.class, injectMethodName, BeanResolutionContext.class, DefaultBeanContext.class, int.class, Object.class);
+        // load 'this'
+        methodVisitor.visitVarInsn(ALOAD, 0);
+        // 1st argument load BeanResolutionContext
+        methodVisitor.visitVarInsn(ALOAD, 1);
+        // 2nd argument load BeanContext
+        methodVisitor.visitVarInsn(ALOAD, 2);
+        pushCastToType(methodVisitor, DefaultBeanContext.class);
+        // 3rd argument the method index
+        pushIntegerConstant(methodVisitor, injectIndex);
+        // 4th argument: the instance being injected
+        methodVisitor.visitVarInsn(ALOAD, instanceIndex);
+
+        pushInvokeMethodOnSuperClass(methodVisitor, injectBeanMethod);
     }
 
     private void visitPreDestroyMethodDefinition() {
@@ -1165,8 +1183,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void finalizeInjectMethod() {
-        invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHODS_METHOD);
-
         injectMethodVisitor.visitVarInsn(ALOAD, 3);
         injectMethodVisitor.visitInsn(ARETURN);
     }

@@ -2,7 +2,6 @@ package org.particleframework.context;
 
 import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.config.PropertyResolver;
-import org.particleframework.context.annotation.Configuration;
 import org.particleframework.context.annotation.Provided;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.context.event.BeanInitializedEventListener;
@@ -230,6 +229,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     }
 
     @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return annotatedElements;
+    }
+
+    @Override
     public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
         return (T) injectBean(resolutionContext, context, bean);
     }
@@ -246,6 +250,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return this;
     }
 
+
     /**
      * Adds an injection point for a field. Typically called by a dynamically generated subclass.
      *
@@ -258,7 +263,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this, field, qualifier, requiresReflection));
         return this;
     }
-
 
     /**
      * Adds an injection point for a field. Typically called by a dynamically generated subclass.
@@ -288,6 +292,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         Collection<MethodInjectionPoint> methodInjectionPoints = this.methodInjectionPoints;
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, methodInjectionPoints);
     }
+
 
     /**
      * Adds an injection point for a setter and field to be set. Typically called by a dynamically generated subclass.
@@ -323,7 +328,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
     }
-
 
     /**
      * Adds a post construct method definition
@@ -363,16 +367,16 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return addMethodInjectionPointInternal(null, method, arguments, qualifiers, genericTypes, requiresReflection, preDestroyMethods);
     }
 
+    /**
+     * The default implementation which provides no injection. To be overridden by compile time tooling
+     *
+     * @param resolutionContext The resolution context
+     * @param context The bean context
+     * @param bean The bean
+     * @return The injected bean
+     */
+    @Internal
     protected Object injectBean(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-
-
-        // Inject fields that require reflection
-        injectBeanFields(resolutionContext, defaultContext, bean);
-
-        // Inject methods that require reflection
-        injectBeanMethods(resolutionContext, defaultContext, bean);
-
         return bean;
     }
 
@@ -413,9 +417,10 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             }
 
         }
-        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+        for (int i = 0; i < methodInjectionPoints.size(); i++) {
+            MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
-                injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
+                injectBeanMethod(resolutionContext, defaultContext, i, bean);
             }
         }
         if (bean instanceof LifeCycle) {
@@ -434,65 +439,74 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      */
     protected Object preDestroy(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
-            if (methodInjectionPoint.isPreDestroyMethod() && methodInjectionPoint.requiresReflection()) {
-                injectBeanMethod(resolutionContext, defaultContext, bean, resolutionContext.getPath(), methodInjectionPoint);
+        for (int i = 0; i < methodInjectionPoints.size(); i++) {
+            MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
+            if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
+                injectBeanMethod(resolutionContext, defaultContext, i, bean);
             }
         }
+
         if (bean instanceof LifeCycle) {
             bean = ((LifeCycle) bean).stop();
         }
         return bean;
     }
 
+
     /**
-     * Injects the methods of the bean that require reflection
+     * Inject a bean method that requires reflection
+     *
+     * @param resolutionContext The resolution context
+     * @param context The bean context
+     * @param methodIndex The method index
+     * @param bean The bean
+     */
+    @Internal
+    protected void injectBeanMethod(BeanResolutionContext resolutionContext, DefaultBeanContext context, int methodIndex, Object bean) {
+        MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(methodIndex);
+        Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
+        Object[] methodArgs = new Object[methodArgumentTypes.length];
+        for (int i = 0; i < methodArgumentTypes.length; i++) {
+            methodArgs[i] = getBeanForMethodArgument(resolutionContext, context, methodIndex, i);
+        }
+        try {
+            methodInjectionPoint.invoke(bean, methodArgs);
+        } catch (Throwable e) {
+            throw new BeanInstantiationException(this, e);
+        }
+    }
+
+    /**
+     * Injects the value of a field of a bean that requires reflection
      *
      * @param resolutionContext The resolution context
      * @param context           The bean context
+     * @param index             The index of the field
      * @param bean              The bean being injected
      */
-    protected void injectBeanMethods(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean) {
-        BeanResolutionContext.Path path = resolutionContext.getPath();
-        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
-            if (methodInjectionPoint.requiresReflection() && !methodInjectionPoint.isPostConstructMethod() && !methodInjectionPoint.isPreDestroyMethod()) {
-                injectBeanMethod(resolutionContext, context, bean, path, methodInjectionPoint);
+    @Internal
+    protected void injectBeanField(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object bean) {
+        FieldInjectionPoint fieldInjectionPoint = fieldInjectionPoints.get(index);
+        boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()) != null;
+        try {
+            Object value;
+            if (isInject) {
+                value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
+            } else {
+                value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
+            }
+            if (value != null) {
+                fieldInjectionPoint.set(bean, value);
+            }
+        } catch (Throwable e) {
+            if (e instanceof BeanContextException) {
+                throw (BeanContextException) e;
+            } else {
+                throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
             }
         }
     }
 
-
-    /**
-     * Injects the fields of the bean that require reflection
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param bean              The bean being injected
-     */
-    protected void injectBeanFields(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean) {
-        for (FieldInjectionPoint fieldInjectionPoint : fieldInjectionPoints) {
-            if (fieldInjectionPoint.requiresReflection()) {
-                boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()) != null;
-                try {
-                    Object value;
-                    if (isInject) {
-                        value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
-                    } else {
-                        value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
-                    }
-                    if (value != null) {
-                        fieldInjectionPoint.set(bean, value);
-                    }
-                } catch (Throwable e) {
-                    if (e instanceof BeanContextException) {
-                        throw (BeanContextException) e;
-                    } else {
-                        throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage());
-                    }
-                }
-            }
-        }
-    }
 
     /**
      * Obtains a value for the given method argument
@@ -525,6 +539,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         Argument argument = injectionPoint.getArguments()[argIndex];
         return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, defaultValue);
     }
+
 
     private Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument, Object defaultValue) {
         if (context instanceof ApplicationContext) {
@@ -576,7 +591,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
     }
 
-
     /**
      * Obtains a bean definition for the method at the given index and the argument at the given index
      * <p>
@@ -598,6 +612,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
         }
     }
+
 
     protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
         Class argumentType = argument.getType();
@@ -643,7 +658,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 ((DefaultBeanContext) context).getBeansOfType(resolutionContext, beanType, qualifier)
         );
     }
-
 
     /**
      * Obtains a bean provider for the method at the given index and the argument at the given index
@@ -692,6 +706,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
         );
     }
+
 
     /**
      * Obtains a bean definition for a constructor at the given index
@@ -749,7 +764,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             }
         }
     }
-
 
     /**
      * Obtains a bean provider for a constructor at the given index
@@ -830,6 +844,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return getBeanForField(resolutionContext, context, injectionPoint);
     }
 
+
     /**
      * Obtains a value for the given field from the bean context
      * <p>
@@ -844,7 +859,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
         return getValueForField(resolutionContext, context, fieldIndex, null);
     }
-
 
     /**
      * Obtains a value for the given field from the bean context
@@ -935,6 +949,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
     }
 
+
     /**
      * Obtains a bean definition for the field at the given index and the argument at the given index
      * <p>
@@ -950,7 +965,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier)
         );
     }
-
 
     /**
      * Obtains a an optional for the field at the given index and the argument at the given index
@@ -1252,6 +1266,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
     }
 
+
     private <B> B resolveBeanWithGenericsForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint, BeanResolver<B> beanResolver) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
@@ -1271,7 +1286,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
         }
     }
-
 
     protected static Map createMap(Object[] values) {
         return CollectionUtils.createMap(values);
@@ -1296,6 +1310,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return qualifier;
     }
 
+
     private Qualifier resolveQualifier(Argument argument) {
         Qualifier qualifier = null;
         Annotation ann = argument.getQualifier();
@@ -1314,26 +1329,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
     }
 
-
-    private void injectBeanMethod(BeanResolutionContext resolutionContext, DefaultBeanContext context, Object bean, BeanResolutionContext.Path path, MethodInjectionPoint methodInjectionPoint) {
-        Argument[] methodArgumentTypes = methodInjectionPoint.getArguments();
-        Object[] methodArgs = new Object[methodArgumentTypes.length];
-        for (int i = 0; i < methodArgumentTypes.length; i++) {
-            Argument argument = methodArgumentTypes[i];
-
-            methodArgs[i] = getBeanForMethodArgument(resolutionContext, context, methodInjectionPoint, argument);
-        }
-        try {
-            methodInjectionPoint.invoke(bean, methodArgs);
-        } catch (Throwable e) {
-            throw new BeanInstantiationException(this, e);
-        }
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return annotatedElements;
-    }
 
     private class MethodKey {
         final String name;
@@ -1367,7 +1362,4 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         T resolveBean(Class<T> beanType, Qualifier<T> qualifier);
     }
 
-    protected interface MethodExecutor {
-        Object invoke(Object target, Object... arguments);
-    }
 }
