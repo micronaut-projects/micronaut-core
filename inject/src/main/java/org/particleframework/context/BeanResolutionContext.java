@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
 import java.util.Deque;

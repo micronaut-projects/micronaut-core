@@ -16,7 +16,8 @@
 package org.particleframework.inject;
 
 import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.util.ArrayUtil;
+import org.particleframework.core.type.Executable;
+import org.particleframework.core.type.ReturnType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -24,7 +25,7 @@ import java.lang.reflect.Method;
 import java.util.Set;
 
 /**
- * <p>An invocable method is a compile time produced invocation of a method call. Avoiding the use of reflection and allowing the JIT to optimize the call</p>
+ * <p>An executable method is a compile time produced invocation of a method call. Avoiding the use of reflection and allowing the JIT to optimize the call</p>
  *
  * @author Graeme Rocher
  * @since 1.0

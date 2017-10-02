@@ -15,6 +15,9 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.Executable;
+
 import java.lang.reflect.AnnotatedElement;
 
 /**

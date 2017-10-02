@@ -20,7 +20,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.binding.annotation.Parameter;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 

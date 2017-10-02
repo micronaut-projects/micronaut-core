@@ -1,15 +1,21 @@
-package org.particleframework.inject;
+package org.particleframework.core.type;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.List;
+import java.util.Map;
 
 /**
- * Models a return type of a method in Particle
+ * Represents an argument to a method or constructor or type
  *
- * @param <T> The concrete type
+ * @author Graeme Rocher
+ * @since 1.0
  */
-public interface ReturnType<T> extends AnnotatedElement{
+public interface Argument<T> extends AnnotatedElement {
+    /**
+     * @return The name of the argument
+     */
+    String getName();
+
     /**
      * @return The type of the argument
      */
@@ -18,8 +24,17 @@ public interface ReturnType<T> extends AnnotatedElement{
     /**
      * @return The generic types for the type. For example for Iterable&lt;Foo&gt; this would return an array containing Foo
      */
-    List<Class> getGenericTypes();
+    Class[] getGenericTypes();
 
+    /**
+     * @return Obtain a map of the type parameters for the argument
+     */
+    Map<String,Class> getTypeParameters();
+
+    /**
+     * @return The qualifier or null if there is none
+     */
+    Annotation getQualifier();
 
     /**
      * Obtain an annotation for the given type

@@ -1,7 +1,8 @@
 package org.particleframework.context;
 
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
@@ -9,7 +10,6 @@ import org.particleframework.context.exceptions.BeanInstantiationException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 

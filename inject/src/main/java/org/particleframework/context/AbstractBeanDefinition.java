@@ -15,6 +15,7 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 import org.particleframework.inject.qualifiers.Qualifiers;

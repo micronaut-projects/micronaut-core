@@ -15,7 +15,7 @@
  */
 package org.particleframework.bind;
 
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 

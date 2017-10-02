@@ -17,14 +17,11 @@ package org.particleframework.aop
 
 import groovy.transform.CompileStatic
 import groovyjarjarasm.asm.ClassReader
-import groovyjarjarasm.asm.ClassVisitor
-import groovyjarjarasm.asm.util.ASMifier
-import groovyjarjarasm.asm.util.TraceClassVisitor
 import org.particleframework.aop.internal.InterceptorChain
 import org.particleframework.context.ExecutionHandleLocator
 import org.particleframework.context.annotation.Type
 import org.particleframework.core.order.OrderUtil
-import org.particleframework.inject.Argument
+import org.particleframework.core.type.Argument
 import org.particleframework.inject.ExecutableMethod
 import spock.lang.Specification
 

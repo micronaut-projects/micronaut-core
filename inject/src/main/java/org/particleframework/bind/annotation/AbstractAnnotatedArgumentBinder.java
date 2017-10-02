@@ -17,7 +17,7 @@ package org.particleframework.bind.annotation;
 
 import org.particleframework.core.convert.*;
 import org.particleframework.core.naming.NameUtils;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.lang.annotation.Annotation;
 import java.util.*;

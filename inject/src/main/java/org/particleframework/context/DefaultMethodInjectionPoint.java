@@ -2,7 +2,8 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
 

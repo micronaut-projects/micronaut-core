@@ -15,6 +15,8 @@
  */
 package org.particleframework.bind.annotation;
 
+import org.particleframework.core.type.Argument;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -23,7 +25,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An annotation stereotype for other annotations that indicates a method {@link org.particleframework.inject.Argument} is bindable
+ * An annotation stereotype for other annotations that indicates a method {@link Argument} is bindable
  *
  * @author Graeme Rocher
  * @since 1.0

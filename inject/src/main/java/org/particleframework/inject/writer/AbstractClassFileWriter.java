@@ -3,6 +3,7 @@ package org.particleframework.inject.writer;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.ArrayUtil;
 
@@ -495,7 +496,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
-     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     * Represents a method {@link AnnotationSource} reference
      */
     protected class TypeAnnotationSource {
         final Object declaringType;
@@ -520,7 +521,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
     /**
-     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     * Represents a method {@link AnnotationSource} reference
      */
     protected class MethodAnnotationSource extends TypeAnnotationSource{
         final String methodName;

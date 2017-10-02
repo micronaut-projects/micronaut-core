@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.type.Executable;
+
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 

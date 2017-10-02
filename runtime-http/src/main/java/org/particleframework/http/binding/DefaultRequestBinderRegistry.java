@@ -28,14 +28,13 @@ import org.particleframework.http.binding.binders.request.*;
 import org.particleframework.http.binding.binders.request.DefaultBodyAnnotationBinder;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface

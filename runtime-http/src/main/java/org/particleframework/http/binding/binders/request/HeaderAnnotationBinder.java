@@ -22,8 +22,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.binding.annotation.Header;
-import org.particleframework.http.binding.annotation.Parameter;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 

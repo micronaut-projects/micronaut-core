@@ -1,8 +1,7 @@
-package org.particleframework.context;
+package org.particleframework.core.type;
 
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.Argument;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.TypeVariable;
@@ -10,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Represents an argument to a constructor or method
@@ -18,14 +18,14 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class DefaultArgument<T> implements Argument<T> {
+public class DefaultArgument<T> implements Argument<T> {
     private final Class type;
     private final String name;
     private final Annotation qualifier;
     private final Class[] genericTypes;
     private final Annotation[] annotations;
 
-    DefaultArgument(Class type, String name, Annotation qualifier, Annotation[] annotations, Class...genericTypes) {
+    public DefaultArgument(Class type, String name, Annotation qualifier, Annotation[] annotations, Class...genericTypes) {
         this.type = type;
         this.name = name;
         this.annotations = annotations;
@@ -33,7 +33,7 @@ class DefaultArgument<T> implements Argument<T> {
         this.genericTypes = genericTypes;
     }
 
-    DefaultArgument(Class type, String name, Annotation qualifier,  Class...genericTypes) {
+    public DefaultArgument(Class type, String name, Annotation qualifier,  Class...genericTypes) {
         this.type = type;
         this.name = name;
         this.annotations = new Annotation[0];
@@ -61,36 +61,6 @@ class DefaultArgument<T> implements Argument<T> {
             }
         }
         return typeParameterMap;
-    }
-
-    /**
-     * Builds the arguments from the given maps. A LinkedHashMap is used to maintain the order of the arguments
-     *
-     * @param arguments The arguments
-     * @param qualifiers The qualifiers
-     * @param genericTypes The generic types
-     *
-     * @return The argument array
-     */
-    static Argument[] from(Map<String, Class> arguments,
-                           Map<String, Annotation> qualifiers,
-                           Map<String, List<Class>> genericTypes,
-                           AnnotationResolver annotationResolver) {
-        if(arguments == null) {
-            return new Argument[0];
-        }
-
-        List<Argument> args = new ArrayList<>(arguments.size());
-        int i = 0;
-        for (Map.Entry<String, Class> entry : arguments.entrySet()) {
-            String name = entry.getKey();
-            Annotation[] annotations = annotationResolver.resolveAnnotations(i++);
-            Annotation qualifier = qualifiers != null ? qualifiers.get(name) : null;
-            List<Class> genericTypeList = genericTypes != null ? genericTypes.get(name) : null;
-            Class[] genericsArray = genericTypeList != null ? genericTypeList.toArray(new Class[genericTypeList.size()]) : new Class[0];
-            args.add( new DefaultArgument(entry.getValue(), name, qualifier, annotations, genericsArray));
-        }
-        return args.toArray(new Argument[arguments.size()]);
     }
 
     @Override
@@ -153,12 +123,41 @@ class DefaultArgument<T> implements Argument<T> {
         return annotations;
     }
 
+
+
     @Override
     public Annotation[] getDeclaredAnnotations() {
         return annotations;
     }
 
-    interface AnnotationResolver {
-        Annotation[] resolveAnnotations(int index);
+
+    /**
+     * Builds the arguments from the given maps. A LinkedHashMap is used to maintain the order of the arguments
+     *
+     * @param arguments The arguments
+     * @param qualifiers The qualifiers
+     * @param genericTypes The generic types
+     *
+     * @return The argument array
+     */
+    public static Argument[] from(Map<String, Class> arguments,
+                                  Map<String, Annotation> qualifiers,
+                                  Map<String, List<Class>> genericTypes,
+                                  Function<Integer, Annotation[]> annotationResolver) {
+        if(arguments == null) {
+            return new Argument[0];
+        }
+
+        List<Argument> args = new ArrayList<>(arguments.size());
+        int i = 0;
+        for (Map.Entry<String, Class> entry : arguments.entrySet()) {
+            String name = entry.getKey();
+            Annotation[] annotations = annotationResolver.apply(i++);
+            Annotation qualifier = qualifiers != null ? qualifiers.get(name) : null;
+            List<Class> genericTypeList = genericTypes != null ? genericTypes.get(name) : null;
+            Class[] genericsArray = genericTypeList != null ? genericTypeList.toArray(new Class[genericTypeList.size()]) : new Class[0];
+            args.add( new DefaultArgument(entry.getValue(), name, qualifier, annotations, genericsArray));
+        }
+        return args.toArray(new Argument[arguments.size()]);
     }
 }

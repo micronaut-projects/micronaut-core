@@ -11,7 +11,7 @@ import org.particleframework.http.server.netty.DefaultHttpContentSubscriber;
 import org.particleframework.http.server.netty.HttpContentSubscriber;
 import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
 import org.particleframework.http.server.netty.NettyHttpRequest;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 
 import javax.inject.Singleton;

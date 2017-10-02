@@ -3,10 +3,8 @@ package org.particleframework.http.binding.binders.request;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.MediaType;
 import org.particleframework.http.binding.annotation.Body;
-import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.nio.charset.Charset;
 import java.util.Locale;

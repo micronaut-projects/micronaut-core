@@ -2,6 +2,8 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.*;
 
 import java.util.*;

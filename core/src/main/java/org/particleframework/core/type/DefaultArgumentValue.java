@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.core.type;
 
 import org.particleframework.core.annotation.Internal;
 

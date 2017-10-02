@@ -18,10 +18,11 @@ package org.particleframework.context;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.DefaultArgument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.ReturnType;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
