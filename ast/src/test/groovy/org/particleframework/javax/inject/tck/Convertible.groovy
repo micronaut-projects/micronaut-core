@@ -379,12 +379,10 @@ class Convertible implements Car {
             assertFalse(spareTire.methodInjectedBeforeFields)
         }
 
-        // TODO: FIXME
         void testSupertypeMethodsInjectedBeforeSubtypeFields() {
             assertFalse(spareTire.subtypeFieldInjectedBeforeSupertypeMethods)
         }
 
-        // TODO: FIXME
         void testSupertypeMethodInjectedBeforeSubtypeMethods() {
             assertFalse(spareTire.subtypeMethodInjectedBeforeSupertypeMethods)
         }
