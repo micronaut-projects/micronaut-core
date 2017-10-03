@@ -16,9 +16,9 @@
 package org.particleframework.aop;
 
 import org.particleframework.core.convert.MutableConvertibleValues;
-import org.particleframework.inject.ArgumentValue;
-import org.particleframework.inject.Executable;
-import org.particleframework.inject.MutableArgumentValue;
+import org.particleframework.core.type.ArgumentValue;
+import org.particleframework.core.type.Executable;
+import org.particleframework.core.type.MutableArgumentValue;
 
 import java.util.Map;
 

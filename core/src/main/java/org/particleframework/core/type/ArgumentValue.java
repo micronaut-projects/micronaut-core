@@ -13,31 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.core.type;
 
 /**
- * A mutable version of the {@link ArgumentValue} interface
+ * An {@link Argument} with a value
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableArgumentValue<V> extends ArgumentValue<V> {
+public interface ArgumentValue<V> extends Argument<V> {
     /**
-     * Sets the argument value
-     * @param value The value
-     * @throws IllegalArgumentException If the argument is not a compatible argument
+     * @return The current value of the argument
      */
-    void setValue(V value);
+    V getValue();
 
     /**
-     * Create a new {@link MutableArgumentValue} for the given {@link Argument} and value
+     * Create a new {@link ArgumentValue} for the given {@link Argument} and value
      *
      * @param argument The argument
      * @param value The value
      * @param <T> The value type
      * @return The created instance
      */
-    static <T> MutableArgumentValue<T> create(Argument<T> argument, T value) {
-        return new DefaultMutableArgumentValue<>(argument, value);
+    static <T> ArgumentValue<T> create(Argument<T> argument, T value) {
+        return new DefaultArgumentValue<>(argument, value);
     }
 }

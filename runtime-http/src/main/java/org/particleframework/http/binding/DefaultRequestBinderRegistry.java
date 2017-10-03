@@ -28,14 +28,13 @@ import org.particleframework.http.binding.binders.request.*;
 import org.particleframework.http.binding.binders.request.DefaultBodyAnnotationBinder;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface
@@ -93,10 +92,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     @Override
     public <T> Optional<ArgumentBinder<T, HttpRequest>> findArgumentBinder(Argument<T> argument, HttpRequest source) {
-        Annotation annotation = argument.findAnnotation(Bindable.class);
-        if(annotation != null) {
-
-            Class<? extends Annotation> annotationType = annotation.annotationType();
+        Optional<Annotation> annotation = argument.findAnnotationWithStereoType(Bindable.class);
+        if(annotation.isPresent()) {
+            Class<? extends Annotation> annotationType = annotation.get().annotationType();
             RequestArgumentBinder<T> binder = byTypeAndAnnotation.get(new TypeAndAnnotation(argument.getType(), annotationType));
             if(binder ==  null) {
                 binder = byAnnotation.get(annotationType);

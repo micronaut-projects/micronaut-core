@@ -1,9 +1,9 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;

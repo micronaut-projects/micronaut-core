@@ -1,11 +1,11 @@
 package org.particleframework.configuration.jackson.convert;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.type.Argument;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;
@@ -30,8 +30,8 @@ public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, It
 
     @Override
     public Optional<Iterable> convert(ArrayNode node, Class<Iterable> targetType, ConversionContext context) {
-            Map<String, Class> typeVariables = context.getTypeVariables();
-            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next();
+            Map<String, Argument<?>> typeVariables = context.getTypeVariables();
+            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             List results = new ArrayList();
             node.elements().forEachRemaining(jsonNode -> {
                 Optional converted = conversionService.convert(jsonNode, elementType);

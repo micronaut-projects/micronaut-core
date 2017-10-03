@@ -6,6 +6,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
 import java.lang.annotation.Annotation;
@@ -70,8 +71,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             typeConverter = findTypeConverter(sourceType, targetType, formattingType);
             if (typeConverter == null) {
                 return Optional.empty();
-            }
-            else {
+            } else {
                 converterCache.put(pair, typeConverter);
             }
         }
@@ -241,9 +241,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class,(CharSequence object, Class<Locale> targetType, ConversionContext context) -> {
+        addConverter(CharSequence.class, Locale.class, (CharSequence object, Class<Locale> targetType, ConversionContext context) -> {
             try {
-                return Optional.of(Locale.forLanguageTag(object.toString().replace('_','-')));
+                return Optional.of(Locale.forLanguageTag(object.toString().replace('_', '-')));
             } catch (IllegalArgumentException e) {
                 return Optional.empty();
             }
@@ -356,17 +356,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // String -> List/Iterable
         addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, ConversionContext context) -> {
-            TypeVariable<Class<Iterable>> typeVariable = targetType.getTypeParameters()[0];
-            String name = typeVariable.getName();
-            Class targetComponentType = context.getTypeVariables().get(name);
-            if (targetComponentType == null) {
-                targetComponentType = Object.class;
-            }
+            Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
+            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
+
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             String[] strings = object.toString().split(",");
             List list = new ArrayList();
             for (String string : strings) {
-                Optional converted = convert(string, targetComponentType);
+                Optional converted = convert(string, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
                 }
@@ -375,12 +373,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         addConverter(Object.class, Optional.class, (object, targetType, context) -> {
-            TypeVariable<Class<Optional>> typeVariable = targetType.getTypeParameters()[0];
-            String name = typeVariable.getName();
-            Class targetComponentType = context.getTypeVariables().get(name);
-            if (targetComponentType == null) targetComponentType = Object.class;
+            Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
+            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
+
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
-            Optional converted = convert(object, targetComponentType);
+            Optional converted = convert(object, targetComponentType, newContext);
             if (converted.isPresent()) {
                 return Optional.of(converted);
             } else {
@@ -390,25 +388,26 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
-            Class targetComponentType = resolveComponentTypeForIterable(targetType, context);
+            Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
+            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
             if (targetType.isInstance(object)) {
-                if (targetComponentType == null) {
+                if(targetComponentType == Object.class) {
                     return Optional.of(object);
-                } else {
-                    List list = new ArrayList();
-                    for (Object o : object) {
-                        Optional converted = convert(o, targetComponentType);
-                        if (converted.isPresent()) {
-                            list.add(converted.get());
-                        }
-                    }
-                    return CollectionUtils.convertCollection((Class) targetType, list);
                 }
+                List list = new ArrayList();
+                for (Object o : object) {
+                    Optional converted = convert(o, targetComponentType, newContext);
+                    if (converted.isPresent()) {
+                        list.add(converted.get());
+                    }
+                }
+                return CollectionUtils.convertCollection((Class) targetType, list);
             } else {
                 targetComponentType = Object.class;
                 List list = new ArrayList();
                 for (Object o : object) {
-                    list.add(convert(o, targetComponentType));
+                    list.add(convert(o, targetComponentType, newContext));
                 }
                 return CollectionUtils.convertCollection((Class) targetType, list);
             }
@@ -420,27 +419,34 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Class keyType = String.class;
             Class valueType = Object.class;
             boolean isProperties = false;
+            ConversionContext keyContext = context;
+            ConversionContext valContext = context;
             if (targetType.equals(Properties.class)) {
                 valueType = String.class;
                 isProperties = true;
             } else if (typeParameters.length == 2) {
 
-                keyType = context.getTypeVariables().get(typeParameters[0].getName());
-                if (keyType == null) {
-                    keyType = String.class;
-                }
-                valueType = context.getTypeVariables().get(typeParameters[1].getName());
-                if (valueType == null) {
-                    valueType = Object.class;
-                }
+                Optional<Argument<?>> keyVar = context.getTypeVariable(typeParameters[0].getName());
+
+                keyType = keyVar
+                        .map(arg -> (Class) arg.getType())
+                        .orElse(String.class);
+                keyContext = keyVar.map(ConversionContext::of).orElse(context);
+
+                Optional<Argument<?>> valVar = context.getTypeVariable(typeParameters[1].getName());
+                valueType = valVar
+                        .map(arg -> (Class) arg.getType())
+                        .orElse(Object.class);
+                valContext = valVar.map(ConversionContext::of).orElse(context);
             }
             Map newMap = isProperties ? new Properties() : new LinkedHashMap();
+
             for (Object o : object.entrySet()) {
                 Map.Entry entry = (Map.Entry) o;
                 Object key = entry.getKey();
                 Object value = entry.getValue();
                 if (!keyType.isInstance(key)) {
-                    Optional convertedKey = convert(key, keyType);
+                    Optional convertedKey = convert(key, keyType, keyContext);
                     if (convertedKey.isPresent()) {
                         key = convertedKey.get();
                     } else {
@@ -448,7 +454,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     }
                 }
                 if (!valueType.isInstance(value)) {
-                    Optional converted = convert(value, valueType);
+                    Optional converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();
                     } else {
@@ -480,25 +486,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair;
-        if(typeConverter instanceof FormattingTypeConverter) {
+        if (typeConverter instanceof FormattingTypeConverter) {
             pair = new ConvertiblePair(sourceType, targetType, ((FormattingTypeConverter) typeConverter).annotationType());
-        }
-        else {
+        } else {
             pair = new ConvertiblePair(sourceType, targetType);
         }
         return pair;
     }
 
-    private Class resolveComponentTypeForIterable(Class<Iterable> targetType, ConversionContext context) {
-        TypeVariable<Class<Iterable>>[] typeParameters = targetType.getTypeParameters();
-        if (typeParameters != null && typeParameters.length > 0) {
-
-            TypeVariable<Class<Iterable>> typeVariable = typeParameters[0];
-            String name = typeVariable != null ? typeVariable.getName() : null;
-            return name != null ? context.getTypeVariables().get(name) : null;
-        }
-        return null;
-    }
 
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, Class<? extends Annotation> formattingAnnotation) {
         TypeConverter typeConverter = null;
@@ -515,7 +510,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
         }
-        if(hasFormatting) {
+        if (hasFormatting) {
             for (Class sourceSuperType : sourceHierarchy) {
                 for (Class targetSuperType : targetHierarchy) {
                     ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);

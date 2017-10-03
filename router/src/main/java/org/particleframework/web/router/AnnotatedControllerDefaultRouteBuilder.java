@@ -23,7 +23,7 @@ import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Action;

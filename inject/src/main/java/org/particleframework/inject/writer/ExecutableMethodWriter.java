@@ -22,6 +22,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -37,6 +38,7 @@ import static org.particleframework.inject.writer.BeanDefinitionWriter.*;
 public class ExecutableMethodWriter extends AbstractClassFileWriter implements Opcodes
 {
     public static final String FIELD_PARENT = "$parent";
+    public static final String FIELD_METHOD = "$METHOD";
     public static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getDeclaredMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class).orElseThrow(() -> new IllegalStateException("AbstractExecutableMethod.invokeInternal(..) method not found. Incompatible version of Particle on the classpath?"))
     );
@@ -96,12 +98,14 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
      */
     public void visitMethod(Object declaringType,
                             Object returnType,
-                            List<Object> returnTypeGenericTypes,
+                            Map<String, Object> returnTypeGenericTypes,
                             String methodName,
                             Map<String, Object> argumentTypes,
                             Map<String, Object> qualifierTypes,
-                            Map<String, List<Object>> genericTypes) {
+                            Map<String, Map<String, Object>> genericTypes) {
         Type declaringTypeObject = getTypeReference(declaringType);
+        boolean hasArgs = !argumentTypes.isEmpty();
+        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
 
         int modifiers = isStatic ? ACC_PUBLIC | ACC_STATIC : ACC_PUBLIC;
         classWriter.visit(V1_8, modifiers,
@@ -110,7 +114,18 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                 Type.getInternalName(AbstractExecutableMethod.class),
                 null);
 
+        classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_METHOD, TYPE_METHOD.getDescriptor() , null, null);
+        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
 
+        pushGetMethodFromTypeCall(staticInit, declaringTypeObject, methodName, argumentTypeClasses);
+        staticInit.putStatic(
+                methodType,
+                FIELD_METHOD,
+                TYPE_METHOD
+        );
+        staticInit.visitInsn(RETURN);
+        staticInit.visitMaxs(1,1);
+        staticInit.visitEnd();
         MethodVisitor executorMethodConstructor;
         GeneratorAdapter generatorAdapter;
 
@@ -138,39 +153,37 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         // ALOAD 0
         generatorAdapter.loadThis();
 
-        // First constructor argument: The factory method
-        boolean hasArgs = !argumentTypes.isEmpty();
-        Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
         // load 'this'
         generatorAdapter.loadThis();
 
         // 1st argument Class.getMethod(..)
-        pushGetMethodFromTypeCall(executorMethodConstructor, declaringTypeObject, methodName, argumentTypeClasses);
+        generatorAdapter.getStatic(
+                methodType,
+                FIELD_METHOD,
+                TYPE_METHOD
+        );
 
-        // 2nd argument the return types
-        pushNewArrayOfTypes(executorMethodConstructor, returnTypeGenericTypes);
+        // 2nd argument the return type generics
+        buildTypeArguments(generatorAdapter, returnTypeGenericTypes);
 
         if (hasArgs) {
-            // 3rd Argument: Create a call to createMap from an argument types
-            pushCreateMapCall(executorMethodConstructor, argumentTypes);
 
-            // 4th Argument: Create a call to createMap from qualifier types
-            if (qualifierTypes != null) {
-                pushCreateMapCall(executorMethodConstructor, qualifierTypes);
-            } else {
-                executorMethodConstructor.visitInsn(ACONST_NULL);
-            }
-
-            // 5th Argument: Create a call to createMap from generic types
-            if (genericTypes != null) {
-                pushCreateGenericsMapCall(executorMethodConstructor, genericTypes);
-            } else {
-                executorMethodConstructor.visitInsn(ACONST_NULL);
-            }
+            // 3rd Argument: Create a call to createMap from generic types
+            pushBuildArgumentsForMethod(
+                    generatorAdapter,
+                    ga -> ga.getStatic(
+                            methodType,
+                            FIELD_METHOD,
+                            TYPE_METHOD
+                    ),
+                    argumentTypes,
+                    qualifierTypes,
+                    genericTypes
+            );
             // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class, Map.class, Map.class, Map.class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class, Argument[].class);
         } else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class);
         }
         generatorAdapter.visitInsn(RETURN);
         generatorAdapter.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);

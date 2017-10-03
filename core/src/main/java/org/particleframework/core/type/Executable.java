@@ -13,29 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.core.type;
+
+import org.particleframework.core.annotation.AnnotationSource;
+import org.particleframework.core.type.Argument;
 
 /**
- * An {@link Argument} with a value
+ * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
  *
  * @author Graeme Rocher
  * @since 1.0
+ *
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
  */
-public interface ArgumentValue<V> extends Argument<V> {
+public interface Executable<T, R> extends AnnotationSource {
     /**
-     * @return The current value of the argument
+     * The required argument types
      */
-    V getValue();
+    Argument[] getArguments();
 
     /**
-     * Create a new {@link ArgumentValue} for the given {@link Argument} and value
+     * Invokes the method
      *
-     * @param argument The argument
-     * @param value The value
-     * @param <T> The value type
-     * @return The created instance
+     * @param instance The instance
+     * @param arguments The arguments
+     *
+     * @return The result
      */
-    static <T> ArgumentValue<T> create(Argument<T> argument, T value) {
-        return new DefaultArgumentValue<>(argument, value);
-    }
+    R invoke(T instance, Object... arguments);
+
 }

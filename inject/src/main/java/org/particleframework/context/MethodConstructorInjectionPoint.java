@@ -15,6 +15,7 @@
  */
 package org.particleframework.context;
 
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
 
@@ -30,8 +31,8 @@ import java.util.Map;
  * @since 1.0
  */
 class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
-    public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
-        super(declaringComponent, method, requiresReflection, arguments, qualifiers, genericTypes);
+    public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Argument...arguments) {
+        super(declaringComponent, method, requiresReflection, arguments);
     }
 
     @Override

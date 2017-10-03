@@ -20,6 +20,7 @@ import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 
 import java.util.Collections;
@@ -53,10 +54,14 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
     class $blah0 extends AbstractExecutableMethod {
         protected $blah0() {
             super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
-                    new Class[0],
-                    Collections.singletonMap("name", String.class),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
+                    new Argument[0],
+                    Argument.create(
+                            ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
+                            "name",
+                            0,
+                            null
+
+                    )
             );
         }
         @Override

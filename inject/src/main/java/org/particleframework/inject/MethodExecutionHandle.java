@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.type.ReturnType;
+
 /**
  * Represents an execution handle that invokes a method
  *

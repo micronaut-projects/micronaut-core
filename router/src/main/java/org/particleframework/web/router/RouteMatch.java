@@ -16,8 +16,7 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.MediaType;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.Arrays;

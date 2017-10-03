@@ -6,6 +6,9 @@ import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 
+import javax.inject.Inject
+import javax.inject.Qualifier
+import javax.inject.Scope
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
@@ -19,7 +22,7 @@ import java.lang.annotation.Target
  */
 @CompileStatic
 class AnnotationStereoTypeFinder {
-
+    private static final List<String> EXCLUDED_ANNOTATIONS = [Retention.name, Documented.name, Target.name, Inject.name, Qualifier.name, Scope.name]
 
     boolean hasStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
         return hasStereoType(annotatedNode, stereotype.name)
@@ -50,8 +53,8 @@ class AnnotationStereoTypeFinder {
             if(annotationClassNode.name == stereotype) {
                 return ann
             }
-            else if(!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
-                if(findAnnotationWithStereoType(ann.classNode, stereotype) != null) {
+            else if(!(annotationClassNode.name in EXCLUDED_ANNOTATIONS) && annotatedNode != annotationClassNode) {
+                if(findAnnotationWithStereoType(annotationClassNode, stereotype) != null) {
                     return ann
                 }
             }
@@ -98,7 +101,7 @@ class AnnotationStereoTypeFinder {
             ClassNode annotationClassNode = ann.classNode
             if (findAnnotationWithStereoType(ann.classNode, stereotype) != null) {
                 foundAnnotations.add(ann)
-            } else if (!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
+            } else if (!(annotationClassNode.name in EXCLUDED_ANNOTATIONS)) {
                 findAnnotationsInternal(ann.classNode, stereotype, foundAnnotations)
             }
         }

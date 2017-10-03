@@ -113,7 +113,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private int beanContextArgumentIndex = -1;
     private Map<String, Object> constructorArgumentTypes;
     private Map<String, Object> constructorQualfierTypes;
-    private Map<String, List<Object>> constructorGenericTypes;
+    private Map<String, Map<String, Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
@@ -253,7 +253,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param qualifierTypes The argument names and qualifier types. Should be an ordered map should as {@link LinkedHashMap}
      * @param genericTypes   The argument names and generic types. Should be an ordered map should as {@link LinkedHashMap}
      */
-    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitBeanDefinitionConstructor(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
         this.constructorArgumentTypes = argumentTypes;
         this.constructorQualfierTypes = qualifierTypes;
         this.constructorGenericTypes = genericTypes;
@@ -278,11 +278,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
-                                  List<Object> returnTypeGenericTypes,
+                                  Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
-                                  Map<String, List<Object>> genericTypes) {
+                                  Map<String, Map<String, Object>> genericTypes) {
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -783,7 +783,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSetterInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, String setterName, List<Object> genericTypes) {
+    public void visitSetterInjectionPoint(
+            Object declaringType,
+            Object qualifierType,
+            boolean requiresReflection,
+            Object fieldType,
+            String fieldName,
+            String setterName,
+            Map<String, Object> genericTypes) {
         proxyBeanDefinitionWriter.visitSetterInjectionPoint(
                 declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
         );
@@ -800,31 +807,67 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, String setterName, List<Object> genericTypes, boolean isOptional) {
+    public void visitSetterValue(
+            Object declaringType,
+            Object qualifierType,
+            boolean requiresReflection,
+            Object fieldType,
+            String fieldName,
+            String setterName,
+            Map<String, Object> genericTypes,
+            boolean isOptional) {
         proxyBeanDefinitionWriter.visitSetterValue(
                 declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
         );
     }
 
     @Override
-    public void visitPostConstructMethod(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitPostConstructMethod(
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes) {
         proxyBeanDefinitionWriter.visitPostConstructMethod(
                 declaringType,requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes
         );
     }
 
     @Override
-    public void visitPreDestroyMethod(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitPreDestroyMethod(
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes) {
         proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
     }
 
     @Override
-    public void visitMethodInjectionPoint(Object declaringType, boolean requiresReflection, Object returnType, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public void visitMethodInjectionPoint(
+            Object declaringType,
+            boolean requiresReflection,
+            Object returnType,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes) {
         proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
     }
 
     @Override
-    public ExecutableMethodWriter visitExecutableMethod(Object declaringType, Object returnType, List<Object> returnTypeGenericTypes, String methodName, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, List<Object>> genericTypes) {
+    public ExecutableMethodWriter visitExecutableMethod(
+            Object declaringType,
+            Object returnType,
+            Map<String, Object> returnTypeGenericTypes,
+            String methodName,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes) {
         return proxyBeanDefinitionWriter.visitExecutableMethod(
                 declaringType,
                 returnType,

@@ -18,9 +18,9 @@ package org.particleframework.context;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.ReturnType;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
 import java.lang.annotation.Annotation;
@@ -48,26 +48,18 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final AnnotatedElement[] annotationElements;
 
     protected AbstractExecutableMethod(Method method,
-                                       Class[] genericReturnTypes,
-                                       Map<String, Class> arguments,
-                                       Map<String, Annotation> qualifiers,
-                                       Map<String, List<Class>> genericTypes) {
+                                       Argument<?>[] genericReturnTypes,
+                                       Argument...arguments) {
         this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
         this.annotationElements = new AnnotatedElement[] { method, method.getDeclaringClass() };
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
-        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if (index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
-            }
-            return AnnotationUtil.ZERO_ANNOTATIONS;
-        });
+        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
     }
 
-    protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
-        this(method, genericReturnTypes, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    protected AbstractExecutableMethod(Method method, Argument<?>[] genericReturnTypes) {
+        this(method, genericReturnTypes, Argument.ZERO_ARGUMENTS);
     }
 
     @Override
@@ -162,11 +154,19 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     class ReturnTypeImpl implements ReturnType<Object> {
         private final Method method;
-        private final List<Class> genericTypes;
+        private final Map<String, Argument<?>> typeVariables;
 
-        public ReturnTypeImpl(Method method, Class... genericTypes) {
+        public ReturnTypeImpl(Method method, Argument<?>[] genericReturnType) {
             this.method = method;
-            this.genericTypes = Arrays.asList(genericTypes);
+            if(genericReturnType == null || genericReturnType.length == 0) {
+                typeVariables = Collections.emptyMap();
+            }
+            else {
+                typeVariables = new LinkedHashMap<>(genericReturnType.length);
+                for (Argument<?> argument : genericReturnType) {
+                    typeVariables.put(argument.getName(), argument);
+                }
+            }
         }
 
         @Override
@@ -174,29 +174,15 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
             return (Class<Object>) method.getReturnType();
         }
 
+
         @Override
-        public List<Class> getGenericTypes() {
-            return genericTypes;
+        public AnnotatedElement[] getAnnotatedElements() {
+            return new AnnotatedElement[] { method.getAnnotatedReturnType(), method};
         }
 
         @Override
-        public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-            return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotatedReturnType().getAnnotations());
-        }
-
-        @Override
-        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-            return method.getAnnotatedReturnType().getAnnotation(annotationClass);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotatedReturnType().getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getAnnotatedReturnType().getDeclaredAnnotations();
+        public Map<String, Argument<?>> getTypeVariables() {
+            return typeVariables;
         }
     }
 }

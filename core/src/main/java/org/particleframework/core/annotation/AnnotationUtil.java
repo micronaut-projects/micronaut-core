@@ -37,6 +37,26 @@ public class AnnotationUtil {
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
 
     /**
+     * An empty re-usable element
+     */
+    public static final AnnotatedElement EMPTY_ANNOTATED_ELEMENT = new AnnotatedElement() {
+        @Override
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            return null;
+        }
+
+        @Override
+        public Annotation[] getAnnotations() {
+            return ZERO_ANNOTATIONS;
+        }
+
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return ZERO_ANNOTATIONS;
+        }
+    };
+
+    /**
      * Finds an annotation on the given class for the given stereotype
      *
      * @param cls The class
@@ -57,7 +77,7 @@ public class AnnotationUtil {
      * @param <T> The annotation generic type
      * @return The annotation
      */
-    public static <T extends Annotation> T findAnnotation(Method method, Class type) {
+    public static <T extends Annotation> T findAnnotation(Method method, Class<T> type) {
         Optional<Annotation> result = findAnnotationsWithStereoType(method, type)
                 .stream()
                 .filter(annotation -> annotation.annotationType() == type)
@@ -70,7 +90,20 @@ public class AnnotationUtil {
         );
     }
 
-
+    /**
+     * Finds an annotation on the given class for the given type
+     *
+     * @param annotations The annotations
+     * @param type The annotation type
+     * @param <T> The annotation generic type
+     * @return The annotation
+     */
+    public static <T extends Annotation> T findAnnotation(Annotation[] annotations, Class<T> type) {
+        return (T) Arrays.stream(annotations)
+                .filter(ann -> ann.annotationType() == type)
+                .findFirst()
+                .orElse(null);
+    }
     /**
      * Finds an annotation on the given class for the given stereotype
      *
@@ -209,7 +242,7 @@ public class AnnotationUtil {
         else if(annotatedElement instanceof Class){
             return findAnnotationsWithStereoType((Class)annotatedElement, stereotype);
         }
-        return Collections.emptySet();
+        return findAnnotationsWithStereoType(stereotype, annotatedElement.getAnnotations());
     }
 
     private static boolean isNotInternalAnnotation(Annotation ann) {

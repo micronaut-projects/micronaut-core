@@ -3,6 +3,7 @@ package org.particleframework.inject.writer;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.ArrayUtil;
 
@@ -11,6 +12,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Constructor;
 import java.util.*;
 
 /**
@@ -26,6 +28,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     public static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     public static final int MODIFIERS_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
     public static final Type TYPE_OBJECT = Type.getType(Object.class);
+    public static final Type TYPE_METHOD = Type.getType(java.lang.reflect.Method.class);
+    public static final int ACC_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
+    public static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
+    public static final Type TYPE_CLASS = Type.getType(Class.class);
 
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
@@ -164,7 +170,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return false;
     }
 
-    protected static void pushMethodNameAndTypesArguments(MethodVisitor methodVisitor, String methodName, Collection<Object> argumentTypes) {
+    protected static void pushMethodNameAndTypesArguments(GeneratorAdapter methodVisitor, String methodName, Collection<Object> argumentTypes) {
         // and the method name
         methodVisitor.visitLdcInsn(methodName);
 
@@ -422,7 +428,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         overriddenMethodGenerator.visitInsn(RETURN);
     }
 
-    protected GeneratorAdapter visitStaticInitializer(ClassWriter classWriter) {
+    protected GeneratorAdapter visitStaticInitializer(ClassVisitor classWriter) {
         MethodVisitor mv = classWriter.visitMethod(ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
         return new GeneratorAdapter(mv, ACC_STATIC, "<clinit>", DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
@@ -495,7 +501,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
-     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     * Represents a method {@link AnnotationSource} reference
      */
     protected class TypeAnnotationSource {
         final Object declaringType;
@@ -520,7 +526,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
     /**
-     * Represents a method {@link org.particleframework.inject.AnnotationSource} reference
+     * Represents a method {@link AnnotationSource} reference
      */
     protected class MethodAnnotationSource extends TypeAnnotationSource{
         final String methodName;

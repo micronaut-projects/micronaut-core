@@ -15,11 +15,9 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.aop.Interceptor;
-import org.particleframework.aop.InvocationContext;
-import org.particleframework.inject.ArgumentValue;
+import org.particleframework.core.type.ArgumentValue;
 import org.particleframework.inject.MethodExecutionHandle;
-import org.particleframework.inject.MutableArgumentValue;
+import org.particleframework.core.type.MutableArgumentValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -13,10 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
-
-import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.util.ArrayUtil;
+package org.particleframework.core.annotation;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -27,7 +24,7 @@ import java.util.Set;
 
 /**
  * <p>
- * An abstract interface around an source of {@link Annotation} instances. Since {@link BeanDefinition} instances
+ * An abstract interface around an source of {@link Annotation} instances. Since bean definition instances
  * can read annotations from many potential sources (factory beans, factory methods, method level, class level etc.). This
  * abstraction allows a simplified view for annotation discovery.
  * </p>
@@ -51,7 +48,7 @@ public interface AnnotationSource extends AnnotatedElement {
 
 
     /**
-     * <p>The annotated elements that this {@link ExecutableMethod} is able to resolve annotations from</p>
+     * <p>The annotated elements that this {@link AnnotationSource} is able to resolve annotations from</p>
      *
      * <p>These elements are used when resolving annotations via the {@link #findAnnotationsWithStereoType(Class)} method</p>
      *

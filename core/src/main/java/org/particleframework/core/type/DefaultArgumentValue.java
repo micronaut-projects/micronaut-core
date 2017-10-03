@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.core.type;
 
 import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Default implementation of {@link ArgumentValue}
@@ -47,13 +49,13 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public Class[] getGenericTypes() {
-        return argument.getGenericTypes();
+    public Optional<Argument<?>> getFirstTypeVariable() {
+        return argument.getFirstTypeVariable();
     }
 
     @Override
-    public Map<String, Class> getTypeParameters() {
-        return argument.getTypeParameters();
+    public Map<String, Argument<?>> getTypeVariables() {
+        return argument.getTypeVariables();
     }
 
     @Override
@@ -61,14 +63,15 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
         return argument.getQualifier();
     }
 
-    @Override
-    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-        return argument.findAnnotation(stereotype);
-    }
 
     @Override
     public V getValue() {
         return value;
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return argument.getAnnotatedElements();
     }
 
     @Override

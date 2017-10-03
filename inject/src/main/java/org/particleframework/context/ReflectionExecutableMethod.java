@@ -18,13 +18,15 @@ package org.particleframework.context;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.ReturnType;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.inject.annotation.Executable;
 
+import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -46,18 +48,27 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
         this.beanDefinition = beanDefinition;
         this.method = method;
         this.method.setAccessible(true);
-        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        Map<String, Class> arguments = new LinkedHashMap<>();
-        Map<String, Annotation> qualifiers = new LinkedHashMap<>();
-        Map<String, List<Class>> genericTypes = new LinkedHashMap<>();
 
-        buildReflectionMetadata(method, arguments, genericTypes);
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if(index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        if(parameterTypes.length > 0) {
+
+            Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+            List<Argument> arguments = new ArrayList<>(parameterTypes.length);
+
+            for (int i = 0; i < parameterTypes.length; i++) {
+                Annotation ann = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i]);
+                arguments.add(Argument.create(
+                        method,
+                        "arg" + i,
+                        i,
+                        ann != null ? ann.annotationType() : null
+                ));
             }
-            return new Annotation[0];
-        });
+            this.arguments = arguments.toArray(new Argument[arguments.size()]);
+        }
+        else {
+            this.arguments =  Argument.ZERO_ARGUMENTS;
+        }
     }
 
     @Override
@@ -154,34 +165,21 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     private class MethodReturnType<MRT> implements ReturnType<MRT> {
+
         @Override
         public Class<MRT> getType() {
             return (Class<MRT>) method.getReturnType();
         }
 
         @Override
-        public List<Class> getGenericTypes() {
-            return Arrays.asList(GenericTypeUtils.resolveTypeArguments(method.getGenericReturnType()));
+        public Map<String, Argument<?>> getTypeVariables() {
+            // TODO: build via reflection
+            return Collections.emptyMap();
         }
 
         @Override
-        public <A extends Annotation> A getAnnotation(Class<A> type) {
-            return method.getAnnotatedReturnType().getAnnotation(type);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotatedReturnType().getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getAnnotatedReturnType().getDeclaredAnnotations();
-        }
-
-        @Override
-        public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-            return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotatedReturnType().getAnnotations());
+        public AnnotatedElement[] getAnnotatedElements() {
+            return new AnnotatedElement[] { method.getAnnotatedReturnType(), method};
         }
     }
 }

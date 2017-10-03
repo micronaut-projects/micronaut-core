@@ -1,7 +1,7 @@
 package org.particleframework.context.exceptions;
 
 import org.particleframework.context.BeanResolutionContext;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.FieldInjectionPoint;
 import org.particleframework.inject.MethodInjectionPoint;
 

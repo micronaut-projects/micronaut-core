@@ -20,7 +20,7 @@ import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.*;

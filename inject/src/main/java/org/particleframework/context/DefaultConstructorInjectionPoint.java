@@ -1,17 +1,14 @@
 package org.particleframework.context;
 
+import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
-import org.particleframework.context.exceptions.BeanInstantiationException;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * An injection point for a constructor
@@ -26,17 +23,19 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     private final BeanDefinition declaringComponent;
     private final boolean requiresReflection;
 
-    DefaultConstructorInjectionPoint(BeanDefinition declaringComponent, Constructor<T> constructor, Map<String, Class> arguments, Map<String, Annotation> qualifiers, Map<String, List<Class>> genericTypes) {
-        this.declaringComponent = declaringComponent;
+    /**
+     * @param beanDefinition The bean definition
+     * @param constructor The constructor used to construct the object
+     * @param arguments The arguments to the constructor
+     */
+    DefaultConstructorInjectionPoint(
+            BeanDefinition beanDefinition,
+            Constructor<T> constructor,
+            Argument...arguments) {
+        this.declaringComponent = beanDefinition;
         this.constructor = constructor;
         this.requiresReflection = Modifier.isPrivate(constructor.getModifiers());
-        Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if(index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
-            }
-            return new Annotation[0];
-        });
+        this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
     }
 
     @Override

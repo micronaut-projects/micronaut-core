@@ -8,7 +8,7 @@ import java.util.Map;
 class ExecutableElementParamInfo {
     Map<String, Object> parameters = new LinkedHashMap<>();
     Map<String, Object> qualifierTypes = new LinkedHashMap<>();
-    Map<String, List<Object>> genericTypes = new LinkedHashMap<>();
+    Map<String, Map<String, Object>> genericTypes = new LinkedHashMap<>();
 
     void addParameter(String paramName, Object type) {
         parameters.put(paramName, type);
@@ -18,7 +18,7 @@ class ExecutableElementParamInfo {
         qualifierTypes.put(paramName, qualifier);
     }
 
-    void addGenericTypes(String paramName, List<Object> generics) {
+    void addGenericTypes(String paramName, Map<String, Object> generics) {
         genericTypes.put(paramName, generics);
     }
 
@@ -30,7 +30,7 @@ class ExecutableElementParamInfo {
         return Collections.unmodifiableMap(qualifierTypes);
     }
 
-    Map<String, List<Object>> getGenericTypes() {
+    Map<String, Map<String, Object>> getGenericTypes() {
         return Collections.unmodifiableMap(genericTypes);
     }
 }

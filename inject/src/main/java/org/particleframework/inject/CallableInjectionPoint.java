@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.type.Argument;
+
 /**
  * A callable injection point is an injection point that accepts {@link Argument} instances.
  *

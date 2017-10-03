@@ -19,14 +19,12 @@ import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.ReturnType;
+import org.particleframework.core.type.ReturnType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  *

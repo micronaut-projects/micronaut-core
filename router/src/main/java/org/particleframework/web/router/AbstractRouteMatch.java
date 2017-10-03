@@ -17,9 +17,9 @@ package org.particleframework.web.router;
 
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
-import org.particleframework.inject.ReturnType;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.web.router.exceptions.RoutingException;
 
 import java.lang.annotation.Annotation;

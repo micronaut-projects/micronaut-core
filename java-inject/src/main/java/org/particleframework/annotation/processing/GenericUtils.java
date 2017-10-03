@@ -4,10 +4,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.type.TypeKind.ARRAY;
@@ -77,41 +74,14 @@ class GenericUtils {
         return Collections.emptyList();
     }
 
-    // FIXME I don't know if this works correctly for all cases
-    // Needs a test case. See InjectTransform.resolveGenericTypes
-    // It doesn't get covered either.
-    // test for FooBar<? extends Foo> and FooBar<? super Bar>
-    List<Object> resolveGenericTypes(TypeMirror type) {
+    Map<String, Object> resolveGenericTypes(TypeMirror type) {
         if (type.getKind().isPrimitive() || type.getKind() == VOID || type.getKind() == ARRAY) {
-            return Collections.emptyList();
+            return Collections.emptyMap();
         }
-
         if(type instanceof DeclaredType) {
 
             DeclaredType declaredType = (DeclaredType) type;
-            return declaredType.getTypeArguments().stream()
-                    .map(typeArg -> {
-                        TypeKind kind = typeArg.getKind();
-                        if (kind == WILDCARD) {
-                            WildcardType wcType = (WildcardType)typeArg;
-                            TypeMirror extendsBound = wcType.getExtendsBound();
-                            TypeMirror superBound = wcType.getSuperBound();
-                            if(extendsBound == null && superBound == null) {
-                                return Object.class.getName();
-                            }
-                            else if(extendsBound != null) {
-                                return typeUtils.erasure(extendsBound).toString();
-                            }
-                            else if(superBound != null) {
-                                return typeUtils.erasure(superBound).toString();
-                            }
-                            else {
-                                return typeUtils.getWildcardType(extendsBound, superBound).toString();
-                            }
-                        }
-                        return typeArg.toString();
-                    })
-                    .collect(Collectors.toList());
+            return resolveGenericTypes(declaredType, (TypeElement) declaredType.asElement());
         }
         else if(type instanceof TypeVariable) {
             TypeVariable var = (TypeVariable) type;
@@ -120,7 +90,81 @@ class GenericUtils {
                 return resolveGenericTypes(upperBound);
             }
         }
-        return Collections.emptyList();
+        return Collections.emptyMap();
+    }
+
+
+    Map<String, Object> resolveGenericTypes(DeclaredType type, TypeElement typeElement) {
+        List<? extends TypeMirror> typeArguments = type.getTypeArguments();
+        Map<String, Object> resolvedParameters = new LinkedHashMap<>();
+        List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
+        if(typeArguments.size() == typeParameters.size()) {
+            Iterator<? extends TypeMirror> i = typeArguments.iterator();
+            for (TypeParameterElement typeParameter : typeParameters) {
+                String parameterName = typeParameter.toString();
+                TypeMirror mirror = i.next();
+
+                TypeKind kind = mirror.getKind();
+                if(kind == TypeKind.DECLARED) {
+                    resolveGenericTypeParameter(resolvedParameters, parameterName, mirror);
+
+                }
+                else if(kind == TypeKind.WILDCARD) {
+                    WildcardType wcType = (WildcardType) mirror;
+                    TypeMirror extendsBound = wcType.getExtendsBound();
+                    TypeMirror superBound = wcType.getSuperBound();
+                    if (extendsBound != null) {
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound);
+                    }
+                    else if (superBound != null) {
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, superBound);
+                    }
+                    else {
+                        resolvedParameters.put(parameterName, Object.class);
+                    }
+                }
+            }
+        }
+        return resolvedParameters;
+    }
+
+    private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
+        DeclaredType declaredType = (DeclaredType)mirror;
+        List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
+        if(nestedArguments.isEmpty()) {
+            resolvedParameters.put(
+                    parameterName,
+                    resolveTypeReference(typeUtils.erasure(mirror))
+            );
+        }
+        else {
+            resolvedParameters.put(
+                  parameterName,
+                  Collections.singletonMap(
+                          resolveTypeReference(typeUtils.erasure(mirror)),
+                          resolveGenericTypes(declaredType)
+                  )
+            );
+        }
+    }
+
+    String resolveTypeReference(TypeMirror mirror) {
+        TypeKind kind = mirror.getKind();
+        if (kind == WILDCARD) {
+            WildcardType wcType = (WildcardType) mirror;
+            TypeMirror extendsBound = wcType.getExtendsBound();
+            TypeMirror superBound = wcType.getSuperBound();
+            if (extendsBound == null && superBound == null) {
+                return Object.class.getName();
+            } else if (extendsBound != null) {
+                return typeUtils.erasure(extendsBound).toString();
+            } else if (superBound != null) {
+                return typeUtils.erasure(superBound).toString();
+            } else {
+                return typeUtils.getWildcardType(extendsBound, superBound).toString();
+            }
+        }
+        return mirror.toString();
     }
 
     public DeclaredType resolveTypeVariable(Element element, TypeVariable typeVariable) {

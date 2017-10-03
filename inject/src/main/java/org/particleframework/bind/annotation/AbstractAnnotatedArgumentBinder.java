@@ -17,9 +17,10 @@ package org.particleframework.bind.annotation;
 
 import org.particleframework.core.convert.*;
 import org.particleframework.core.naming.NameUtils;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.lang.annotation.Annotation;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -37,7 +38,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         this.conversionService = conversionService;
     }
 
-    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale) {
+    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale, Charset characterEncoding) {
         Class<T> argumentType = argument.getType();
         Object value = resolveValue(argument, values, argumentType, annotationValue);
         if(value == null) {
@@ -52,14 +53,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        Map<String,Class> typeParameterMap = argument.getTypeParameters();
-        ConversionContext conversionContext;
-        if(typeParameterMap != null) {
-            conversionContext = ConversionContext.of(argument, typeParameterMap, locale);
-        }
-        else {
-            conversionContext = ConversionContext.of(argument, locale);
-        }
+        ConversionContext conversionContext = ConversionContext.of(argument, locale, characterEncoding);
         return doConvert(value, argumentType, conversionContext);
     }
 
@@ -69,7 +63,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         }
         Object value = values.get(annotationValue, Object.class).orElse(null);
         boolean isConvertibleValues = values instanceof ConvertibleMultiValues;
-        if(isConvertibleValues && isManyObjects(argumentType)) {
+        if(isConvertibleValues && isManyObjects(argument)) {
             ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
             List<?> all = multiValues.getAll(annotationValue);
             boolean hasMultiValues = all != null;
@@ -84,8 +78,16 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         else if(Map.class.isAssignableFrom(argumentType)) {
             if(isConvertibleValues) {
                 ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
-                Class[] genericTypes = argument.getGenericTypes();
-                Class valueType = genericTypes != null && genericTypes.length == 2 ? genericTypes[1] : Object.class;
+                Map<String, Argument<?>> typeParameters = argument.getTypeVariables();
+
+                Class valueType;
+                if(typeParameters.containsKey("V")) {
+                    valueType = typeParameters.get("V").getType();
+                }
+                else {
+                    valueType = Object.class;
+                }
+
                 value = multiValues.subMap(annotationValue, valueType);
             }
             else if(Arrays.asList("parameters", "params").contains(annotationValue)) {
@@ -95,8 +97,19 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         return value;
     }
 
-    private boolean isManyObjects(Class<T> argumentType) {
-        return argumentType.isArray() || Iterable.class.isAssignableFrom(argumentType) || Stream.class.isAssignableFrom(argumentType);
+    private boolean isManyObjects(Argument<?> argument) {
+        Class<?> argumentType = argument.getType();
+        if(argumentType.isArray() || Iterable.class.isAssignableFrom(argumentType) || Stream.class.isAssignableFrom(argumentType)) {
+            return true;
+        }
+        else {
+            Optional<Argument<?>> firstTypeVariable = argument.getFirstTypeVariable();
+            if(firstTypeVariable.isPresent()) {
+                Argument<?> typeVariable = firstTypeVariable.get();
+                return isManyObjects(typeVariable);
+            }
+        }
+        return false;
     }
 
     private Optional<T> doConvert(Object value, Class<T> targetType, ConversionContext context) {

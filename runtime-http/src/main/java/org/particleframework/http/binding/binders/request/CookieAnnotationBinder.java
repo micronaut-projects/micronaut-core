@@ -21,8 +21,7 @@ import org.particleframework.core.convert.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.binding.annotation.Cookie;
-import org.particleframework.http.binding.annotation.Header;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 
@@ -48,7 +47,7 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
         ConvertibleValues<org.particleframework.http.cookie.Cookie> parameters = source.getCookies();
         Cookie annotation = argument.getAnnotation(Cookie.class);
         String parameterName = annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale());
+        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
     }
 
     @Override

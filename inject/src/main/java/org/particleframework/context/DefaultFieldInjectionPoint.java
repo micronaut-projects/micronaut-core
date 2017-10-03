@@ -71,7 +71,7 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
         return field.getAnnotation(annotationClass);
     }
 

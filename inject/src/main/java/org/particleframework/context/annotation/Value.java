@@ -1,5 +1,6 @@
 package org.particleframework.context.annotation;
 
+import javax.inject.Qualifier;
 import java.lang.annotation.*;
 
 /**
@@ -11,9 +12,10 @@ import java.lang.annotation.*;
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
+@Qualifier
 public @interface Value {
     /**
-     * @return The name of the property to inject. Can be a Groovy expression
+     * @return The name of the property to inject.
      */
     String value();
 }

@@ -17,7 +17,7 @@ package org.particleframework.aop.proxytarget
 
 import org.particleframework.aop.Interceptor
 import org.particleframework.aop.InvocationContext
-import org.particleframework.inject.MutableArgumentValue
+import org.particleframework.core.type.MutableArgumentValue
 
 import javax.inject.Singleton
 

@@ -2,19 +2,16 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.inject.Argument;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.MethodInjectionPoint;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Represents an injection point for a method
@@ -27,52 +24,36 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final Method method;
     private final Argument[] arguments;
     private final boolean requiresReflection;
-    private final BeanDefinition declaringComponent;
+    private final BeanDefinition declaringBean;
     private final AnnotatedElement[] annotationElements;
 
-    DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
+    DefaultMethodInjectionPoint(BeanDefinition declaringBean,
                                 Method method,
                                 boolean requiresReflection,
-                                Map<String, Class> arguments,
-                                Map<String, Annotation> qualifiers,
-                                Map<String, List<Class>> genericTypes) {
+                                Argument...arguments) {
         this.method = method;
-        this.annotationElements = new AnnotatedElement[] { method, declaringComponent};
+        this.annotationElements = new AnnotatedElement[] { method, declaringBean};
         this.requiresReflection = requiresReflection;
         if (requiresReflection) {
             this.method.setAccessible(true);
         }
-        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if(index < parameterAnnotations.length) {
-                return parameterAnnotations[index];
-            }
-            return new Annotation[0];
-        });
-        this.declaringComponent = declaringComponent;
+        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
+        this.declaringBean = declaringBean;
     }
 
     DefaultMethodInjectionPoint(BeanDefinition declaringComponent,
                                 Field field,
                                 Method method,
                                 boolean requiresReflection,
-                                Map<String, Class> arguments,
-                                Map<String, Annotation> qualifiers,
-                                Map<String, List<Class>> genericTypes) {
+                                Argument...arguments) {
         this.method = method;
         this.annotationElements = new AnnotatedElement[] { field, method, declaringComponent};
         this.requiresReflection = requiresReflection;
         if(requiresReflection) {
             this.method.setAccessible(true);
         }
-        Annotation[] annotations = field.getAnnotations();
-        this.arguments = DefaultArgument.from(arguments, qualifiers, genericTypes, index -> {
-            if(index == 0) {
-                return annotations;
-            }
-            return new Annotation[0];
-        });
-        this.declaringComponent = declaringComponent;
+        this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
+        this.declaringBean = declaringComponent;
     }
 
     @Override
@@ -92,7 +73,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public BeanDefinition getDeclaringBean() {
-        return this.declaringComponent;
+        return this.declaringBean;
     }
 
     @Override
