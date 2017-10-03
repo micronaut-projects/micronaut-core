@@ -46,6 +46,6 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         String parameterName = annotation == null ? argument.getName() : annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale());
+        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
     }
 }

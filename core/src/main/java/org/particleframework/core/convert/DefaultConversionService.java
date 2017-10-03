@@ -358,12 +358,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, ConversionContext context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            Map<String, Argument<?>> typeVariables = typeVariable.map(Argument::getTypeVariables).orElse(Collections.emptyMap());
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
 
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
             String[] strings = object.toString().split(",");
             List list = new ArrayList();
-            ConversionContext newContext = ConversionContext.of(typeVariables);
             for (String string : strings) {
                 Optional converted = convert(string, targetComponentType, newContext);
                 if (converted.isPresent()) {
@@ -376,10 +375,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Object.class, Optional.class, (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            Map<String, Argument<?>> typeVariables = typeVariable.map(Argument::getTypeVariables).orElse(Collections.emptyMap());
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
 
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
-            Optional converted = convert(object, targetComponentType, ConversionContext.of(typeVariables));
+            Optional converted = convert(object, targetComponentType, newContext);
             if (converted.isPresent()) {
                 return Optional.of(converted);
             } else {
@@ -391,8 +390,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            Map<String, Argument<?>> typeVariables = typeVariable.map(Argument::getTypeVariables).orElse(Collections.emptyMap());
-            ConversionContext newContext = ConversionContext.of(typeVariables);
+            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
             if (targetType.isInstance(object)) {
                 if(targetComponentType == Object.class) {
                     return Optional.of(object);
@@ -420,9 +418,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             TypeVariable<Class<Map>>[] typeParameters = targetType.getTypeParameters();
             Class keyType = String.class;
             Class valueType = Object.class;
-            Map<String, Argument<?>> keyVariables = Collections.emptyMap();
-            Map<String, Argument<?>> valVariables = Collections.emptyMap();
             boolean isProperties = false;
+            ConversionContext keyContext = context;
+            ConversionContext valContext = context;
             if (targetType.equals(Properties.class)) {
                 valueType = String.class;
                 isProperties = true;
@@ -433,17 +431,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 keyType = keyVar
                         .map(arg -> (Class) arg.getType())
                         .orElse(String.class);
-                keyVariables = keyVar.map(Argument::getTypeVariables).orElse(Collections.emptyMap());
+                keyContext = keyVar.map(ConversionContext::of).orElse(context);
 
                 Optional<Argument<?>> valVar = context.getTypeVariable(typeParameters[1].getName());
                 valueType = valVar
                         .map(arg -> (Class) arg.getType())
                         .orElse(Object.class);
-                valVariables = valVar.map(Argument::getTypeVariables).orElse(Collections.emptyMap());
+                valContext = valVar.map(ConversionContext::of).orElse(context);
             }
             Map newMap = isProperties ? new Properties() : new LinkedHashMap();
-            ConversionContext keyContext = ConversionContext.of(keyVariables);
-            ConversionContext valContext = ConversionContext.of(valVariables);
 
             for (Object o : object.entrySet()) {
                 Map.Entry entry = (Map.Entry) o;

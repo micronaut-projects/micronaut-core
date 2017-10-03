@@ -47,7 +47,7 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
         ConvertibleValues<org.particleframework.http.cookie.Cookie> parameters = source.getCookies();
         Cookie annotation = argument.getAnnotation(Cookie.class);
         String parameterName = annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale());
+        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
     }
 
     @Override

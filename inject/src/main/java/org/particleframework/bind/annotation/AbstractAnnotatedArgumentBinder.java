@@ -20,6 +20,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
 
 import java.lang.annotation.Annotation;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -37,7 +38,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         this.conversionService = conversionService;
     }
 
-    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale) {
+    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale, Charset characterEncoding) {
         Class<T> argumentType = argument.getType();
         Object value = resolveValue(argument, values, argumentType, annotationValue);
         if(value == null) {
@@ -52,8 +53,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        Map<String, Argument<?>> typeParameters = argument.getTypeVariables();
-        ConversionContext conversionContext = ConversionContext.of(argument, typeParameters, locale);
+        ConversionContext conversionContext = ConversionContext.of(argument, locale, characterEncoding);
         return doConvert(value, argumentType, conversionContext);
     }
 

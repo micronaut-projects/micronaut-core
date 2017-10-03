@@ -46,7 +46,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         Header annotation = argument.getAnnotation(Header.class);
         String parameterName = annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale());
+        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
     }
 
     @Override

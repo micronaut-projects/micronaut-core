@@ -71,9 +71,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                                 if (firstTypeParameter.isPresent()) {
                                     Argument<?> arg = firstTypeParameter.get();
                                     Class targetType = arg.getType();
-                                    Optional converted = conversionService.convert(body, targetType, ConversionContext.of(
-                                            arg.getTypeVariables()
-                                    ));
+                                    Optional converted = conversionService.convert(body, targetType, ConversionContext.of(arg));
                                     if (converted.isPresent()) {
                                         future.complete(converted.get());
                                     } else {

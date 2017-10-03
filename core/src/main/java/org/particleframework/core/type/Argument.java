@@ -8,8 +8,6 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Represents an argument to a method or constructor or type
@@ -137,7 +135,7 @@ public interface Argument<T> extends AnnotatedElement, TypeVariableResolver {
             Constructor constructor,
             String name,
             int index,
-            @Nullable  Class qualifierType,
+            @Nullable Class qualifierType,
             @Nullable Argument...typeParameters) {
         Class type = constructor.getParameterTypes()[index];
 
@@ -173,6 +171,51 @@ public interface Argument<T> extends AnnotatedElement, TypeVariableResolver {
                 type,
                 name,
                 annotation,
+                annotations,
+                typeParameters
+        );
+    }
+
+    /**
+     * Create a new argument for the given field
+     *
+     * @param field The field
+     * @param qualifierType The qualifier type
+     * @param typeParameters The generic type parameters
+     * @return The argument instance
+     */
+    static Argument create(
+            Field field,
+            @Nullable Class qualifierType,
+            @Nullable Argument...typeParameters) {
+        Class type = field.getType();
+        Annotation[] annotations = field.getAnnotations();
+        Annotation annotation = qualifierType != null ? AnnotationUtil.findAnnotation(annotations, qualifierType) : null;
+        return new DefaultArgument(
+                type,
+                field.getName(),
+                annotation,
+                annotations,
+                typeParameters
+        );
+    }
+
+    /**
+     * Create a new argument for the given field
+     *
+     * @param field The field
+     * @param typeParameters The generic type parameters
+     * @return The argument instance
+     */
+    static Argument create(
+            Field field,
+            @Nullable Argument...typeParameters) {
+        Class type = field.getType();
+        Annotation[] annotations = field.getAnnotations();
+        return new DefaultArgument(
+                type,
+                field.getName(),
+                null,
                 annotations,
                 typeParameters
         );

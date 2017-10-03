@@ -521,7 +521,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, injectionPoint, argumentType, valString, genericTypes);
+                    Optional value = resolveValue(applicationContext, argument, argumentType, valString);
                     if (!value.isPresent() && argumentType == Optional.class) {
                         return value;
                     } else {
@@ -530,10 +530,9 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                                 String cliOption = resolveCliOption(declaringClass, argumentName);
                                 if (cliOption != null) {
                                     return resolveValue(applicationContext,
-                                            injectionPoint,
+                                            argument,
                                             argumentType,
-                                            cliOption,
-                                            genericTypes)
+                                            cliOption)
                                             .orElse(defaultValue);
                                 } else {
                                     return defaultValue;
@@ -852,32 +851,31 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 Class<?> declaringClass = field.getDeclaringClass();
                 String valString = resolveValueString(declaringClass, beanType, injectionPoint.getName(), valueAnn);
                 Class[] typeArguments = GenericTypeUtils.resolveGenericTypeArguments(field);
-                Map<String, Argument<?>> arguments = Collections.emptyMap();
+                List<Argument<?>> arguments = Collections.emptyList();
                 if(typeArguments != null && typeArguments.length > 0) {
                     TypeVariable<? extends Class<?>>[] typeParameters = field.getType().getTypeParameters();
                     if(typeParameters.length == typeArguments.length) {
-                        arguments = new LinkedHashMap<>();
+                        arguments = new ArrayList<>();
                         for (int i = 0; i < typeParameters.length; i++) {
                             TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
                             String name = typeParameter.getName();
-                            arguments.put(name, Argument.create(typeArguments[i], name));
+                            arguments.add(Argument.create(typeArguments[i], name));
                         }
                     }
                 }
-                Optional value = resolveValue((ApplicationContext) context, injectionPoint, fieldType, valString, arguments);
+                Argument fieldArgument = Argument.create(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
+                Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
                 } else {
                     if (isConfigurationProperties && valueAnn == null) {
-                        Map<String, Argument<?>> finalArguments = arguments;
                         return value.orElseGet(() -> {
                             String cliOption = resolveCliOption(declaringClass, field.getName());
                             if (cliOption != null) {
                                 return resolveValue((ApplicationContext) context,
-                                        injectionPoint,
+                                        fieldArgument,
                                         fieldType,
-                                        cliOption,
-                                        finalArguments)
+                                        cliOption)
                                         .orElse(defaultValue);
                             } else {
                                 return defaultValue;
@@ -991,24 +989,20 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, AnnotatedElement annotatedElement, Class type, String valString, Map<String, Argument<?>> genericTypes) {
+    private Optional resolveValue(ApplicationContext context, Argument<?> argument, Class argumentTYpe, String valString) {
 
         int i = valString.indexOf(':');
         Object defaultValue = null;
         if (i > -1) {
-            Optional converted = context.getConversionService().convert(valString.substring(i + 1, valString.length()), type);
+            Optional converted = context.getConversionService().convert(valString.substring(i + 1, valString.length()), argumentTYpe);
             valString = valString.substring(0, i);
             defaultValue = converted.orElse(null);
         }
         Optional value;
 
 
-        ConversionContext conversionContext = ConversionContext.of(
-                annotatedElement,
-                genericTypes,
-                Locale.ENGLISH
-        );
-        value = context.getProperty(valString, (Class<?>) type, conversionContext);
+        ConversionContext conversionContext = ConversionContext.of(argument);
+        value = context.getProperty(valString, (Class<?>) argumentTYpe, conversionContext);
 
         if (defaultValue != null && !value.isPresent()) {
             value = Optional.of(defaultValue);

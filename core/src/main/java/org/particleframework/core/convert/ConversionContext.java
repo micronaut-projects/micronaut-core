@@ -16,8 +16,10 @@
 package org.particleframework.core.convert;
 
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.TypeVariableResolver;
+import org.particleframework.core.util.ArrayUtil;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -83,6 +85,53 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
     }
 
     /**
+     * Augment this context with data for the given argument
+     *
+     * @param argument The argument
+     * @return The conversion context
+     */
+    default ConversionContext with(Argument<?> argument) {
+
+        ConversionContext childContext = ConversionContext.of(argument);
+        ConversionContext thisContext =  this;
+        return new ConversionContext() {
+            @Override
+            public Map<String, Argument<?>> getTypeVariables() {
+                return childContext.getTypeVariables();
+            }
+
+            @Override
+            public Locale getLocale() {
+                return thisContext.getLocale();
+            }
+
+            @Override
+            public Charset getCharset() {
+                return thisContext.getCharset();
+            }
+
+            @Override
+            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+                T annotation = childContext.getAnnotation(annotationClass);
+                if(annotation == null) {
+                    return thisContext.getAnnotation(annotationClass);
+                }
+                return annotation;
+            }
+
+            @Override
+            public Annotation[] getAnnotations() {
+                return ArrayUtil.concat(childContext.getAnnotations(), thisContext.getAnnotations());
+            }
+
+            @Override
+            public Annotation[] getDeclaredAnnotations() {
+                return ArrayUtil.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
+            }
+        };
+    }
+
+    /**
      * Create a simple {@link ConversionContext} for the given generic type variables
      *
      * @param typeVariables The type variables
@@ -98,86 +147,66 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given charset
+     * Create a simple {@link ConversionContext} for the given generic type variables
      *
-     * @param charset The charset to use
+     * @param argument The argument
      * @return The conversion context
      */
-    static ConversionContext of(Charset charset) {
-        return new ConversionContext() {
-            @Override
-            public Charset getCharset() {
-                return charset;
-            }
-        };
+    static ConversionContext of(Argument<?> argument) {
+        return of(argument, null,null);
     }
 
     /**
-     * Creates a {@link ConversionContext} for the given format and Locale
+     * Create a simple {@link ConversionContext} for the given generic type variables
      *
-     * @param annotatedElement The annotated element
+     * @param argument The argument
      * @param locale The locale
      * @return The conversion context
      */
-    static ConversionContext of(AnnotatedElement annotatedElement, Locale locale) {
-        return new ConversionContext() {
-            @Override
-            public Locale getLocale() {
-                return locale;
-            }
-
-            @Override
-            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                return annotatedElement.getAnnotation(annotationClass);
-            }
-
-            @Override
-            public Annotation[] getAnnotations() {
-                return annotatedElement.getAnnotations();
-            }
-
-            @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return annotatedElement.getDeclaredAnnotations();
-            }
-        };
+    static ConversionContext of(Argument<?> argument, @Nullable Locale locale) {
+        return of(argument, locale,null);
     }
 
-
     /**
-     * Creates a {@link ConversionContext} for the given format and Locale
+     * Create a simple {@link ConversionContext} for the given generic type variables
      *
-     * @param annotatedElement The annotated element
+     * @param argument The argument
      * @param locale The locale
-     * @param typeVariables The type variables
-     *
+     * @param charset The charset
      * @return The conversion context
      */
-    static ConversionContext of(AnnotatedElement annotatedElement,Map<String,Argument<?>> typeVariables, Locale locale) {
+    static ConversionContext of(Argument<?> argument, @Nullable Locale locale, @Nullable Charset charset) {
+        Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
+        Locale finalLocale = locale != null ? locale : Locale.ENGLISH;
         return new ConversionContext() {
-            @Override
-            public Locale getLocale() {
-                return locale;
-            }
-
             @Override
             public Map<String, Argument<?>> getTypeVariables() {
-                return typeVariables;
+                return argument.getTypeVariables();
             }
 
             @Override
             public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                return annotatedElement.getAnnotation(annotationClass);
+                return argument.getAnnotation(annotationClass);
             }
 
             @Override
             public Annotation[] getAnnotations() {
-                return annotatedElement.getAnnotations();
+                return argument.getAnnotations();
             }
 
             @Override
             public Annotation[] getDeclaredAnnotations() {
-                return annotatedElement.getDeclaredAnnotations();
+                return argument.getDeclaredAnnotations();
+            }
+
+            @Override
+            public Locale getLocale() {
+                return finalLocale;
+            }
+
+            @Override
+            public Charset getCharset() {
+                return finalCharset;
             }
         };
     }

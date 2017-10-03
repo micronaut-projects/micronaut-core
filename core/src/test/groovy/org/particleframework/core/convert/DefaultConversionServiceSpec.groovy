@@ -66,7 +66,7 @@ class DefaultConversionServiceSpec extends Specification {
         ConversionService conversionService = new DefaultConversionService()
         Field field = getClass().getDeclaredField("today")
         expect:
-        conversionService.convert(sourceObject, targetType, ConversionContext.of(field, Locale.ENGLISH)).get() == result
+        conversionService.convert(sourceObject, targetType, ConversionContext.of(Argument.create(field, "today", null), Locale.ENGLISH)).get() == result
 
         where:
         sourceObject | targetType | result
@@ -82,7 +82,7 @@ class DefaultConversionServiceSpec extends Specification {
         ConversionService conversionService = new DefaultConversionService()
         Field field = getClass().getDeclaredField("maxSize")
         expect:
-        conversionService.convert(sourceObject, targetType, ConversionContext.of(field, Locale.ENGLISH)).get() == result
+        conversionService.convert(sourceObject, targetType, ConversionContext.of(Argument.create(field, "maxSize", null), Locale.ENGLISH)).get() == result
 
         where:
         sourceObject | targetType | result
