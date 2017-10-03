@@ -9,7 +9,7 @@ import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtil;
 import org.particleframework.inject.BeanDefinitionClass;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.inject.writer.*;
 
 import javax.annotation.PostConstruct;
@@ -50,7 +50,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             "org.particleframework.context.annotation.Bean",
             "org.particleframework.context.annotation.Replaces",
             "org.particleframework.context.annotation.Value",
-            "org.particleframework.inject.annotation.Executable"
+            "org.particleframework.context.annotation.Executable"
 
     };
     private static final String AROUND_TYPE = "org.particleframework.aop.Around";

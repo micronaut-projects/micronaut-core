@@ -21,7 +21,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.ReturnType;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;

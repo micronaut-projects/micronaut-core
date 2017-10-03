@@ -13,26 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation;
+package org.particleframework.context.annotation;
 
-import org.particleframework.context.annotation.Executable;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import javax.inject.Qualifier;
+import java.lang.annotation.*;
 
 /**
- * <p>A meta annotation for HTTP {@link org.particleframework.stereotype.Controller} actions</p>
+ * <p>Specifies that the the argument is user provided and a {@link org.particleframework.inject.ParametrizedBeanFactory} should be generated</p>
+ *
+ * <p>Should be applied only to constructor arguments and {@link Bean} factory methods</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
+@Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Retention(RUNTIME)
-@Target({ElementType.ANNOTATION_TYPE})
-@Executable
-public @interface Action {
+@Qualifier
+public @interface Argument {
 }

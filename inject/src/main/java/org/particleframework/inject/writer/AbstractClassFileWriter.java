@@ -23,15 +23,16 @@ import java.util.*;
  */
 public abstract class AbstractClassFileWriter implements Opcodes {
 
-    public static final String CONSTRUCTOR_NAME = "<init>";
-    public static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
-    public static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
-    public static final int MODIFIERS_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
-    public static final Type TYPE_OBJECT = Type.getType(Object.class);
-    public static final Type TYPE_METHOD = Type.getType(java.lang.reflect.Method.class);
-    public static final int ACC_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
-    public static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
-    public static final Type TYPE_CLASS = Type.getType(Class.class);
+    protected static final String CONSTRUCTOR_NAME = "<init>";
+    protected static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
+    protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
+    protected static final int MODIFIERS_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
+    protected static final Type TYPE_OBJECT = Type.getType(Object.class);
+    protected static final Type TYPE_METHOD = Type.getType(java.lang.reflect.Method.class);
+    protected static final int ACC_PRIVATE_STATIC_FINAL = ACC_PRIVATE | ACC_FINAL | ACC_STATIC;
+    protected static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
+    protected static final Type TYPE_CLASS = Type.getType(Class.class);
+    protected static final int DEFAULT_MAX_STACK = 13;
 
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);

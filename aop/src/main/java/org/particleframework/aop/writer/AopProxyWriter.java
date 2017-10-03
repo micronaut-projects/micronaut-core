@@ -40,8 +40,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static org.particleframework.inject.writer.BeanDefinitionWriter.DEFAULT_MAX_STACK;
-
 /**
  * A class that generates AOP proxy classes at compile time
  *
@@ -318,28 +316,27 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface
             ) {
                 @Override
-                protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, MethodVisitor invokeMethodVisitor) {
-                    GeneratorAdapter invokeMethodGenerator = new GeneratorAdapter(invokeMethodVisitor, ACC_PUBLIC, METHOD_INVOKE_INTERNAL.getName(), METHOD_INVOKE_INTERNAL.getDescriptor());
+                protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
                     // load this
-                    invokeMethodGenerator.loadThis();
+                    invokeMethodVisitor.loadThis();
                     // first argument to static bridge is reference to parent
-                    invokeMethodGenerator.getField(methodType, FIELD_PARENT, proxyType);
+                    invokeMethodVisitor.getField(methodType, FIELD_PARENT, proxyType);
                     // now remaining arguments
                     for (int i = 0; i < argumentTypeList.size(); i++) {
-                        invokeMethodGenerator.loadArg(1);
-                        invokeMethodGenerator.push(i);
-                        invokeMethodGenerator.visitInsn(AALOAD);
+                        invokeMethodVisitor.loadArg(1);
+                        invokeMethodVisitor.push(i);
+                        invokeMethodVisitor.visitInsn(AALOAD);
                         AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
                     }
-                    invokeMethodGenerator.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
+                    invokeMethodVisitor.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
                     if(isVoidReturn) {
-                        invokeMethodGenerator.visitInsn(ACONST_NULL);
+                        invokeMethodVisitor.visitInsn(ACONST_NULL);
                     }
                     else {
                         AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
                     }
-                    invokeMethodGenerator.visitInsn(ARETURN);
-                    invokeMethodVisitor.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
+                    invokeMethodVisitor.visitInsn(ARETURN);
+                    invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
                     invokeMethodVisitor.visitEnd();
                 }
             };

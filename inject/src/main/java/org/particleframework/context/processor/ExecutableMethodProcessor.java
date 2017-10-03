@@ -15,10 +15,8 @@
  */
 package org.particleframework.context.processor;
 
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.BeanContext;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 
 import java.lang.annotation.Annotation;
 
