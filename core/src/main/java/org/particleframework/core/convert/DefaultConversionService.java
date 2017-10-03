@@ -391,7 +391,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 targetComponentType = arg.getType();
             }
             targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
-            Optional converted = convert(object, targetComponentType);
+            Optional converted = convert(object, targetComponentType, ConversionContext.of(arg != null ? arg.getTypeVariables() : Collections.emptyMap()));
             if (converted.isPresent()) {
                 return Optional.of(converted);
             } else {

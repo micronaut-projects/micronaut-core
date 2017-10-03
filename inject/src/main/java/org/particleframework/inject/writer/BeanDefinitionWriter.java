@@ -12,7 +12,6 @@ import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 
 import java.io.File;
@@ -50,10 +49,25 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public static final int DEFAULT_MAX_STACK = 13;
     public static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
-
-    private static final Method CREATE_MAP_METHOD = ReflectionUtils.getDeclaredMethod(CollectionUtils.class, "createMap", Object[].class).orElseThrow(() ->
-            new IllegalStateException("CollectionUtils.createMap(..) method not found. Incompatible version of Particle on the classpath?")
+    private static final org.objectweb.asm.commons.Method METHOD_ARGUMENT_CREATE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(
+                    Argument.class,
+                    "create",
+                    Class.class,
+                    String.class
+            )
     );
+
+    private static final org.objectweb.asm.commons.Method METHOD_ARGUMENT_CREATE_WITH_GENERICS = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(
+                    Argument.class,
+                    "create",
+                    Class.class,
+                    String.class,
+                    Argument[].class
+            )
+    );
+
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
     );
@@ -75,10 +89,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method ADD_EXECUTABLE_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addExecutableMethod", ExecutableMethod.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.addExecutableMethod(..) method not found. Incompatible version of Particle on the classpath?")
-    );
-
-    private static final Method CREATE_LIST_METHOD = ReflectionUtils.getDeclaredMethod(Arrays.class, "asList", Object[].class).orElseThrow(() ->
-            new IllegalStateException("Arrays.asList(..) method not found. Incompatible JVM?")
     );
 
     private static final Method GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getBeanForConstructorArgument", BeanResolutionContext.class, BeanContext.class, int.class).orElseThrow(() ->
@@ -110,17 +120,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
     );
-    public static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
+    private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class
     ));
-    public static final org.objectweb.asm.commons.Method BEAN_DEFINITION_METHOD_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
+
+    private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_METHOD_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Method.class, Argument[].class
     ));
 
-    public static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
-    public static final Type TYPE_CONSTRUCTOR = Type.getType(Constructor.class);
-    public static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
-    public static final Type TYPE_CLASS = Type.getType(Class.class);
+    private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
+    private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
     private final ClassVisitor classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -802,14 +811,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         defaultConstructor.visitEnd();
     }
 
-    private void pushThreeCallsToEmptyMap(GeneratorAdapter constructorGenerator) {
-        org.objectweb.asm.commons.Method emptyMapMethod = org.objectweb.asm.commons.Method.getMethod("java.util.Map emptyMap()");
-
-        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
-        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
-        constructorGenerator.invokeStatic(Type.getType(Collections.class), emptyMapMethod);
-    }
-
 
     private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isOptional) {
         // ready this
@@ -1111,14 +1112,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
                 methodToInvoke.getName(),
                 Type.getMethodDescriptor(methodToInvoke),
-                false);
-    }
-
-    private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, org.objectweb.asm.commons.Method methodToInvoke) {
-        constructorVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
-                methodToInvoke.getName(),
-                methodToInvoke.getDescriptor(),
                 false);
     }
 
@@ -1593,22 +1586,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             generatorAdapter.push(i);
             String typeParameterName = entry.getKey();
             Object value = entry.getValue();
+            Map nestedTypes = null;
+            if(value instanceof Map) {
+                Map nestedTypeData = (Map)value;
+                Optional<Map.Entry> nestedEntry = nestedTypeData.entrySet().stream().findFirst();
+                if(nestedEntry.isPresent()) {
+                    Map.Entry data = nestedEntry.get();
+                    Object key = data.getKey();
+                    Object map = data.getValue();
+                    value = key;
+                    if(map instanceof Map) {
+                        nestedTypes = (Map) map;
+                    }
+                }
+            }
+
             // 1st argument: the type
             generatorAdapter.push(getTypeReference(value));
             // 2nd argument: the name
             generatorAdapter.push(typeParameterName);
+
+            // 3rd argument: generic types
+            boolean hasGenerics = nestedTypes != null;
+            if(hasGenerics) {
+                buildTypeArguments(generatorAdapter, nestedTypes);
+            }
+
             // Argument.create( .. )
             generatorAdapter.invokeStatic(
                     Type.getType(Argument.class),
-                    org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.getRequiredMethod(
-                                    Argument.class,
-                                    "create",
-                                    Class.class,
-                                    String.class
-                            )
-                    )
+                    hasGenerics ? METHOD_ARGUMENT_CREATE_WITH_GENERICS : METHOD_ARGUMENT_CREATE
             );
+
             // store the type reference
             generatorAdapter.visitInsn(AASTORE);
             // if we are not at the end of the array duplicate array onto the stack
@@ -1646,60 +1655,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return protectedConstructor;
     }
 
-    static void pushCreateMapCall(GeneratorAdapter methodVisitor, Map<String, Object> argumentTypes) {
-        int totalSize = argumentTypes.size() * 2;
-        if (totalSize > 0) {
-
-            // start a new array
-            pushNewArray(methodVisitor, Object.class, totalSize);
-            int i = 0;
-            for (Map.Entry<String, Object> entry : argumentTypes.entrySet()) {
-                // use the property name as the key
-                pushStoreStringInArray(methodVisitor, i++, totalSize, entry.getKey());
-                // use the property type as the value
-                pushStoreTypeInArray(methodVisitor, i++, totalSize, entry.getValue());
-            }
-            // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(CollectionUtils.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
-        } else {
-            methodVisitor.visitInsn(ACONST_NULL);
-        }
-    }
-
-    static void pushCreateGenericsMapCall(GeneratorAdapter methodVisitor, Map<String, List<Object>> genericTypes) {
-        int totalSize = genericTypes.size() * 2;
-        if (totalSize > 0) {
-            // start a new array
-            pushNewArray(methodVisitor, Object.class, totalSize);
-            int i = 0;
-
-            for (Map.Entry<String, List<Object>> entry : genericTypes.entrySet()) {
-                // use the property name as the key
-                pushStoreStringInArray(methodVisitor, i++, totalSize, entry.getKey());
-
-
-                // push a new array for the generic types
-                pushIntegerConstant(methodVisitor, i++);
-
-                List<Object> genericTypeRefs = entry.getValue();
-                pushNewListOfTypes(methodVisitor, genericTypeRefs);
-                methodVisitor.visitInsn(AASTORE);
-                if (i < totalSize) {
-                    // if we are not at the end of the array duplicate array onto the stack
-                    methodVisitor.visitInsn(DUP);
-                }
-            }
-            methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(CollectionUtils.class), "createMap", Type.getMethodDescriptor(CREATE_MAP_METHOD), false);
-        } else {
-            methodVisitor.visitInsn(ACONST_NULL);
-        }
-    }
-
-    static void pushNewListOfTypes(GeneratorAdapter methodVisitor, List<Object> types) {
-        pushNewArrayOfTypes(methodVisitor, types);
-        // invoke the Arrays.asList() method
-        methodVisitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arrays.class), "asList", Type.getMethodDescriptor(CREATE_LIST_METHOD), false);
-    }
 
     static void pushGetMethodFromTypeCall(GeneratorAdapter methodVisitor, Type declaringType, String methodName, Collection<Object> argumentTypes) {
         // lookup the Method instance from the declaring type
@@ -1773,18 +1728,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    static void pushStoreStringInArray(MethodVisitor methodVisitor, int index, int size, String string) {
-        // the array index position
-        pushIntegerConstant(methodVisitor, index);
-        // load the constant string
-        methodVisitor.visitLdcInsn(string);
-        // store the string in the position
-        methodVisitor.visitInsn(AASTORE);
-        if (index != (size - 1)) {
-            // if we are not at the end of the array duplicate array onto the stack
-            methodVisitor.visitInsn(DUP);
-        }
-    }
 
     static void pushNewArray(MethodVisitor methodVisitor, Class arrayType, int size) {
         // the size of the array

@@ -104,14 +104,48 @@ class GenericUtils {
                 String parameterName = typeParameter.toString();
                 TypeMirror mirror = i.next();
 
-                // TODO: recurse for type parameters
-                resolvedParameters.put(
-                        parameterName,
-                        resolveTypeReference(mirror)
-                );
+                TypeKind kind = mirror.getKind();
+                if(kind == TypeKind.DECLARED) {
+                    resolveGenericTypeParameter(resolvedParameters, parameterName, mirror);
+
+                }
+                else if(kind == TypeKind.WILDCARD) {
+                    WildcardType wcType = (WildcardType) mirror;
+                    TypeMirror extendsBound = wcType.getExtendsBound();
+                    TypeMirror superBound = wcType.getSuperBound();
+                    if (extendsBound != null) {
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound);
+                    }
+                    else if (superBound != null) {
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, superBound);
+                    }
+                    else {
+                        resolvedParameters.put(parameterName, Object.class);
+                    }
+                }
             }
         }
         return resolvedParameters;
+    }
+
+    private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
+        DeclaredType declaredType = (DeclaredType)mirror;
+        List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
+        if(nestedArguments.isEmpty()) {
+            resolvedParameters.put(
+                    parameterName,
+                    resolveTypeReference(typeUtils.erasure(mirror))
+            );
+        }
+        else {
+            resolvedParameters.put(
+                  parameterName,
+                  Collections.singletonMap(
+                          resolveTypeReference(typeUtils.erasure(mirror)),
+                          resolveGenericTypes(declaredType)
+                  )
+            );
+        }
     }
 
     String resolveTypeReference(TypeMirror mirror) {

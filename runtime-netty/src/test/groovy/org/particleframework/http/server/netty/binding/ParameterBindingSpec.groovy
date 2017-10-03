@@ -50,7 +50,7 @@ class ParameterBindingSpec extends AbstractParticleSpec {
         '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
         '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-//       TODO: '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
+        '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
     }
 
     @Controller

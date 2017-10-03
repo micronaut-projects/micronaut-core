@@ -63,7 +63,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         }
         Object value = values.get(annotationValue, Object.class).orElse(null);
         boolean isConvertibleValues = values instanceof ConvertibleMultiValues;
-        if(isConvertibleValues && isManyObjects(argumentType)) {
+        if(isConvertibleValues && isManyObjects(argument)) {
             ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;
             List<?> all = multiValues.getAll(annotationValue);
             boolean hasMultiValues = all != null;
@@ -97,8 +97,19 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         return value;
     }
 
-    private boolean isManyObjects(Class<T> argumentType) {
-        return argumentType.isArray() || Iterable.class.isAssignableFrom(argumentType) || Stream.class.isAssignableFrom(argumentType);
+    private boolean isManyObjects(Argument<?> argument) {
+        Class<?> argumentType = argument.getType();
+        if(argumentType.isArray() || Iterable.class.isAssignableFrom(argumentType) || Stream.class.isAssignableFrom(argumentType)) {
+            return true;
+        }
+        else {
+            Optional<Argument<?>> firstTypeVariable = argument.getFirstTypeVariable();
+            if(firstTypeVariable.isPresent()) {
+                Argument<?> typeVariable = firstTypeVariable.get();
+                return isManyObjects(typeVariable);
+            }
+        }
+        return false;
     }
 
     private Optional<T> doConvert(Object value, Class<T> targetType, ConversionContext context) {

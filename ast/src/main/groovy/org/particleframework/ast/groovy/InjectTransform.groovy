@@ -1,13 +1,11 @@
 package org.particleframework.ast.groovy
 
 import groovy.transform.CompilationUnitAware
-import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.Expression
-import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -38,7 +36,6 @@ import org.particleframework.inject.writer.ProxyingBeanDefinitionVisitor
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 import javax.inject.*
-import javax.lang.model.element.AnnotationMirror
 import java.beans.Introspector
 import java.lang.reflect.Modifier
 
@@ -272,7 +269,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Map<String, Object> targetMethodParamsToType = [:]
                     Map<String, Object> targetMethodQualifierTypes = [:]
                     Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                    Object resolvedReturnType = resolveTypeReference(methodNode.returnType)
+                    Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType)
                     List<Object> resolvedGenericTypes = resolveGenericTypes(methodNode.returnType)
                     populateParameterData(
                             methodNode.parameters,
@@ -282,7 +279,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     aopProxyWriter.visitAroundMethod(
-                            resolveTypeReference(methodNode.declaringClass),
+                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                             resolvedReturnType,
                             resolvedGenericTypes,
                             methodNode.name,
@@ -330,7 +327,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Map<String, Map<String,Object>> genericTypeMap = [:]
                 populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                beanMethodWriter.visitBeanFactoryMethod(resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
+                beanMethodWriter.visitBeanFactoryMethod(AstGenericUtils.resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
                 String beanMethodDeclaringType = declaringClass.name
                 beanMethodWriter.visitMethodAnnotationSource(
                         beanMethodDeclaringType,
@@ -366,7 +363,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Map<String, Object> targetMethodParamsToType = [:]
                             Map<String, Object> targetMethodQualifierTypes = [:]
                             Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                            Object resolvedReturnType = resolveTypeReference(targetBeanMethodNode.returnType)
+                            Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType)
                             List<Object> resolvedGenericTypes = resolveGenericTypes(targetBeanMethodNode.returnType)
                             populateParameterData(
                                     targetBeanMethodNode.parameters,
@@ -374,7 +371,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap )
                             beanMethodWriter.visitExecutableMethod(
-                                    resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
                                     resolvedGenericTypes,
                                     targetBeanMethodNode.name,
@@ -389,7 +386,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                             proxyWriter.visitAroundMethod(
-                                    resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
                                     resolvedGenericTypes,
                                     targetBeanMethodNode.name,
@@ -458,27 +455,27 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         if (stereoTypeFinder.hasStereoType(methodNode, PostConstruct.name)) {
                             beanWriter.visitPostConstructMethod(
-                                    resolveTypeReference(declaringClass),
+                                    AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
-                                    resolveTypeReference(methodNode.returnType),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
                         } else if (stereoTypeFinder.hasStereoType(methodNode, PreDestroy.name)) {
                             beanWriter.visitPreDestroyMethod(
-                                    resolveTypeReference(declaringClass),
+                                    AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
-                                    resolveTypeReference(methodNode.returnType),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
                                     qualifierTypes,
                                     genericTypeMap)
                         } else {
                             beanWriter.visitMethodInjectionPoint(
-                                    resolveTypeReference(declaringClass),
+                                    AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
-                                    resolveTypeReference(methodNode.returnType),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodName,
                                     paramsToType,
                                     qualifierTypes,
@@ -503,8 +500,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         beanWriter.visitExecutableMethod(
-                                resolveTypeReference(methodNode.declaringClass),
-                                resolveTypeReference(methodNode.returnType),
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
                                 methodName,
                                 paramsToType,
@@ -530,8 +527,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
-                                        resolveTypeReference(methodNode.declaringClass),
-                                        resolveTypeReference(methodNode.returnType),
+                                        AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                         returnTypeGenerics,
                                         methodName,
                                         paramsToType,
@@ -608,19 +605,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         protected Object[] resolveTypeReferences(AnnotationNode[] annotationNodes) {
-            return annotationNodes.collect() { AnnotationNode node -> resolveTypeReference(node.classNode) } as Object[]
+            return annotationNodes.collect() { AnnotationNode node -> AstGenericUtils.resolveTypeReference(node.classNode) } as Object[]
         }
 
         protected List<Object> resolveGenericTypes(ClassNode type) {
             List<Object> generics = []
             for(gt in type.genericsTypes) {
                 if(!gt.isPlaceholder()) {
-                    generics.add(resolveTypeReference(gt.type))
+                    generics.add(AstGenericUtils.resolveTypeReference(gt.type))
                 }
                 else if(gt.isWildcard()) {
                     ClassNode[] upperBounds = gt.upperBounds
                     if(upperBounds != null && upperBounds.length == 1) {
-                        generics.add(resolveTypeReference(upperBounds[0]))
+                        generics.add(AstGenericUtils.resolveTypeReference(upperBounds[0]))
                     }
                 }
             }
@@ -695,10 +692,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 GenericsType[] genericsTypes = fieldType.genericsTypes
                 Map<String, Object> genericTypeList = null
                 if (genericsTypes != null && genericsTypes.length > 0) {
-                    genericTypeList = buildGenericTypeInfo(fieldType)
+                    genericTypeList = AstGenericUtils.buildGenericTypeInfo(fieldType)
                 } else if (fieldType.isArray()) {
                     genericTypeList = [:]
-                    genericTypeList.put(fieldNode.name,resolveTypeReference(fieldType.componentType))
+                    genericTypeList.put(fieldNode.name, AstGenericUtils.resolveTypeReference(fieldType.componentType))
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
                 if(!beanWriter.isValidated()) {
@@ -710,10 +707,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(isInject) {
 
                     beanWriter.visitSetterInjectionPoint(
-                            resolveTypeReference(declaringClass),
+                            AstGenericUtils.resolveTypeReference(declaringClass),
                             qualifier,
                             false,
-                            resolveTypeReference(fieldType),
+                            AstGenericUtils.resolveTypeReference(fieldType),
                             fieldNode.name,
                             getSetterName(propertyNode.name),
                             genericTypeList
@@ -721,10 +718,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 else if(isValue){
                     beanWriter.visitSetterValue(
-                            resolveTypeReference(declaringClass),
+                            AstGenericUtils.resolveTypeReference(declaringClass),
                             qualifier,
                             false,
-                            resolveTypeReference(fieldType),
+                            AstGenericUtils.resolveTypeReference(fieldType),
                             fieldNode.name,
                             getSetterName(propertyNode.name),
                             genericTypeList,
@@ -734,13 +731,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        private Object resolveTypeReference(ClassNode classNode) {
-            if (classNode == null) {
-                return null
-            } else {
-                return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
-            }
-        }
 
         protected boolean isInheritedAndNotPublic(AnnotatedNode annotatedNode, ClassNode declaringClass, int modifiers) {
             return declaringClass != concreteClass &&
@@ -856,43 +846,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 GenericsType[] genericsTypes = parameterType.genericsTypes
                 if (genericsTypes != null && genericsTypes.length > 0) {
-                    Map<String, Object> resolvedGenericTypes = buildGenericTypeInfo(parameterType)
+                    Map<String, Object> resolvedGenericTypes = AstGenericUtils.extractPlaceholders(parameterType)
                     genericTypeMap.put(parameterName, resolvedGenericTypes)
                 } else if (parameterType.isArray()) {
                     Map<String, Object> genericTypeList = [:]
-                    genericTypeList.put('E',resolveTypeReference(parameterType.componentType))
+                    genericTypeList.put('E', AstGenericUtils.resolveTypeReference(parameterType.componentType))
                     genericTypeMap.put(parameterName, genericTypeList)
                 }
             }
-        }
-
-        protected Map<String, Object> buildGenericTypeInfo(ClassNode parameterType) {
-            Map<String, Object> resolvedGenericTypes = [:]
-            Map<String, GenericsType> placeholders = GenericsUtils.extractPlaceholders(parameterType)
-            for (entry in placeholders) {
-                GenericsType gt = entry.value
-                if (!gt.isPlaceholder()) {
-                    resolvedGenericTypes.put(entry.key, resolveTypeReference(gt.type))
-                } else if (gt.isWildcard()) {
-                    ClassNode[] upperBounds = gt.upperBounds
-                    if (upperBounds != null && upperBounds.length == 1) {
-                        resolvedGenericTypes.put(entry.key, resolveTypeReference(upperBounds[0]))
-                        continue
-                    }
-
-                    ClassNode lowerBounds = gt.lowerBound
-                    if (lowerBounds != null) {
-                        resolvedGenericTypes.put(entry.key, resolveTypeReference(lowerBounds))
-                        continue
-                    }
-
-                    resolvedGenericTypes.put(entry.key, Object.class)
-                } else {
-                    resolvedGenericTypes.put(entry.key, Object.class)
-                }
-
-            }
-            resolvedGenericTypes
         }
 
 
