@@ -517,7 +517,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                     return context.createBean(argumentType);
                 } else {
                     String argumentName = argument.getName();
-                    Map<String,Argument<?>> genericTypes = argument.getTypeVariables();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
@@ -568,11 +567,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     protected Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        if (argument.getAnnotation(Value.class) != null) {
-            return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, null);
-        } else {
-            return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
-        }
+        return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
     }
 
 
@@ -683,7 +678,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     @Internal
     protected Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
-        Argument argument = constructorInjectionPoint.getArguments()[argIndex];
+        Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
         Class argumentType = argument.getType();
         if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
@@ -702,28 +697,49 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             path.pushConstructorResolve(this, argument);
             try {
                 Object bean;
-                if (argument.getAnnotation(Value.class) != null) {
-                    if (context instanceof PropertyResolver) {
-                        PropertyResolver propertyResolver = (PropertyResolver) context;
-                        Value valAnn = (Value) argument.getAnnotation(Value.class);
-                        if (valAnn == null) {
-                            throw new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing.");
-                        }
-                        Optional value = propertyResolver.getProperty(valAnn.value(), argumentType);
-                        // can't use orElseThrow here due to compiler bug
-                        bean = value.orElseGet(() -> new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + value + "]. Property doesn't exist"));
-                    } else {
-                        throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
-                    }
-                } else {
-                    Qualifier qualifier = resolveQualifier(argument);
-                    bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
-                }
+                Qualifier qualifier = resolveQualifier(argument);
+                bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException | BeanInstantiationException e) {
                 throw new DependencyInjectionException(resolutionContext, argument, e);
             }
+        }
+    }
+
+    /**
+     * Obtains a value for a bean definition for a constructor at the given index
+     * <p>
+     * Warning: this method is used by internal generated code and should not be called by user code.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argIndex          The argument index
+     * @return The resolved bean
+     */
+    @Internal
+    protected Object getValueForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
+        ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
+        path.pushConstructorResolve(this, argument);
+        try {
+            Object result;
+            if (context instanceof PropertyResolver) {
+                PropertyResolver propertyResolver = (PropertyResolver) context;
+                Value valAnn = argument.findAnnotation(Value.class)
+                                        .orElseThrow(()-> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
+
+                Optional value = propertyResolver.getProperty(valAnn.value(), (Class<T>) argument.getType(), ConversionContext.of(argument));
+                // can't use orElseThrow here due to compiler bug
+                result = value.orElseGet(() -> new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + value + "]. Property doesn't exist"));
+            } else {
+                throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
+            }
+            path.pop();
+            return result;
+        } catch (NoSuchBeanException | BeanInstantiationException e) {
+            throw new DependencyInjectionException(resolutionContext, argument, e);
         }
     }
 
