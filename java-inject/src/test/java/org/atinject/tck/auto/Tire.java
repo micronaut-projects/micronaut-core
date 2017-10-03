@@ -1,23 +1,7 @@
-/*
- * Copyright (C) 2009 The JSR-330 Expert Group
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.atinject.tck.auto;
 
-import org.atinject.tck.auto.accessories.SpareTire;
 import org.atinject.tck.auto.accessories.RoundThing;
+import org.atinject.tck.auto.accessories.SpareTire;
 
 import javax.inject.Inject;
 import java.util.LinkedHashSet;
@@ -30,7 +14,7 @@ public class Tire extends RoundThing {
     protected static final Set<String> moreProblems = new LinkedHashSet<String>();
 
     FuelTank constructorInjection = NEVER_INJECTED;
-    @Inject FuelTank fieldInjection = NEVER_INJECTED;
+    @Inject protected FuelTank fieldInjection = NEVER_INJECTED;
     FuelTank methodInjection = NEVER_INJECTED;
     @Inject static FuelTank staticFieldInjection = NEVER_INJECTED;
     static FuelTank staticMethodInjection = NEVER_INJECTED;
@@ -64,7 +48,8 @@ public class Tire extends RoundThing {
     public boolean overriddenProtectedMethodInjectedTwice;
     public boolean overriddenPublicMethodInjectedTwice;
 
-    @Inject public Tire(FuelTank constructorInjection) {
+    @Inject
+    public Tire(FuelTank constructorInjection) {
         this.constructorInjection = constructorInjection;
     }
 
@@ -115,7 +100,8 @@ public class Tire extends RoundThing {
         superProtectedMethodInjected = true;
     }
 
-    @Inject public void injectPublicMethod() {
+    @Inject
+    public void injectPublicMethod() {
         if (superPublicMethodInjected) {
             overriddenPublicMethodInjectedTwice = true;
         }
@@ -134,7 +120,8 @@ public class Tire extends RoundThing {
         protectedMethodForOverrideInjected = true;
     }
 
-    @Inject public void injectPublicMethodForOverride() {
+    @Inject
+    public void injectPublicMethodForOverride() {
         publicMethodForOverrideInjected = true;
     }
 
@@ -162,21 +149,33 @@ public class Tire extends RoundThing {
         return false;
     }
 
-    boolean packagePrivateMethod2Injected;
+    public boolean tirePackagePrivateMethod2Injected;
+
+    public boolean getTirePackagePrivateMethod2Injected() {
+        return tirePackagePrivateMethod2Injected;
+    }
 
     @Inject void injectPackagePrivateMethod2() {
-        packagePrivateMethod2Injected = true;
+        tirePackagePrivateMethod2Injected = true;
     }
 
-    public boolean packagePrivateMethod3Injected;
+    public boolean tirePackagePrivateMethod3Injected;
+
+    public boolean getTirePackagePrivateMethod3Injected() {
+        return tirePackagePrivateMethod3Injected;
+    }
 
     @Inject void injectPackagePrivateMethod3() {
-        packagePrivateMethod3Injected = true;
+        tirePackagePrivateMethod3Injected = true;
     }
 
-    public boolean packagePrivateMethod4Injected;
+    public boolean tirePackagePrivateMethod4Injected;
+
+    public boolean getTirePackagePrivateMethod4Injected() {
+        return tirePackagePrivateMethod4Injected;
+    }
 
     void injectPackagePrivateMethod4() {
-        packagePrivateMethod4Injected = true;
+        tirePackagePrivateMethod4Injected = true;
     }
 }

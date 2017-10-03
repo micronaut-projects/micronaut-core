@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-package org.atinject.tck;
-
-import org.atinject.tck.auto.Car;
-import org.atinject.tck.auto.Convertible;
+package org.atinject.tck.auto;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
@@ -30,7 +27,7 @@ import junit.framework.TestSuite;
  *
  * <pre>
  * import junit.framework.Test;
- * import org.atinject.tck.Tck;
+ * import org.atinject.tck.auto.Tck;
  * import org.atinject.tck.auto.Car;
  *
  * public class MyTck {
@@ -115,7 +112,7 @@ public class Tck {
         try {
             TestSuite suite = new TestSuite(Convertible.Tests.class);
             if (supportsStatic) {
-                suite.addTestSuite(Convertible.StaticTests.class);
+//                suite.addTestSuite(Convertible.StaticTests.class);
             }
             if (supportsPrivate) {
                 suite.addTestSuite(Convertible.PrivateTests.class);

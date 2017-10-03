@@ -85,18 +85,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     .filter(element -> element.getKind() != ANNOTATION_TYPE)
                     .forEach(element -> {
                         TypeElement typeElement = modelUtils.classElementFor(element);
-                        if(!modelUtils.isAbstract(typeElement)) {
-                            String name = typeElement.getQualifiedName().toString();
-                            if(!processed.contains(name) && !name.endsWith("$Intercepted")) {
-                                AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
-                                beanDefinitionWriters.put(name, visitor);
+                        String name = typeElement.getQualifiedName().toString();
+                        if (!beanDefinitionWriters.containsKey(name)) {
+                            if(!modelUtils.isAbstract(typeElement)) {
+                                if(!processed.contains(name) && !name.endsWith("$Intercepted")) {
+                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
+                                    beanDefinitionWriters.put(name, visitor);
+                                }
                             }
-                        }
-                        else {
-                            if( annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) ) {
-                                String name = typeElement.getQualifiedName().toString();
-                                AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
-                                beanDefinitionWriters.put(name, visitor);
+                            else {
+                                if( annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) ) {
+                                    AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
+                                    beanDefinitionWriters.put(name, visitor);
+                                }
                             }
                         }
                     }));
@@ -214,7 +215,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if(annotationUtils.hasStereotype(classElement, "org.particleframework.aop.Introduction") && modelUtils.isAbstract(classElement)) {
 
                 AopProxyWriter aopProxyWriter = createAopWriterFor(classElement);
-                ExecutableElement constructor = classElement.getKind() == ElementKind.CLASS ? publicConstructorFor(classElement) : null;
+                ExecutableElement constructor = classElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(classElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
                 if(constructorData != null) {
                     aopProxyWriter.visitBeanDefinitionConstructor(
@@ -276,7 +277,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         BeanDefinitionWriter beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
                         beanDefinitionWriters.put(concreteClass.getQualifiedName(), beanDefinitionWriter);
 
-                        ExecutableElement constructor = publicConstructorFor(classElement);
+                        ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement);
                         this.constructorParamterInfo = populateParameterData(constructor);
                         Name proxyKey = createProxyKey(beanDefinitionWriter.getBeanDefinitionName());
                         BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
@@ -404,7 +405,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 AnnotationMirror[] annotationMirrors = annotationUtils.findAnnotationsWithStereotype(beanMethod, AROUND_TYPE);
                 Object[] interceptorTypes = modelUtils.resolveTypeReferences(annotationMirrors);
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
-                ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? publicConstructorFor(returnTypeElement) : null;
+                ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
                 AopProxyWriter proxyWriter = resolveAopProxyWriter(
                         beanMethodWriter,
@@ -614,7 +615,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer;
             boolean overriddenInjected = overridden && annotationUtils.hasStereotype(overridingMethod, Inject.class);
 
-            if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected) {
+            if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && !overriddenInjected && !isPrivate) {
                 // bail out if the overridden method is package private and in the same package
                 // and is not annotated with @Inject
                 return;
@@ -867,24 +868,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     singletonAnn.isPresent());
         }
 
-        ExecutableElement publicConstructorFor(TypeElement classElement) {
-            // following logic of InjectTransform.groovy
-            List<ExecutableElement> constructors = modelUtils.findPublicConstructors(classElement);
-            if (constructors.isEmpty()) {
-                return null;
-            }
-            if (constructors.size() == 1) {
-                return constructors.get(0);
-            }
-            Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
-                List<? extends VariableElement> parameters = ctor.getParameters();
-                return !parameters.stream()
-                    .filter(param -> Objects.nonNull(param.getAnnotation(Inject.class)))
-                    .collect(Collectors.toList())
-                    .isEmpty();
-            }).findFirst();
-            return element.orElse(null);
-        }
 
         private ExecutableElementParamInfo populateParameterData(ExecutableElement element) {
             ExecutableElementParamInfo params = new ExecutableElementParamInfo();

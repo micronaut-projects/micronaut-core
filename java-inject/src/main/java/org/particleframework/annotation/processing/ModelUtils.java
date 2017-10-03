@@ -1,5 +1,6 @@
 package org.particleframework.annotation.processing;
 
+import javax.inject.Inject;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
@@ -9,11 +10,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.Modifier.*;
-import static javax.lang.model.type.TypeKind.ARRAY;
-import static javax.lang.model.type.TypeKind.NONE;
-import static javax.lang.model.type.TypeKind.VOID;
+import static javax.lang.model.type.TypeKind.*;
 
 class ModelUtils {
     private final Elements elementUtils;
@@ -78,19 +76,31 @@ class ModelUtils {
         return "set" + name;
     }
 
-    List<? extends Element> findPublicConstructors(String className) {
-        TypeElement typeElement = elementUtils.getTypeElement(className);
-        return elementUtils.getAllMembers(typeElement).stream()
-            .filter(element ->
-                element.getKind() == CONSTRUCTOR && element.getModifiers().contains(PUBLIC))
-            .collect(Collectors.toList());
+    ExecutableElement concreteConstructorFor(TypeElement classElement) {
+        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+        if (constructors.isEmpty()) {
+            return null;
+        }
+        if (constructors.size() == 1) {
+            return constructors.get(0);
+        }
+        Optional<ExecutableElement> element = constructors.stream().filter(ctor ->
+            Objects.nonNull(ctor.getAnnotation(Inject.class))
+        ).findFirst();
+        if (!element.isPresent()) {
+            element = constructors.stream().filter(ctor ->
+                Objects.nonNull(ctor.getModifiers().contains(PUBLIC))
+            ).findFirst();
+        }
+        return element.orElse(null);
     }
 
-    List<ExecutableElement> findPublicConstructors(TypeElement classElement) {
+
+    List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
         List<ExecutableElement> ctors =
             ElementFilter.constructorsIn(classElement.getEnclosedElements());
         return ctors.stream()
-            .filter(ctor -> ctor.getModifiers().contains(PUBLIC))
+            .filter(ctor -> !ctor.getModifiers().contains(PRIVATE))
             .collect(Collectors.toList());
     }
 
