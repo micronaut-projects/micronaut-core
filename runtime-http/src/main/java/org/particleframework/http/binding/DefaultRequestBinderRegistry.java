@@ -92,10 +92,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     @Override
     public <T> Optional<ArgumentBinder<T, HttpRequest>> findArgumentBinder(Argument<T> argument, HttpRequest source) {
-        Annotation annotation = argument.findAnnotation(Bindable.class);
-        if(annotation != null) {
-
-            Class<? extends Annotation> annotationType = annotation.annotationType();
+        Optional<Annotation> annotation = argument.findAnnotationWithStereoType(Bindable.class);
+        if(annotation.isPresent()) {
+            Class<? extends Annotation> annotationType = annotation.get().annotationType();
             RequestArgumentBinder<T> binder = byTypeAndAnnotation.get(new TypeAndAnnotation(argument.getType(), annotationType));
             if(binder ==  null) {
                 binder = byAnnotation.get(annotationType);

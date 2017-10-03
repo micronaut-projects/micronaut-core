@@ -26,6 +26,7 @@ import org.particleframework.inject.annotation.Executable;
 
 import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -164,34 +165,21 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     private class MethodReturnType<MRT> implements ReturnType<MRT> {
+
         @Override
         public Class<MRT> getType() {
             return (Class<MRT>) method.getReturnType();
         }
 
         @Override
-        public List<Class> getGenericTypes() {
-            return Arrays.asList(GenericTypeUtils.resolveTypeArguments(method.getGenericReturnType()));
+        public Map<String, Argument<?>> getTypeVariables() {
+            // TODO: build via reflection
+            return Collections.emptyMap();
         }
 
         @Override
-        public <A extends Annotation> A getAnnotation(Class<A> type) {
-            return method.getAnnotatedReturnType().getAnnotation(type);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotatedReturnType().getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getAnnotatedReturnType().getDeclaredAnnotations();
-        }
-
-        @Override
-        public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-            return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotatedReturnType().getAnnotations());
+        public AnnotatedElement[] getAnnotatedElements() {
+            return new AnnotatedElement[] { method.getAnnotatedReturnType(), method};
         }
     }
 }

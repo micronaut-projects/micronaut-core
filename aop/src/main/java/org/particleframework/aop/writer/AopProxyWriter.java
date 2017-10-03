@@ -278,7 +278,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
-                                  List<Object> returnTypeGenericTypes,
+                                  Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
@@ -863,7 +863,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public ExecutableMethodWriter visitExecutableMethod(
             Object declaringType,
             Object returnType,
-            List<Object> returnTypeGenericTypes,
+            Map<String, Object> returnTypeGenericTypes,
             String methodName,
             Map<String, Object> argumentTypes,
             Map<String, Object> qualifierTypes,

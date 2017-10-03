@@ -3,6 +3,7 @@ package org.particleframework.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
+import groovyjarjarantlr.collections.AST
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.Expression
@@ -270,7 +271,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Map<String, Object> targetMethodQualifierTypes = [:]
                     Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
                     Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType)
-                    List<Object> resolvedGenericTypes = resolveGenericTypes(methodNode.returnType)
+                    Map<String,Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType)
                     populateParameterData(
                             methodNode.parameters,
                             targetMethodParamsToType,
@@ -364,7 +365,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Map<String, Object> targetMethodQualifierTypes = [:]
                             Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
                             Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType)
-                            List<Object> resolvedGenericTypes = resolveGenericTypes(targetBeanMethodNode.returnType)
+                            Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(targetBeanMethodNode.returnType)
                             populateParameterData(
                                     targetBeanMethodNode.parameters,
                                     targetMethodParamsToType,
@@ -373,7 +374,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             beanMethodWriter.visitExecutableMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
-                                    resolvedGenericTypes,
+                                    returnTypeGenerics,
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
@@ -388,7 +389,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             proxyWriter.visitAroundMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
-                                    resolvedGenericTypes,
+                                    returnTypeGenerics,
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
@@ -492,7 +493,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if(declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
-                        List<Object> returnTypeGenerics = resolveGenericTypes(methodNode.returnType)
+                        Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType)
 
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]

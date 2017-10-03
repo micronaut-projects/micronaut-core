@@ -54,7 +54,7 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
     class $blah0 extends AbstractExecutableMethod {
         protected $blah0() {
             super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
-                    new Class[0],
+                    new Argument[0],
                     Argument.create(
                             ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
                             "name",

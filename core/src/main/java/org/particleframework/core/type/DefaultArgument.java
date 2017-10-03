@@ -4,6 +4,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,16 +18,16 @@ import java.util.Optional;
  */
 @Internal
 class DefaultArgument<T> implements Argument<T> {
-    private final Class type;
+    private final Class<T> type;
     private final String name;
     private final Annotation qualifier;
-    private final Annotation[] annotations;
+    private final AnnotatedElement annotatedElement;
     private final Map<String, Argument<?>> typeParameters;
 
     DefaultArgument(Class type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
         this.type = type;
         this.name = name;
-        this.annotations = annotations;
+        this.annotatedElement = createInternalElement(annotations);
         this.qualifier = qualifier;
         this.typeParameters = initializeTypeParameters(genericTypes);
     }
@@ -34,7 +35,7 @@ class DefaultArgument<T> implements Argument<T> {
     DefaultArgument(Class type, String name, Annotation qualifier, Argument... genericTypes) {
         this.type = type;
         this.name = name;
-        this.annotations = new Annotation[0];
+        this.annotatedElement = AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
         this.qualifier = qualifier;
         this.typeParameters = initializeTypeParameters(genericTypes);
     }
@@ -53,7 +54,7 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
-    public Class getType() {
+    public Class<T> getType() {
         return type;
     }
 
@@ -63,18 +64,8 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
-    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-        return AnnotationUtil.findAnnotationWithStereoType(stereotype, annotations);
-    }
-
-    @Override
-    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-        for (Annotation annotation : annotations) {
-            if(annotation.annotationType().equals(annotationClass)) {
-                return (A) annotation;
-            }
-        }
-        return null;
+    public AnnotatedElement[] getAnnotatedElements() {
+        return new AnnotatedElement[] { annotatedElement };
     }
 
     @Override
@@ -107,18 +98,6 @@ class DefaultArgument<T> implements Argument<T> {
         return result;
     }
 
-    @Override
-    public Annotation[] getAnnotations() {
-        return annotations;
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return annotations;
-    }
-
-
-
     private Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if(genericTypes != null && genericTypes.length > 0) {
@@ -131,6 +110,26 @@ class DefaultArgument<T> implements Argument<T> {
             typeParameters = Collections.emptyMap();
         }
         return typeParameters;
+    }
+
+
+    private AnnotatedElement createInternalElement(Annotation[] annotations) {
+        return new AnnotatedElement() {
+            @Override
+            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+                return AnnotationUtil.findAnnotation(annotations, annotationClass);
+            }
+
+            @Override
+            public Annotation[] getAnnotations() {
+                return annotations;
+            }
+
+            @Override
+            public Annotation[] getDeclaredAnnotations() {
+                return annotations;
+            }
+        };
     }
 
 

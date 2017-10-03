@@ -18,6 +18,7 @@ package org.particleframework.core.type;
 import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.Map;
 import java.util.Optional;
 
@@ -62,14 +63,15 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
         return argument.getQualifier();
     }
 
-    @Override
-    public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-        return argument.findAnnotation(stereotype);
-    }
 
     @Override
     public V getValue() {
         return value;
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return argument.getAnnotatedElements();
     }
 
     @Override

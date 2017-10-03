@@ -47,8 +47,20 @@ import java.util.function.Consumer;
  */
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
     public static final int DEFAULT_MAX_STACK = 13;
-    public static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
+    private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
+
+    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(
+                    Argument.class,
+                    "create",
+                    Constructor.class,
+                    String.class,
+                    int.class,
+                    Class.class,
+                    Argument[].class
+            )
+    );
     private static final org.objectweb.asm.commons.Method METHOD_ARGUMENT_CREATE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(
                     Argument.class,
@@ -634,7 +646,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                       Object returnType,
-                                      List<Object> returnTypeGenericTypes,
+                                      Map<String, Object> returnTypeGenericTypes,
                                       String methodName,
                                       Map<String, Object> argumentTypes,
                                       Map<String, Object> qualifierTypes,
@@ -900,43 +912,44 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String setterName,
             Map<String, Object> genericTypes,
             Type declaringTypeRef) {
-        int fieldVarIndex = pushGetFieldFromTypeLocalVariable(constructorVisitor, declaringTypeRef, fieldName);
+        GeneratorAdapter generatorAdapter = this.constructorVisitor;
+        int fieldVarIndex = pushGetFieldFromTypeLocalVariable(generatorAdapter, declaringTypeRef, fieldName);
         List<Object> argumentTypes = Collections.singletonList(fieldType);
-        int currentMethodVar = pushGetMethodFromTypeCallLocalVariable(constructorVisitor, declaringTypeRef, setterName, argumentTypes);
-        constructorVisitor.visitVarInsn(ALOAD, currentMethodVar);
+        int currentMethodVar = pushGetMethodFromTypeCallLocalVariable(generatorAdapter, declaringTypeRef, setterName, argumentTypes);
+        generatorAdapter.visitVarInsn(ALOAD, currentMethodVar);
 
         // load this
-        constructorVisitor.visitVarInsn(ALOAD, 0);
+        generatorAdapter.visitVarInsn(ALOAD, 0);
         // 1st argument: the field
-        constructorVisitor.visitVarInsn(ALOAD, fieldVarIndex);
+        generatorAdapter.visitVarInsn(ALOAD, fieldVarIndex);
 
         // 2nd argument: the method
-        constructorVisitor.visitVarInsn(ALOAD,  currentMethodVar);
+        generatorAdapter.visitVarInsn(ALOAD,  currentMethodVar);
 
 
 
         // 1st argument: the constructor
-        constructorVisitor.visitVarInsn(ALOAD, fieldVarIndex);
+        generatorAdapter.visitVarInsn(ALOAD, fieldVarIndex);
         // 2nd argument: The argument name
-        constructorVisitor.push(fieldName);
+        generatorAdapter.push(fieldName);
         // 3rd argument:  The qualifier type
         if(qualifierType != null) {
-            constructorVisitor.push(getTypeReference(qualifierType));
+            generatorAdapter.push(getTypeReference(qualifierType));
         }
         else {
-            constructorVisitor.visitInsn(ACONST_NULL);
+            generatorAdapter.visitInsn(ACONST_NULL);
         }
 
         // 5h argument: The generic types
         if(genericTypes != null) {
-            buildTypeArguments(constructorVisitor,genericTypes);
+            buildTypeArguments(generatorAdapter,genericTypes);
         }
         else {
-            constructorVisitor.visitInsn(ACONST_NULL);
+            generatorAdapter.visitInsn(ACONST_NULL);
         }
 
         // Argument.create( .. )
-        constructorVisitor.invokeStatic(
+        generatorAdapter.invokeStatic(
                 Type.getType(Argument.class),
                 org.objectweb.asm.commons.Method.getMethod(
                         ReflectionUtils.getRequiredMethod(
@@ -951,10 +964,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
 
         // 4th argument: requires reflection
-        constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
+        generatorAdapter.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
 
         // now invoke the addInjectionPoint method
-        pushInvokeMethodOnSuperClass(constructorVisitor, ADD_SETTER_INJECTION_POINT_METHOD);
+        pushInvokeMethodOnSuperClass(generatorAdapter, ADD_SETTER_INJECTION_POINT_METHOD);
     }
 
     private void visitMethodInjectionPointInternal(Object declaringType,
@@ -1536,17 +1549,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     // Argument.create( .. )
                     defaultConstructorVisitor.invokeStatic(
                             Type.getType(Argument.class),
-                            org.objectweb.asm.commons.Method.getMethod(
-                                    ReflectionUtils.getRequiredMethod(
-                                            Argument.class,
-                                            "create",
-                                            Constructor.class,
-                                            String.class,
-                                            int.class,
-                                            Class.class,
-                                            Argument[].class
-                                    )
-                            )
+                            METHOD_CREATE_ARGUMENT_CONSTRUCTOR
                     );
                     // store the type reference
                     defaultConstructorVisitor.visitInsn(AASTORE);
@@ -1573,7 +1576,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
-        if(types == null) {
+        if(types == null || types.isEmpty()) {
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }

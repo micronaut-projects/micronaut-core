@@ -237,17 +237,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             throw new IllegalStateException("Owning type cannot be null");
                         }
                         Object resolvedReturnType = modelUtils.resolveTypeReference(method.getReturnType());
-                        Map<String, Object> resolvedGenericTypes = genericUtils.resolveGenericTypes(method.getReturnType());
+                        Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(method.getReturnType());
                         String methodName = method.getSimpleName().toString();
                         Map<String, Object> methodParameters = params.getParameters();
                         Map<String, Object> methodQualifier = params.getQualifierTypes();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
-                        // TODO: FIX RETURN TYPE GENERICS!!
                         aopProxyWriter.visitAroundMethod(
                                 owningType,
                                 resolvedReturnType,
-                                new ArrayList<>(resolvedGenericTypes.values()),
+                                returnTypeGenerics,
                                 methodName,
                                 methodParameters,
                                 methodQualifier,
@@ -430,17 +429,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             throw new IllegalStateException("Owning type cannot be null");
                         }
                         Object resolvedReturnType = modelUtils.resolveTypeReference(method.getReturnType());
-                        Map<String, Object> resolvedGenericTypes = genericUtils.resolveGenericTypes(method.getReturnType());
+                        Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(method.getReturnType());
                         String methodName = method.getSimpleName().toString();
                         Map<String, Object> methodParameters = params.getParameters();
                         Map<String, Object> methodQualifier = params.getQualifierTypes();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
-                        // TODO: FIX RETURN TYPE GENERICS!!
                         beanMethodWriter.visitExecutableMethod(
                                 owningType,
                                 resolvedReturnType,
-                                new ArrayList<>(resolvedGenericTypes.values()),
+                                returnTypeGenerics,
                                 methodName,
                                 methodParameters,
                                 methodQualifier,
@@ -455,7 +453,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aopProxyWriter.visitAroundMethod(
                                 owningType,
                                 resolvedReturnType,
-                                new ArrayList<>(resolvedGenericTypes.values()),
+                                returnTypeGenerics,
                                 methodName,
                                 methodParameters,
                                 methodQualifier,
@@ -487,11 +485,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
             if(typeRef == null) typeRef = modelUtils.resolveTypeReference(concreteClass);
 
-            // TODO: FIX RETURN TYPE GENERICS!!
             beanWriter.visitExecutableMethod(
                     typeRef,
                 modelUtils.resolveTypeReference(returnType),
-                new ArrayList<>(returnTypeGenerics.values()),
+                returnTypeGenerics,
                 method.getSimpleName().toString(),
                 params.getParameters(),
                 params.getQualifierTypes(),
@@ -521,11 +518,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 aopProxyWriter.visitInterceptorTypes(interceptorTypes);
 
-                // TODO: FIX RETURN TYPE GENERICS!!
                 aopProxyWriter.visitAroundMethod(
                         typeRef,
                         modelUtils.resolveTypeReference(returnType),
-                        new ArrayList<>(returnTypeGenerics.values()),
+                        returnTypeGenerics,
                         method.getSimpleName().toString(),
                         params.getParameters(),
                         params.getQualifierTypes(),

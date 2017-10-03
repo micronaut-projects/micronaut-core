@@ -236,7 +236,7 @@ public interface BeanDefinitionVisitor {
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                Object returnType,
-                               List<Object> returnTypeGenericTypes,
+                               Map<String, Object> returnTypeGenericTypes,
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, Object> qualifierTypes,

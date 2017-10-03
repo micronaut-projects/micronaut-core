@@ -48,7 +48,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final AnnotatedElement[] annotationElements;
 
     protected AbstractExecutableMethod(Method method,
-                                       Class[] genericReturnTypes,
+                                       Argument<?>[] genericReturnTypes,
                                        Argument...arguments) {
         this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
@@ -58,7 +58,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
         this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
     }
 
-    protected AbstractExecutableMethod(Method method, Class[] genericReturnTypes) {
+    protected AbstractExecutableMethod(Method method, Argument<?>[] genericReturnTypes) {
         this(method, genericReturnTypes, Argument.ZERO_ARGUMENTS);
     }
 
@@ -154,11 +154,19 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     class ReturnTypeImpl implements ReturnType<Object> {
         private final Method method;
-        private final List<Class> genericTypes;
+        private final Map<String, Argument<?>> typeVariables;
 
-        public ReturnTypeImpl(Method method, Class... genericTypes) {
+        public ReturnTypeImpl(Method method, Argument<?>[] genericReturnType) {
             this.method = method;
-            this.genericTypes = Arrays.asList(genericTypes);
+            if(genericReturnType == null || genericReturnType.length == 0) {
+                typeVariables = Collections.emptyMap();
+            }
+            else {
+                typeVariables = new LinkedHashMap<>(genericReturnType.length);
+                for (Argument<?> argument : genericReturnType) {
+                    typeVariables.put(argument.getName(), argument);
+                }
+            }
         }
 
         @Override
@@ -166,29 +174,15 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
             return (Class<Object>) method.getReturnType();
         }
 
+
         @Override
-        public List<Class> getGenericTypes() {
-            return genericTypes;
+        public AnnotatedElement[] getAnnotatedElements() {
+            return new AnnotatedElement[] { method.getAnnotatedReturnType(), method};
         }
 
         @Override
-        public <A extends Annotation> A findAnnotation(Class<A> stereotype) {
-            return AnnotationUtil.findAnnotationWithStereoType(stereotype, method.getAnnotatedReturnType().getAnnotations());
-        }
-
-        @Override
-        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-            return method.getAnnotatedReturnType().getAnnotation(annotationClass);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return method.getAnnotatedReturnType().getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return method.getAnnotatedReturnType().getDeclaredAnnotations();
+        public Map<String, Argument<?>> getTypeVariables() {
+            return typeVariables;
         }
     }
 }

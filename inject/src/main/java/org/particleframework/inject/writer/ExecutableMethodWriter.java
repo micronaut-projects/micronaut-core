@@ -98,7 +98,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
      */
     public void visitMethod(Object declaringType,
                             Object returnType,
-                            List<Object> returnTypeGenericTypes,
+                            Map<String, Object> returnTypeGenericTypes,
                             String methodName,
                             Map<String, Object> argumentTypes,
                             Map<String, Object> qualifierTypes,
@@ -163,8 +163,8 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                 TYPE_METHOD
         );
 
-        // 2nd argument the return types
-        pushNewArrayOfTypes(generatorAdapter, returnTypeGenericTypes);
+        // 2nd argument the return type generics
+        buildTypeArguments(generatorAdapter, returnTypeGenericTypes);
 
         if (hasArgs) {
 
@@ -181,9 +181,9 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
                     genericTypes
             );
             // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class, Argument[].class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class, Argument[].class);
         } else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Class[].class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class);
         }
         generatorAdapter.visitInsn(RETURN);
         generatorAdapter.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
