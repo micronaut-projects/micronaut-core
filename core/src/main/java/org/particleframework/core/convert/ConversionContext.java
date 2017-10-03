@@ -17,6 +17,7 @@ package org.particleframework.core.convert;
 
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.TypeVariableResolver;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -33,7 +34,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext extends AnnotatedElement {
+public interface ConversionContext extends AnnotatedElement, TypeVariableResolver {
 
 
     /**
@@ -47,6 +48,7 @@ public interface ConversionContext extends AnnotatedElement {
      *
      * @return A map of type variables
      */
+    @Override
     default Map<String, Argument<?>> getTypeVariables() {
         return Collections.emptyMap();
     }

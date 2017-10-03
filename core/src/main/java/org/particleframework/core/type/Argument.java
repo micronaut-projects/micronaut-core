@@ -17,7 +17,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends AnnotatedElement {
+public interface Argument<T> extends AnnotatedElement, TypeVariableResolver {
     /**
      * Constant representing zero arguments
      */
@@ -32,15 +32,6 @@ public interface Argument<T> extends AnnotatedElement {
      * @return The type of the argument
      */
     Class<T> getType();
-
-    /**
-     * @return Return the first type parameter if it is present
-     */
-    Optional<Argument<?>> getFirstTypeVariable();
-    /**
-     * @return Obtain a map of the type parameters for the argument
-     */
-    Map<String,Argument<?>> getTypeVariables();
 
     /**
      * @return The qualifier or null if there is none
