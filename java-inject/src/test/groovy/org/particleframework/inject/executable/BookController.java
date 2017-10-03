@@ -1,6 +1,6 @@
 package org.particleframework.inject.executable;
 
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.stereotype.Controller;
 
 import javax.inject.Inject;

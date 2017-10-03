@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject.annotation;
+package org.particleframework.context.annotation;
 
 import org.particleframework.inject.ExecutableMethod;
 
@@ -25,9 +25,11 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>Annotation applied to the method or type indicating to particle that a {@link ExecutableMethod} should be produced for this method</p>
+ * <p>Annotation applied to the method or type indicating that a {@link ExecutableMethod} should be produced for this method</p>
  *
  * <p>When applied to a type all public methods will be considered executable and the necessary metadata produced</p>
+ *
+ * <p>This annotation can be used as a meta annotation</p>
  *
  * @author Graeme Rocher
  * @since 1.0

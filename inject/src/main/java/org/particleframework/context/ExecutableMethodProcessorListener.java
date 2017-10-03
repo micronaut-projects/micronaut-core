@@ -21,7 +21,7 @@ import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 
 import java.lang.annotation.Annotation;
 import java.util.*;

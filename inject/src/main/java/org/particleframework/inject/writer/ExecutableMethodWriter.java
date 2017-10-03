@@ -39,7 +39,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
 {
     public static final String FIELD_PARENT = "$parent";
     public static final String FIELD_METHOD = "$METHOD";
-    public static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
+    protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getDeclaredMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class).orElseThrow(() -> new IllegalStateException("AbstractExecutableMethod.invokeInternal(..) method not found. Incompatible version of Particle on the classpath?"))
     );
     private final ClassWriter classWriter;
@@ -186,16 +186,22 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
             invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class);
         }
         generatorAdapter.visitInsn(RETURN);
-        generatorAdapter.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
+        generatorAdapter.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
 
         // invoke the methods with the passed arguments
         String invokeDescriptor = METHOD_INVOKE_INTERNAL.getDescriptor();
-        MethodVisitor invokeMethod = classWriter.visitMethod(
+        String invokeInternalName = METHOD_INVOKE_INTERNAL.getName();
+        GeneratorAdapter invokeMethod = new GeneratorAdapter( classWriter.visitMethod(
                 Opcodes.ACC_PUBLIC,
-                "invokeInternal",
+                invokeInternalName,
                 invokeDescriptor,
                 null,
-                null);
+                null),
+                ACC_PUBLIC,
+                invokeInternalName,
+                invokeDescriptor
+
+        );
 
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
     }
@@ -213,7 +219,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         }
     }
 
-    protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, MethodVisitor invokeMethodVisitor) {
+    protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
         invokeMethodVisitor.visitVarInsn(ALOAD, 1);
         pushCastToType(invokeMethodVisitor, beanFullClassName);
@@ -225,7 +231,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
             Iterator<Object> argIterator = argumentTypes.iterator();
             for (int i = 0; i < argCount; i++) {
                 invokeMethodVisitor.visitVarInsn(ALOAD, 2);
-                pushIntegerConstant(invokeMethodVisitor, i);
+                invokeMethodVisitor.push(i);
                 invokeMethodVisitor.visitInsn(AALOAD);
                 // cast the return value to the correct type
                 pushCastToType(invokeMethodVisitor, argIterator.next());
@@ -245,7 +251,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
         }
         invokeMethodVisitor.visitInsn(ARETURN);
 
-        invokeMethodVisitor.visitMaxs(BeanDefinitionWriter.DEFAULT_MAX_STACK, 1);
+        invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
         invokeMethodVisitor.visitEnd();
     }
 

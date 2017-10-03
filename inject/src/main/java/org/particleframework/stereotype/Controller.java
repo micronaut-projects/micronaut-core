@@ -16,7 +16,7 @@
 package org.particleframework.stereotype;
 
 import org.particleframework.context.annotation.Bean;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

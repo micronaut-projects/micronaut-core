@@ -22,7 +22,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.ReturnType;
-import org.particleframework.inject.annotation.Executable;
+import org.particleframework.context.annotation.Executable;
 
 import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;

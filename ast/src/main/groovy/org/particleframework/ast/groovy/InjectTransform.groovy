@@ -3,7 +3,6 @@ package org.particleframework.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
-import groovyjarjarantlr.collections.AST
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.Expression
@@ -27,7 +26,7 @@ import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtil
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
-import org.particleframework.inject.annotation.Executable
+import org.particleframework.context.annotation.Executable
 import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionVisitor

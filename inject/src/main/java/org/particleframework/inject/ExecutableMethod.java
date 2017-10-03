@@ -59,7 +59,7 @@ public interface ExecutableMethod<T, R> extends Executable<T,R> {
     Class[] getArgumentTypes();
 
     /**
-     * @return One or many {@link org.particleframework.inject.annotation.Executable} annotations for this method
+     * @return One or many {@link org.particleframework.context.annotation.Executable} annotations for this method
      */
     Set<? extends Annotation> getExecutableAnnotations();
 

@@ -12,5 +12,5 @@ public interface CallableInjectionPoint extends InjectionPoint {
     /**
      * The required argument types
      */
-    Argument[] getArguments();
+    Argument<?>[] getArguments();
 }

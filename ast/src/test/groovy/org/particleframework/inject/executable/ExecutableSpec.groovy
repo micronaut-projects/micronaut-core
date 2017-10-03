@@ -21,7 +21,7 @@ import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.inject.ExecutionHandle
 import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.MethodExecutionHandle
-import org.particleframework.inject.annotation.Executable
+import org.particleframework.context.annotation.Executable
 import org.particleframework.stereotype.Controller
 import spock.lang.Specification
 
