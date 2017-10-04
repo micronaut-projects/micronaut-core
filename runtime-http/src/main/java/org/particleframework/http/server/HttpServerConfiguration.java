@@ -19,11 +19,12 @@ import org.particleframework.config.ConfigurationProperties;
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.core.convert.format.ReadableBytes;
 import org.particleframework.core.util.Toggleable;
+import org.particleframework.http.cors.CorsOriginConfiguration;
 
 import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * <p>A base {@link ConfigurationProperties} for servers</p>
@@ -42,6 +43,7 @@ public class HttpServerConfiguration {
     protected long maxRequestSize = 1024 * 10; // 10MB
     protected SslConfiguration ssl;
     protected MultipartConfiguration multipart;
+    protected CorsConfiguration cors;
     /**
      * The default server port
      */
@@ -83,6 +85,11 @@ public class HttpServerConfiguration {
     public MultipartConfiguration getMultipart() {
         return multipart;
     }
+
+    /**
+     * @return Configuration for CORS
+     */
+    public CorsConfiguration getCors() { return cors; }
 
     /**
      * @return The maximum request body size
@@ -156,4 +163,36 @@ public class HttpServerConfiguration {
             return disk;
         }
     }
+
+    @ConfigurationProperties("cors")
+    public static class CorsConfiguration implements Toggleable {
+
+        protected boolean enabled = false;
+
+        protected Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
+
+        private Map<String, CorsOriginConfiguration> defaultConfiguration = new LinkedHashMap<>(1);
+
+        /**
+         * @return Whether cors is enabled. Defaults to false.
+         */
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * @return The cors configurations
+         */
+        public Map<String, CorsOriginConfiguration> getConfigurations() {
+            if (enabled && configurations.isEmpty()) {
+                if (defaultConfiguration.isEmpty()) {
+                    defaultConfiguration.put("default", new CorsOriginConfiguration());
+                }
+                return defaultConfiguration;
+            }
+            return configurations;
+        }
+    }
+
 }

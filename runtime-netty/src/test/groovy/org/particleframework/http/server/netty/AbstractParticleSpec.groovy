@@ -35,7 +35,7 @@ abstract class AbstractParticleSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext applicationContext =
                             ParticleApplication.build('-port',String.valueOf(serverPort))
                                                .include(configurationNames() as String[])
-                                               .properties((SPEC_NAME_PROPERTY):getClass().simpleName)
+                                               .properties(getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName])
                                                .run()
 
     @Shared String server = "http://localhost:$serverPort"
@@ -43,5 +43,9 @@ abstract class AbstractParticleSpec extends Specification {
 
     Collection<String> configurationNames() {
         ['org.particleframework.configuration.jackson','org.particleframework.web.router']
+    }
+
+    Map<String, Object> getConfiguration() {
+        [:]
     }
 }
