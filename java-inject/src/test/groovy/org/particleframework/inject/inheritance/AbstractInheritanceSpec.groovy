@@ -18,5 +18,7 @@ class AbstractInheritanceSpec extends Specification {
         b.a != null
         b.another != null
         b.a.is(b.another)
+        b.packagePrivate != null
+        b.packagePrivate.is(b.another)
     }
 }

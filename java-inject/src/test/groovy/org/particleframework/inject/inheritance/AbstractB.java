@@ -9,10 +9,18 @@ public abstract class AbstractB {
 
     private A another;
 
+    private A packagePrivate;
+
     // inject via method
     @Inject
     public void setAnother(A a) {
         this.another = a;
+    }
+
+    // inject via package private method
+    @Inject
+    void setPackagePrivate(A a) {
+        this.packagePrivate = a;
     }
 
     public A getA() {
@@ -21,5 +29,9 @@ public abstract class AbstractB {
 
     public A getAnother() {
         return another;
+    }
+
+    A getPackagePrivate() {
+        return packagePrivate;
     }
 }
