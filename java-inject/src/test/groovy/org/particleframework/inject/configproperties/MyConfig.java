@@ -1,6 +1,6 @@
 package org.particleframework.inject.configproperties;
 
-import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationProperties;
 
 import java.net.URL;
 import java.util.List;

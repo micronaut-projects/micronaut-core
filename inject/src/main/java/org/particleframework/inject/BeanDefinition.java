@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import org.particleframework.core.annotation.AnnotationSource;
+import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
@@ -14,7 +15,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotationSource {
+public interface BeanDefinition<T> extends AnnotationSource, Named {
 
     /**
      * @return The scope of the component
@@ -31,6 +32,15 @@ public interface BeanDefinition<T> extends AnnotationSource {
      */
     boolean isProvided();
 
+    /**
+     * @return Whether the bean declared {@link org.particleframework.context.annotation.ForEach}
+     */
+    boolean isIterable();
+
+    /**
+     * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
+     */
+    boolean isPrimary();
     /**
      * @return The component type
      */

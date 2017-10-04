@@ -15,8 +15,7 @@
  */
 package org.particleframework.http.server;
 
-import org.particleframework.config.ConfigurationProperties;
-import org.particleframework.context.annotation.Configuration;
+import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.convert.format.ReadableBytes;
 import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.cors.CorsOriginConfiguration;

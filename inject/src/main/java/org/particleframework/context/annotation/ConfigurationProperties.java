@@ -1,4 +1,6 @@
-package org.particleframework.config;
+package org.particleframework.context.annotation;
+
+import org.particleframework.config.PropertyResolver;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

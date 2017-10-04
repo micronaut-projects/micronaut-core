@@ -19,7 +19,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.TypeVariableResolver;
-import org.particleframework.core.util.ArrayUtil;
+import org.particleframework.core.util.ArrayUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
@@ -28,7 +28,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * A conversion context is a context object supplied to a {@link TypeConverter} that allows more accurate conversion.
@@ -121,12 +120,12 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
 
             @Override
             public Annotation[] getAnnotations() {
-                return ArrayUtil.concat(childContext.getAnnotations(), thisContext.getAnnotations());
+                return ArrayUtils.concat(childContext.getAnnotations(), thisContext.getAnnotations());
             }
 
             @Override
             public Annotation[] getDeclaredAnnotations() {
-                return ArrayUtil.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
+                return ArrayUtils.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
             }
         };
     }

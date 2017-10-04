@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.type.Argument;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
@@ -38,4 +40,11 @@ public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement
      * @param object The the field on the target object
      */
     void set(Object object, T instance);
+
+    /**
+     * Convert this field to an {@link Argument} reference
+     *
+     * @return The argument
+     */
+    Argument<T> asArgument();
 }

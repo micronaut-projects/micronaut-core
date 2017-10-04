@@ -1,9 +1,9 @@
 package org.particleframework.context;
 
-import org.particleframework.config.ConfigurationProperties;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.context.annotation.*;
 import org.particleframework.config.PropertyResolver;
-import org.particleframework.context.annotation.Provided;
-import org.particleframework.context.annotation.Value;
 import org.particleframework.context.event.BeanInitializedEventListener;
 import org.particleframework.context.event.BeanInitializingEvent;
 import org.particleframework.context.exceptions.BeanContextException;
@@ -13,10 +13,12 @@ import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.*;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
@@ -62,8 +64,14 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
     protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> invocableMethodMap = new LinkedHashMap<>(3);
-    private final WeakHashMap<Class, String> valuePrefixes = new WeakHashMap<>();
+    private final Cache<Class, String> valuePrefixes = Caffeine
+                                                            .newBuilder()
+                                                            .initialCapacity(2)
+                                                            .maximumSize(10)
+                                                            .build();
     private final AnnotatedElement[] annotatedElements;
+    private final boolean iterable;
+    private final boolean isPrimary;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type
@@ -89,6 +97,8 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 method,
                 Modifier.isPrivate(method.getModifiers()),
                 arguments);
+        this.iterable = getAnnotation(ForEach.class) != null;
+        this.isPrimary = getAnnotation(Primary.class) != null;
     }
 
     @Internal
@@ -104,8 +114,19 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         this.provided = type.getAnnotation(Provided.class) != null;
         this.isConfigurationProperties = isConfigurationProperties(type);
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
+        this.iterable = getAnnotation(ForEach.class) != null;
+        this.isPrimary = getAnnotation(Primary.class) != null;
     }
 
+    @Override
+    public boolean isIterable() {
+        return this.iterable;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return this.isPrimary;
+    }
 
     @Override
     public Optional<ExecutableMethod<T, ?>> findMethod(String name, Class... argumentTypes) {
@@ -340,7 +361,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
      */
     @Internal
     protected Object injectBean(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        return bean;
+        try {
+            return bean;
+        } finally {
+            valuePrefixes.invalidateAll();
+        }
     }
 
     /**
@@ -514,11 +539,11 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 Class argumentType = argument.getType();
 
                 if (isInnerConfiguration(argumentType)) {
-                    return context.createBean(argumentType);
+                    return ((DefaultBeanContext)context).createBean(resolutionContext, argumentType, null);
                 } else {
                     String argumentName = argument.getName();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
-                    String valString = resolveValueString(declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
+                    String valString = resolveValueString(resolutionContext, declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argument, argumentType, valString);
                     if (!value.isPresent() && argumentType == Optional.class) {
@@ -578,7 +603,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
         } else if (Collection.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
-            return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
+            return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
         } else if (Provider.class.isAssignableFrom(argumentType)) {
@@ -589,7 +614,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             BeanResolutionContext.Path path = resolutionContext.getPath();
             path.pushMethodArgumentResolve(this, injectionPoint, argument);
             try {
-                Qualifier qualifier = resolveQualifier(argument);
+                Qualifier qualifier = resolveQualifier(resolutionContext, argument);
                 Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
@@ -685,7 +710,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
         } else if (Collection.class.isAssignableFrom(argumentType)) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-            return coerceCollectionToCorrectType(resolutionContext, argument, argumentType, beansOfType);
+            return coerceCollectionToCorrectType(argumentType, beansOfType);
         } else if (Stream.class.isAssignableFrom(argumentType)) {
             return streamOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
         } else if (Provider.class.isAssignableFrom(argumentType)) {
@@ -697,7 +722,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             path.pushConstructorResolve(this, argument);
             try {
                 Object bean;
-                Qualifier qualifier = resolveQualifier(argument);
+                Qualifier qualifier = resolveQualifier(resolutionContext, argument);
                 bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
@@ -865,21 +890,15 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             } else {
                 Class<?> beanType = injectionPoint.getDeclaringBean().getType();
                 Class<?> declaringClass = field.getDeclaringClass();
-                String valString = resolveValueString(declaringClass, beanType, injectionPoint.getName(), valueAnn);
-                Class[] typeArguments = GenericTypeUtils.resolveGenericTypeArguments(field);
-                List<Argument<?>> arguments = Collections.emptyList();
-                if(typeArguments != null && typeArguments.length > 0) {
-                    TypeVariable<? extends Class<?>>[] typeParameters = field.getType().getTypeParameters();
-                    if(typeParameters.length == typeArguments.length) {
-                        arguments = new ArrayList<>();
-                        for (int i = 0; i < typeParameters.length; i++) {
-                            TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
-                            String name = typeParameter.getName();
-                            arguments.add(Argument.create(typeArguments[i], name));
-                        }
-                    }
-                }
-                Argument fieldArgument = Argument.create(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
+
+                String valString = resolveValueString(
+                        resolutionContext,
+                        declaringClass,
+                        beanType,
+                        injectionPoint.getName(),
+                        valueAnn
+                );
+                Argument fieldArgument = injectionPoint.asArgument();
                 Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
                 if (!value.isPresent() && fieldType == Optional.class) {
                     return value;
@@ -930,7 +949,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             path.pushFieldResolve(this, injectionPoint);
 
             try {
-                Qualifier qualifier = resolveQualifier(injectionPoint);
+                Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
                 Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
@@ -1026,12 +1045,12 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return value;
     }
 
-    private String resolveValueString(Class<?> declaringClass, Class<?> beanType, String name, Value val) {
+    private String resolveValueString(BeanResolutionContext resolutionContext, Class<?> declaringClass, Class<?> beanType, String name, Value val) {
 
         String valString;
         if (val == null) {
             if (isConfigurationProperties) {
-                String prefix = resolvePrefix(declaringClass,beanType);
+                String prefix = resolvePrefix(resolutionContext, declaringClass,beanType);
                 valString = prefix + "." + name;
             } else {
                 throw new IllegalStateException("Compiled getValue*(..) call present but @Value annotation missing.");
@@ -1060,23 +1079,22 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
-    private String resolvePrefix(Class<?> declaringClass, Class<?> beanType) {
-        return valuePrefixes.computeIfAbsent(declaringClass, aClass -> {
-            Class<?> type = declaringClass;
-            ConfigurationProperties configurationProperties = type.getAnnotation(ConfigurationProperties.class);
+    private String resolvePrefix(BeanResolutionContext resolutionContext, Class<?> declaringClass, Class<?> beanType) {
+        return valuePrefixes.get(declaringClass, aClass -> {
+            String configurationPropertiesString = resolveConfigPropertiesValue(declaringClass);
             StringBuilder prefix = new StringBuilder();
-            boolean isInner = type.getDeclaringClass() != null;
+            boolean isInner = declaringClass.getDeclaringClass() != null;
             if (isInner) {
                 // must be an inner class
                 String name;
 
-                if(configurationProperties != null) {
-                    prefix.append(configurationProperties.value());
+                if(configurationPropertiesString != null) {
+                    prefix.append(configurationPropertiesString);
                 }
                 else {
-                    ConfigurationProperties annotation = beanType.getAnnotation(ConfigurationProperties.class);
-                    if(annotation != null) {
-                        prefix.append(annotation.value());
+                    String beanTypeString = resolveConfigPropertiesValue(beanType);
+                    if(beanTypeString != null) {
+                        prefix.append(beanTypeString);
                     }
                     else {
 
@@ -1088,13 +1106,15 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                         prefix.append(Introspector.decapitalize(name));
                     }
                 }
+                Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);
+                named.ifPresent(val -> prefix.insert(0,'.').insert(0, val));
 
-                Class<?> nestedType = type.getDeclaringClass();
+                Class<?> nestedType = declaringClass.getDeclaringClass();
                 while (nestedType != null) {
-                    configurationProperties = nestedType.getAnnotation(ConfigurationProperties.class);
-                    if (configurationProperties != null) {
+                    configurationPropertiesString = resolveConfigPropertiesValue(nestedType);
+                    if (configurationPropertiesString != null) {
                         prefix.insert(0, '.')
-                              .insert(0, configurationProperties.value());
+                              .insert(0, configurationPropertiesString);
                         prependSuperClasses(prefix, nestedType);
                     }
                     else {
@@ -1104,26 +1124,46 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
 
                 }
             }
-            else if(configurationProperties != null) {
-                prefix.append(configurationProperties.value());
+            else if(configurationPropertiesString != null) {
+                prefix.append(configurationPropertiesString);
             }
 
-            prependSuperClasses(prefix, type);
+            prependSuperClasses(prefix, declaringClass);
+            if(!isInner) {
+
+                Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);
+                named.ifPresent(val -> prefix.append('.').append(val));
+            }
             return prefix.toString();
         });
 
     }
 
     private void prependSuperClasses(StringBuilder prefix, Class<?> nestedType) {
-        ConfigurationProperties configurationProperties;
+        String configurationPropertiesPrefix;
         Class<?> supertype = nestedType.getSuperclass();
         while (supertype != null) {
-            configurationProperties = supertype.getAnnotation(ConfigurationProperties.class);
-            if (configurationProperties != null) {
-                prefix.insert(0, configurationProperties.value() + '.');
+            configurationPropertiesPrefix = resolveConfigPropertiesValue(supertype);
+            if (configurationPropertiesPrefix != null) {
+                prefix.insert(0, configurationPropertiesPrefix + '.');
             }
             supertype = supertype.getSuperclass();
         }
+    }
+
+    private String resolveConfigPropertiesValue(Class<?> supertype) {
+        ConfigurationProperties annotation = supertype.getAnnotation(ConfigurationProperties.class);
+        if(annotation != null) {
+            return annotation.value();
+        }
+        ForEach ann = supertype.getAnnotation(ForEach.class);
+        if(ann != null) {
+            String property = ann.property();
+            if(StringUtils.isNotEmpty(property)) {
+                return property;
+            }
+        }
+        return null;
     }
 
     private AbstractBeanDefinition addMethodInjectionPointInternal(
@@ -1147,26 +1187,6 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return this;
     }
 
-    private void populateQualifiersFromParameterAnnotations(Map<String, Class> argumentTypes, Map<String, Class> qualifierTypes, LinkedHashMap<String, Annotation> qualifiers, Annotation[][] parameterAnnotations) {
-        int i = 0;
-        for (Map.Entry<String, Class> entry : argumentTypes.entrySet()) {
-            Annotation[] annotations = parameterAnnotations[i++];
-            Annotation matchingAnnotation = null;
-            if (annotations.length > 0) {
-                Class annotationType = qualifierTypes.get(entry.getKey());
-                if (annotationType != null) {
-                    matchingAnnotation = findMatchingAnnotation(annotations, annotationType);
-                }
-            }
-
-            if (matchingAnnotation != null) {
-                qualifiers.put(entry.getKey(), matchingAnnotation);
-            } else {
-                qualifiers.put(entry.getKey(), null);
-            }
-        }
-    }
-
     private Annotation findMatchingAnnotation(Annotation[] annotations, Class annotationType) {
         for (Annotation annotation : annotations) {
             if (annotation.annotationType() == annotationType) {
@@ -1180,7 +1200,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
-            Qualifier qualifier = resolveQualifier(argument);
+            Qualifier qualifier = resolveQualifier(resolutionContext, argument);
             Class genericType;
             Class argumentType = argument.getType();
             if (argumentType.isArray()) {
@@ -1217,7 +1237,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
                     genericType = genericTypes.values().iterator().next().getType();
                 }
             }
-            Qualifier qualifier = resolveQualifier(argument);
+            Qualifier qualifier = resolveQualifier(resolutionContext, argument);
             B bean = (B) beanResolver.resolveBean(genericType, qualifier);
             path.pop();
             return bean;
@@ -1238,7 +1258,7 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
             if (!genericType.isPresent()) {
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
             }
-            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
             B bean = (B) beanResolver.resolveBean(genericType.get(), qualifier);
             path.pop();
             return bean;
@@ -1247,13 +1267,9 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         }
     }
 
-    protected static Map createMap(Object[] values) {
-        return CollectionUtils.createMap(values);
-    }
-
     private boolean isConfigurationProperties(Class type) {
         while (type != null) {
-            if (type.getAnnotation(ConfigurationProperties.class) != null) {
+            if (resolveConfigPropertiesValue(type) != null) {
                 return true;
             }
             type = type.getDeclaringClass();
@@ -1261,27 +1277,27 @@ public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
         return false;
     }
 
-    private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {
+    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, FieldInjectionPoint injectionPoint) {
         Qualifier qualifier = null;
         Annotation ann = injectionPoint.getQualifier();
         if (ann != null) {
             qualifier = Qualifiers.byAnnotation(ann);
         }
-        return qualifier;
+        return qualifier != null ? qualifier : resolutionContext.get(javax.inject.Qualifier.class.getName(), Qualifier.class).orElse(null);
     }
 
 
-    private Qualifier resolveQualifier(Argument argument) {
+    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument) {
         Qualifier qualifier = null;
         Annotation ann = argument.getQualifier();
         if (ann != null) {
             qualifier = Qualifiers.byAnnotation(ann);
         }
-        return qualifier;
+        return qualifier != null ? qualifier : resolutionContext.get(javax.inject.Qualifier.class.getName(), Qualifier.class).orElse(null);
     }
 
 
-    private Object coerceCollectionToCorrectType(BeanResolutionContext resolutionContext, Argument argument, Class collectionType, Collection beansOfType) {
+    private Object coerceCollectionToCorrectType(Class collectionType, Collection beansOfType) {
         if (collectionType.isInstance(beansOfType)) {
             return beansOfType;
         } else {

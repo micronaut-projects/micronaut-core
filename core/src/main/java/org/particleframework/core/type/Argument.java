@@ -18,6 +18,7 @@ package org.particleframework.core.type;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Nullable;
+import org.particleframework.core.naming.Named;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -30,7 +31,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends AnnotationSource, TypeVariableResolver {
+public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named {
     /**
      * Constant representing zero arguments
      */

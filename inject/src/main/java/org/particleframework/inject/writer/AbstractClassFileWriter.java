@@ -5,7 +5,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.core.util.ArrayUtil;
+import org.particleframework.core.util.ArrayUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -494,9 +494,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
 
         // invoke: ArrayUtils.concat(a1, a2)
-        java.lang.reflect.Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtil.class, "concat", Object[].class, Object[].class);
+        java.lang.reflect.Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtils.class, "concat", Object[].class, Object[].class);
         Method concatMethod = Method.getMethod(javaMethod);
-        generator.invokeStatic(Type.getType(ArrayUtil.class), concatMethod);
+        generator.invokeStatic(Type.getType(ArrayUtils.class), concatMethod);
         generator.returnValue();
         return generator;
     }

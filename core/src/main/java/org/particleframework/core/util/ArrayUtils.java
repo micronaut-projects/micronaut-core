@@ -23,7 +23,7 @@ import java.lang.reflect.Array;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ArrayUtil {
+public class ArrayUtils {
 
     /**
      * Concatenate two arrays

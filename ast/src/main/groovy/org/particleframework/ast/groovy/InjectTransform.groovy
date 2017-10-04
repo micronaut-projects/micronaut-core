@@ -19,11 +19,12 @@ import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
-import org.particleframework.config.ConfigurationProperties
+import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.*
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
-import org.particleframework.core.util.ArrayUtil
+import org.particleframework.core.util.ArrayUtils
+import org.particleframework.core.util.StringUtils
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
 import org.particleframework.context.annotation.Executable
@@ -196,7 +197,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         BeanDefinitionVisitor aopProxyWriter
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
-            this(sourceUnit, targetClassNode, stereoTypeFinder.hasStereoType(targetClassNode, ConfigurationProperties))
+            this(sourceUnit, targetClassNode, InjectVisitor.isConfigurationProperties(targetClassNode))
         }
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, boolean isConfigurationProperties) {
@@ -228,7 +229,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 AnnotationNode[] introductionMirrors = stereoTypeFinder
                         .findAnnotationsWithStereoType(node, Introduction)
 
-                AnnotationNode[] annotationMirrors = ArrayUtil.concat(aroundMirrors, introductionMirrors)
+                AnnotationNode[] annotationMirrors = ArrayUtils.concat(aroundMirrors, introductionMirrors)
                 Object[] interceptorTypes = resolveTypeReferences(annotationMirrors)
 
                 String scopeType = scopeAnn?.classNode?.name
@@ -258,6 +259,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     classNode.visitContents(this)
                 }
                 super.visitClass(node)
+            }
+        }
+
+        static boolean isConfigurationProperties(ClassNode targetClassNode) {
+            if( new AnnotationStereoTypeFinder().hasStereoType(targetClassNode, ConfigurationProperties) ) {
+                return true
+            }
+            else {
+                AnnotationNode ann = AstAnnotationUtils.findAnnotation(targetClassNode, ForEach)
+                return ann != null && StringUtils.isNotEmpty(ann.getMember("property")?.toString())
             }
         }
 

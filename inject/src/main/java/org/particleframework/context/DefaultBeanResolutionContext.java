@@ -2,6 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.MutableConvertibleValuesMap;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
@@ -14,7 +15,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultBeanResolutionContext implements BeanResolutionContext {
+public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Object> implements BeanResolutionContext {
 
     private final BeanContext context;
     private final BeanDefinition rootDefinition;

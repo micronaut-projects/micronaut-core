@@ -1,6 +1,6 @@
 package org.particleframework.inject.configproperties
 
-import org.particleframework.config.ConfigurationProperties
+import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource

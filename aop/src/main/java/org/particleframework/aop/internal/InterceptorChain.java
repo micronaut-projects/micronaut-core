@@ -21,7 +21,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleValues;
 import org.particleframework.core.order.OrderUtil;
-import org.particleframework.core.util.ArrayUtil;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.MutableArgumentValue;
@@ -203,7 +203,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         if(introductionInterceptors.length == 0) {
             throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
         }
-        return ArrayUtil.concat(aroundInterceptors, introductionInterceptors);
+        return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
 

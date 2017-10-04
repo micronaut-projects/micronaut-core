@@ -1,5 +1,6 @@
 package org.particleframework.context;
 
+import org.particleframework.core.convert.MutableConvertibleValues;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
@@ -11,7 +12,7 @@ import java.util.Deque;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanResolutionContext {
+public interface BeanResolutionContext extends MutableConvertibleValues<Object> {
 
     /**
      * @return The context

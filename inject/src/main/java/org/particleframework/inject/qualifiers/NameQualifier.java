@@ -1,6 +1,7 @@
 package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
+import org.particleframework.context.annotation.ForEach;
 import org.particleframework.inject.BeanDefinition;
 
 import javax.inject.Named;
@@ -17,7 +18,7 @@ import static org.particleframework.core.util.ArgumentUtils.check;
  * @author Graeme Rocher
  * @since 1.0
  */
-class NameQualifier<T> implements Qualifier<T> {
+class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.naming.Named {
     private final String name;
 
     NameQualifier(String name) {
@@ -28,7 +29,9 @@ class NameQualifier<T> implements Qualifier<T> {
     public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
         check("beanType", beanType).notNull();
         check("candidates", candidates).notNull();
-
+        if(beanType.getAnnotation(ForEach.class) != null) {
+            return candidates;
+        }
         return candidates.filter(candidate -> {
                     String typeName;
                     Optional<Named> beanQualifier = candidate.findAnnotation(Named.class);
@@ -56,5 +59,10 @@ class NameQualifier<T> implements Qualifier<T> {
     @Override
     public int hashCode() {
         return name.hashCode();
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 }

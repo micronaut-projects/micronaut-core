@@ -13,32 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.docs.config.properties
-
-// tag::imports[]
-import org.hibernate.validator.constraints.NotBlank
-import org.particleframework.context.annotation.ConfigurationProperties
-
-import javax.validation.constraints.Min
-// end::imports[]
+package org.particleframework.core.naming;
 
 /**
+ * An interface for components that a named
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
-@ConfigurationProperties('my.engine') // <1>
-class EngineConfig {
+public interface Named {
 
-    @NotBlank // <2>
-    String manufacturer = "Ford" // <3>
-
-    @Min(1L)
-    int cylinders
-    CrankShaft crankShaft
-
-    static class CrankShaft { // <4>
-        Optional<Double> rodLength // <5>
-    }
+    /**
+     * @return The name of the component
+     */
+    String getName();
 }
-// end::class[]
