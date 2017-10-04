@@ -83,6 +83,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
     );
+
+    private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
+            new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
+    );
+
     private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
             new IllegalStateException("AbstractBeanDefinition.preDestroy(..) method not found. Incompatible version of Particle on the classpath?")
     );
@@ -1132,7 +1137,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, Method methodToInvoke) {
-        constructorVisitor.visitMethodInsn(INVOKEVIRTUAL,
+        constructorVisitor.visitMethodInsn(INVOKESPECIAL,
                 isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
                 methodToInvoke.getName(),
                 Type.getMethodDescriptor(methodToInvoke),
@@ -1292,7 +1297,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void finalizeInjectMethod() {
-        injectMethodVisitor.visitVarInsn(ALOAD, 3);
+
+        invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHOD);
         injectMethodVisitor.visitInsn(ARETURN);
     }
 

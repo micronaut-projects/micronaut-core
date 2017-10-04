@@ -56,6 +56,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         if (object == null) {
             return Optional.empty();
         }
+        if(targetType == Object.class) {
+            return Optional.of((T) object);
+        }
         Class<?> sourceType = object.getClass();
         targetType = ReflectionUtils.getWrapperType(targetType);
 

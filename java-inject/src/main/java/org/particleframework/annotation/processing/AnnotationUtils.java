@@ -311,4 +311,15 @@ class AnnotationUtils {
                 .filter(method -> elementUtils.overrides(executableElement, method, (TypeElement) method.getEnclosingElement()))
                 .findFirst();
     }
+
+    /**
+     * Return whether the attribute on the given annotation is present
+     *
+     * @param annotation The annotation
+     * @param attribute The attribute
+     * @return True if it is
+     */
+    public boolean isAttributePresent(AnnotationMirror annotation, String attribute) {
+        return getAnnotationAttributeValue(annotation, attribute).isPresent();
+    }
 }

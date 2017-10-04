@@ -1,6 +1,6 @@
 package org.particleframework.inject.configproperties
 
-import org.particleframework.config.ConfigurationProperties
+import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
@@ -8,7 +8,6 @@ import org.particleframework.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
 import javax.validation.Validation
-import javax.validation.ValidatorFactory
 import javax.validation.constraints.NotNull
 import org.hibernate.validator.constraints.NotBlank
 /**

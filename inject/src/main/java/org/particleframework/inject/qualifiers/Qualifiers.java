@@ -3,6 +3,7 @@ package org.particleframework.inject.qualifiers;
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.Type;
 
+import javax.inject.Named;
 import java.lang.annotation.Annotation;
 
 /**
@@ -46,8 +47,8 @@ public class Qualifiers {
         if(annotation.annotationType() == Type.class) {
             Type typeAnn = (Type) annotation;
             return byType(typeAnn.value());
-        } else {
-
+        }
+        else {
             return new AnnotationQualifier<>(annotation);
         }
     }

@@ -144,6 +144,10 @@ public class DefaultEnvironment implements Environment {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
                     return conversionService.convert(subMap, requiredType, context);
                 }
+                else if(Properties.class.isAssignableFrom(requiredType)) {
+                    Properties properties = resolveSubProperties(name, entries);
+                    return Optional.of((T) properties);
+                }
                 else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
                     return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
@@ -211,6 +215,23 @@ public class DefaultEnvironment implements Environment {
                 return next.load();
             }
         };
+    }
+
+    protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
+        // special handling for maps for resolving sub keys
+        Properties properties = new Properties();
+        String prefix = name + '.';
+        entries.entrySet().stream()
+                .filter(map -> map.getKey().startsWith(prefix))
+                .forEach(entry -> {
+                    Object value = entry.getValue();
+                    if(value != null) {
+                        String key = entry.getKey().substring(prefix.length());
+                        properties.put(key, value.toString());
+                    }
+                });
+
+        return properties;
     }
 
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries) {

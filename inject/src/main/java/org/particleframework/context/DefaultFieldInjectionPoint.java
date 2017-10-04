@@ -1,5 +1,7 @@
 package org.particleframework.context;
 
+import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.FieldInjectionPoint;
 import org.particleframework.context.exceptions.BeanInstantiationException;
@@ -7,6 +9,10 @@ import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Represents an injection point for a field
@@ -21,6 +27,8 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     private final Annotation qualifier;
     private final BeanDefinition declaringComponent;
     private final boolean requiresReflection;
+
+    private Argument<T> argument = null;
 
     DefaultFieldInjectionPoint(BeanDefinition declaringComponent, Field field, Annotation qualifier, boolean requiresReflection) {
         this.field = field;
@@ -68,6 +76,27 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
         } catch (IllegalAccessException e) {
             throw new BeanInstantiationException("Exception occured injecting field ["+field+"]: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public Argument<T> asArgument() {
+        if(argument == null) {
+            Class[] typeArguments = GenericTypeUtils.resolveGenericTypeArguments(field);
+            List<Argument<?>> arguments = Collections.emptyList();
+            if(typeArguments != null && typeArguments.length > 0) {
+                TypeVariable<? extends Class<?>>[] typeParameters = field.getType().getTypeParameters();
+                if(typeParameters.length == typeArguments.length) {
+                    arguments = new ArrayList<>();
+                    for (int i = 0; i < typeParameters.length; i++) {
+                        TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
+                        String name = typeParameter.getName();
+                        arguments.add(Argument.create(typeArguments[i], name));
+                    }
+                }
+            }
+            argument = Argument.create(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
+        }
+        return argument;
     }
 
     @Override

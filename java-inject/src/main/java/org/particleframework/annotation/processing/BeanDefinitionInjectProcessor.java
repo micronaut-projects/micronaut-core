@@ -3,11 +3,11 @@ package org.particleframework.annotation.processing;
 import org.particleframework.aop.Around;
 import org.particleframework.aop.Introduction;
 import org.particleframework.aop.writer.AopProxyWriter;
-import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
-import org.particleframework.core.util.ArrayUtil;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.inject.writer.*;
@@ -193,12 +193,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.concreteClass = concreteClass;
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
-            this.isConfigurationPropertiesType = annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class);
+            this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
 
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE);
             this.isProxyTargetClass = isAopProxyType && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget");
             this.isHotSwappable = isProxyTargetClass && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap");
             this.isExecutableType = isAopProxyType  || annotationUtils.hasStereotype(concreteClass, Executable.class);
+        }
+
+        private boolean isConfigurationProperties(TypeElement concreteClass) {
+            if(annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class)) {
+                return true;
+            }
+            else {
+                Optional<AnnotationMirror> mirror = annotationUtils.findAnnotation(concreteClass, ForEach.class);
+                return mirror.map(ann -> annotationUtils.isAttributePresent(ann, "property")).orElse(false);
+            }
         }
 
         TypeElement getConcreteClass() {
@@ -824,7 +834,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     .findAnnotationsWithStereotype(typeElement, Around.class.getName());
             AnnotationMirror[] introductionMirrors = annotationUtils
                     .findAnnotationsWithStereotype(typeElement, Introduction.class.getName());
-            AnnotationMirror[] annotationMirrors = ArrayUtil.concat(aroundMirrors, introductionMirrors);
+            AnnotationMirror[] annotationMirrors = ArrayUtils.concat(aroundMirrors, introductionMirrors);
             Object[] interceptorTypes = modelUtils.resolveTypeReferences(annotationMirrors);
 
             String scopeType = scopeAnn.map(ann -> ann.getAnnotationType().toString()).orElse(null);

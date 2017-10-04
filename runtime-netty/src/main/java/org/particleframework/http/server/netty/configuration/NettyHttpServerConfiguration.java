@@ -17,7 +17,7 @@ package org.particleframework.http.server.netty.configuration;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
-import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.NettyHttpServer;
 

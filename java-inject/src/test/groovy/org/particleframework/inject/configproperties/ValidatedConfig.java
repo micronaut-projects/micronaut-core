@@ -1,7 +1,7 @@
 package org.particleframework.inject.configproperties;
 
 import org.hibernate.validator.constraints.NotBlank;
-import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationProperties;
 
 import javax.validation.constraints.NotNull;
 import java.net.URL;

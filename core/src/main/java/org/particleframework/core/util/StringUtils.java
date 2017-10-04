@@ -13,32 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.docs.config.properties
+package org.particleframework.core.util;
 
-// tag::imports[]
-import org.hibernate.validator.constraints.NotBlank
-import org.particleframework.context.annotation.ConfigurationProperties
-
-import javax.validation.constraints.Min
-// end::imports[]
+import org.particleframework.core.annotation.Nullable;
 
 /**
+ * Utility methods for Strings
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
-@ConfigurationProperties('my.engine') // <1>
-class EngineConfig {
+public class StringUtils {
 
-    @NotBlank // <2>
-    String manufacturer = "Ford" // <3>
+    /**
+     * Return whether the given string is empty
+     *
+     * @param str The string
+     * @return True if is
+     */
+    public static boolean isEmpty(@Nullable  String str) {
+        return str == null || str.length() == 0;
+    }
 
-    @Min(1L)
-    int cylinders
-    CrankShaft crankShaft
 
-    static class CrankShaft { // <4>
-        Optional<Double> rodLength // <5>
+    /**
+     * Return whether the given string is not empty
+     *
+     * @param str The string
+     * @return True if is
+     */
+    public static boolean isNotEmpty(@Nullable  String str) {
+        return !isEmpty(str);
     }
 }
-// end::class[]

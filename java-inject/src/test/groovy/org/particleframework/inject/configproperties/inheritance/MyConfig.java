@@ -1,6 +1,6 @@
 package org.particleframework.inject.configproperties.inheritance;
 
-import org.particleframework.config.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationProperties;
 
 @ConfigurationProperties("foo.bar")
 public class MyConfig {
