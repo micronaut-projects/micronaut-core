@@ -450,10 +450,9 @@ public class Convertible implements Car {
 
         // inject only once
 
-        // FIXME
-//        public void testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
-//            assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice);
-//        }
+        public void testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
+            assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice);
+        }
 
         public void testSimilarPackagePrivateMethodInjectedOnlyOnce() {
             assertFalse(spareTire.similarPackagePrivateMethodInjectedTwice);

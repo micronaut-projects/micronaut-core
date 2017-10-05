@@ -625,6 +625,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer;
             boolean overriddenInjected = overridden && annotationUtils.hasStereotype(overridingMethod, Inject.class);
 
+            if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
+                // bail out if the method has been overridden by another method annotated with @Inject
+                return;
+            }
             if (isParent && overridden && !overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) {
                 // bail out if the overridden method is package private and in the same package
                 // and is not annotated with @Inject
