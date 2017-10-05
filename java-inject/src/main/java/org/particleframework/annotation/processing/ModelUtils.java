@@ -245,13 +245,13 @@ class ModelUtils {
 
 
     // FIXME review/test this
-    boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, ExecutableElement method) {
+    boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, Element methodOrField) {
         PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
         PackageElement packageOfConcreteClass = elementUtils.getPackageOf(concreteClass);
 
         return declaringClass != concreteClass &&
             !packageOfDeclaringClass.getQualifiedName().equals(packageOfConcreteClass.getQualifiedName())
-            && (isProtected(method) || !isPublic(method));
+            && (isProtected(methodOrField) || !isPublic(methodOrField));
     }
 
     /**
@@ -261,14 +261,20 @@ class ModelUtils {
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
      * @return the overriding method
      */
-    Optional<ExecutableElement> overridingMethod(ExecutableElement overridden, TypeElement classElement) {
+    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
         for (ExecutableElement method: methods) {
-            if (!method.equals(overridden)) {
-                if (elementUtils.overrides(method, overridden, classElement)) {
-                    return Optional.ofNullable(method);
-                }
+            if (!method.equals(overridden) && method.getSimpleName().equals(overridden.getSimpleName())) {
+                return Optional.ofNullable(method);
             }
+        }
+        // might be looking for a package private & packages differ method in a superclass
+        // that is not visible to the most concrete subclass, really!
+        // e.g. see injectPackagePrivateMethod4() for SpareTire -> Tire -> RoundThing in Inject tck
+        // check the superclass until we reach Object, then bail out with empty if necessary.
+        TypeElement superClass = superClassFor(classElement);
+        if (superClass != null && !isObjectClass(superClass)) {
+            return overridingOrHidingMethod(overridden, superClass);
         }
         return Optional.empty();
     }

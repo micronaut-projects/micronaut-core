@@ -606,14 +606,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
-            ExecutableElement overridingMethod = modelUtils.overridingMethod(method, this.concreteClass).orElse(method);
+            ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
             boolean overridden = isParent &&
                 !overridingClass.getQualifiedName().equals(declaringClass.getQualifiedName());
 
             boolean isPackagePrivate = modelUtils.isPackagePrivate(method);
             boolean isPrivate = modelUtils.isPrivate(method);
-            if (overridden && !(isPrivate && isPackagePrivate)) {
+            if (overridden && !(isPrivate || isPackagePrivate)) {
                 // bail out if the method has been overridden, since it will have already been handled
                 return;
             }
@@ -671,12 +671,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         @Override
         public Object visitVariable(VariableElement variable, Object o) {
-            // assuming just fields, visitExecutable should be handling params for method calls
             if (modelUtils.isStatic(variable)) {
                 return null;
             }
 
-            if( variable.getKind() != FIELD) return null;
+            // assuming just fields, visitExecutable should be handling params for method calls
+            if(variable.getKind() != FIELD) return null;
 
             boolean isInjected = annotationUtils.hasStereotype(variable, Inject.class);
             boolean isValue = !isInjected &&
@@ -685,20 +685,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (isInjected || isValue) {
                 BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
 
+                TypeElement declaringClass = modelUtils.classElementFor(variable);
                 Object qualifierRef = annotationUtils.resolveQualifier(variable);
-                boolean isPrivate = modelUtils.isPrivate(variable);
-                // FIXME, add this logic from InjectTransform: isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
-                boolean requiresReflection = isPrivate;
 
-                if (!writer.isValidated() && annotationUtils.hasStereotype(variable, "javax.validation.Constraint")) {
+                boolean isPrivate = modelUtils.isPrivate(variable);
+                boolean requiresReflection = isPrivate
+                    || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable);
+
+                if (!writer.isValidated()
+                    && annotationUtils.hasStereotype(variable, "javax.validation.Constraint")) {
                     writer.setValidated(true);
                 }
 
                 Name fieldName = variable.getSimpleName();
                 TypeMirror type = variable.asType();
                 Object fieldType = modelUtils.resolveTypeReference(type);
-
-                TypeElement declaringClass = modelUtils.classElementFor(variable);
 
                 if (isValue) {
                     writer.visitFieldValue(
