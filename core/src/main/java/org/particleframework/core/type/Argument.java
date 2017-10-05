@@ -24,6 +24,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 /**
  * Represents an argument to a method or constructor or type
@@ -61,7 +64,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param <T> The generic type
      * @return The argument instance
      */
-    static <T> Argument<T> create(
+    static <T> Argument<T> of(
             Class<T> type,
             String name,
             Annotation qualifier) {
@@ -76,7 +79,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param <T> The generic type
      * @return The argument instance
      */
-    static <T> Argument<T> create(
+    static <T> Argument<T> of(
             Class<T> type,
             String name,
             @Nullable Argument...typeParameters) {
@@ -92,10 +95,61 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param <T> The generic type
      * @return The argument instance
      */
-    static <T> Argument<T> create(
+    static <T> Argument<T> of(
             Class<T> type,
             String name) {
         return new DefaultArgument<>(type, name, null, Argument.ZERO_ARGUMENTS);
+    }
+
+    /**
+     * Creates a new argument for the given type and name
+     *
+     * @param type The type
+     * @param <T> The generic type
+     * @return The argument instance
+     */
+    static <T> Argument<T> of(
+            Class<T> type, @Nullable Argument...typeParameters) {
+        return new DefaultArgument<>(type, type.getSimpleName(), null, typeParameters);
+    }
+
+    /**
+     * Creates a new argument for the given type and name
+     *
+     * @param type The type
+     * @param <T> The generic type
+     * @return The argument instance
+     */
+    static <T> Argument<T> of(
+            Class<T> type) {
+        return new DefaultArgument<>(type, type.getSimpleName(), null, Argument.ZERO_ARGUMENTS);
+    }
+    /**
+     * Creates a new argument for the given type and name
+     *
+     * @param type The type
+     * @param <T> The generic type
+     * @return The argument instance
+     */
+    static <T> Argument<T> of(
+            Class<T> type, @Nullable Class<?>...typeParameters) {
+        if(typeParameters == null) {
+            return of(type);
+        }
+        else {
+
+            TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
+            int len = typeParameters.length;
+            if(parameters.length != len) {
+                throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
+            }
+            Argument[] typeArguments = new Argument[len];
+            for (int i = 0; i < parameters.length; i++) {
+                TypeVariable<Class<T>> parameter = parameters[i];
+                typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
+            }
+            return new DefaultArgument<>(type, type.getSimpleName(), null, typeArguments);
+        }
     }
 
     /**
@@ -108,7 +162,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
-    static Argument create(
+    static Argument of(
             Method method,
             String name,
             int index,
@@ -138,7 +192,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
-    static Argument create(
+    static Argument of(
             Constructor constructor,
             String name,
             int index,
@@ -166,7 +220,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
-    static Argument create(
+    static Argument of(
             Field field,
             String name,
             @Nullable Class qualifierType,
@@ -191,7 +245,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
-    static Argument create(
+    static Argument of(
             Field field,
             @Nullable Class qualifierType,
             @Nullable Argument...typeParameters) {
@@ -214,7 +268,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
-    static Argument create(
+    static Argument of(
             Field field,
             @Nullable Argument...typeParameters) {
         Class type = field.getType();

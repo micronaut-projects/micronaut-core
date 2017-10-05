@@ -10,6 +10,7 @@ import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.order.OrderUtil;
+import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanConfiguration;
 
 import java.lang.annotation.Annotation;

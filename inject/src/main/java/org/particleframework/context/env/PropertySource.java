@@ -2,6 +2,8 @@ package org.particleframework.context.env;
 
 import org.particleframework.core.order.Ordered;
 
+import java.util.Map;
+
 /**
  * A PropertySource is a location to resolve property values from. The property keys are are available via the {@link #iterator()} method.
  *
@@ -23,5 +25,15 @@ public interface PropertySource extends Iterable<String>, Ordered {
      */
     default boolean hasUpperCaseKeys() {
         return false;
+    }
+
+    /**
+     * Create a {@link PropertySource} from the given map
+     *
+     * @param map The map
+     * @return The {@link PropertySource}
+     */
+    static PropertySource of(Map<String, Object> map) {
+        return new MapPropertySource(map);
     }
 }

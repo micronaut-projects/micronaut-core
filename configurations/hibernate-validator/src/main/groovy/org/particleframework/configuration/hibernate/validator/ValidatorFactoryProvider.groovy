@@ -35,7 +35,7 @@ class ValidatorFactoryProvider implements Provider<ValidatorFactory> {
         if(environment.isPresent()) {
             Environment env = environment.get()
             Optional<Map<String,String>> config = env.getProperty("hibernate.validator", Map,
-                    ConversionContext.of([K:Argument.create(String, "K"), V:Argument.create(String, "V")])
+                    ConversionContext.of([K:Argument.of(String, "K"), V:Argument.of(String, "V")])
             )
             if(config.isPresent()) {
                 for(entry in config.get()) {

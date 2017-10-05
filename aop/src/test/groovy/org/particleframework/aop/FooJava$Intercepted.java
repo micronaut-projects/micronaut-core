@@ -23,8 +23,6 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 
-import java.util.Collections;
-
 /**
  * This class is what the final compiled byte code for a proxy generated with @Around looks like when decompiled
  *
@@ -55,7 +53,7 @@ public class FooJava$Intercepted extends Foo implements Intercepted {
         protected $blah0() {
             super(ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
                     new Argument[0],
-                    Argument.create(
+                    Argument.of(
                             ReflectionUtils.findMethod(Foo.class, "blah", String.class).get(),
                             "name",
                             0,

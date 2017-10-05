@@ -4,8 +4,8 @@ dependencies {
     compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
     compile 'com.fasterxml.jackson.datatype:jackson-datatype-jsr353:2.9.0'
 
-    compileOnly project(":runtime-netty")
+    compileOnly project(":http-server-netty")
     compileOnly project(":java-inject")
 
-    testRuntime project(":runtime-netty")
+    testRuntime project(":http-server-netty")
 }

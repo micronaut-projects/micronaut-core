@@ -7,7 +7,7 @@ dependencies {
     compileOnly project(":aop")
 
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    compileOnly 'javax.validation:validation-api:1.1.0.Final'
+    compileOnly 'javax.validation:validation-api:2.0.0.Final'
     testCompile project(":aop")
     testCompile "org.hibernate:hibernate-core:5.1.5.Final"
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'

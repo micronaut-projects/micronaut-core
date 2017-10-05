@@ -16,6 +16,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleValuesMap;
 import org.particleframework.inject.*;
 
@@ -31,10 +32,11 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> implements BeanDefinition<T>, BeanFactory<T> {
-    private final BeanDefinition<T> definition;
+@Internal
+class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> implements ProxyingBeanDefinition<T>, BeanFactory<T> {
+    protected final BeanDefinition<T> definition;
 
-    BeanDefinitionDelegate(BeanDefinition<T> definition) {
+    private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         if(!(definition instanceof BeanFactory)) {
             throw new IllegalArgumentException("Delegate can only be used for bean factories");
         }
@@ -117,6 +119,16 @@ class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
+    public T inject(BeanContext context, T bean) {
+        return definition.inject(context, bean);
+    }
+
+    @Override
+    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        return definition.inject(resolutionContext, context, bean);
+    }
+
+    @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         resolutionContext.putAll(this);
         return ((BeanFactory<T>)this.definition).build(resolutionContext, context, definition);
@@ -140,5 +152,73 @@ class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> impl
     @Override
     public int hashCode() {
         return definition.hashCode();
+    }
+
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
+        if(definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
+            if(definition instanceof ValidatedBeanDefinition) {
+                return new LifeCycleValidatingDelegate<>(definition);
+            }
+            else {
+                return new LifeCycleDelegate<>(definition);
+            }
+        }
+        else if(definition instanceof ValidatedBeanDefinition) {
+            return new ValidatingDelegate<>(definition);
+        }
+        return new BeanDefinitionDelegate<>(definition);
+    }
+
+    public BeanDefinition<T> getTarget() {
+        return definition;
+    }
+
+    interface ProxyInitializingBeanDefinition<T> extends ProxyingBeanDefinition<T>, InitializingBeanDefinition<T> {
+        @Override
+        default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+            BeanDefinition<T> definition = getTarget();
+            if(definition instanceof InitializingBeanDefinition) {
+                return ((InitializingBeanDefinition<T>) definition).initialize(resolutionContext, context, bean);
+            }
+            return bean;
+        }
+    }
+
+    interface ProxyDisosableBeanDefinition<T> extends ProxyingBeanDefinition<T>, DisposableBeanDefinition<T> {
+        @Override
+        default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+            BeanDefinition<T> definition = getTarget();
+            if(definition instanceof DisposableBeanDefinition) {
+                return ((DisposableBeanDefinition<T>) definition).dispose(resolutionContext, context, bean);
+            }
+            return bean;
+        }
+    }
+
+    interface ProxyValidatingBeanDefinitino<T> extends ProxyingBeanDefinition<T>, ValidatedBeanDefinition<T> {
+        @Override
+        default T validate(BeanResolutionContext resolutionContext, T instance) {
+            BeanDefinition<T> definition = getTarget();
+            if(definition instanceof ValidatedBeanDefinition) {
+                return ((ValidatedBeanDefinition<T>) definition).validate(resolutionContext, instance);
+            }
+            return instance;
+        }
+    }
+
+    private static class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisosableBeanDefinition<T> {
+        private LifeCycleDelegate(BeanDefinition<T> definition) {
+            super(definition);
+        }
+    }
+    private static class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
+        private ValidatingDelegate(BeanDefinition<T> definition) {
+            super(definition);
+        }
+    }
+    private static class LifeCycleValidatingDelegate<T> extends LifeCycleDelegate<T> implements ProxyValidatingBeanDefinitino<T> {
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition) {
+            super(definition);
+        }
     }
 }

@@ -16,6 +16,8 @@
 package org.particleframework.core.cli;
 
 /**
+ * Utility class for parsing command line arguments
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -163,4 +163,41 @@ public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, Exe
      */
     <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType);
 
+    /**
+     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
+     *
+     * @return The running {@link BeanContext}
+     */
+    static BeanContext run() {
+        return build().start();
+    }
+
+    /**
+     * Build a {@link BeanContext}
+     *
+     * @return The built, but not yet running {@link BeanContext}
+     */
+    static BeanContext build() {
+        return new DefaultBeanContext();
+    }
+
+    /**
+     * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
+     *
+     * @param classLoader The classloader to use
+     * @return The running {@link BeanContext}
+     */
+    static BeanContext run(ClassLoader classLoader) {
+        return build(classLoader).start();
+    }
+
+    /**
+     * Build a {@link BeanContext}
+     *
+     * @param classLoader The classloader to use
+     * @return The built, but not yet running {@link BeanContext}
+     */
+    static BeanContext build(ClassLoader classLoader) {
+        return new DefaultBeanContext(classLoader);
+    }
 }

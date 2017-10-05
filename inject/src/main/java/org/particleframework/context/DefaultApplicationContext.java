@@ -165,61 +165,64 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> Collection<BeanDefinition> findBeanCandidates(Class<T> beanType) {
-        ForEach forEach = beanType.getAnnotation(ForEach.class);
         Collection<BeanDefinition> candidates = super.findBeanCandidates(beanType);
-        if (forEach != null) {
-            String property = forEach.property();
+        if (candidates.size() == 1) {
+            BeanDefinition first = candidates.iterator().next();
+            ForEach forEach = first.getAnnotation(ForEach.class);
+            if(forEach != null) {
 
-            Optional<BeanDefinition> foundBean = candidates.stream().findFirst();
-            BeanDefinition definition = foundBean.orElseThrow(() -> new BeanInstantiationException("Invalid bean: [" + beanType.getName() + "].Beans annotated with @ForEach must be singleton and unique."));
-            if (StringUtils.isNotEmpty(property)) {
-                Map entries = getProperty(property, Map.class, Collections.emptyMap());
-                if (entries.isEmpty()) {
-                    return Collections.emptySet();
-                } else {
+                String property = forEach.property();
 
-                    List<BeanDefinition> transformedCandidates = new ArrayList<>();
-                    for (Object key : entries.keySet()) {
-                        BeanDefinitionDelegate delegate = new BeanDefinitionDelegate<>(definition);
-                        delegate.put(Named.class.getName(), key.toString());
-                        transformedCandidates.add(delegate);
-                    }
-                    return transformedCandidates;
-                }
-            } else {
-                Class[] value = forEach.value();
-                if (value.length == 1) {
-                    Class<?> dependentType = value[0];
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
-                    if (dependentCandidates.isEmpty()) {
+                Optional<BeanDefinition> foundBean = candidates.stream().findFirst();
+                BeanDefinition definition = foundBean.orElseThrow(() -> new BeanInstantiationException("Invalid bean: [" + beanType.getName() + "].Beans annotated with @ForEach must be singleton and unique."));
+                if (StringUtils.isNotEmpty(property)) {
+                    Map entries = getProperty(property, Map.class, Collections.emptyMap());
+                    if (entries.isEmpty()) {
                         return Collections.emptySet();
                     } else {
-                        List<BeanDefinition> transformedCandidates = new ArrayList<>();
-                        for (BeanDefinition dependentCandidate : dependentCandidates) {
-                            BeanDefinitionDelegate<?> delegate = new BeanDefinitionDelegate<>(definition);
-                            Optional<Qualifier> optional;
-                            if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                                BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                                optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
-                            } else {
-                                Optional<Annotation> candidateQualifier = dependentCandidate.findAnnotationWithStereoType(javax.inject.Qualifier.class);
-                                optional = candidateQualifier.map(Qualifiers::byAnnotation);
-                            }
 
-                            optional.ifPresent(qualifier -> {
-                                        delegate.put(javax.inject.Qualifier.class.getName(), qualifier);
-                                        transformedCandidates.add(delegate);
-                                    }
-                            );
+                        List<BeanDefinition> transformedCandidates = new ArrayList<>();
+                        for (Object key : entries.keySet()) {
+                            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(definition);
+                            delegate.put(Named.class.getName(), key.toString());
+                            transformedCandidates.add(delegate);
                         }
                         return transformedCandidates;
                     }
+                } else {
+                    Class[] value = forEach.value();
+                    if (value.length == 1) {
+                        Class<?> dependentType = value[0];
+                        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
+                        if (dependentCandidates.isEmpty()) {
+                            return Collections.emptySet();
+                        } else {
+                            List<BeanDefinition> transformedCandidates = new ArrayList<>();
+                            for (BeanDefinition dependentCandidate : dependentCandidates) {
+                                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(definition);
+                                Optional<Qualifier> optional;
+                                if (dependentCandidate instanceof BeanDefinitionDelegate) {
+                                    BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
+                                    optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                                } else {
+                                    Optional<Annotation> candidateQualifier = dependentCandidate.findAnnotationWithStereoType(javax.inject.Qualifier.class);
+                                    optional = candidateQualifier.map(Qualifiers::byAnnotation);
+                                }
+
+                                optional.ifPresent(qualifier -> {
+                                            delegate.put(javax.inject.Qualifier.class.getName(), qualifier);
+                                            transformedCandidates.add(delegate);
+                                        }
+                                );
+                            }
+                            return transformedCandidates;
+                        }
+                    }
+                    return candidates;
                 }
-                return candidates;
             }
-        } else {
-            return candidates;
         }
+        return candidates;
     }
 
     @Override

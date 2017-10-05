@@ -1,0 +1,9 @@
+dependencies {
+    compile project(":inject")
+    compile project(":http")
+    compile 'javax.validation:validation-api:2.0.0.Final'
+
+    compileOnly project(":java-inject")
+    testCompile project(":java-inject")
+    testCompile project(":ast")
+}

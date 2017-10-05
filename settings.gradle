@@ -8,10 +8,10 @@ include "aop"
 include "spring"
 include "http"
 include "router"
-include "runtime"
+include "bootstrap"
 //include "runtime-green-lightning"
-include "runtime-http"
-include "runtime-netty"
+include "http-server"
+include "http-server-netty"
 include "test-suite"
 
 // configurations

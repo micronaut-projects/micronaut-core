@@ -57,7 +57,7 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
 
             for (int i = 0; i < parameterTypes.length; i++) {
                 Annotation ann = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i]);
-                arguments.add(Argument.create(
+                arguments.add(Argument.of(
                         method,
                         "arg" + i,
                         i,

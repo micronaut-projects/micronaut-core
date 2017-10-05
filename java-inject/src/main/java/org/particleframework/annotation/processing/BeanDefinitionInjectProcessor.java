@@ -479,7 +479,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 .ifPresent(destroyMethodName -> {
                     TypeElement destroyMethodDeclaringClass = (TypeElement)typeUtils.asElement(returnType);
                     beanMethodWriter.visitPreDestroyMethod(
-                        destroyMethodDeclaringClass.getQualifiedName(),
+                        destroyMethodDeclaringClass.getQualifiedName().toString(),
                         destroyMethodName
                     );
                 });

@@ -49,11 +49,33 @@ import java.util.function.Consumer;
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
     private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
+    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_METHOD = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(
+                    Argument.class,
+                    "of",
+                    Method.class,
+                    String.class,
+                    int.class,
+                    Class.class,
+                    Argument[].class
+            )
+    );
+
+    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_FIELD = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(
+                    Argument.class,
+                    "of",
+                    Field.class,
+                    String.class,
+                    Class.class,
+                    Argument[].class
+            )
+    );
 
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(
                     Argument.class,
-                    "create",
+                    "of",
                     Constructor.class,
                     String.class,
                     int.class,
@@ -61,19 +83,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     Argument[].class
             )
     );
-    private static final org.objectweb.asm.commons.Method METHOD_ARGUMENT_CREATE = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_SIMPLE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(
                     Argument.class,
-                    "create",
+                    "of",
                     Class.class,
                     String.class
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_ARGUMENT_CREATE_WITH_GENERICS = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_WITH_GENERICS = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(
                     Argument.class,
-                    "create",
+                    "of",
                     Class.class,
                     String.class,
                     Argument[].class
@@ -962,16 +984,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // Argument.create( .. )
         generatorAdapter.invokeStatic(
                 Type.getType(Argument.class),
-                org.objectweb.asm.commons.Method.getMethod(
-                        ReflectionUtils.getRequiredMethod(
-                                Argument.class,
-                                "create",
-                                Field.class,
-                                String.class,
-                                Class.class,
-                                Argument[].class
-                        )
-                )
+                METHOD_CREATE_ARGUMENT_FIELD
         );
 
         // 4th argument: requires reflection
@@ -1059,9 +1072,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
             }
-            injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+            injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                     declaringTypeRef.getInternalName(), methodName,
-                    methodDescriptor, false);
+                    methodDescriptor, isInterface);
         }
         else {
             // otherwise use injectBeanMethod instead which triggers reflective injection
@@ -1114,17 +1127,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // Argument.create( .. )
             generatorAdapter.invokeStatic(
                     Type.getType(Argument.class),
-                    org.objectweb.asm.commons.Method.getMethod(
-                            ReflectionUtils.getRequiredMethod(
-                                    Argument.class,
-                                    "create",
-                                    Method.class,
-                                    String.class,
-                                    int.class,
-                                    Class.class,
-                                    Argument[].class
-                            )
-                    )
+                    METHOD_CREATE_ARGUMENT_METHOD
             );
             // store the type reference
             generatorAdapter.visitInsn(AASTORE);
@@ -1716,7 +1719,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // Argument.create( .. )
             generatorAdapter.invokeStatic(
                     Type.getType(Argument.class),
-                    hasGenerics ? METHOD_ARGUMENT_CREATE_WITH_GENERICS : METHOD_ARGUMENT_CREATE
+                    hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
             );
 
             // store the type reference

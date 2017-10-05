@@ -179,7 +179,7 @@ public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Ob
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
-                    Argument.create(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
+                    Argument.of(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
         }
         @Override
         public String toString() {

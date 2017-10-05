@@ -90,11 +90,11 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
                     for (int i = 0; i < typeParameters.length; i++) {
                         TypeVariable<? extends Class<?>> typeParameter = typeParameters[i];
                         String name = typeParameter.getName();
-                        arguments.add(Argument.create(typeArguments[i], name));
+                        arguments.add(Argument.of(typeArguments[i], name));
                     }
                 }
             }
-            argument = Argument.create(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
+            argument = Argument.of(field, field.getName(), null, arguments.toArray(new Argument[arguments.size()]));
         }
         return argument;
     }

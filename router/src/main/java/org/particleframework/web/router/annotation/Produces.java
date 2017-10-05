@@ -28,7 +28,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * <p>An annotation to indicate the {@link MediaType}s produced by a particular component. Typically a {@link org.particleframework.stereotype.Controller}</p>
  *
- * <p>Generally with controllers one can use {@link Controller#produces()} ()}, however this annotation is more generic and applies
+ * <p>Generally with controllers one can use {@link Controller#produces()}, however this annotation is more generic and applies
  * to any component</p>
  *
  * @author Graeme Rocher
