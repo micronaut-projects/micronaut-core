@@ -1,7 +1,23 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.http.cors;
 
-import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.convert.*;
+import org.particleframework.core.type.Argument;
+import org.particleframework.http.HttpMethod;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
@@ -15,6 +31,7 @@ import java.util.stream.Collectors;
  * of {@link CorsOriginConfiguration}
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
@@ -27,65 +44,30 @@ public class CorsOriginConverter implements TypeConverter<Object, CorsOriginConf
     private static final String ALLOW_CREDENTIALS = "allowCredentials";
     private static final String MAX_AGE = "maxAge";
 
-    private Optional<List<String>> getListValue(Object value) {
-        Optional<List<String>> list;
-        if (value instanceof String) {
-            list = Optional.of(Arrays.asList((String) value));
-        }
-        else if (value instanceof List) {
-            List<String> strings = ((List<Object>) value).stream().map(Object::toString).collect(Collectors.toList());
-            list = Optional.of(strings);
-        }
-        else {
-            list = Optional.empty();
-        }
-        return list;
-    }
-
     @Override
     public Optional<CorsOriginConfiguration> convert(Object object, Class<CorsOriginConfiguration> targetType, ConversionContext context) {
         CorsOriginConfiguration configuration = new CorsOriginConfiguration();
         if (object instanceof Map) {
             Map mapConfig = (Map) object;
-            if (mapConfig.containsKey(ALLOWED_ORIGINS)) {
-                Object value = mapConfig.get(ALLOWED_ORIGINS);
-                configuration.setAllowedOrigins(getListValue(value));
-            }
-            if (mapConfig.containsKey(ALLOWED_METHODS)) {
-                Object value = mapConfig.get(ALLOWED_METHODS);
-                configuration.setAllowedMethods(getListValue(value));
-            }
-            if (mapConfig.containsKey(ALLOWED_HEADERS)) {
-                Object value = mapConfig.get(ALLOWED_HEADERS);
-                configuration.setAllowedHeaders(getListValue(value));
-            }
-            if (mapConfig.containsKey(EXPOSED_HEADERS)) {
-                Object value = mapConfig.get(EXPOSED_HEADERS);
-                configuration.setExposedHeaders(getListValue(value));
+            ConvertibleValues<Object> convertibleValues = new ConvertibleValuesMap<>(mapConfig);
 
-            }
-            if (mapConfig.containsKey(ALLOW_CREDENTIALS)) {
-                Object value = mapConfig.get(ALLOW_CREDENTIALS);
-                Optional<Boolean> allow;
-                if (value instanceof Boolean) {
-                    allow = Optional.of(((Boolean) value));
-                }
-                else {
-                    allow = Optional.empty();
-                }
-                configuration.setAllowCredentials(allow);
-            }
-            if (mapConfig.containsKey(MAX_AGE)) {
-                Object value = mapConfig.get(MAX_AGE);
-                Optional<Long> maxAge;
-                if (value instanceof Number) {
-                    maxAge = Optional.of(((Number) value).longValue());
-                }
-                else {
-                    maxAge = Optional.empty();
-                }
-                configuration.setMaxAge(maxAge);
-            }
+            convertibleValues.get(ALLOWED_ORIGINS, Argument.of(List.class, String.class))
+                    .ifPresent(configuration::setAllowedOrigins);
+
+            convertibleValues.get(ALLOWED_METHODS, Argument.of(List.class, HttpMethod.class))
+                             .ifPresent(configuration::setAllowedMethods);
+
+            convertibleValues.get(ALLOWED_HEADERS, Argument.of(List.class, String.class))
+                             .ifPresent(configuration::setAllowedHeaders);
+
+            convertibleValues.get(EXPOSED_HEADERS, Argument.of(List.class, String.class))
+                            .ifPresent(configuration::setExposedHeaders);
+
+            convertibleValues.get(ALLOW_CREDENTIALS, Boolean.class)
+                    .ifPresent(configuration::setAllowCredentials);
+
+            convertibleValues.get(MAX_AGE, Long.class)
+                    .ifPresent(configuration::setMaxAge);
         }
         return Optional.of(configuration);
     }

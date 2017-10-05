@@ -83,6 +83,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     }
 
     @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return attributes.get(name, requiredType);
+    }
+
+    @Override
     public Argument[] getArguments() {
         return executionHandle.getArguments();
     }

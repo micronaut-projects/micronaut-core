@@ -19,6 +19,7 @@ import io.netty.channel.ChannelOption
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.http.HttpMethod
 import org.particleframework.http.cors.CorsOriginConfiguration
 import org.particleframework.http.server.netty.NettyHttpServer
 import spock.lang.Specification
@@ -70,7 +71,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
                 'particle.server.cors.enabled': true,
                 'particle.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
                 'particle.server.cors.configurations.foo.allowedMethods': ['GET'],
-                'particle.server.cors.configurations.foo.maxAge': null,
+                'particle.server.cors.configurations.foo.maxAge': -1,
                 'particle.server.cors.configurations.bar.allowedOrigins': ['bar.com'],
                 'particle.server.cors.configurations.bar.allowedHeaders': ['Content-Type', 'Accept'],
                 'particle.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
@@ -90,20 +91,20 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.cors.configurations.size() == 2
         config.cors.configurations.containsKey('foo')
         config.cors.configurations.get('foo') instanceof CorsOriginConfiguration
-        config.cors.configurations.get('foo').allowedOrigins.get() == ['foo.com']
-        config.cors.configurations.get('foo').allowedMethods.get() == ['GET']
-        config.cors.configurations.get('foo').allowedHeaders.get() == ['*']
-        !config.cors.configurations.get('foo').exposedHeaders.isPresent()
-        config.cors.configurations.get('foo').allowCredentials.get()
-        !config.cors.configurations.get('foo').maxAge.isPresent()
+        config.cors.configurations.get('foo').allowedOrigins == ['foo.com']
+        config.cors.configurations.get('foo').allowedMethods == [HttpMethod.GET]
+        config.cors.configurations.get('foo').allowedHeaders == ['*']
+        !config.cors.configurations.get('foo').exposedHeaders
+        config.cors.configurations.get('foo').allowCredentials
+        config.cors.configurations.get('foo').maxAge == -1
         config.cors.configurations.containsKey('bar')
         config.cors.configurations.get('bar') instanceof CorsOriginConfiguration
-        config.cors.configurations.get('bar').allowedOrigins.get() == ['bar.com']
-        config.cors.configurations.get('bar').allowedMethods.get() == ['*']
-        config.cors.configurations.get('bar').allowedHeaders.get() == ['Content-Type', 'Accept']
-        config.cors.configurations.get('bar').exposedHeaders.get() == ['x', 'y']
-        !config.cors.configurations.get('bar').allowCredentials.get()
-        config.cors.configurations.get('bar').maxAge.get() == 150
+        config.cors.configurations.get('bar').allowedOrigins == ['bar.com']
+        config.cors.configurations.get('bar').allowedMethods == CorsOriginConfiguration.ANY_METHOD
+        config.cors.configurations.get('bar').allowedHeaders == ['Content-Type', 'Accept']
+        config.cors.configurations.get('bar').exposedHeaders == ['x', 'y']
+        !config.cors.configurations.get('bar').allowCredentials
+        config.cors.configurations.get('bar').maxAge == 150
 
         cleanup:
         beanContext.close()

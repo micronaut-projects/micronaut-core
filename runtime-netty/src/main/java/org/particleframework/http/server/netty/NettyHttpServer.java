@@ -21,9 +21,8 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
@@ -33,13 +32,17 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.*;
+import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
+import org.particleframework.http.cors.CorsHandler;
+import org.particleframework.http.cors.CorsUtil;
 import org.particleframework.http.exceptions.InternalServerException;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
-import org.particleframework.http.server.netty.cors.NettyCorsInterceptor;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.util.HttpUtil;
 import org.particleframework.core.type.Argument;
@@ -65,6 +68,10 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN;
+import static io.netty.handler.codec.http.HttpResponseStatus.OK;
+import static io.netty.util.ReferenceCountUtil.release;
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -73,15 +80,17 @@ import java.util.stream.Stream;
 public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CODEC = "http-codec";
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     public static final String PARTICLE_HANDLER = "particle-handler";
+    public static final String CORS_HANDLER = "cors-handler";
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final BeanLocator beanLocator;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final ChannelHandlerFactory[] channelHandlerFactories;
     private final Environment environment;
-
+    private final boolean corsEnabled;
+    private final CorsHandler corsHandler;
     @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
@@ -97,6 +106,9 @@ public class NettyHttpServer implements EmbeddedServer {
         this.serverConfiguration = serverConfiguration;
         this.beanLocator = beanLocator;
         this.channelHandlerFactories = channelHandlerFactories;
+        HttpServerConfiguration.CorsConfiguration corsConfiguration = serverConfiguration.getCors();
+        this.corsEnabled = corsConfiguration.isEnabled();
+        this.corsHandler = this.corsEnabled ? new CorsHandler(corsConfiguration) : null;
     }
 
     @Override
@@ -123,10 +135,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
 
-                        if (serverConfiguration.getCors().isEnabled()) {
-                            pipeline.addLast(new NettyCorsInterceptor(serverConfiguration.getCors()));
-                        }
-
                         List<ChannelHandler> channelHandlers = new ArrayList<>();
                         for (ChannelHandlerFactory channelHandlerFactory : channelHandlerFactories) {
                             ChannelHandler channelHandler = channelHandlerFactory.build(ch);
@@ -149,6 +157,28 @@ public class NettyHttpServer implements EmbeddedServer {
                                 // set the request on the channel
                                 channel.attr(NettyHttpRequest.KEY)
                                         .set(nettyHttpRequest);
+
+                                if(corsEnabled && nettyHttpRequest.getHeaders().getOrigin().isPresent()) {
+                                    Optional<MutableHttpResponse<?>> corsResponse = corsHandler.handleRequest(nettyHttpRequest);
+                                    if(corsResponse.isPresent()) {
+                                        ChannelFuture channelFuture = ctx.writeAndFlush(corsResponse.get());
+                                        if(!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
+                                            channelFuture.addListener(ChannelFutureListener.CLOSE);
+                                        }
+                                    }
+                                    else {
+                                        pipeline.addBefore(PARTICLE_HANDLER, CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
+                                            @Override
+                                            public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+                                                if(msg instanceof MutableHttpResponse) {
+                                                    corsHandler.handleResponse(nettyHttpRequest, (MutableHttpResponse<?>) msg);
+                                                }
+                                                pipeline.remove(this);
+                                                super.write(ctx, msg, promise);
+                                            }
+                                        });
+                                    }
+                                }
 
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug("Matching route {} - {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath());

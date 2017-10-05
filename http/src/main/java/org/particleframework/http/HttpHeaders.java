@@ -421,4 +421,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     default boolean isKeepAlive() {
         return getFirst(CONNECTION, String.class).map(val-> val.equalsIgnoreCase("keep-alive") ).orElse(false);
     }
+
+    /**
+     * @return The {@link #ORIGIN} header
+     */
+    default Optional<String> getOrigin() {
+        return findFirst(ORIGIN);
+    }
 }

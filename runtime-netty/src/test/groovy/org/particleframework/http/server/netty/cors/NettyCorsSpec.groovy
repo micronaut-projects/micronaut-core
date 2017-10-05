@@ -220,7 +220,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ['particle.server.cors.enabled': true,
         'particle.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
         'particle.server.cors.configurations.foo.allowedMethods': ['GET'],
-        'particle.server.cors.configurations.foo.maxAge': null,
+        'particle.server.cors.configurations.foo.maxAge': -1,
         'particle.server.cors.configurations.bar.allowedOrigins': ['bar.com'],
         'particle.server.cors.configurations.bar.allowedHeaders': ['Content-Type', 'Accept'],
         'particle.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],

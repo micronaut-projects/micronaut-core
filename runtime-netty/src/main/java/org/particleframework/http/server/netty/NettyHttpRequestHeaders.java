@@ -15,7 +15,9 @@
  */
 package org.particleframework.http.server.netty;
 
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.MutableHttpHeaders;
 
@@ -43,6 +45,15 @@ class NettyHttpRequestHeaders implements MutableHttpHeaders {
         String value = nettyHeaders.get(name);
         if (value != null) {
             return conversionService.convert(value, requiredType);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        String value = nettyHeaders.get(name);
+        if (value != null) {
+            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
         }
         return Optional.empty();
     }

@@ -19,7 +19,9 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 
@@ -65,6 +67,11 @@ public class NettyCookies implements Cookies {
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
         return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType)));
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType.getType(), ConversionContext.of(requiredType))));
     }
 
     public static class NettyCookie implements Cookie {

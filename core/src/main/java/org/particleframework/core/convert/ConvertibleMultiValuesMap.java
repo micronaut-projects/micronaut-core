@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.convert;
 
+import org.particleframework.core.type.Argument;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +47,16 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
         if(!values.isEmpty()) {
             V value = values.get(0);
             return conversionService.convert(value, requiredType);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        List<V> values = getAll(name);
+        if(!values.isEmpty()) {
+            V value = values.get(0);
+            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
         }
         return Optional.empty();
     }

@@ -1,73 +1,154 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.http.cors;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import org.particleframework.core.annotation.Nullable;
+import org.particleframework.http.HttpMethod;
+
+import java.util.*;
 
 /**
  * Stores configuration for CORS
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 public class CorsOriginConfiguration {
 
-    public static List<String> ANY = new ArrayList<>(Arrays.asList("*"));
-
-    Optional<List<String>> allowedOrigins = Optional.of(ANY);
-    Optional<List<String>> allowedMethods = Optional.of(ANY);
-    Optional<List<String>> allowedHeaders = Optional.of(ANY);
-    Optional<List<String>> exposedHeaders = Optional.empty();
-    Optional<Boolean> allowCredentials = Optional.of(true);
-    Optional<Long> maxAge = Optional.of(1800L);
+    /**
+     * Constant to represent any value
+     */
+    public static List<String> ANY = Collections.singletonList("*");
+    public static List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
 
-    public Optional<List<String>> getAllowedOrigins() {
+    private List<String> allowedOrigins = ANY;
+    private List<HttpMethod> allowedMethods = ANY_METHOD;
+    private List<String> allowedHeaders = ANY;
+    private List<String> exposedHeaders = Collections.emptyList();
+    private boolean allowCredentials = true;
+    private Long maxAge = 1800L;
+
+
+    /**
+     * @return The allowed origins
+     */
+    public List<String> getAllowedOrigins() {
         return allowedOrigins;
     }
 
-    public void setAllowedOrigins(Optional<List<String>> allowedOrigins) {
-        this.allowedOrigins = allowedOrigins;
+    /**
+     * Sets the allowed origins
+     * @param allowedOrigins The allow origins
+     */
+    public void setAllowedOrigins(@Nullable List<String> allowedOrigins) {
+        if(allowedOrigins != null) {
+            this.allowedOrigins = allowedOrigins;
+        }
     }
 
-    public Optional<List<String>> getAllowedMethods() {
+    /**
+     * @return The allowed methods
+     */
+    public List<HttpMethod> getAllowedMethods() {
         return allowedMethods;
     }
 
-    public void setAllowedMethods(Optional<List<String>> allowedMethods) {
-        this.allowedMethods = allowedMethods;
+    /**
+     * Sets the allowed methods
+     *
+     * @param allowedMethods The allowed methods
+     */
+    public void setAllowedMethods(@Nullable List<HttpMethod> allowedMethods) {
+        if(allowedMethods != null) {
+            this.allowedMethods = allowedMethods;
+        }
     }
 
-    public Optional<List<String>> getAllowedHeaders() {
+    /**
+     * @return The allowed headers
+     */
+    public List<String> getAllowedHeaders() {
         return allowedHeaders;
     }
 
-    public void setAllowedHeaders(Optional<List<String>> allowedHeaders) {
-        this.allowedHeaders = allowedHeaders;
+    /**
+     * Sets the allowed headers
+     *
+     * @param allowedHeaders The allowed headers
+     */
+    public void setAllowedHeaders(@Nullable List<String> allowedHeaders) {
+        if(allowedHeaders != null) {
+            this.allowedHeaders = allowedHeaders;
+        }
     }
 
-    public Optional<List<String>> getExposedHeaders() {
+    /**
+     * @return The exposed headers
+     */
+    public List<String> getExposedHeaders() {
         return exposedHeaders;
     }
 
-    public void setExposedHeaders(Optional<List<String>> exposedHeaders) {
-        this.exposedHeaders = exposedHeaders;
+    /**
+     * Sets the exposed headers
+     *
+     * @param exposedHeaders The exposed headers
+     */
+    public void setExposedHeaders(@Nullable List<String> exposedHeaders) {
+        if(exposedHeaders != null) {
+            this.exposedHeaders = exposedHeaders;
+        }
     }
 
-    public Optional<Boolean> getAllowCredentials() {
+    /**
+     * @return Whether to allow credentials
+     */
+    public boolean isAllowCredentials() {
         return allowCredentials;
     }
 
-    public void setAllowCredentials(Optional<Boolean> allowCredentials) {
+    /**
+     * Sets whether to allow credentials
+     *
+     * @param allowCredentials The credentials
+     */
+    public void setAllowCredentials(boolean allowCredentials) {
         this.allowCredentials = allowCredentials;
     }
 
-    public Optional<Long> getMaxAge() {
+    /**
+     * @return The max age. A value of -1 indicates no max age
+     */
+    public Long getMaxAge() {
         return maxAge;
     }
 
-    public void setMaxAge(Optional<Long> maxAge) {
-        this.maxAge = maxAge;
+    /**
+     * Sets the max age
+     *
+     * @param maxAge The max age
+     */
+    public void setMaxAge(@Nullable Long maxAge) {
+        if(maxAge == null) {
+            this.maxAge = -1L;
+        }
+        else {
+            this.maxAge = maxAge;
+        }
     }
 }

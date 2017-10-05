@@ -2,6 +2,7 @@ package org.particleframework.config;
 
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ValueResolver;
+import org.particleframework.core.type.Argument;
 
 import java.util.Collections;
 import java.util.Map;
@@ -30,6 +31,11 @@ public interface PropertyResolver extends ValueResolver {
     @Override
     default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
         return getProperty(name.toString(), requiredType, defaultValue);
+    }
+
+    @Override
+    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return getProperty(name.toString(), requiredType.getType(), ConversionContext.of(requiredType));
     }
 
     /**

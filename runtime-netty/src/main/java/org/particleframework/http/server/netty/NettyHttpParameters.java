@@ -19,7 +19,9 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpParameters;
 
 import java.io.IOException;
@@ -46,6 +48,16 @@ public class NettyHttpParameters implements HttpParameters {
         if(!values.isEmpty()) {
             String value = values.get(0);
             return conversionService.convert(value, requiredType);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        List<String> values = getAll(name);
+        if(!values.isEmpty()) {
+            String value = values.get(0);
+            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
         }
         return Optional.empty();
     }

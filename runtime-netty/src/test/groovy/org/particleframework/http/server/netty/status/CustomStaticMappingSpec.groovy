@@ -3,22 +3,16 @@ package org.particleframework.http.server.netty.status
 import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.RequestBody
-import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
-import org.particleframework.web.router.GroovyRouteBuilder
-import org.particleframework.web.router.RouteBuilder
 import org.particleframework.web.router.annotation.Consumes
 import org.particleframework.web.router.annotation.Error
 import org.particleframework.web.router.annotation.Get
 import org.particleframework.web.router.annotation.Post
-
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Created by graemerocher on 13/09/2017.
