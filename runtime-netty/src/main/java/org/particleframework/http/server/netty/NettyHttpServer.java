@@ -21,8 +21,9 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import org.particleframework.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
@@ -31,21 +32,18 @@ import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
-import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.binding.RequestBinderRegistry;
 import org.particleframework.http.binding.binders.request.BodyArgumentBinder;
 import org.particleframework.http.binding.binders.request.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.cors.CorsHandler;
-import org.particleframework.http.cors.CorsUtil;
 import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.util.HttpUtil;
-import org.particleframework.core.type.Argument;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
@@ -68,10 +66,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN;
-import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-import static io.netty.util.ReferenceCountUtil.release;
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -84,17 +78,22 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String CORS_HANDLER = "cors-handler";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
-    private final BeanLocator beanLocator;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final ChannelHandlerFactory[] channelHandlerFactories;
     private final Environment environment;
     private final boolean corsEnabled;
     private final CorsHandler corsHandler;
+    private final Optional<Router> router;
+    private final RequestBinderRegistry binderRegistry;
+    private final BeanLocator beanLocator;
+
     @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             Environment environment,
+            Optional<Router> router,
+            RequestBinderRegistry binderRegistry,
             BeanLocator beanLocator,
             ChannelHandlerFactory[] channelHandlerFactories
     ) {
@@ -102,10 +101,12 @@ public class NettyHttpServer implements EmbeddedServer {
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
+        this.beanLocator = beanLocator;
         this.environment = environment;
         this.serverConfiguration = serverConfiguration;
-        this.beanLocator = beanLocator;
+        this.router = router;
         this.channelHandlerFactories = channelHandlerFactories;
+        this.binderRegistry = binderRegistry;
         HttpServerConfiguration.CorsConfiguration corsConfiguration = serverConfiguration.getCors();
         this.corsEnabled = corsConfiguration.isEnabled();
         this.corsHandler = this.corsEnabled ? new CorsHandler(corsConfiguration) : null;
@@ -130,8 +131,8 @@ public class NettyHttpServer implements EmbeddedServer {
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
 
-                        Optional<Router> routerBean = beanLocator.findBean(Router.class);
-                        RequestBinderRegistry binderRegistry = beanLocator.getBean(RequestBinderRegistry.class);
+                        Optional<Router> routerBean = NettyHttpServer.this.router;
+                        RequestBinderRegistry binderRegistry = NettyHttpServer.this.binderRegistry;
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
 
@@ -368,13 +369,12 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
-        Optional<Router> routerBean = beanLocator.findBean(Router.class);
         try {
-            return routerBean.flatMap(router ->
+            return this.router.flatMap(router ->
                     router.route(HttpStatus.BAD_REQUEST)
                             .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
-                            .filter(match -> match.isExecutable())
-                            .map(match -> match.execute())
+                            .filter(RouteMatch::isExecutable)
+                            .map(RouteMatch::execute)
             ).orElse(HttpResponse.badRequest());
         } catch (Exception e) {
             throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
@@ -514,8 +514,7 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     private Optional<RouteMatch<Object>> findStatusRoute(HttpStatus status, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
-        Optional<Router> routerBean = beanLocator.findBean(Router.class);
-        return routerBean.flatMap(router ->
+        return this.router.flatMap(router ->
                 router.route(status)
         ).map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
                 .filter(RouteMatch::isExecutable);
