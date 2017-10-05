@@ -15,15 +15,15 @@
  */
 package org.particleframework.http.binding;
 
-import org.particleframework.bind.ArgumentBinder;
-import org.particleframework.bind.annotation.Bindable;
+import org.particleframework.core.bind.ArgumentBinder;
+import org.particleframework.core.bind.annotation.Bindable;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpParameters;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.binding.annotation.Body;
+import org.particleframework.http.annotation.Body;
 import org.particleframework.http.binding.binders.request.*;
 import org.particleframework.http.binding.binders.request.DefaultBodyAnnotationBinder;
 import org.particleframework.http.cookie.Cookie;

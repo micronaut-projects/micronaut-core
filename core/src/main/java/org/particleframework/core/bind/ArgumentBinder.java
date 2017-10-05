@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.bind;
+package org.particleframework.core.bind;
 
 import org.particleframework.core.type.Argument;
 
@@ -29,7 +29,7 @@ import java.util.Optional;
  *  objects and typically work on conjunction with a {@link org.particleframework.core.convert.ConvertibleValues} instance</p>
  *
  * <p>An {@link ArgumentBinder} can either be registered as a bean or by META-INF/services. In the case of the latter
- * it will be globally available at all times, whilst the former is only present when a {@link org.particleframework.context.BeanContext} is initialized</p>
+ * it will be globally available at all times, whilst the former is only present when a {@code org.particleframework.context.BeanContext} is initialized</p>
  *
  * @see org.particleframework.core.convert.TypeConverter
  * @see org.particleframework.core.convert.ConvertibleValues

@@ -25,7 +25,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.io.socket.SocketUtils;

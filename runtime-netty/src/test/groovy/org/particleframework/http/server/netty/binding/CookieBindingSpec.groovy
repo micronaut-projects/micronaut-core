@@ -2,10 +2,7 @@ package org.particleframework.http.server.netty.binding
 
 import okhttp3.Request
 import org.particleframework.context.annotation.Requires
-import org.particleframework.http.HttpHeaders
-import org.particleframework.http.MediaType
-import org.particleframework.http.binding.annotation.Cookie
-import org.particleframework.http.binding.annotation.Header
+import org.particleframework.http.annotation.Cookie
 import org.particleframework.http.cookie.Cookies
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller

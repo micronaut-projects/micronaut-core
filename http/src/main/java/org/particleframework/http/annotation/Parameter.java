@@ -13,27 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.bind.annotation;
+package org.particleframework.http.annotation;
 
-import org.particleframework.bind.ArgumentBinder;
+import org.particleframework.core.bind.annotation.Bindable;
 
-import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An {@link ArgumentBinder} whose lookup is driven by an annotation definition
- *
- * @param <A> The annotation type
- * @param <T> The argument type
- * @param <S> The binding source type
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotatedArgumentBinder<A extends Annotation, T, S> extends ArgumentBinder<T, S> {
-
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER})
+@Bindable
+public @interface Parameter {
     /**
-     * @return The annotation type
+     * @return The name of the parameter
      */
-    Class<A> getAnnotationType();
+    String value() default "";
 
 }

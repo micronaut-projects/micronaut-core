@@ -19,7 +19,7 @@ import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.http.HttpStatus
-import org.particleframework.http.binding.annotation.Body
+import org.particleframework.http.annotation.Body
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Post

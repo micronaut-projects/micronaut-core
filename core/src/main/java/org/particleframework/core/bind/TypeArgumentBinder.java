@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.bind;
+package org.particleframework.core.bind;
 
 /**
  * An {@link ArgumentBinder} that is resolved based on the argument type

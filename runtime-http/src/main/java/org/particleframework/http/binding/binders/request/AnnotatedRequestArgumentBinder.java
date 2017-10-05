@@ -15,8 +15,8 @@
  */
 package org.particleframework.http.binding.binders.request;
 
-import org.particleframework.bind.ArgumentBinder;
-import org.particleframework.bind.annotation.AnnotatedArgumentBinder;
+import org.particleframework.core.bind.ArgumentBinder;
+import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 

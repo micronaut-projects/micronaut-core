@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding.annotation;
+package org.particleframework.http.annotation;
 
-import org.particleframework.bind.annotation.Bindable;
-import org.particleframework.http.MediaType;
+import org.particleframework.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -26,7 +25,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from the HTTP body
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,10 +34,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER})
 @Bindable
-public @interface Body {
-
+public @interface Header {
     /**
-     * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
+     * @return The name of the header, otherwise it is inferred from the parameter name
      */
     String value() default "";
 }

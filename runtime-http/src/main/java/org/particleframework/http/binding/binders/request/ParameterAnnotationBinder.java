@@ -15,17 +15,18 @@
  */
 package org.particleframework.http.binding.binders.request;
 
-import org.particleframework.bind.annotation.AbstractAnnotatedArgumentBinder;
+import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinder;
+import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.binding.annotation.Parameter;
+import org.particleframework.http.annotation.Parameter;
 import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 
 /**
- * An {@link org.particleframework.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Parameter}
+ * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Parameter}
  * to trigger binding from an HTTP request parameter
  *
  * @author Graeme Rocher

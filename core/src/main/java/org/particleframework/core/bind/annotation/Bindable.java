@@ -13,28 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.bind;
+package org.particleframework.core.bind.annotation;
 
 import org.particleframework.core.type.Argument;
 
-import java.util.Optional;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A registry of {@link ArgumentBinder} instances
+ * An annotation stereotype for other annotations that indicates a method {@link Argument} is bindable
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ArgumentBinderRegistry<S> {
-
-
-    /**
-     * Locate an {@link ArgumentBinder} for the given argument and source type
-     *
-     * @param argument The argument
-     * @param source The source
-     * @param <T> The argument type
-     * @return An {@link Optional} of {@link ArgumentBinder}
-     */
-    <T> Optional<ArgumentBinder<T,S>> findArgumentBinder(Argument<T> argument, S source);
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+public @interface Bindable {
 }

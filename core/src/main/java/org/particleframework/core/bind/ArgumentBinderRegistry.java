@@ -13,30 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding.annotation;
+package org.particleframework.core.bind;
 
-import org.particleframework.bind.annotation.Bindable;
+import org.particleframework.core.type.Argument;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.util.Optional;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP cookie
+ * A registry of {@link ArgumentBinder} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface Cookie {
+public interface ArgumentBinderRegistry<S> {
+
+
     /**
-     * @return The name of the cookie, otherwise it is inferred from the parameter name
+     * Locate an {@link ArgumentBinder} for the given argument and source type
+     *
+     * @param argument The argument
+     * @param source The source
+     * @param <T> The argument type
+     * @return An {@link Optional} of {@link ArgumentBinder}
      */
-    String value() default "";
+    <T> Optional<ArgumentBinder<T,S>> findArgumentBinder(Argument<T> argument, S source);
 }

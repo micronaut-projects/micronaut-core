@@ -3,7 +3,7 @@ package org.particleframework.http.server.netty.binding
 import okhttp3.Request
 import org.particleframework.http.HttpParameters
 import org.particleframework.http.HttpStatus
-import org.particleframework.http.binding.annotation.Parameter
+import org.particleframework.http.annotation.Parameter
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get

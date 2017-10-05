@@ -13,30 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding.annotation;
+package org.particleframework.core.bind.annotation;
 
-import org.particleframework.bind.annotation.Bindable;
+import org.particleframework.core.bind.ArgumentBinder;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Annotation;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
+ * An {@link ArgumentBinder} whose lookup is driven by an annotation definition
+ *
+ * @param <A> The annotation type
+ * @param <T> The argument type
+ * @param <S> The binding source type
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface Header {
+public interface AnnotatedArgumentBinder<A extends Annotation, T, S> extends ArgumentBinder<T, S> {
+
     /**
-     * @return The name of the header, otherwise it is inferred from the parameter name
+     * @return The annotation type
      */
-    String value() default "";
+    Class<A> getAnnotationType();
+
 }

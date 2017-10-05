@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.binding.annotation;
+package org.particleframework.http.annotation;
 
-import org.particleframework.bind.annotation.Bindable;
+import org.particleframework.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -25,6 +25,8 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP cookie
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -32,10 +34,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER})
 @Bindable
-public @interface Parameter {
+public @interface Cookie {
     /**
-     * @return The name of the parameter
+     * @return The name of the cookie, otherwise it is inferred from the parameter name
      */
     String value() default "";
-
 }

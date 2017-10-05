@@ -15,7 +15,7 @@
  */
 package org.particleframework.http.binding;
 
-import org.particleframework.bind.ArgumentBinderRegistry;
+import org.particleframework.core.bind.ArgumentBinderRegistry;
 import org.particleframework.http.HttpRequest;
 
 /**

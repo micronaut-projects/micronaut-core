@@ -1,6 +1,6 @@
 package org.particleframework.http.binding.binders.request;
 
-import org.particleframework.http.binding.annotation.Body;
+import org.particleframework.http.annotation.Body;
 
 /**
  * A binder that binds from a parsed request body

@@ -15,19 +15,20 @@
  */
 package org.particleframework.http.binding.binders.request;
 
-import org.particleframework.bind.annotation.AbstractAnnotatedArgumentBinder;
+import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinder;
+import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.binding.annotation.Header;
+import org.particleframework.http.annotation.Header;
 import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 
 /**
- * An {@link org.particleframework.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header} annotation
+ * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Header} annotation
  * to trigger binding from an HTTP header
  *
  *
