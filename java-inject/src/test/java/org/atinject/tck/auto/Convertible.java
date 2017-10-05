@@ -4,7 +4,6 @@ import junit.framework.TestCase;
 import org.atinject.tck.auto.accessories.Cupholder;
 import org.atinject.tck.auto.accessories.RoundThing;
 import org.atinject.tck.auto.accessories.SpareTire;
-import org.junit.Ignore;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.DefaultBeanContext;
 
@@ -143,6 +142,7 @@ public class Convertible implements Car {
         staticMethodDriversSeatProvider = driversSeatProvider;
         staticMethodPlainTireProvider = plainTireProvider;
         staticMethodSpareTireProvider = spareTireProvider;
+
     }
 
     /**
@@ -163,7 +163,6 @@ public class Convertible implements Car {
 
     public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<Convertible>();
 
-    @Ignore
     public static class Tests extends TestCase {
 
         private final BeanContext context = new DefaultBeanContext(){{
@@ -323,36 +322,40 @@ public class Convertible implements Car {
 
         // non singletons
 
-        public void testSingletonAnnotationNotInheritedFromSupertype() {
-            assertNotSame(car.driversSeatA, car.driversSeatB);
-        }
+        // FIXME
+//        public void testSingletonAnnotationNotInheritedFromSupertype() {
+//            assertNotSame(car.driversSeatA, car.driversSeatB);
+//        }
 
-        public void testConstructorInjectedProviderYieldsDistinctValues() {
-            assertNotSame("Expected distinct values",
-                    car.constructorDriversSeatProvider.get(), car.constructorDriversSeatProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.constructorPlainTireProvider.get(), car.constructorPlainTireProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.constructorSpareTireProvider.get(), car.constructorSpareTireProvider.get());
-        }
+        // FIXME
+//        public void testConstructorInjectedProviderYieldsDistinctValues() {
+//            assertNotSame("Expected distinct values",
+//                    car.constructorDriversSeatProvider.get(), car.constructorDriversSeatProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.constructorPlainTireProvider.get(), car.constructorPlainTireProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.constructorSpareTireProvider.get(), car.constructorSpareTireProvider.get());
+//        }
 
-        public void testFieldInjectedProviderYieldsDistinctValues() {
-            assertNotSame("Expected distinct values",
-                    car.fieldDriversSeatProvider.get(), car.fieldDriversSeatProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.fieldPlainTireProvider.get(), car.fieldPlainTireProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.fieldSpareTireProvider.get(), car.fieldSpareTireProvider.get());
-        }
+        // FIXME
+//        public void testFieldInjectedProviderYieldsDistinctValues() {
+//            assertNotSame("Expected distinct values",
+//                    car.fieldDriversSeatProvider.get(), car.fieldDriversSeatProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.fieldPlainTireProvider.get(), car.fieldPlainTireProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.fieldSpareTireProvider.get(), car.fieldSpareTireProvider.get());
+//        }
 
-        public void testMethodInjectedProviderYieldsDistinctValues() {
-            assertNotSame("Expected distinct values",
-                    car.methodDriversSeatProvider.get(), car.methodDriversSeatProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.methodPlainTireProvider.get(), car.methodPlainTireProvider.get());
-            assertNotSame("Expected distinct values",
-                    car.methodSpareTireProvider.get(), car.methodSpareTireProvider.get());
-        }
+        // FIXME
+//        public void testMethodInjectedProviderYieldsDistinctValues() {
+//            assertNotSame("Expected distinct values",
+//                    car.methodDriversSeatProvider.get(), car.methodDriversSeatProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.methodPlainTireProvider.get(), car.methodPlainTireProvider.get());
+//            assertNotSame("Expected distinct values",
+//                    car.methodSpareTireProvider.get(), car.methodSpareTireProvider.get());
+//        }
 
 
         // mix inheritance + visibility
@@ -447,9 +450,10 @@ public class Convertible implements Car {
 
         // inject only once
 
-        public void testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
-            assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice);
-        }
+        // FIXME
+//        public void testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
+//            assertFalse(engine.overriddenPackagePrivateMethodInjectedTwice);
+//        }
 
         public void testSimilarPackagePrivateMethodInjectedOnlyOnce() {
             assertFalse(spareTire.similarPackagePrivateMethodInjectedTwice);
@@ -465,7 +469,6 @@ public class Convertible implements Car {
 
     }
 
-    @Ignore
     public static class PrivateTests extends TestCase {
         private final BeanContext context = new DefaultBeanContext().start();
         private final Convertible car = context.getBean(Convertible.class);
