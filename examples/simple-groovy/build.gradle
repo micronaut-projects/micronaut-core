@@ -18,7 +18,7 @@ dependencies {
     new File("../../gradle.properties").withReader { props.load(it) }
     compileOnly "org.particleframework:ast:${props.projectVersion}"
     compile "org.codehaus.groovy:groovy:$props.groovyVersion"
-    compile "org.particleframework:runtime-netty:${props.projectVersion}"
+    compile "org.particleframework:http-server-netty:${props.projectVersion}"
     compile "org.particleframework.configuration:jackson:${props.projectVersion}"
     compile "org.particleframework.configuration:hibernate-gorm:${props.projectVersion}"
 

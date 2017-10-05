@@ -1,7 +1,0 @@
-dependencies {
-    compile 'org.reactivestreams:reactive-streams:1.0.1'
-    compile project(":runtime")
-    compile project(":http")
-    compileOnly project(":java-inject")
-    testCompile project(":java-inject")
-}
