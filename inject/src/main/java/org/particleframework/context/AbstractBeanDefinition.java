@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanDefinition<T> implements InjectableBeanDefinition<T> {
+public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private final Annotation scope;
     private final boolean singleton;

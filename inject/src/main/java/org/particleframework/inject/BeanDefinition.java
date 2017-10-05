@@ -1,5 +1,7 @@
 package org.particleframework.inject;
 
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -121,4 +123,23 @@ public interface BeanDefinition<T> extends AnnotationSource, Named {
      * @return The possible methods
      */
     <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
+
+    /**
+     * Inject the given bean with the context
+     *
+     * @param context The context
+     * @param bean The bean
+     * @return The injected bean
+     */
+    T inject(BeanContext context, T bean);
+
+    /**
+     * Inject the given bean with the context
+     *
+     * @param resolutionContext the resolution context
+     * @param context The context
+     * @param bean The bean
+     * @return The injected bean
+     */
+    T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
 }

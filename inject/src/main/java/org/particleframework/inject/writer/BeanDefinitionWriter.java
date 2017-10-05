@@ -1072,9 +1072,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
             }
-            injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+            injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                     declaringTypeRef.getInternalName(), methodName,
-                    methodDescriptor, false);
+                    methodDescriptor, isInterface);
         }
         else {
             // otherwise use injectBeanMethod instead which triggers reflective injection

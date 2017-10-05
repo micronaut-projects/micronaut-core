@@ -1,6 +1,8 @@
 package org.particleframework.core.reflect;
 
 import org.particleframework.core.reflect.exception.InstantiationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.util.Optional;
@@ -14,6 +16,8 @@ import java.util.function.Function;
  */
 public class InstantiationUtils {
 
+    private static final Logger LOG = LoggerFactory.getLogger(InstantiationUtils.class);
+
     /**
      * Try to instantiate the given class
      *
@@ -26,6 +30,9 @@ public class InstantiationUtils {
             return ClassUtils.forName(name, classLoader)
                       .map((Function<Class, Optional>) InstantiationUtils::tryInstantiate);
         } catch (Throwable e) {
+            if(LOG.isErrorEnabled()) {
+                LOG.error("Tried, but could not instantiate type: " + name, e);
+            }
             return Optional.empty();
         }
     }
@@ -40,6 +47,9 @@ public class InstantiationUtils {
         try {
             return Optional.of(type.newInstance());
         } catch (Throwable e) {
+            if(LOG.isErrorEnabled()) {
+                LOG.error("Tried, but could not instantiate type: " + type, e);
+            }
             return Optional.empty();
         }
     }
@@ -56,6 +66,9 @@ public class InstantiationUtils {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
+            if(LOG.isErrorEnabled()) {
+                LOG.error("Tried, but could not instantiate type: " + type, e);
+            }
             return Optional.empty();
         }
     }
