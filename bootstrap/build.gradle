@@ -1,0 +1,6 @@
+dependencies {
+    compile project(":inject")
+    compile project(":http")
+    compileOnly project(":ast")
+    testCompile project(":ast")
+}
