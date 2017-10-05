@@ -165,6 +165,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                         if(!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
                                             channelFuture.addListener(ChannelFutureListener.CLOSE);
                                         }
+                                        return;
                                     }
                                     else {
                                         pipeline.addBefore(PARTICLE_HANDLER, CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
