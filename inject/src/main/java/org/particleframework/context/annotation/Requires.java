@@ -103,6 +103,13 @@ public @interface Requires {
     String[] missingConfigurations() default {};
 
     /**
+     * Expresses that the bean or configuration will only be configured if the given property is missing
+     *
+     * @return The property or properties that should be missing
+     */
+    String missingProperty() default "";
+
+    /**
      * Used to express a required SDK version
      */
     enum Sdk {

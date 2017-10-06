@@ -46,7 +46,9 @@ public interface ValueResolver {
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists and is able to be converted
      */
-    <T> Optional<T> get(CharSequence name, Argument<T> requiredType);
+    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return get(name, requiredType.getType());
+    }
     /**
      * Resolve the given property for the given name
      *

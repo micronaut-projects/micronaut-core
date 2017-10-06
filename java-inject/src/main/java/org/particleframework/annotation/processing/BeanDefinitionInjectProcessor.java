@@ -326,7 +326,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (isConfigurationPropertiesType) {
                         // handle non @Inject, @Value fields as config properties
                         ElementFilter.fieldsIn(elementUtils.getAllMembers(classElement)).forEach(
-                                field -> visitConfigurationProperty(field, o)
+                                field -> {
+                                    if(!modelUtils.isStatic(field) && !modelUtils.isFinal(field)) {
+                                        visitConfigurationProperty(field, o);
+                                    }
+                                }
                         );
                     } else {
                         TypeElement superClass = modelUtils.superClassFor(classElement);

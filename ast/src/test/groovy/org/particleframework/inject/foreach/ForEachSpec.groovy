@@ -129,6 +129,7 @@ class ForEachSpec extends Specification {
         MyBean bean2 = applicationContext.getBean(MyBean, Qualifiers.byName("two"))
 
         expect:
+        bean != bean2
         bean.configuration.port == 8080
         bean.configuration.anotherPort == 9090
         bean.configuration.intList == [1,2,3]

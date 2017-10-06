@@ -311,4 +311,9 @@ class ModelUtils {
         }
         return null;
     }
+
+
+    public boolean isFinal(Element element) {
+        return element.getModifiers().contains(FINAL);
+    }
 }

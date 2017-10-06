@@ -2,6 +2,7 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.core.naming.NameResolver;
 import org.particleframework.inject.BeanDefinition;
 
 import javax.inject.Named;
@@ -15,11 +16,12 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AnnotationQualifier<T> implements Qualifier<T> {
+class AnnotationQualifier<T> extends NameQualifier<T> {
 
     private final Annotation qualifier;
 
     AnnotationQualifier(Annotation qualifier) {
+        super(qualifier.annotationType().getSimpleName());
         this.qualifier = qualifier;
     }
 
@@ -36,7 +38,15 @@ class AnnotationQualifier<T> implements Qualifier<T> {
         }
 
         return candidates.filter(candidate -> {
-                    String candidateName = candidate.getType().getSimpleName();
+                    String candidateName;
+            System.out.println("candidateName = " + candidate);
+                    if(candidate instanceof NameResolver) {
+                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getType().getSimpleName());
+                    }
+                    else {
+                        Optional<Named> annotation = candidate.findAnnotation(Named.class);
+                        candidateName = annotation.map(Named::value).orElse( candidate.getType().getSimpleName() );
+                    }
 
                     if(candidateName.equalsIgnoreCase(name)) {
                         return true;

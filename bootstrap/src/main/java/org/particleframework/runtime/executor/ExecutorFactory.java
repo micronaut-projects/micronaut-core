@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Constructs {@link ExecutorService} instances based on {@link ExecutorConfiguration} instances
+ * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances
  *
  * @author Graeme Rocher
  * @since 1.0

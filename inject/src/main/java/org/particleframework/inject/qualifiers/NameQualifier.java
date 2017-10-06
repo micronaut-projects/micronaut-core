@@ -2,12 +2,14 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.ForEach;
+import org.particleframework.core.naming.NameResolver;
 import org.particleframework.inject.BeanDefinition;
 
 import javax.inject.Named;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.particleframework.core.util.ArgumentUtils.check;
@@ -35,7 +37,13 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
         return candidates.filter(candidate -> {
                     String typeName;
                     Optional<Named> beanQualifier = candidate.findAnnotation(Named.class);
-                    typeName = beanQualifier.map(Named::value).orElse(candidate.getType().getSimpleName());
+                    typeName = beanQualifier.map(Named::value).orElseGet(() -> {
+                        if(candidate instanceof NameResolver) {
+                            Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
+                            return resolvedName.orElse(candidate.getType().getSimpleName());
+                        }
+                        return candidate.getType().getSimpleName();
+                    });
                     return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
                 }
         );

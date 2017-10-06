@@ -47,6 +47,9 @@ public class RequiresCondition implements Condition<ConditionContext> {
             if(!matchesProperty(context, annotation)) {
                 return false;
             }
+            if(!matchesMissingProperty(context, annotation)) {
+                return false;
+            }
             if(!matchesPresenceOfBean(context, annotation)) {
                 return false;
             }
@@ -79,6 +82,21 @@ public class RequiresCondition implements Condition<ConditionContext> {
                     if(!resolvedValue.equals(value)) {
                         return false;
                     }
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesMissingProperty(ConditionContext context, Requires annotation) {
+        String property = annotation.missingProperty();
+        if(property.length() > 0) {
+            BeanContext beanContext = context.getBeanContext();
+            if(beanContext instanceof PropertyResolver) {
+                PropertyResolver propertyResolver = (PropertyResolver) beanContext;
+                Optional<Object> resolved = propertyResolver.getProperty(property, Object.class);
+                if(resolved.isPresent()) {
+                    return false;
                 }
             }
         }
@@ -150,7 +168,7 @@ public class RequiresCondition implements Condition<ConditionContext> {
 
     protected boolean matchesPresenceOfClasses(Requires requires) {
         try {
-            Class[] classes = requires.classes();
+            requires.classes();
             return true;
         } catch (TypeNotPresentException e) {
             // type not present exception

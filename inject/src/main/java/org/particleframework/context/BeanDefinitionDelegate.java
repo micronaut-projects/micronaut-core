@@ -17,13 +17,14 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.MutableConvertibleValuesMap;
+import org.particleframework.core.convert.ValueResolver;
+import org.particleframework.core.naming.NameResolver;
+import org.particleframework.core.naming.Named;
 import org.particleframework.inject.*;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Collection;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -33,8 +34,9 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> implements ProxyingBeanDefinition<T>, BeanFactory<T> {
+class BeanDefinitionDelegate<T> implements ProxyingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver {
     protected final BeanDefinition<T> definition;
+    protected final Map<String, Object> attributes = new HashMap<>();
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         if(!(definition instanceof BeanFactory)) {
@@ -130,9 +132,10 @@ class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> impl
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        resolutionContext.putAll(this);
+        resolutionContext.putAll(attributes);
         return ((BeanFactory<T>)this.definition).build(resolutionContext, context, definition);
     }
+
 
     @Override
     public AnnotatedElement[] getAnnotatedElements() {
@@ -171,6 +174,24 @@ class BeanDefinitionDelegate<T> extends MutableConvertibleValuesMap<Object> impl
 
     public BeanDefinition<T> getTarget() {
         return definition;
+    }
+
+    @Override
+    public Optional<String> resolveName() {
+        return get(Named.class.getName(), String.class);
+    }
+
+    @Override
+    public <V> Optional<V> get(CharSequence name, Class<V> requiredType) {
+        Object value = attributes.get(name);
+        if(value != null && requiredType.isInstance(value)) {
+            return Optional.of((V) value);
+        }
+        return Optional.empty();
+    }
+
+    public void put(String name, Object value) {
+        this.attributes.put(name, value);
     }
 
     interface ProxyInitializingBeanDefinition<T> extends ProxyingBeanDefinition<T>, InitializingBeanDefinition<T> {

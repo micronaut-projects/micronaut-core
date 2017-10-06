@@ -48,6 +48,10 @@ public class Qualifiers {
             Type typeAnn = (Type) annotation;
             return byType(typeAnn.value());
         }
+        else if(annotation.annotationType() == Named.class) {
+            Named nameAnn = (Named) annotation;
+            return byName(nameAnn.value());
+        }
         else {
             return new AnnotationQualifier<>(annotation);
         }

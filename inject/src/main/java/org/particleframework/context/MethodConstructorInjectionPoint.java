@@ -44,4 +44,5 @@ class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implem
     public Object invoke(Object... args) {
         throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
     }
+
 }

@@ -3,6 +3,7 @@ package org.particleframework.context;
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.MutableConvertibleValuesMap;
+import org.particleframework.core.convert.ValueResolver;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
@@ -15,7 +16,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Object> implements BeanResolutionContext {
+public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> implements BeanResolutionContext {
 
     private final BeanContext context;
     private final BeanDefinition rootDefinition;
@@ -41,6 +42,15 @@ public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Ob
     @Override
     public Path getPath() {
         return path;
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        Object value = get(name);
+        if(value != null && requiredType.isInstance(value)) {
+            return Optional.of((T) value);
+        }
+        return Optional.empty();
     }
 
 
@@ -97,12 +107,26 @@ public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Ob
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
-            ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
-            if(contains(constructorSegment)) {
-                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+            ConstructorInjectionPoint constructor = declaringType.getConstructor();
+            if(constructor instanceof MethodConstructorInjectionPoint) {
+               MethodConstructorInjectionPoint factoryMethod = (MethodConstructorInjectionPoint) constructor;
+               MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
+                if(contains(methodSegment)) {
+                    throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                }
+                else {
+                    push(methodSegment);
+                }
             }
             else {
-                push(constructorSegment);
+
+                ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
+                if(contains(constructorSegment)) {
+                    throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                }
+                else {
+                    push(constructorSegment);
+                }
             }
             return this;
         }
@@ -163,10 +187,9 @@ public class DefaultBeanResolutionContext extends MutableConvertibleValuesMap<Ob
             this.methodInjectionPoint = methodInjectionPoint;
         }
 
-
         @Override
         public String toString() {
-            StringBuilder baseString = new StringBuilder(getDeclaringType().getType().getSimpleName()).append('.');
+            StringBuilder baseString = new StringBuilder(methodInjectionPoint.getMethod().getDeclaringClass().getSimpleName()).append('.');
             baseString.append(getName());
             outputArguments(baseString, methodInjectionPoint.getArguments());
             return baseString.toString();

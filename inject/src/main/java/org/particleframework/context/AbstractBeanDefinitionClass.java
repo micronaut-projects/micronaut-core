@@ -28,6 +28,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     private final String beanDefinitionTypeName;
     private Class beanDefinition;
     private Boolean present;
+    private Boolean enabled;
 
     public AbstractBeanDefinitionClass(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;

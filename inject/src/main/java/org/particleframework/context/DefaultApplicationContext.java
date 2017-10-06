@@ -1,7 +1,6 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.ForEach;
-import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.BeanInstantiationException;
@@ -10,6 +9,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
@@ -166,61 +166,72 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     protected <T> Collection<BeanDefinition> findBeanCandidates(Class<T> beanType) {
         Collection<BeanDefinition> candidates = super.findBeanCandidates(beanType);
-        if (candidates.size() == 1) {
-            BeanDefinition first = candidates.iterator().next();
-            ForEach forEach = first.getAnnotation(ForEach.class);
-            if(forEach != null) {
+        if(!candidates.isEmpty()) {
 
-                String property = forEach.property();
+            List<BeanDefinition> transformedCandidates = new ArrayList<>();
+            for (BeanDefinition candidate : candidates) {
+                ForEach forEach = candidate.getAnnotation(ForEach.class);
+                if (forEach != null) {
 
-                Optional<BeanDefinition> foundBean = candidates.stream().findFirst();
-                BeanDefinition definition = foundBean.orElseThrow(() -> new BeanInstantiationException("Invalid bean: [" + beanType.getName() + "].Beans annotated with @ForEach must be singleton and unique."));
-                if (StringUtils.isNotEmpty(property)) {
-                    Map entries = getProperty(property, Map.class, Collections.emptyMap());
-                    if (entries.isEmpty()) {
-                        return Collections.emptySet();
-                    } else {
+                    String property = forEach.property();
 
-                        List<BeanDefinition> transformedCandidates = new ArrayList<>();
-                        for (Object key : entries.keySet()) {
-                            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(definition);
-                            delegate.put(Named.class.getName(), key.toString());
-                            transformedCandidates.add(delegate);
+                    if (StringUtils.isNotEmpty(property)) {
+                        Map entries = getProperty(property, Map.class, Collections.emptyMap());
+                        if (!entries.isEmpty()) {
+                            for (Object key : entries.keySet()) {
+                                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                delegate.put(Named.class.getName(), key.toString());
+                                transformedCandidates.add(delegate);
+                            }
                         }
-                        return transformedCandidates;
+                    } else {
+                        Class[] value = forEach.value();
+                        if (value.length == 1) {
+                            Class<?> dependentType = value[0];
+                            Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
+                            if (!dependentCandidates.isEmpty()) {
+                                for (BeanDefinition dependentCandidate : dependentCandidates) {
+
+                                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
+                                    Optional<Qualifier> optional;
+                                    if (dependentCandidate instanceof BeanDefinitionDelegate) {
+                                        BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
+                                        optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                                    } else {
+                                        Optional<Annotation> candidateQualifier = dependentCandidate.findAnnotationWithStereoType(javax.inject.Qualifier.class);
+                                        optional = candidateQualifier.map(Qualifiers::byAnnotation);
+                                    }
+
+
+                                    optional.ifPresent(qualifier -> {
+                                                String qualifierKey = javax.inject.Qualifier.class.getName();
+                                                Argument<?>[] arguments = candidate.getConstructor().getArguments();
+                                                for (Argument<?> argument : arguments) {
+                                                    if (argument.getType().equals(dependentType)) {
+                                                        Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
+                                                        delegate.put(qualifierKey, qualifedArg);
+                                                        break;
+                                                    }
+                                                }
+
+                                                if (qualifier instanceof Named) {
+                                                    delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                                                }
+                                                transformedCandidates.add(delegate);
+                                            }
+                                    );
+                                }
+                            }
+                        }
                     }
                 } else {
-                    Class[] value = forEach.value();
-                    if (value.length == 1) {
-                        Class<?> dependentType = value[0];
-                        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
-                        if (dependentCandidates.isEmpty()) {
-                            return Collections.emptySet();
-                        } else {
-                            List<BeanDefinition> transformedCandidates = new ArrayList<>();
-                            for (BeanDefinition dependentCandidate : dependentCandidates) {
-                                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(definition);
-                                Optional<Qualifier> optional;
-                                if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                                    BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                                    optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
-                                } else {
-                                    Optional<Annotation> candidateQualifier = dependentCandidate.findAnnotationWithStereoType(javax.inject.Qualifier.class);
-                                    optional = candidateQualifier.map(Qualifiers::byAnnotation);
-                                }
-
-                                optional.ifPresent(qualifier -> {
-                                            delegate.put(javax.inject.Qualifier.class.getName(), qualifier);
-                                            transformedCandidates.add(delegate);
-                                        }
-                                );
-                            }
-                            return transformedCandidates;
-                        }
-                    }
-                    return candidates;
+                    transformedCandidates.add(candidate);
                 }
             }
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Finalized bean definitions candidates: {}", transformedCandidates);
+            }
+            return transformedCandidates;
         }
         return candidates;
     }
@@ -240,12 +251,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     .filter(candidate -> {
                                         if (candidate instanceof BeanDefinitionDelegate) {
                                             BeanDefinitionDelegate<T> delegate = (BeanDefinitionDelegate) candidate;
-                                            Optional<Qualifier> optional = delegate.get(javax.inject.Qualifier.class.getName(), Qualifier.class);
-                                            if (optional.isPresent()) {
-                                                if (Qualifiers.byName(primary).equals(optional.get())) {
-                                                    return true;
-                                                }
-                                            }
+                                            Optional<String> optional = delegate.get(Named.class.getName(), String.class);
+                                            return optional.map(val-> val.equals(primary)).orElse(false);
                                         }
                                         return false;
                                     }).findFirst().orElse(null);

@@ -54,6 +54,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     private final boolean singleton;
     private final Class<T> type;
     private final boolean provided;
+    private final Class<?> declaringType;
     private boolean hasPreDestroyMethods = false;
     private boolean hasPostConstructMethods = false;
     private final ConstructorInjectionPoint<T> constructor;
@@ -85,6 +86,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations());
         this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()) != null;
         this.type = (Class<T>) method.getReturnType();
+        this.declaringType = method.getDeclaringClass();
         this.annotatedElements = new AnnotatedElement[] {
                 method.getReturnType(),
                 method,
@@ -111,6 +113,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.annotatedElements = new AnnotatedElement[] { type };
         this.singleton = singleton;
         this.type = type;
+        this.declaringType = type;
         this.provided = type.getAnnotation(Provided.class) != null;
         this.isConfigurationProperties = isConfigurationProperties(type);
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
@@ -171,6 +174,11 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Override
     public int hashCode() {
         return type != null ? type.hashCode() : 0;
+    }
+
+    @Override
+    public String toString() {
+        return "Definition: "  + declaringType.getName();
     }
 
     @Override
@@ -1283,7 +1291,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         if (ann != null) {
             qualifier = Qualifiers.byAnnotation(ann);
         }
-        return qualifier != null ? qualifier : resolutionContext.get(javax.inject.Qualifier.class.getName(), Qualifier.class).orElse(null);
+        return qualifier;
     }
 
 
@@ -1293,7 +1301,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         if (ann != null) {
             qualifier = Qualifiers.byAnnotation(ann);
         }
-        return qualifier != null ? qualifier : resolutionContext.get(javax.inject.Qualifier.class.getName(), Qualifier.class).orElse(null);
+
+        if(qualifier == null) {
+            Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
+                                                            .map(map -> (Qualifier) map.get(argument));
+            qualifier = optional.orElse(null);
+        }
+        return qualifier;
     }
 
 

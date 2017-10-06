@@ -2,6 +2,7 @@ package org.particleframework.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.sun.javafx.scene.control.behavior.OptionalBoolean;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.naming.NameUtils;
@@ -376,6 +377,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(list);
         });
 
+        // Optional handling
         addConverter(Object.class, Optional.class, (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
@@ -389,6 +391,18 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.of(Optional.empty());
             }
         });
+
+        addConverter(Object.class, OptionalInt.class, (object, targetType, context) -> {
+            Optional<Integer> converted = convert(object, Integer.class, context);
+            return converted.map(integer -> Optional.of(OptionalInt.of(integer))).orElseGet(() -> Optional.of(OptionalInt.empty()));
+        });
+
+        addConverter(Object.class, OptionalLong.class, (object, targetType, context) -> {
+            Optional<Long> converted = convert(object, Long.class, context);
+            return converted.map(longValue -> Optional.of(OptionalLong.of(longValue))).orElseGet(() -> Optional.of(OptionalLong.empty()));
+        });
+
+
 
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
@@ -420,12 +434,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Map -> Map (inner type conversion)
         addConverter(Map.class, Map.class, (object, targetType, context) -> {
             TypeVariable<Class<Map>>[] typeParameters = targetType.getTypeParameters();
-            Class keyType = String.class;
+            Class keyType = Object.class;
             Class valueType = Object.class;
             boolean isProperties = false;
             ConversionContext keyContext = context;
             ConversionContext valContext = context;
             if (targetType.equals(Properties.class)) {
+                keyType = String.class;
                 valueType = String.class;
                 isProperties = true;
             } else if (typeParameters.length == 2) {

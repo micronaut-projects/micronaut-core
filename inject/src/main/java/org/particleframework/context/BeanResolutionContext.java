@@ -1,10 +1,12 @@
 package org.particleframework.context;
 
 import org.particleframework.core.convert.MutableConvertibleValues;
+import org.particleframework.core.convert.ValueResolver;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
 import java.util.Deque;
+import java.util.Map;
 
 /**
  * Represents the resolution context for a current resolve of a given bean
@@ -12,7 +14,7 @@ import java.util.Deque;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanResolutionContext extends MutableConvertibleValues<Object> {
+public interface BeanResolutionContext extends Map<String, Object>, ValueResolver {
 
     /**
      * @return The context
