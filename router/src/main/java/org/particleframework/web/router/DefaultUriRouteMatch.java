@@ -23,6 +23,7 @@ import org.particleframework.http.uri.UriMatchInfo;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
+import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -119,5 +120,10 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
     @Override
     public HttpMethod getHttpMethod() {
         return httpMethod;
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return executableMethod.getAnnotatedElements();
     }
 }

@@ -47,21 +47,6 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return executableMethod.getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return executableMethod.getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return executableMethod.getDeclaredAnnotations();
-    }
-
-    @Override
     public String getMethodName() {
         return this.executableMethod.getMethodName();
     }
@@ -125,7 +110,7 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
     }
 
     @Override
-    public R execute(Map argumentValues) {
+    public R execute(Map<String, Object> argumentValues) {
         Argument[] targetArguments = getArguments();
 
         if (targetArguments.length == 0) {

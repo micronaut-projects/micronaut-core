@@ -21,12 +21,15 @@ import org.particleframework.http.HttpStatus;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
+import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
+ * A {@link RouteMatch} for a status code
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -90,5 +93,10 @@ public class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
                 return variables;
             }
         };
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return executableMethod.getAnnotatedElements();
     }
 }

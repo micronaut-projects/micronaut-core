@@ -1174,6 +1174,10 @@ public class DefaultBeanContext implements BeanContext {
             return method.getReturnType();
         }
 
+        @Override
+        public AnnotatedElement[] getAnnotatedElements() {
+            return method.getAnnotatedElements();
+        }
 
         @Override
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
@@ -1208,6 +1212,7 @@ public class DefaultBeanContext implements BeanContext {
         public Class getDeclaringType() {
             return target.getClass();
         }
+
     }
 
     private static final class BeanExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {

@@ -61,6 +61,8 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -159,20 +161,17 @@ public class NettyHttpServer implements EmbeddedServer {
                                 channel.attr(NettyHttpRequest.KEY)
                                         .set(nettyHttpRequest);
 
-                                if(corsEnabled && nettyHttpRequest.getHeaders().getOrigin().isPresent()) {
+                                if (corsEnabled && nettyHttpRequest.getHeaders().getOrigin().isPresent()) {
                                     Optional<MutableHttpResponse<?>> corsResponse = corsHandler.handleRequest(nettyHttpRequest);
-                                    if(corsResponse.isPresent()) {
-                                        ChannelFuture channelFuture = ctx.writeAndFlush(corsResponse.get());
-                                        if(!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
-                                            channelFuture.addListener(ChannelFutureListener.CLOSE);
-                                        }
+                                    if (corsResponse.isPresent()) {
+                                        ctx.writeAndFlush(corsResponse.get())
+                                                .addListener(createCloseListener(msg));
                                         return;
-                                    }
-                                    else {
+                                    } else {
                                         pipeline.addBefore(PARTICLE_HANDLER, CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
                                             @Override
                                             public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-                                                if(msg instanceof MutableHttpResponse) {
+                                                if (msg instanceof MutableHttpResponse) {
                                                     corsHandler.handleResponse(nettyHttpRequest, (MutableHttpResponse<?>) msg);
                                                 }
                                                 pipeline.remove(this);
@@ -208,7 +207,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
 
                                         ctx.writeAndFlush(unsupportedResult)
-                                                .addListener(ChannelFutureListener.CLOSE);
+                                                .addListener(createCloseListener(msg));
                                     } else {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
@@ -241,7 +240,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         ));
 
                                         ctx.writeAndFlush(notAllowedResponse)
-                                                .addListener(ChannelFutureListener.CLOSE);
+                                                .addListener(createCloseListener(msg));
                                     } else {
                                         // if no alternative route was found send back 404 - NOT_FOUND
                                         Object notFoundResponse =
@@ -250,7 +249,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         .orElse(HttpResponse.notFound());
 
                                         ctx.writeAndFlush(notFoundResponse)
-                                                .addListener(ChannelFutureListener.CLOSE);
+                                                .addListener(createCloseListener(msg));
                                     }
                                 }
                             }
@@ -281,7 +280,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                 RouteMatch finalRoute = match.get();
                                                 Object result = finalRoute.execute();
                                                 ctx.writeAndFlush(result)
-                                                        .addListener(ChannelFutureListener.CLOSE);
+                                                        .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
                                                 return;
                                             }
                                         }
@@ -294,7 +293,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                     .get()
                                                     .handle(nettyHttpRequest, cause);
                                             ctx.writeAndFlush(result)
-                                                    .addListener(ChannelFutureListener.CLOSE);
+                                                    .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
                                             return;
                                         }
                                     } catch (Throwable e) {
@@ -339,6 +338,14 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         });
         return this;
+    }
+
+    private ChannelFutureListener createCloseListener(HttpRequest msg) {
+        return future -> {
+            if (!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
+                future.channel().close();
+            }
+        };
     }
 
     @Override
@@ -406,7 +413,7 @@ public class NettyHttpServer implements EmbeddedServer {
                 LOG.debug("Bad request: Unbindable arguments for route: " + route);
             }
             context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                    .addListener(ChannelFutureListener.CLOSE);
+                    .addListener(createCloseListener(request.getNativeRequest()));
         } else {
 
             // decorate the execution of the route so that it runs an async executor
@@ -431,15 +438,14 @@ public class NettyHttpServer implements EmbeddedServer {
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
                         HttpContentSubscriber subscriber = factory.build(request);
-                        if(subscriber.isEnabled()) {
+                        if (subscriber.isEnabled()) {
                             streamedHttpRequest.subscribe(subscriber);
-                        }
-                        else {
+                        } else {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("Request body parsing not enabled for subscriber: " + subscriber.getClass().getSimpleName());
                             }
                             context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                                    .addListener(ChannelFutureListener.CLOSE);
+                                    .addListener(createCloseListener(nativeRequest));
 
                         }
                     } else {
@@ -452,7 +458,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         LOG.debug("Request body expected, but was empty.");
                     }
                     context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                            .addListener(ChannelFutureListener.CLOSE);
+                            .addListener(createCloseListener(nativeRequest));
 
                 }
             }
@@ -462,10 +468,10 @@ public class NettyHttpServer implements EmbeddedServer {
 
     private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
-        Executor executor = context.channel().eventLoop();
+        ExecutorService executor = context.channel().eventLoop();
 
         route = route.decorate(finalRoute -> {
-            executor.execute(() -> {
+            executor.submit(() -> {
 
                 Object result;
                 try {

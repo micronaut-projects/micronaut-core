@@ -90,7 +90,11 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
                     JsonContentSubscriber.this.onComplete(jsonNode);
                 } else {
                     ctx.writeAndFlush(HttpResponse.badRequest())
-                            .addListener(ChannelFutureListener.CLOSE);
+                            .addListener((ChannelFutureListener) future -> {
+                        if(!io.netty.handler.codec.http.HttpUtil.isKeepAlive(nettyHttpRequest.getNativeRequest())) {
+                            future.channel().close();
+                        }
+                    });
                 }
             }
         });

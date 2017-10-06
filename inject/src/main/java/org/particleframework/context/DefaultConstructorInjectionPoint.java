@@ -7,6 +7,7 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ConstructorInjectionPoint;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 
@@ -86,6 +87,11 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
                 throw new BeanInstantiationException("Cannot instantiate bean of type ["+constructor.getDeclaringClass().getName()+"] using constructor ["+constructor+"]:" + e.getMessage(), e);
             }
         }
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        return new AnnotatedElement[] { constructor, constructor.getDeclaringClass() };
     }
 
     @Override

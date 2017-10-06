@@ -24,7 +24,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Configures the default I/O thread pool if non is configured by the user
+ * Configures the default I/O thread pool if none is configured by the user
  *
  * @author Graeme Rocher
  * @since 1.0
