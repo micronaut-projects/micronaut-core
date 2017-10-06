@@ -1,5 +1,6 @@
 package org.particleframework.inject.inheritance
 
+import groovy.transform.PackageScope
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
@@ -24,6 +25,8 @@ class AbstractInheritanceSpec extends Specification {
         b.a != null
         b.another != null
         b.a.is(b.another)
+        b.packagePrivate != null
+        b.packagePrivate.is(b.another)
     }
 
     @Singleton
@@ -35,10 +38,20 @@ class AbstractInheritanceSpec extends Specification {
         // inject via field
         @Inject protected A a
         private A another
+
+        private A packagePrivate;
+
         // inject via method
         @Inject void setAnother(A a) {
             this.another = a
         }
+
+        @Inject
+        @PackageScope
+        void setPackagePrivate(A a) {
+            this.packagePrivate = a;
+        }
+
 
         A getA() {
             return a
@@ -47,6 +60,12 @@ class AbstractInheritanceSpec extends Specification {
         A getAnother() {
             return another
         }
+
+        @PackageScope
+        A getPackagePrivate() {
+            return packagePrivate;
+        }
+
     }
 
     @Singleton
