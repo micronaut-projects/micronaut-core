@@ -17,7 +17,6 @@ package org.particleframework.runtime.executor;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Requires;
 
 import javax.inject.Named;
@@ -31,11 +30,13 @@ import javax.inject.Singleton;
  */
 @Requires(missingProperty = "particle.server.executors.io")
 @Factory
-public class IOExecutorFactory {
+public class IOExecutorService {
+
+    public static final String NAME = "io";
 
     @Singleton
     @Bean
-    @Named("io")
+    @Named(IOExecutorService.NAME)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
     }

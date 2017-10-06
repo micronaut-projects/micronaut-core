@@ -917,8 +917,9 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
             if(qualifier == null) {
-                Optional<Annotation> optional = beanDefinition.findAnnotationWithStereoType(javax.inject.Qualifier.class);
+                Optional<javax.inject.Named> optional = beanDefinition.findAnnotation(javax.inject.Named.class);
                 qualifier = (Qualifier<T>) optional.map(Qualifiers::byAnnotation).orElse(null);
+
             }
         }
         if(LOG.isDebugEnabled()) {
@@ -1028,10 +1029,10 @@ public class DefaultBeanContext implements BeanContext {
         if (existing != null) {
             if(LOG.isDebugEnabled()) {
                 if(hasQualifier) {
-                    LOG.debug("Found existing beans for type [{} {}]: {} ", qualifier, beanType.getName(), existing);
+                    LOG.debug("Found {} existing beans for type [{} {}]: {} ", existing.size(), qualifier, beanType.getName(), existing);
                 }
                 else {
-                    LOG.debug("Found existing beans for type [{}]: {} ", beanType.getName(), existing);
+                    LOG.debug("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
                 }
             }
             return Collections.unmodifiableCollection(existing);
@@ -1057,7 +1058,13 @@ public class DefaultBeanContext implements BeanContext {
                         if(!hasQualifier) {
 
                             if(LOG.isDebugEnabled()) {
-                                LOG.debug("Found existing bean for type {}: {} ", beanType.getName(), instance);
+                                Qualifier registeredQualifier = entry.getKey().qualifier;
+                                if(registeredQualifier != null) {
+                                    LOG.debug("Found existing bean for type {} {}: {} ",registeredQualifier, beanType.getName(), instance);
+                                }
+                                else {
+                                    LOG.debug("Found existing bean for type {}: {} ", beanType.getName(), instance);
+                                }
                             }
 
                             beansOfTypeList.add((T) instance);
@@ -1123,10 +1130,10 @@ public class DefaultBeanContext implements BeanContext {
         }
         if(LOG.isDebugEnabled() && !beans.isEmpty()) {
             if(hasQualifier) {
-                LOG.debug("Found beans for type [{} {}]: {} ", qualifier, beanType.getName(), beans);
+                LOG.debug("Found {} beans for type [{} {}]: {} ", beans.size(), qualifier, beanType.getName(), beans);
             }
             else {
-                LOG.debug("Found beans for type [{}]: {} ", beanType.getName(), beans);
+                LOG.debug("Found {} beans for type [{}]: {} ", beans.size(), beanType.getName(), beans);
             }
         }
 
@@ -1209,6 +1216,11 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
+        }
+
+        @Override
         public Class getDeclaringType() {
             return target.getClass();
         }
@@ -1223,6 +1235,11 @@ public class DefaultBeanContext implements BeanContext {
             super(method);
             this.beanContext = beanContext;
             this.beanType = beanType;
+        }
+
+        @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
         }
 
         @Override
@@ -1294,7 +1311,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Annotation getScope() {
-            return AnnotationUtil.findAnnotationWithStereoType(singletonClass, Scope.class);
+            return AnnotationUtil.findAnnotationWithStereoType(singletonClass, Scope.class).orElse(null);
         }
 
         @Override

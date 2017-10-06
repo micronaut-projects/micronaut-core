@@ -56,12 +56,13 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
             List<Argument> arguments = new ArrayList<>(parameterTypes.length);
 
             for (int i = 0; i < parameterTypes.length; i++) {
-                Annotation ann = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i]);
+                Class<? extends Annotation> qualifierType = AnnotationUtil.findAnnotationWithStereoType(Qualifier.class, parameterAnnotations[i])
+                                                                          .map(Annotation::annotationType).orElse(null);
                 arguments.add(Argument.of(
                         method,
                         "arg" + i,
                         i,
-                        ann != null ? ann.annotationType() : null
+                        qualifierType
                 ));
             }
             this.arguments = arguments.toArray(new Argument[arguments.size()]);

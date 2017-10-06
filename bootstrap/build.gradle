@@ -6,4 +6,5 @@ dependencies {
     compileOnly project(":java-inject")
     testCompile project(":java-inject")
     testCompile project(":ast")
+    testCompile "org.grails:grails-datastore-gorm:6.1.7.RELEASE"
 }

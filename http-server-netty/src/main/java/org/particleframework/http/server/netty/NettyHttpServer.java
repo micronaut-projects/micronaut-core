@@ -45,6 +45,7 @@ import org.particleframework.http.server.netty.configuration.NettyHttpServerConf
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -89,6 +90,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final Optional<Router> router;
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
+    private final ExecutorSelector executorSelector;
 
     @Inject
     public NettyHttpServer(
@@ -97,6 +99,7 @@ public class NettyHttpServer implements EmbeddedServer {
             Optional<Router> router,
             RequestBinderRegistry binderRegistry,
             BeanLocator beanLocator,
+            ExecutorSelector executorSelector,
             ChannelHandlerFactory[] channelHandlerFactories
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -104,6 +107,7 @@ public class NettyHttpServer implements EmbeddedServer {
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
         this.beanLocator = beanLocator;
+        this.executorSelector = executorSelector;
         this.environment = environment;
         this.serverConfiguration = serverConfiguration;
         this.router = router;
@@ -240,7 +244,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         ));
 
                                         ctx.writeAndFlush(notAllowedResponse)
-                                                .addListener(createCloseListener(msg));
+                                                .addListener(ChannelFutureListener.CLOSE);
                                     } else {
                                         // if no alternative route was found send back 404 - NOT_FOUND
                                         Object notFoundResponse =
@@ -249,7 +253,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         .orElse(HttpResponse.notFound());
 
                                         ctx.writeAndFlush(notFoundResponse)
-                                                .addListener(createCloseListener(msg));
+                                                .addListener(ChannelFutureListener.CLOSE);
                                     }
                                 }
                             }
@@ -293,7 +297,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                     .get()
                                                     .handle(nettyHttpRequest, cause);
                                             ctx.writeAndFlush(result)
-                                                    .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
+                                                    .addListener(ChannelFutureListener.CLOSE);
                                             return;
                                         }
                                     } catch (Throwable e) {
@@ -468,7 +472,9 @@ public class NettyHttpServer implements EmbeddedServer {
 
     private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
-        ExecutorService executor = context.channel().eventLoop();
+        // Select the most appropriate Executor
+        ExecutorService executor = executorSelector.select(route)
+                                                   .orElse(context.channel().eventLoop());
 
         route = route.decorate(finalRoute -> {
             executor.submit(() -> {

@@ -116,8 +116,8 @@ class DefaultArgument<T> implements Argument<T> {
     private AnnotatedElement createInternalElement(Annotation[] annotations) {
         return new AnnotatedElement() {
             @Override
-            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                return AnnotationUtil.findAnnotation(annotations, annotationClass);
+            public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+                return AnnotationUtil.findAnnotation(annotations, annotationClass).orElse(null);
             }
 
             @Override

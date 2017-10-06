@@ -23,6 +23,7 @@ import org.particleframework.core.type.ReturnType;
 import org.particleframework.web.router.exceptions.RoutingException;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -44,6 +45,11 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
         this.executableMethod = executableMethod;
         this.conversionService = conversionService;
 
+    }
+
+    @Override
+    public Method getTargetMethod() {
+        return executableMethod.getTargetMethod();
     }
 
     @Override

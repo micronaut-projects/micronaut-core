@@ -17,10 +17,8 @@ package org.particleframework.core.annotation;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * <p>
@@ -67,12 +65,9 @@ public interface AnnotationSource extends AnnotatedElement {
     default <A extends Annotation> Optional<A> findAnnotation(Class<A> type) {
         AnnotatedElement[] elements = getAnnotatedElements();
         for (AnnotatedElement element : elements) {
-            Optional<? extends Annotation> result = AnnotationUtil.findAnnotationsWithStereoType(element, type)
-                    .stream()
-                    .filter(ann-> ann.annotationType() == type)
-                    .findFirst();
-            if(result.isPresent()) {
-                return (Optional<A>) result;
+            Optional<A> optional = AnnotationUtil.findAnnotation(element, type);
+            if(optional.isPresent()) {
+                return optional;
             }
         }
         return Optional.empty();
@@ -84,10 +79,15 @@ public interface AnnotationSource extends AnnotatedElement {
      * @param stereotype The method
      * @return The stereotype
      */
-    default Optional<Annotation> findAnnotationWithStereoType(Class<?> stereotype) {
+    default Optional<Annotation> findAnnotationWithStereoType(Class<? extends Annotation> stereotype) {
         AnnotatedElement[] candidates = getAnnotatedElements();
-        Set<Annotation> results = AnnotationUtil.findAnnotationsWithStereoType(candidates, stereotype);
-        return results.stream().findFirst();
+        for (AnnotatedElement candidate : candidates) {
+            Optional<? extends Annotation> opt = AnnotationUtil.findAnnotationWithStereoType(candidate, stereotype);
+            if(opt.isPresent()) {
+                return (Optional<Annotation>) opt;
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -101,6 +101,14 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
 
+    /**
+     * Get a concrete annotation for the given annotation type searching all of the {@link #getAnnotatedElements()}
+     *
+     * @param annotationClass The annotation class
+     * @param <T> The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @see #findAnnotation(Class)
+     */
     @Override
     default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         for (AnnotatedElement annotatedElement : getAnnotatedElements()) {
@@ -112,24 +120,58 @@ public interface AnnotationSource extends AnnotatedElement {
         return null;
     }
 
+    /**
+     * @return A merged view of all of the annotations from {@link  #getAnnotatedElements()}
+     */
     @Override
     default Annotation[] getAnnotations() {
         AnnotatedElement[] elements = getAnnotatedElements();
-        ArrayList<Annotation> annotations = new ArrayList<>();
-        for (AnnotatedElement element : elements) {
-            Collections.addAll(annotations, element.getAnnotations());
-        }
-        return annotations.toArray(new Annotation[annotations.size()]);
+        return Arrays.stream(elements)
+              .flatMap(element -> Arrays.stream(element.getAnnotations()))
+              .toArray(Annotation[]::new);
     }
 
+    /**
+     * @return A merged view of all of the declared annotations from {@link  #getAnnotatedElements()}
+     */
     @Override
     default Annotation[] getDeclaredAnnotations() {
         AnnotatedElement[] elements = getAnnotatedElements();
-        ArrayList<Annotation> annotations = new ArrayList<>();
-        for (AnnotatedElement element : elements) {
-            Collections.addAll(annotations, element.getDeclaredAnnotations());
-        }
-        return annotations.toArray(new Annotation[annotations.size()]);
+        return Arrays.stream(elements)
+                .flatMap(element -> Arrays.stream(element.getDeclaredAnnotations()))
+                .toArray(Annotation[]::new);
     }
 
+    /**
+     * Return whether an annotation is present for any of the given stereotypes
+     *
+     * @param stereotypes The stereotypes
+     * @return True if it is
+     */
+    default boolean isAnnotationStereotypePresent(String... stereotypes) {
+        for (AnnotatedElement annotatedElement : getAnnotatedElements()) {
+            for (String stereotype : stereotypes) {
+                if( AnnotationUtil.findAnnotationWithStereoType(annotatedElement, stereotype).isPresent() ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Return whether any annotation is present for any of the given annotation names
+     *
+     * @param annotationNames The annotation names
+     * @return True if it is
+     */
+    default boolean isAnyAnnotationPresent(String...annotationNames) {
+        Annotation[] annotations = getAnnotations();
+        for (String annotationName : annotationNames) {
+            if( Arrays.stream(annotations).anyMatch(ann -> ann.annotationType().getName().equals(annotationName)) ) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

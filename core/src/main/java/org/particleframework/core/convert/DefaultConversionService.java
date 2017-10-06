@@ -67,13 +67,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Annotation formattingAnnotation = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations());
-
-        Class<? extends Annotation> formattingType = formattingAnnotation != null ? formattingAnnotation.annotationType() : null;
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingType);
+        Optional<? extends Class<? extends Annotation>> formattingAnn = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations())
+                                                                                      .map(Annotation::annotationType);
+        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnn.orElse(null));
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
         if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, formattingType);
+            typeConverter = findTypeConverter(sourceType, targetType, formattingAnn.orElse(null));
             if (typeConverter == null) {
                 return Optional.empty();
             } else {

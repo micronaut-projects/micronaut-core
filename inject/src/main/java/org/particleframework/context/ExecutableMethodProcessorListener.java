@@ -59,7 +59,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
                             .keySet()
                             .stream()
                             .filter((type) ->
-                                    type == annotationType || AnnotationUtil.findAnnotationWithStereoType(type, annotationType) != null
+                                    type == annotationType || AnnotationUtil.findAnnotationWithStereoType(type, annotationType).isPresent()
                             )
                             .forEach((key) -> {
                                         List<ExecutableMethod> executableMethods = methodsByAnnotation.get(key);
@@ -97,10 +97,10 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
             if(applicationContext.findBeanDefinition(declaringType).isPresent()) {
 
                 if(annotations.isEmpty()) {
-                    Annotation executableType = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
-                    if(executableType != null) {
-                        registerExecutableMethod(result, executableType, executableMethod);
-                    }
+                    Optional<Annotation> execOpt = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
+                    execOpt.ifPresent(annotation ->
+                        registerExecutableMethod(result, annotation, executableMethod)
+                    );
                 }
                 else {
 

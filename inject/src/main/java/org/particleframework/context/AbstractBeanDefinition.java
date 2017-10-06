@@ -83,13 +83,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Internal
     protected AbstractBeanDefinition(Method method,
                                      Argument...arguments) {
-        this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations());
-        this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()) != null;
+        this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations()).orElse(null);
+        this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()).isPresent();
         this.type = (Class<T>) method.getReturnType();
         this.declaringType = method.getDeclaringClass();
         this.annotatedElements = new AnnotatedElement[] {
-                method.getReturnType(),
                 method,
+                method.getReturnType(),
                 method.getDeclaringClass()
         };
         this.provided = method.getAnnotation(Provided.class) != null;
@@ -483,7 +483,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Internal
     protected void injectBeanField(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object bean) {
         FieldInjectionPoint fieldInjectionPoint = fieldInjectionPoints.get(index);
-        boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()) != null;
+        boolean isInject = AnnotationUtil.findAnnotationWithStereoType(Inject.class, fieldInjectionPoint.getField().getAnnotations()).isPresent();
         try {
             Object value;
             if (isInject) {

@@ -14,11 +14,13 @@ import org.particleframework.inject.writer.BeanDefinitionWriter;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 import javax.inject.Scope;
+import javax.inject.Singleton;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -44,9 +46,9 @@ public class BeanDefinitionReader {
     public <T> BeanDefinition<T> readBeanDefinition(Class<T> type) {
         String className = type.getName();
         String classAsPath = className.replace('.', '/') + ".class";
-        Annotation scope = AnnotationUtil.findAnnotationWithStereoType(type, Scope.class);
-        boolean isSingleton = AnnotationUtil.findAnnotationWithStereoType(type, Scope.class) != null;
-        String scopeAnnotationName = scope != null ? scope.getClass().getName() : null;
+        Optional<Annotation> scopeOpt = AnnotationUtil.findAnnotationWithStereoType(type, Scope.class);
+        boolean isSingleton = AnnotationUtil.findAnnotationWithStereoType(type, Singleton.class).isPresent();
+        String scopeAnnotationName = scopeOpt.map(annotation -> annotation.annotationType().getName()).orElse(null);
 
         String packageName = type.getPackage().getName();
         String nameWithoutPackage = type.getName().substring(packageName.length() + 1, type.getName().length());
@@ -125,7 +127,7 @@ public class BeanDefinitionReader {
                 String className = Type.getType(annotationNode.desc).getClassName();
                 Class<?> annotationClass = ClassUtils.forName(className, classLoader)
                                                         .orElse(null);
-                if( annotationClass != null && AnnotationUtil.findAnnotationWithStereoType(annotationClass, Qualifier.class) != null)  {
+                if( annotationClass != null && AnnotationUtil.findAnnotationWithStereoType(annotationClass, Qualifier.class).isPresent())  {
                     return annotationClass;
                 }
             }

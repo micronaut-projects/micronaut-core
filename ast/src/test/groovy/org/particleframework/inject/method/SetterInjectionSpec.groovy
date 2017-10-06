@@ -28,7 +28,9 @@ class SetterInjectionSpec extends Specification {
 
     @Singleton
     static class AImpl implements A {
-
+        AImpl() {
+            println 'foo'
+        }
     }
 
     static class B {

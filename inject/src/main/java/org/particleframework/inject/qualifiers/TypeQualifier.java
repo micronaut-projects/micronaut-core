@@ -25,6 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,9 +43,9 @@ class TypeQualifier<T> implements Qualifier<T> {
         this.types = new ArrayList<>();
         if(types != null) {
             for (Class type : types) {
-                Type typeAnn = AnnotationUtil.findAnnotationWithStereoType(type, Type.class);
-                if(typeAnn != null) {
-                    this.types.addAll(Arrays.asList(typeAnn.value()));
+                Optional<Type> typeOpt = AnnotationUtil.findAnnotationWithStereoType(type, Type.class);
+                if(typeOpt.isPresent()) {
+                    this.types.addAll(Arrays.asList(typeOpt.get().value()));
                 }
                 else {
                     this.types.add(type);

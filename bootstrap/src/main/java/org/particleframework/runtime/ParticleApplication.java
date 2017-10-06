@@ -22,6 +22,7 @@ import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.runtime.exceptions.ApplicationStartupException;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,32 +86,29 @@ public class ParticleApplication {
             environment.addPropertySource(new MapPropertySource(propertyMap));
         }
 
-        // TODO: error handling for start()
-        applicationContext.start();
-        Optional<EmbeddedServer> embeddedContainerBean = applicationContext.findBean(EmbeddedServer.class);
+        try {
+            applicationContext.start();
+            Optional<EmbeddedServer> embeddedContainerBean = applicationContext.findBean(EmbeddedServer.class);
 
-        embeddedContainerBean.ifPresent((embeddedServer -> {
-            try {
-                embeddedServer.start();
-                // TODO: Different protocols and hosts
-                if(LOG.isInfoEnabled()) {
-                    LOG.info("Server Running: http://localhost:" + embeddedServer.getPort());
-                }
-            } catch (Throwable e) {
-                if(LOG.isErrorEnabled()) {
-                    LOG.error("Error starting Particle server: " + e.getMessage(), e);
-                }
-                Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(e.getClass(), exceptionType -> (throwable -> 1));
-                Integer code = exitCodeMapper.apply(e);
-                if(code > 0) {
-                    if(!Environment.TEST.equals(environmentToUse)) {
-                        System.exit(code);
+            embeddedContainerBean.ifPresent((embeddedServer -> {
+                try {
+                    embeddedServer.start();
+                    // TODO: Different protocols and hosts
+                    if(LOG.isInfoEnabled()) {
+                        LOG.info("Server Running: http://localhost:" + embeddedServer.getPort());
                     }
+                } catch (Throwable e) {
+                    handleStartupException(environmentToUse, e);
                 }
-            }
-        }));
-        return applicationContext;
+            }));
+            return applicationContext;
+        } catch (Throwable e) {
+            handleStartupException(environmentToUse, e);
+            return null;
+        }
     }
+
+
 
     /**
      * Add classes to be included in the initialization of the application
@@ -279,6 +277,26 @@ public class ParticleApplication {
                 .classes(classes)
                 .args(args)
                 .run();
+    }
+
+    /**
+     * Default handling of startup exceptions.
+     * @param environment The environment
+     * @param exception The exception
+     * @throws ApplicationStartupException If the server cannot be shutdown with an appropriate exist code
+     */
+    protected void handleStartupException(String environment, Throwable exception)  {
+        Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
+        Integer code = exitCodeMapper.apply(exception);
+        if(code > 0) {
+            if(!Environment.TEST.equals(environment)) {
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error starting Particle server: " + exception.getMessage(), exception);
+                }
+                System.exit(code);
+            }
+        }
+        throw new ApplicationStartupException("Error starting Particle server: " + exception.getMessage(), exception);
     }
 
     private String deduceEnvironment() {

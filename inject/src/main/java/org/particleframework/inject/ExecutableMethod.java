@@ -33,30 +33,7 @@ import java.util.Set;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  */
-public interface ExecutableMethod<T, R> extends Executable<T,R> {
-
-    /**
-     * @return The target method
-     */
-    Method getTargetMethod();
-    /**
-     * @return Return the return type
-     */
-    ReturnType<R> getReturnType();
-    /**
-     * @return The bean that declares this injection point
-     */
-    Class<?> getDeclaringType();
-
-    /**
-     * @return The name of the method
-     */
-    String getMethodName();
-
-    /**
-     * @return The argument types
-     */
-    Class[] getArgumentTypes();
+public interface ExecutableMethod<T, R> extends Executable<T,R>, MethodReference {
 
     /**
      * @return One or many {@link org.particleframework.context.annotation.Executable} annotations for this method

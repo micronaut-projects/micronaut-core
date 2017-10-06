@@ -171,7 +171,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         Class type = method.getParameterTypes()[index];
 
         Annotation[] annotations = method.getParameterAnnotations()[index];
-        Annotation annotation = qualifierType != null ? AnnotationUtil.findAnnotation(annotations, qualifierType) : null;
+        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
                 type,
                 name,
@@ -201,7 +201,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         Class type = constructor.getParameterTypes()[index];
 
         Annotation[] annotations = constructor.getParameterAnnotations()[index];
-        Annotation annotation = qualifierType != null ? AnnotationUtil.findAnnotation(annotations, qualifierType) : null;
+        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
                 type,
                 name,
@@ -227,7 +227,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             @Nullable Argument...typeParameters) {
         Class type = field.getType();
         Annotation[] annotations = field.getAnnotations();
-        Annotation annotation = qualifierType != null ? AnnotationUtil.findAnnotation(annotations, qualifierType) : null;
+        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
                 type,
                 name,
@@ -251,7 +251,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             @Nullable Argument...typeParameters) {
         Class type = field.getType();
         Annotation[] annotations = field.getAnnotations();
-        Annotation annotation = qualifierType != null ? AnnotationUtil.findAnnotation(annotations, qualifierType) : null;
+        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
         return new DefaultArgument(
                 type,
                 field.getName(),

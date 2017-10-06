@@ -49,9 +49,9 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     @Override
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
-        Controller controllerAnn = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
-        if (controllerAnn != null && AnnotationUtil.findAnnotationWithStereoType(method, Action.class) == null) {
-
+        Optional<Controller> optional = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
+        if (optional.isPresent() && !AnnotationUtil.findAnnotationWithStereoType(method, Action.class).isPresent()) {
+            Controller controllerAnn = optional.get();
 
             Class[] argumentTypes = method.getArgumentTypes();
             if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
