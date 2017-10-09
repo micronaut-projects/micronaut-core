@@ -10,4 +10,3 @@
 * WebSockets
 * JSON Array Decoding via Stream
 * Support for Functions (Serverless)
-* Thread Pool Config for I/O operations

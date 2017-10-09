@@ -23,6 +23,7 @@ import org.particleframework.aop.*;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.convert.OptionalValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.inject.BeanDefinition;
@@ -94,6 +95,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final Set<Object> interceptorTypes;
     private final Type proxyType;
     private final boolean hotswap;
+    private final boolean lazy;
     private final boolean isInterface;
     private final BeanDefinitionVisitor parentWriter;
     private final boolean isIntroduction;
@@ -123,7 +125,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public AopProxyWriter(BeanDefinitionVisitor parent,
                           Object... interceptorTypes) {
-        this(parent, false, false, interceptorTypes);
+        this(parent, OptionalValues.empty(), interceptorTypes);
     }
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
@@ -134,13 +136,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
     public AopProxyWriter(BeanDefinitionVisitor parent,
-                          boolean proxyTarget,
-                          boolean isHotswap,
+                          OptionalValues<Boolean> settings,
                           Object... interceptorTypes) {
         this.isIntroduction = false;
         this.parentWriter = parent;
-        this.isProxyTarget = proxyTarget || parent.isInterface();
-        this.hotswap = isHotswap;
+        this.isProxyTarget = settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
+        this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
+        this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
         this.isInterface = parent.isInterface();
         this.packageName = parent.getPackageName();
         this.targetClassShortName = parent.getBeanSimpleName();
@@ -166,13 +168,24 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     /**
      * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link org.particleframework.aop.Introduction} advise
      *
+     * @param packageName The package name
+     * @param className The class name
+     * @param scope The scope annotation type
+     * @param isInterface Is the target of the advise an interface
+     * @param isSingleton Is the target of the advise singleton
      * @param interceptorTypes The interceptor types
      */
-    public AopProxyWriter(String packageName, String className, String scope, boolean isInterface, boolean isSingleton, Object... interceptorTypes) {
+    public AopProxyWriter(String packageName,
+                          String className,
+                          String scope,
+                          boolean isInterface,
+                          boolean isSingleton,
+                          Object... interceptorTypes) {
         this.isIntroduction = true;
         this.packageName = packageName;
         this.isInterface = isInterface;
         this.hotswap = false;
+        this.lazy = false;
         this.targetClassShortName = className;
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.parentWriter = null;

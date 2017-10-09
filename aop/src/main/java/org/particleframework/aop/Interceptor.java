@@ -36,6 +36,20 @@ import org.particleframework.core.order.Ordered;
 public interface Interceptor<T, R> extends Ordered {
 
     /**
+     * The {@link Around#proxyTarget()} setting
+     */
+    CharSequence PROXY_TARGET = "proxyTarget";
+
+    /**
+     * The {@link Around#hotswap()}  setting
+     */
+    CharSequence HOTSWAP = "hotswap";
+
+    /**
+     * The {@link Around#lazy()}   setting
+     */
+    CharSequence LAZY = "lazy";
+    /**
      * Intercepts an execution from a declared {@link Around} advice. The implementation can either call {@link InvocationContext#proceed()} to return the original value or provide a replacement value
      *
      * @param context The interception context

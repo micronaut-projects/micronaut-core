@@ -39,7 +39,6 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
 
         return candidates.filter(candidate -> {
                     String candidateName;
-            System.out.println("candidateName = " + candidate);
                     if(candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getType().getSimpleName());
                     }

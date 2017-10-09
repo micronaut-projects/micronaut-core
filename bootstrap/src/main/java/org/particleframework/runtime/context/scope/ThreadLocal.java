@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.runtime.context.scope;
+
+import javax.inject.Scope;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An interface implemented by generated proxy classes
+ * A {@link org.particleframework.context.scope.CustomScope} that stores objects in thread local storage
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted {
+@Scope
+@ScopedProxy
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE})
+public @interface ThreadLocal {
 }

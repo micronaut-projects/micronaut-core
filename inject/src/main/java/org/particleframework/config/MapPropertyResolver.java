@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A property resolver that resolves values from a map
+ * A {@link PropertyResolver} that resolves values from a backing map
  *
  * @author Graeme Rocher
  * @since 1.0

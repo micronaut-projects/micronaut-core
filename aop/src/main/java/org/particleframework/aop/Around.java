@@ -73,4 +73,14 @@ public @interface Around {
      * @return True if the proxy should allow hotswap
      */
     boolean hotswap() default false;
+
+    /**
+     * <p>By default Particle will initialize the proxy target eagerly when the proxy is created. This is better for performance, but some use
+     * cases may require the bean to be resolved lazily (for example for resolving the bean from a custom scope).</p>
+     *
+     * <p>If {@link #proxyTarget()} is set to <code>true</code> then one can optionally set the of <code>lazy</code> to true</p>
+     *
+     * @return True if the proxy target should be resolved lazily
+     */
+    boolean lazy() default false;
 }

@@ -18,27 +18,6 @@ public interface PropertyResolver extends ValueResolver {
 
 
     /**
-     * @see ValueResolver#get(CharSequence, Class)
-     */
-    @Override
-    default <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        return getProperty(name.toString(), requiredType);
-    }
-
-    /**
-     * @see ValueResolver#get(CharSequence, Class)
-     */
-    @Override
-    default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
-        return getProperty(name.toString(), requiredType, defaultValue);
-    }
-
-    @Override
-    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        return getProperty(name.toString(), requiredType.getType(), ConversionContext.of(requiredType));
-    }
-
-    /**
      * Whether the given property is contained within this resolved
      * @param name The name of the property
      * @return True if it is
@@ -57,6 +36,31 @@ public interface PropertyResolver extends ValueResolver {
      * @return An optional containing the property value if it exists
      */
     <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context);
+
+
+    /**
+     * @see ValueResolver#get(CharSequence, Class)
+     */
+    @Override
+    default <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        return getProperty(name.toString(), requiredType);
+    }
+
+    /**
+     * @see ValueResolver#get(CharSequence, Class)
+     */
+    @Override
+    default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
+        return getProperty(name.toString(), requiredType, defaultValue);
+    }
+
+    /**
+     * @see ValueResolver#get(CharSequence, Argument)
+     */
+    @Override
+    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return getProperty(name.toString(), requiredType.getType(), ConversionContext.of(requiredType));
+    }
 
     /**
      * Resolve the given property for the given name

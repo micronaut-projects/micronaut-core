@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.inject;
+
+import java.io.Serializable;
 
 /**
- * An interface implemented by generated proxy classes
+ * An identifier for a {@link org.particleframework.context.annotation.Bean} that can be used as a key to uniquely identify an instance
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted {
+public interface BeanIdentifier extends CharSequence, Serializable {
 }

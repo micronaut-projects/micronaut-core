@@ -13,13 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.context.scope;
+
+import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
- * An interface implemented by generated proxy classes
+ * An interface for a registry of {@link CustomScope} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted {
+public interface CustomScopeRegistry {
+
+    /**
+     * Find a custom scope for the given annotation
+     *
+     * @param scopeAnnotation The scope annotation
+     * @return The custom scope
+     */
+    Optional<CustomScope> findScope(Annotation scopeAnnotation);
 }

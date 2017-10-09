@@ -17,6 +17,7 @@ package org.particleframework.core.convert;
 
 import org.particleframework.core.type.Argument;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -60,5 +61,15 @@ public interface ValueResolver {
      */
     default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
         return get(name, requiredType).orElse(defaultValue);
+    }
+
+    /**
+     * Create a new {@link ValueResolver} for the given map
+     *
+     * @param map The map
+     * @return The {@link ValueResolver}
+     */
+    static ValueResolver of(Map<CharSequence, ?> map) {
+        return new MapValueResolver(map);
     }
 }

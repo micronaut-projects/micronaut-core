@@ -1,13 +1,16 @@
 package org.particleframework.annotation.processing;
 
 import org.particleframework.aop.Around;
+import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.Introduction;
 import org.particleframework.aop.writer.AopProxyWriter;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.*;
+import org.particleframework.core.convert.OptionalValues;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.inject.writer.*;
@@ -188,8 +191,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final boolean isFactoryType;
         private final boolean isExecutableType;
         private final boolean isAopProxyType;
-        private final boolean isProxyTargetClass;
-        private final boolean isHotSwappable;
+        private final OptionalValues<Boolean> aopSettings;
         private ExecutableElementParamInfo constructorParamterInfo;
 
         AnnBeanElementVisitor(TypeElement concreteClass) {
@@ -199,8 +201,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
 
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE);
-            this.isProxyTargetClass = isAopProxyType && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget");
-            this.isHotSwappable = isProxyTargetClass && annotationUtils.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap");
+            this.aopSettings = isAopProxyType ? annotationUtils.resolveAttributesOfType(Boolean.class, concreteClass, AROUND_TYPE) : OptionalValues.empty();
             this.isExecutableType = isAopProxyType  || annotationUtils.hasStereotype(concreteClass, Executable.class);
         }
 
@@ -312,8 +313,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             Object[] interceptorTypes = modelUtils.resolveTypeReferences(mirrors);
                             resolveAopProxyWriter(
                                     beanDefinitionWriter,
-                                    isHotSwappable,
-                                    isProxyTargetClass,
+                                    aopSettings,
                                     false,
                                     this.constructorParamterInfo,
                                     interceptorTypes);
@@ -426,8 +426,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
                 AopProxyWriter proxyWriter = resolveAopProxyWriter(
                         beanMethodWriter,
-                        true,
-                        false,
+                        OptionalValues.of(Boolean.class, CollectionUtils.createMap(
+                        Interceptor.PROXY_TARGET, true,
+                                Interceptor.HOTSWAP, false
+                        )),
                         true,
                         constructorData,
                         interceptorTypes);
@@ -522,13 +524,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 AnnotationMirror[] mirrors = annotationUtils
                                                 .findAnnotationsWithStereotype(method, Around.class.getName());
-                boolean isProxyClass = annotationUtils.isAttributeTrue(method, Around.class.getName(), "proxyTarget");
-                boolean isHotSwap = isProxyTargetClass && annotationUtils.isAttributeTrue(method, Around.class.getName(), "hotswap");
+
+                OptionalValues<Boolean> settings = annotationUtils.resolveAttributesOfType(
+                        Boolean.class,
+                        method,
+                        Around.class.getName()
+                );
                 Object[] interceptorTypes = modelUtils.resolveTypeReferences(mirrors);
                 AopProxyWriter aopProxyWriter = resolveAopProxyWriter(
                         beanWriter,
-                        isProxyClass,
-                        isHotSwap,
+                        settings,
                         false,
                         this.constructorParamterInfo,
                         interceptorTypes
@@ -550,8 +555,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private AopProxyWriter resolveAopProxyWriter(BeanDefinitionVisitor beanWriter,
-                                                     boolean isProxyClass,
-                                                     boolean isHotSwappable,
+                                                     OptionalValues<Boolean> aopSettings,
                                                      boolean isFactoryType,
                                                      ExecutableElementParamInfo constructorParamterInfo,
                                                      Object... interceptorTypes) {
@@ -564,8 +568,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 aopProxyWriter
                         = new AopProxyWriter(
                         beanWriter,
-                        isProxyClass,
-                        isHotSwappable,
+                        aopSettings,
                         interceptorTypes
 
                 );

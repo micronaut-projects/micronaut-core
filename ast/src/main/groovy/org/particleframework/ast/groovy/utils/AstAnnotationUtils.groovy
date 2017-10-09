@@ -43,7 +43,6 @@ class AstAnnotationUtils {
      */
     static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, String annotationName) {
         if(annotatedNode != null) {
-
             List<AnnotationNode> annotations = annotatedNode.getAnnotations()
             for(ann in annotations) {
                 ClassNode annotationClassNode = ann.classNode

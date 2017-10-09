@@ -424,12 +424,6 @@ public class DefaultBeanContext implements BeanContext {
         return instance;
     }
 
-    private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
-        definition.inject(resolutionContext, this, instance);
-        if (definition instanceof InitializingBeanDefinition) {
-            ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
-        }
-    }
 
     <T> Collection<T> getBeansOfType(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeansOfTypeInternal(resolutionContext, beanType, null);
@@ -444,7 +438,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
 
-    <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
         if (beanRegistration != null) {
             return new ResolvedProvider<>(beanRegistration.bean);
@@ -467,95 +461,22 @@ public class DefaultBeanContext implements BeanContext {
         if (thisInterfaces.contains(beanType)) {
             return (T) this;
         }
-
-        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
-        if (beanRegistration != null) {
-            if(LOG.isDebugEnabled()) {
-                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
-            }
-            return beanRegistration.bean;
-        }
-        T bean = qualifier != null ? findExistingCompatibleSingleton(beanType, qualifier) : null;
-        if(bean != null) {
-            if(LOG.isDebugEnabled()) {
-                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
-            }
-            return bean;
-        }
-        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, true, false);
-
-        if (definition != null) {
-
-            if (definition.isProvided() && beanType == definition.getType()) {
-                throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
-            } else if (definition.isSingleton()) {
-
-                return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
-            } else {
-                T createBean = doCreateBean(resolutionContext, definition, qualifier, false, null);
-                if(createBean == null) {
-                    throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
-                }
-                return createBean;
-            }
-        } else  {
-            bean = findExistingCompatibleSingleton(beanType, qualifier);
-            if (bean == null) {
-                throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
-            } else {
-                return bean;
-            }
-        }
+        return getBeanInternal(resolutionContext, beanType, qualifier, true, true);
     }
 
-    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier) {
-        T bean = null;
-        for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
-            BeanKey key = entry.getKey();
-            if (qualifier == null || qualifier.equals(key.qualifier)) {
-                BeanRegistration reg = entry.getValue();
-                if (beanType.isInstance(reg.bean)) {
-                    synchronized (singletonObjects) {
-                        bean = (T) reg.bean;
-                        registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
-                    }
-                }
-            }
-        }
-        return bean;
-    }
 
-    <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+
+    public <T> Optional<T> findBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         // allow injection the bean context
         if (thisInterfaces.contains(beanType)) {
             return Optional.of((T) this);
         }
 
-        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
-        if (beanRegistration != null) {
-            return Optional.of(beanRegistration.bean);
-        }
-
-        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, true, false);
-
-        if (definition != null) {
-
-            if (definition.isProvided() && beanType == definition.getType()) {
-                return Optional.empty();
-            } else if (definition.isSingleton()) {
-                T bean = createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
-                return Optional.of(bean);
-            } else {
-                T bean = doCreateBean(resolutionContext, definition, qualifier, false, null);
-                return Optional.of(bean);
-            }
+        T bean = getBeanInternal(resolutionContext, beanType, qualifier, true, false);
+        if (bean == null) {
+            return Optional.empty();
         } else {
-            T bean = findExistingCompatibleSingleton(beanType, qualifier);
-            if (bean == null) {
-                return Optional.empty();
-            } else {
-                return Optional.of(bean);
-            }
+            return Optional.of(bean);
         }
     }
 
@@ -776,6 +697,94 @@ public class DefaultBeanContext implements BeanContext {
         return bean;
     }
 
+    /**
+     * Fall back method to attempt to find a candidate for the given definitions
+     * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param candidates The candidates
+     * @param <T> The generic time
+     * @return The concrete bean definition
+     */
+    protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
+        throw new NonUniqueBeanException(beanType, candidates.iterator());
+    }
+
+    private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
+        definition.inject(resolutionContext, this, instance);
+        if (definition instanceof InitializingBeanDefinition) {
+            ((InitializingBeanDefinition) definition).initialize(resolutionContext, this, instance);
+        }
+    }
+
+    private <T> T getBeanInternal(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, boolean throwNoSuchBean) {
+        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
+        if (beanRegistration != null) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
+            }
+            return beanRegistration.bean;
+        }
+        T bean = qualifier != null ? findExistingCompatibleSingleton(beanType, qualifier) : null;
+        if(bean != null) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
+            }
+            return bean;
+        }
+        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, throwNonUnique, false);
+
+
+        if (definition != null) {
+
+            if (definition.isProvided() && beanType == definition.getType()) {
+                if(throwNoSuchBean) {
+                    throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+                }
+                return null;
+            }
+            else {
+                return getBeanForDefinition(resolutionContext, beanType, qualifier, throwNoSuchBean, definition);
+            }
+
+        } else  {
+            bean = findExistingCompatibleSingleton(beanType, qualifier);
+            if (bean == null && throwNoSuchBean) {
+                throw new NoSuchBeanException("No bean of type [" + beanType.getName() + "] exists");
+            } else {
+                return bean;
+            }
+        }
+    }
+
+    private <T> T getBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
+        if (definition.isSingleton()) {
+
+            return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
+        } else {
+            T createBean = doCreateBean(resolutionContext, definition, qualifier, false, null);
+            if(createBean == null && throwNoSuchBean) {
+                throw new NoSuchBeanException("No bean of type [" + definition.getName() + "] exists");
+            }
+            return createBean;
+        }
+    }
+
+    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier) {
+        T bean = null;
+        for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
+            BeanKey key = entry.getKey();
+            if (qualifier == null || qualifier.equals(key.qualifier)) {
+                BeanRegistration reg = entry.getValue();
+                if (beanType.isInstance(reg.bean)) {
+                    synchronized (singletonObjects) {
+                        bean = (T) reg.bean;
+                        registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
+                    }
+                }
+            }
+        }
+        return bean;
+    }
     /*
      * Find a concrete candidate for the given qualifier
      *
@@ -851,17 +860,7 @@ public class DefaultBeanContext implements BeanContext {
         return definition;
     }
 
-    /**
-     * Fall back method to attempt to find a candidate for the given definitions
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     * @param candidates The candidates
-     * @param <T> The generic time
-     * @return The concrete bean definition
-     */
-    protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
-        throw new NonUniqueBeanException(beanType, candidates.iterator());
-    }
+
 
     private <T> BeanDefinition<T> lastChanceResolve(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, Collection<BeanDefinition<T>> candidates) {
         if(candidates.size() == 1) {
@@ -1269,13 +1268,28 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private static final class BeanKey {
+    private static final class BeanKey implements BeanIdentifier {
         private final Class beanType;
         private final Qualifier qualifier;
 
         BeanKey(Class beanType, Qualifier qualifier) {
             this.beanType = beanType;
             this.qualifier = qualifier;
+        }
+
+        @Override
+        public int length() {
+            return toString().length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return toString().charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return toString().subSequence(start, end);
         }
 
         @Override

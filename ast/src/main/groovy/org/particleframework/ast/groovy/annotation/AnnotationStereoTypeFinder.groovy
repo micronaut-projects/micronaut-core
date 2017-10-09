@@ -4,11 +4,14 @@ import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
+import org.codehaus.groovy.ast.expr.Expression
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
+import org.particleframework.core.convert.OptionalValues
 
 import javax.inject.Inject
 import javax.inject.Qualifier
 import javax.inject.Scope
+import javax.lang.model.element.Element
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
@@ -133,17 +136,30 @@ class AnnotationStereoTypeFinder {
         return null
     }
 
-    boolean isAttributeTrue(AnnotatedNode node, String annotation, String attribute) {
-        AnnotationNode ann = AstAnnotationUtils.findAnnotation(node, annotation)
+    /**
+     * Resolves all of the attribute values from an annotation of the given type
+     * @param type The type
+     * @param node The The node
+     * @param annotationType The annotation type
+     * @param <T> The {@link org.particleframework.core.convert.OptionalValues}
+     * @return An {@link org.particleframework.core.convert.OptionalValues}
+     */
+    def <T> OptionalValues<T> resolveAttributesOfType(Class<T> type, AnnotatedNode node, String annotationType) {
+        AnnotationNode ann = AstAnnotationUtils.findAnnotation(node, annotationType)
         if(ann != null) {
-            def attr = ann.getMember(attribute)
-            if(attr instanceof ConstantExpression) {
-                ConstantExpression ce = (ConstantExpression)attr
-                if(ce.value instanceof Boolean) {
-                    return ce.value
+            Map<CharSequence, T> values = [:]
+            for(entry in ann.members) {
+                def v = entry.value
+                if(v instanceof ConstantExpression) {
+                    v = ((ConstantExpression)v).value
+                }
+                if(v != null && type.isInstance(v)) {
+                    values.put(entry.key, (T)v )
                 }
             }
+            return OptionalValues.of(type, values)
         }
-        return false
+        return OptionalValues.empty()
     }
+
 }

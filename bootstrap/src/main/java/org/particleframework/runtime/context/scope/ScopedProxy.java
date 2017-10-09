@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.aop;
+package org.particleframework.runtime.context.scope;
+
+import org.particleframework.aop.Around;
+import org.particleframework.context.annotation.Type;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An interface implemented by generated proxy classes
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Intercepted {
+@Around(proxyTarget = true)
+@Type(ScopedProxyInterceptor.class)
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+public @interface ScopedProxy {
 }

@@ -1,5 +1,7 @@
 package org.particleframework.annotation.processing;
 
+import org.particleframework.core.convert.OptionalValues;
+
 import javax.inject.Qualifier;
 import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.element.*;
@@ -250,29 +252,34 @@ class AnnotationUtils {
         );
     }
 
-    boolean isAttributeTrue(Element element, String annotationType, String attributeName) {
+    /**
+     * Resolves all of the attribute values from an annotation of the given type
+     * @param type The type
+     * @param element The element
+     * @param annotationType The annotation type
+     * @param <T> The {@link OptionalValues}
+     * @return An {@link OptionalValues}
+     */
+    public <T> OptionalValues<T> resolveAttributesOfType(Class<T> type, Element element, String annotationType) {
         return findAnnotation(element, annotationType)
                 .map(annotationMirror -> {
-                            Map<? extends ExecutableElement, ? extends AnnotationValue> values = annotationMirror.getElementValues();
-                            Optional<? extends ExecutableElement> foundElement = values.keySet().stream()
-                                    .filter(execElem -> execElem.getSimpleName().toString().equals(attributeName))
-                                    .findFirst();
-                            return foundElement.map(exec ->
-                                    {
-                                        AnnotationValue annotationValue = values.get(exec);
-                                        if (annotationValue != null) {
-                                            Object value = annotationValue.getValue();
-                                            if (value instanceof Boolean) {
-                                                return (Boolean) value;
-                                            }
-                                        }
-                                        return false;
-                                    }
-                            ).orElse(false);
-
+                    Map<? extends ExecutableElement, ? extends AnnotationValue> values = annotationMirror.getElementValues();
+                    Map<CharSequence, T> newValues = new LinkedHashMap<>();
+                    values.forEach((exec, value) -> {
+                        String key = exec.getSimpleName().toString();
+                        if (value != null) {
+                            Object v = value.getValue();
+                            if (v != null && type.isInstance(v)) {
+                                newValues.put(key, (T) v);
+                            }
                         }
-                ).orElse(false);
+                    });
+                    return newValues;
+                })
+                .map(charSequenceTMap -> OptionalValues.of(type, charSequenceTMap))
+                .orElse(OptionalValues.empty());
     }
+
 
     private ExecutableElement findOverriddenInterfaceMethod(ExecutableElement executableElement, TypeElement thisType) {
 
@@ -322,4 +329,6 @@ class AnnotationUtils {
     public boolean isAttributePresent(AnnotationMirror annotation, String attribute) {
         return getAnnotationAttributeValue(annotation, attribute).isPresent();
     }
+
+
 }

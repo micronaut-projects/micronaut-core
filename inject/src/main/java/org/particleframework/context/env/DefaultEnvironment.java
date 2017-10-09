@@ -59,12 +59,14 @@ public class DefaultEnvironment implements Environment {
         this.classLoader = classLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
 
-        ServiceLoader<PropertySourceLoader> propertySources = ServiceLoader.load(PropertySourceLoader.class);
-        for (PropertySourceLoader loader : propertySources) {
-            Optional<PropertySource> propertySource = loader.load(this);
-            propertySource.ifPresent(this::addPropertySource);
-        }
+        SoftServiceLoader<PropertySourceLoader> propertySources = SoftServiceLoader.load(PropertySourceLoader.class);
+        for (SoftServiceLoader.Service<PropertySourceLoader> loader : propertySources) {
+            if(loader.isPresent()) {
+                Optional<PropertySource> propertySource = loader.load().load(this);
+                propertySource.ifPresent(this::addPropertySource);
 
+            }
+        }
         addPropertySource(new MapPropertySource(System.getProperties()));
         addPropertySource(new MapPropertySource(System.getenv()) {
             @Override

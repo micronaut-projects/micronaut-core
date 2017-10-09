@@ -12,6 +12,7 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.aop.Around
+import org.particleframework.aop.Interceptor
 import org.particleframework.aop.Introduction
 import org.particleframework.aop.writer.AopProxyWriter
 import org.particleframework.ast.groovy.annotation.AnnotationStereoTypeFinder
@@ -21,9 +22,11 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.*
+import org.particleframework.core.convert.OptionalValues
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtils
+import org.particleframework.core.util.CollectionUtils
 import org.particleframework.core.util.StringUtils
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
@@ -192,8 +195,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isFactoryClass
         final boolean isExecutableType
         final boolean isAopProxyType
-        private final boolean isProxyTargetClass
-        private final boolean isHotSwappable
+        final OptionalValues<Boolean> aopSettings
 
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         BeanDefinitionVisitor beanWriter
@@ -209,9 +211,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.concreteClass = targetClassNode
             this.isFactoryClass = stereoTypeFinder.hasStereoType(targetClassNode, Factory)
             this.isAopProxyType = stereoTypeFinder.hasStereoType(targetClassNode, AROUND_TYPE)
-            this.isProxyTargetClass = isAopProxyType && stereoTypeFinder.isAttributeTrue(concreteClass, AROUND_TYPE, "proxyTarget")
-            this.isHotSwappable = isProxyTargetClass && stereoTypeFinder.isAttributeTrue(concreteClass, AROUND_TYPE, "hotswap")
-
+            this.aopSettings = isAopProxyType ? stereoTypeFinder.resolveAttributesOfType(Boolean.class, concreteClass, AROUND_TYPE) : OptionalValues.<Boolean>empty()
             this.isExecutableType = isAopProxyType || stereoTypeFinder.hasStereoType(targetClassNode, Executable)
             this.isConfigurationProperties = isConfigurationProperties
             if (isFactoryClass || isConfigurationProperties || stereoTypeFinder.hasStereoType(concreteClass, Scope) || stereoTypeFinder.hasStereoType(concreteClass, Bean)) {
@@ -353,10 +353,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
+                    Map<CharSequence, Object> aopSettings = [:]
+                    aopSettings.put(Interceptor.PROXY_TARGET, true)
+                    aopSettings.put(Interceptor.LAZY, false)
                     AopProxyWriter proxyWriter = new AopProxyWriter(
                             beanMethodWriter,
-                            true,
-                            false,
+                            OptionalValues.of(Boolean.class,(Map<CharSequence, Object>)aopSettings),
                             interceptorTypeReferences)
                     if(producedType.isInterface()) {
                         proxyWriter.visitBeanDefinitionConstructor()
@@ -528,11 +530,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                             Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                            boolean isProxyClass = stereoTypeFinder.isAttributeTrue(methodNode, AROUND_TYPE, "proxyTarget")
-                            boolean isHotSwap = isProxyTargetClass && stereoTypeFinder.isAttributeTrue(methodNode, AROUND_TYPE, "hotswap");
+                            def aopSettings = stereoTypeFinder.resolveAttributesOfType(Boolean.class, methodNode, AROUND_TYPE)
                             AopProxyWriter proxyWriter = resolveProxyWriter(
-                                    isProxyClass,
-                                    isHotSwap,
+                                    aopSettings,
                                     false,
                                     interceptorTypeReferences
                             )
@@ -559,14 +559,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private AopProxyWriter resolveProxyWriter(
-                boolean isProxyTargetClass,
-                boolean isHotSwappable,
+                OptionalValues<Boolean> aopSettings,
                 boolean isFactoryType,
                 Object[] interceptorTypeReferences) {
             AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
             if (proxyWriter == null) {
 
-                proxyWriter = new AopProxyWriter(beanWriter,isProxyTargetClass, isHotSwappable, interceptorTypeReferences)
+                proxyWriter = new AopProxyWriter(
+                        beanWriter,
+                        aopSettings,
+                        interceptorTypeReferences)
 
 
                 ClassNode targetClass = concreteClass
@@ -824,7 +826,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(isAopProxyType) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(classNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                    resolveProxyWriter(isHotSwappable, isProxyTargetClass, false, interceptorTypeReferences)
+                    resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
                 }
 
             } else if (!classNode.isAbstract()) {
