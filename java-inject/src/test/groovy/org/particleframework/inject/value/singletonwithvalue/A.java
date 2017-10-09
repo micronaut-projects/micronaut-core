@@ -1,4 +1,4 @@
-package org.particleframework.inject.value;
+package org.particleframework.inject.value.singletonwithvalue;
 
 import org.particleframework.context.annotation.Value;
 
