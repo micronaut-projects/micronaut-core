@@ -17,11 +17,7 @@ package org.particleframework.inject.value.factorywithvalue
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.context.annotation.Bean
-import org.particleframework.context.annotation.Factory
-import org.particleframework.context.annotation.Value
 import spock.lang.Specification
-
 /**
  * @author Graeme Rocher
  * @since 1.0
