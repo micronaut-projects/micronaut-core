@@ -1,6 +1,5 @@
 # TODO
  
-* CORS Support
 * Session Support
 * HTTPS Support
 * Data Binding for form data

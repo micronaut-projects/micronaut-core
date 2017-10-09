@@ -32,6 +32,29 @@ import java.util.function.Consumer;
 public interface MutableHttpResponse<B> extends HttpResponse<B> {
 
     /**
+     * Adds the specified cookie to the response.  This method can be called
+     * multiple times to set more than one cookie.
+     *
+     * @param cookie the Cookie to return to the client
+     *
+     */
+    MutableHttpResponse<B> cookie(Cookie cookie);
+    /**
+     * Sets the body
+     *
+     * @param body The body
+     * @return This response object
+     */
+    MutableHttpResponse<B> setBody(B body);
+
+    /**
+     * Sets the response status
+     *
+     * @param status The status
+     */
+    MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
+
+    /**
      * Mutate the headers with the given consumer
      *
      * @param headers The headers
@@ -41,14 +64,6 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         headers.accept(getHeaders());
         return this;
     }
-    /**
-     * Adds the specified cookie to the response.  This method can be called
-     * multiple times to set more than one cookie.
-     *
-     * @param cookie the Cookie to return to the client
-     *
-     */
-    MutableHttpResponse<B> cookie(Cookie cookie);
 
     /**
      * Sets the response encoding. Should be called after {@link #contentType(MediaType)}
@@ -64,7 +79,6 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         }
         return this;
     }
-
     /**
      * Sets the response encoding
      *
@@ -74,12 +88,6 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         return characterEncoding(encoding.toString());
     }
 
-    /**
-     * Sets the response status
-     *
-     * @param status The status
-     */
-    MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
     /**
      * Set a response header
      *
@@ -122,7 +130,6 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
         return this;
     }
-
     /**
      * Set the response content type
      *
@@ -132,6 +139,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
         return this;
     }
+
     /**
      * Sets the locale to use and will apply the appropriate {@link HttpHeaders#CONTENT_LANGUAGE} header to the response
      *
@@ -161,6 +169,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         return status(HttpStatus.valueOf(status), message);
     }
 
+
     /**
      * Sets the response status
      *
@@ -169,13 +178,4 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
     default MutableHttpResponse<B> status(HttpStatus status) {
         return status(status, null);
     }
-
-
-    /**
-     * Sets the body
-     *
-     * @param body The body
-     * @return This response object
-     */
-    MutableHttpResponse<B> setBody(B body);
 }

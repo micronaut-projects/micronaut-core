@@ -31,6 +31,15 @@ import java.util.stream.Collectors;
 public interface MutableHttpHeaders extends HttpHeaders {
 
     /**
+     * Add a header for the given name and value
+     *
+     * @param header The head name
+     * @param value The value
+     * @return This headers object
+     */
+    MutableHttpHeaders add(CharSequence header, CharSequence value);
+
+    /**
      * Set the allowed HTTP methods
      *
      * @param methods The methods to specify in the Allowed HTTP header
@@ -60,7 +69,6 @@ public interface MutableHttpHeaders extends HttpHeaders {
     default MutableHttpHeaders location(URI uri) {
         return add(HttpHeaders.LOCATION, uri.toString());
     }
-
     /**
      * Sets the {@link HttpHeaders#CONTENT_TYPE} header to the given media type
      *
@@ -70,14 +78,6 @@ public interface MutableHttpHeaders extends HttpHeaders {
     default MutableHttpHeaders contentType(MediaType mediaType) {
         return add(HttpHeaders.CONTENT_TYPE, mediaType);
     }
-    /**
-     * Add a header for the given name and value
-     *
-     * @param header The head name
-     * @param value The value
-     * @return This headers object
-     */
-    MutableHttpHeaders add(CharSequence header, CharSequence value);
 
 
     /**

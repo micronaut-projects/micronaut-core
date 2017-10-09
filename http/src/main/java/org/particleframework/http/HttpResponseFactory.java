@@ -41,21 +41,6 @@ public interface HttpResponseFactory {
 
 
     /**
-     * @return The ok response
-     */
-    default <T> MutableHttpResponse<T> ok() {
-        return ok(null);
-    }
-
-    /**
-     * @param status The status
-     * @return The restus response
-     */
-    default <T> MutableHttpResponse<T> status(HttpStatus status) {
-        return status(status, null);
-    }
-
-    /**
      * Creates an {@link HttpStatus#OK} response with a body
      *
      * @param body The body
@@ -72,5 +57,20 @@ public interface HttpResponseFactory {
      * @return The response
      */
     <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
+
+    /**
+     * @return The ok response
+     */
+    default <T> MutableHttpResponse<T> ok() {
+        return ok(null);
+    }
+
+    /**
+     * @param status The status
+     * @return The restus response
+     */
+    default <T> MutableHttpResponse<T> status(HttpStatus status) {
+        return status(status, null);
+    }
 
 }
