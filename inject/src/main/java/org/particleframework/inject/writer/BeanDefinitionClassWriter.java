@@ -3,12 +3,16 @@ package org.particleframework.inject.writer;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractBeanDefinitionClass;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinition;
 
 import java.io.File;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Writes the bean definition class file to disk
@@ -27,6 +31,7 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
     private String replaceBeanName;
     private boolean contextScope = false;
     private String replaceBeanDefinitionName;
+    private List<TypeAnnotationSource> annotationSourceList = new ArrayList<>();
 
     public BeanDefinitionClassWriter(String beanTypeName, String beanDefinitionName) {
         this.beanTypeName = beanTypeName;
@@ -120,6 +125,19 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
         }
     }
 
+    /**
+     * Visit an annotation source for a method
+     *
+     * @param annotationSource The annotation source
+     */
+    public BeanDefinitionClassWriter visitAnnotationSource(TypeAnnotationSource annotationSource) {
+        if(annotationSource != null && !this.annotationSourceList.contains(annotationSource)) {
+
+            this.annotationSourceList.add(annotationSource);
+        }
+        return this;
+    }
+
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
@@ -165,6 +183,11 @@ public class BeanDefinitionClassWriter extends AbstractClassFileWriter {
             isContextScopeMethod.visitInsn(IRETURN);
             isContextScopeMethod.visitMaxs(1, 1);
 
+        }
+
+        if(!annotationSourceList.isEmpty()) {
+            GeneratorAdapter annotatedElementMethod = writeGetAnnotatedElementsMethod(classWriter, Type.getType(AbstractBeanDefinitionClass.class), annotationSourceList);
+            annotatedElementMethod.visitMaxs(1,1);
         }
 
         // start method: getReplacesBeanTypeName()

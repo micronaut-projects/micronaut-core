@@ -92,7 +92,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         Iterable<ExecutableMethod> executableMethods = applicationContext.findServices(ExecutableMethod.class);
         Map<Class<? extends Annotation>, List<ExecutableMethod>> result = new LinkedHashMap<>();
         for (ExecutableMethod executableMethod : executableMethods) {
-            Set<? extends Annotation> annotations = executableMethod.getExecutableAnnotations();
+            Collection<Annotation> annotations = executableMethod.getExecutableAnnotations();
             Class declaringType = executableMethod.getDeclaringType();
             if(applicationContext.findBeanDefinition(declaringType).isPresent()) {
 

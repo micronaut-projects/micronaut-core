@@ -35,6 +35,11 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionConstructor();
 
     /**
+     * @return A list {@link TypeAnnotationSource} for this class
+     */
+    List<TypeAnnotationSource> getAnnotationSources();
+
+    /**
      * @return Wetherh the provided type an interface
      */
     boolean isInterface();

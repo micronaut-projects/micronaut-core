@@ -43,7 +43,7 @@ class TypeQualifier<T> implements Qualifier<T> {
         this.types = new ArrayList<>();
         if(types != null) {
             for (Class type : types) {
-                Optional<Type> typeOpt = AnnotationUtil.findAnnotationWithStereoType(type, Type.class);
+                Optional<Type> typeOpt = AnnotationUtil.findAnnotation(type, Type.class);
                 if(typeOpt.isPresent()) {
                     this.types.addAll(Arrays.asList(typeOpt.get().value()));
                 }

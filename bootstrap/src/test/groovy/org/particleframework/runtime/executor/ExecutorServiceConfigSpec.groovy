@@ -134,4 +134,44 @@ class ExecutorServiceConfigSpec extends Specification {
         true            | "test"
         false           | "test"
     }
+
+    @Unroll
+    void "test configure existing IO executor - distinct initialization order with invalidate cache: #invalidateCache"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.build(environment)
+                .environment {
+            it.addPropertySource(PropertySource.of(
+                    'particle.server.executors.io.type':'FIXED',
+                    'particle.server.executors.io.nThreads':'5',
+                    'particle.server.executors.two.type':'work_stealing',
+            ))
+        }.start()
+
+
+
+        when:
+        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+
+        then:
+        executorServices.size() == 2
+        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) instanceof ThreadPoolExecutor
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+        def configs = ctx.getBeansOfType(UserExecutorConfiguration)
+        def moreConfigs = ctx.getBeansOfType(ExecutorConfiguration)
+        executorServices = ctx.getBeansOfType(ExecutorService)
+
+        then:
+        executorServices.size() == 2
+        moreConfigs.size() == 2
+        configs.size() == 2
+
+        where:
+        invalidateCache | environment
+        true            | "test"
+        false           | "test"
+    }
 }

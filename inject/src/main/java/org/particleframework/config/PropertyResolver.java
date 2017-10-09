@@ -39,6 +39,12 @@ public interface PropertyResolver extends ValueResolver {
     }
 
     /**
+     * Whether the given property is contained within this resolved
+     * @param name The name of the property
+     * @return True if it is
+     */
+    boolean containsProperty(String name);
+    /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
      *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>

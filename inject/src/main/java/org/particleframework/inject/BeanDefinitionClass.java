@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.Internal;
 
 /**
@@ -13,7 +14,7 @@ import org.particleframework.core.annotation.Internal;
  * @since 1.0
  */
 @Internal
-public interface BeanDefinitionClass<T> {
+public interface BeanDefinitionClass<T> extends AnnotationSource {
     /**
      * @return The underlying component type
      */

@@ -142,6 +142,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             BeanDefinitionClassWriter beanDefinitionClassWriter =
                 new BeanDefinitionClassWriter(beanTypeName, beanDefinitionName);
+            for (TypeAnnotationSource annotationSource : beanDefinitionWriter.getAnnotationSources()) {
+                beanDefinitionClassWriter.visitAnnotationSource(annotationSource);
+            }
             String className = beanDefinitionClassWriter.getBeanDefinitionQualifiedClassName();
             processed.add(className);
             beanDefinitionClassWriter.setContextScope(

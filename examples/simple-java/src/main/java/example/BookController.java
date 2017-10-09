@@ -15,11 +15,16 @@
  */
 package example;
 
+import org.particleframework.runtime.executor.IOExecutorService;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Get;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 /**
  * @author Graeme Rocher

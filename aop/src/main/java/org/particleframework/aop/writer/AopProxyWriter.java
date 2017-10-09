@@ -205,6 +205,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public List<TypeAnnotationSource> getAnnotationSources() {
+        return proxyBeanDefinitionWriter.getAnnotationSources();
+    }
+
+    @Override
     public boolean isSingleton() {
         return proxyBeanDefinitionWriter.isSingleton();
     }

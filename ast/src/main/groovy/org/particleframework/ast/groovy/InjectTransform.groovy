@@ -33,6 +33,7 @@ import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionVisitor
 import org.particleframework.inject.writer.BeanDefinitionWriter
 import org.particleframework.inject.writer.ProxyingBeanDefinitionVisitor
+import org.particleframework.inject.writer.TypeAnnotationSource
 
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
@@ -130,6 +131,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             try {
                 String beanDefinitionName = beanDefWriter.beanDefinitionName
                 BeanDefinitionClassWriter beanClassWriter = new BeanDefinitionClassWriter(beanTypeName, beanDefinitionName)
+                for (TypeAnnotationSource annotationSource : beanDefWriter.getAnnotationSources()) {
+                    beanClassWriter.visitAnnotationSource(annotationSource)
+                }
                 beanClassWriter.setContextScope(stereoTypeFinder.hasStereoType(beanClassNode, Context.name))
                 if(beanDefWriter instanceof ProxyingBeanDefinitionVisitor) {
                     String proxiedBeanDefinitionName = ((ProxyingBeanDefinitionVisitor) beanDefWriter).getProxiedBeanDefinitionName();

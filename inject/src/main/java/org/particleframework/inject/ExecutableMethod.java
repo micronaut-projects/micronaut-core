@@ -22,6 +22,7 @@ import org.particleframework.core.type.ReturnType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Set;
 
 /**
@@ -38,7 +39,7 @@ public interface ExecutableMethod<T, R> extends Executable<T,R>, MethodReference
     /**
      * @return One or many {@link org.particleframework.context.annotation.Executable} annotations for this method
      */
-    Set<? extends Annotation> getExecutableAnnotations();
+    Collection<? extends Annotation> getExecutableAnnotations();
 
     /**
      * <p>The annotated elements that this {@link ExecutableMethod} is able to resolve annotations from</p>

@@ -100,7 +100,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     }
 
     @Override
-    public Set<? extends Annotation> getExecutableAnnotations() {
+    public Collection<? extends Annotation> getExecutableAnnotations() {
         return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, this.annotations);
     }
 

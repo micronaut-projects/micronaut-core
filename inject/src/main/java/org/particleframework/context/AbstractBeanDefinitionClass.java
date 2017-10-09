@@ -4,6 +4,7 @@ import org.particleframework.context.annotation.Requirements;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.context.exceptions.BeanContextException;
@@ -13,6 +14,11 @@ import org.particleframework.context.annotation.Context;
 import org.particleframework.inject.BeanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
+import java.util.Collection;
+import java.util.Set;
 
 /**
  * An uninitialized and unloaded component definition with basic information available regarding its requirements
@@ -94,22 +100,30 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     @Override
     public boolean isEnabled(BeanContext beanContext) {
         if (isPresent()) {
-
-            Class<?> beanType = getBeanType();
-            if(beanType != null) {
-
-                Requires[] annotations = beanType.getAnnotationsByType(Requires.class);
+            if(enabled == null) {
+                Requires[] annotations = findAnnotations(Requires.class).stream().toArray(Requires[]::new);
                 if (annotations.length == 0) {
-                    Requirements requirements = beanType.getAnnotation(Requirements.class);
+                    Requirements requirements = getAnnotation(Requirements.class);
                     if (requirements != null) {
                         annotations = requirements.value();
                     }
                 }
                 Condition condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
-                return condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
+                enabled = condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
             }
+            return enabled;
         }
         return false;
+    }
+
+    @Override
+    public AnnotatedElement[] getAnnotatedElements() {
+        if(isPresent()) {
+            return doGetAnnotatedElements();
+        }
+        else {
+            return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
+        }
     }
 
     @Override
@@ -132,13 +146,17 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
         return beanDefinitionTypeName.hashCode();
     }
 
+    private AnnotatedElement[] doGetAnnotatedElements() {
+        return new AnnotatedElement[] { getBeanType() };
+    }
+
     private void loadType() {
         if (present == null && beanDefinition == null) {
 
             try {
                 beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
                 present = true;
-            } catch (ClassNotFoundException e) {
+            } catch (ClassNotFoundException | NoClassDefFoundError e) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
                 }

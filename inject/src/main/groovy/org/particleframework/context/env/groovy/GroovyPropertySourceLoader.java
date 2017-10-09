@@ -21,11 +21,12 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public class GroovyPropertySourceLoader implements PropertySourceLoader {
+
     @Override
-    public Optional<PropertySource> load(Environment environment) {
+    public Optional<PropertySource> load(String name, Environment environment) {
         Map<String,Object> finalMap = new LinkedHashMap<>();
-        loadProperties(environment, "application.groovy", finalMap);
-        loadProperties(environment, "application-"+environment.getName()+".groovy", finalMap);
+        loadProperties(environment, name + ".groovy", finalMap);
+        loadProperties(environment, name + "-"+environment.getName()+".groovy", finalMap);
         if(!finalMap.isEmpty()) {
             MapPropertySource newPropertySource = new MapPropertySource(finalMap);
             return Optional.of(newPropertySource);

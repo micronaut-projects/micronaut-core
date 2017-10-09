@@ -49,7 +49,7 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     @Override
     public void process(ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
-        Optional<Controller> optional = AnnotationUtil.findAnnotationWithStereoType(declaringType, Controller.class);
+        Optional<Controller> optional = AnnotationUtil.findAnnotation(declaringType, Controller.class);
         if (optional.isPresent() && !AnnotationUtil.findAnnotationWithStereoType(method, Action.class).isPresent()) {
             Controller controllerAnn = optional.get();
 

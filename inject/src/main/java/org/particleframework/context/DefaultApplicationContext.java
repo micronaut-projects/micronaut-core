@@ -126,6 +126,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    public boolean containsProperty(String name) {
+        return getEnvironment().containsProperty(name);
+    }
+
+    @Override
     public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         return getEnvironment().getProperty(name, requiredType, context);
     }

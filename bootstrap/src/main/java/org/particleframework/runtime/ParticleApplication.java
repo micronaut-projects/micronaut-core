@@ -87,6 +87,7 @@ public class ParticleApplication {
         }
 
         try {
+            long start = System.currentTimeMillis();
             applicationContext.start();
             Optional<EmbeddedServer> embeddedContainerBean = applicationContext.findBean(EmbeddedServer.class);
 
@@ -95,7 +96,9 @@ public class ParticleApplication {
                     embeddedServer.start();
                     // TODO: Different protocols and hosts
                     if(LOG.isInfoEnabled()) {
-                        LOG.info("Server Running: http://localhost:" + embeddedServer.getPort());
+                        long end = System.currentTimeMillis();
+                        long took = end - start;
+                        LOG.info("Startup completed in {}ms. Server Running: http://localhost:{}", took, embeddedServer.getPort());
                     }
                 } catch (Throwable e) {
                     handleStartupException(environmentToUse, e);

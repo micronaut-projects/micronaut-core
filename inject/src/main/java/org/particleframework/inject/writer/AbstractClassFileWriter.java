@@ -504,31 +504,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     /**
      * Represents a method {@link AnnotationSource} reference
      */
-    protected class TypeAnnotationSource {
-        final Object declaringType;
-
-        public TypeAnnotationSource(Object declaringType) {
-            this.declaringType = declaringType;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            TypeAnnotationSource that = (TypeAnnotationSource) o;
-
-            return declaringType.equals(that.declaringType);
-        }
-
-        @Override
-        public int hashCode() {
-            return declaringType.hashCode();
-        }
-    }
-    /**
-     * Represents a method {@link AnnotationSource} reference
-     */
     protected class MethodAnnotationSource extends TypeAnnotationSource{
         final String methodName;
         final Map<String, Object> parameters;

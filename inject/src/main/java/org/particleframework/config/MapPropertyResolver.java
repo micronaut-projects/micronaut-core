@@ -27,6 +27,11 @@ public class MapPropertyResolver implements PropertyResolver {
     }
 
     @Override
+    public boolean containsProperty(String name) {
+        return map.containsKey(name);
+    }
+
+    @Override
     public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         Object value = map.get(name);
         return conversionService.convert(value, requiredType, context);

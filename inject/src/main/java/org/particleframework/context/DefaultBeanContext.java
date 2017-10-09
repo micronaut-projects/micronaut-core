@@ -1060,7 +1060,7 @@ public class DefaultBeanContext implements BeanContext {
                             if(LOG.isDebugEnabled()) {
                                 Qualifier registeredQualifier = entry.getKey().qualifier;
                                 if(registeredQualifier != null) {
-                                    LOG.debug("Found existing bean for type {} {}: {} ",registeredQualifier, beanType.getName(), instance);
+                                    LOG.debug("Found existing bean for type {} {}: {} ", beanType.getName(), instance);
                                 }
                                 else {
                                     LOG.debug("Found existing bean for type {}: {} ", beanType.getName(), instance);

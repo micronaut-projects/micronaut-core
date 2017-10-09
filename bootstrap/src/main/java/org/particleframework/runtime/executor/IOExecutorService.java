@@ -32,6 +32,9 @@ import javax.inject.Singleton;
 @Factory
 public class IOExecutorService {
 
+    /**
+     * The name of the default IO executor service
+     */
     public static final String NAME = "io";
 
     @Singleton

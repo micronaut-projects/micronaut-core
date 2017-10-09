@@ -11,6 +11,7 @@ import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
 
 import java.lang.annotation.Annotation;
@@ -130,8 +131,19 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
-        if(name.length() == 0) {
+    public boolean containsProperty(@Nullable String name) {
+        if(StringUtils.isEmpty(name)) {
+            return false;
+        }
+        else {
+            Map<String, Object> entries = resolveEntriesForKey(name, false);
+            return entries != null && entries.keySet().stream().anyMatch(key -> key.startsWith(name));
+        }
+    }
+
+    @Override
+    public <T> Optional<T> getProperty(@Nullable String name, Class<T> requiredType, ConversionContext context) {
+        if(StringUtils.isEmpty(name)) {
             return Optional.empty();
         }
         else {

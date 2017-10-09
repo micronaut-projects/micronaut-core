@@ -290,6 +290,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
+    public List<TypeAnnotationSource> getAnnotationSources() {
+        return annotationSourceList;
+    }
+
+    @Override
     public boolean isInterface() {
         return isInterface;
     }

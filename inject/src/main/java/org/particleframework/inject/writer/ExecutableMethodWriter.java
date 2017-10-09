@@ -279,7 +279,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     }
 
     /**
-     * Adds a method as a source of annotations
+     * Adds a type as a source of annotations
      *
      * @param declaringType The declaring type
      */

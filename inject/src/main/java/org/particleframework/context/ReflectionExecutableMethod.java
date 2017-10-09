@@ -93,7 +93,7 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
-    public Set<? extends Annotation> getExecutableAnnotations() {
+    public Collection<? extends Annotation> getExecutableAnnotations() {
         return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, method.getAnnotations());
     }
 
@@ -130,24 +130,6 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     @Override
     public String toString() {
         return method.toString();
-    }
-
-    private void buildReflectionMetadata(Method method, Map<String, Class> arguments, Map<String, List<Class>> genericTypes) {
-        Type[] genericParameterTypes = method.getGenericParameterTypes();
-        int genTypesLength = genericParameterTypes != null ? genericParameterTypes.length : 0;
-        Class<?>[] parameterTypes = method.getParameterTypes();
-        for (int i = 0; i < parameterTypes.length; i++) {
-            Class<?> parameterType = parameterTypes[i];
-            String paramName = "arg" + i;
-            arguments.put(paramName, parameterType);
-            if(i < genTypesLength) {
-                Type genericType = genericParameterTypes[i];
-                Class[] typeArguments = GenericTypeUtils.resolveTypeArguments(genericType);
-                if(typeArguments != null) {
-                    genericTypes.put(paramName, Arrays.asList(typeArguments));
-                }
-            }
-        }
     }
 
     @Override

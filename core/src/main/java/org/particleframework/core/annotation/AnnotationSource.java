@@ -74,6 +74,21 @@ public interface AnnotationSource extends AnnotatedElement {
     }
 
     /**
+     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class
+     *
+     * @param type The type
+     * @param <A> The generic type
+     * @return An {@link Optional} of the type
+     */
+    default <A extends Annotation> Collection<A> findAnnotations(Class<A> type) {
+        Collection<A> annotations = new ArrayList<>();
+        for (AnnotatedElement element : getAnnotatedElements()) {
+            annotations.addAll( AnnotationUtil.findAnnotations(element, type) );
+        }
+        return annotations;
+    }
+
+    /**
      * Find the first annotation for the given stereotype on the method
      *
      * @param stereotype The method
@@ -95,7 +110,7 @@ public interface AnnotationSource extends AnnotatedElement {
      * @param stereotype The method
      * @return The stereotype
      */
-    default Set<Annotation> findAnnotationsWithStereoType(Class<?> stereotype) {
+    default Collection<Annotation> findAnnotationsWithStereoType(Class<?> stereotype) {
         AnnotatedElement[] candidates = getAnnotatedElements();
         return AnnotationUtil.findAnnotationsWithStereoType(candidates, stereotype);
     }

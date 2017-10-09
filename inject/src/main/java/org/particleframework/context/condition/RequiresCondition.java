@@ -94,8 +94,7 @@ public class RequiresCondition implements Condition<ConditionContext> {
             BeanContext beanContext = context.getBeanContext();
             if(beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
-                Optional<Object> resolved = propertyResolver.getProperty(property, Object.class);
-                if(resolved.isPresent()) {
+                if(propertyResolver.containsProperty(property)) {
                     return false;
                 }
             }
