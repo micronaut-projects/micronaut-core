@@ -1,7 +1,6 @@
 package org.particleframework.context;
 
-import org.particleframework.core.convert.MutableConvertibleValues;
-import org.particleframework.core.convert.ValueResolver;
+import org.particleframework.core.value.ValueResolver;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 

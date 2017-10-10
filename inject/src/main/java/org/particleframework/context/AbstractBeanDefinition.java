@@ -3,7 +3,7 @@ package org.particleframework.context;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.*;
-import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.event.BeanInitializedEventListener;
 import org.particleframework.context.event.BeanInitializingEvent;
 import org.particleframework.context.exceptions.BeanContextException;
@@ -252,11 +252,24 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     /**
+     * Resolves the proxied bean instance for this bean
+     *
+     * @param beanContext The {@link BeanContext}
+     * @return The proxied bean
+     */
+    @Internal
+    protected Object getProxiedBean(BeanContext beanContext) {
+        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) beanContext;
+        Optional<Annotation> qualifier = findAnnotationWithStereoType(javax.inject.Qualifier.class);
+        return defaultBeanContext.getProxyTargetBean(getType(), (Qualifier<T>) qualifier.map(Qualifiers::byAnnotation).orElse(null));
+    }
+    /**
      * Adds a new {@link ExecutableMethod}
      *
      * @param executableMethod The method
      * @return The bean definition
      */
+    @Internal
     protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
         MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
         invocableMethodMap.put(key, executableMethod);
@@ -271,6 +284,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      * @param qualifier The qualifier, can be null
      * @return this component definition
      */
+    @Internal
     protected AbstractBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this, field, qualifier, requiresReflection));
@@ -283,6 +297,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      * @param field The field
      * @return this component definition
      */
+    @Internal
     protected AbstractBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
         requiredComponents.add(field.getType());
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this, field, null, requiresReflection));
@@ -296,6 +311,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      * @param arguments The arguments to the method
      * @return this component definition
      */
+    @Internal
     protected AbstractBeanDefinition addInjectionPoint(
             Method method,
             Argument[] arguments,
@@ -311,6 +327,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      * @param setter The method
      * @return this component definition
      */
+    @Internal
     protected AbstractBeanDefinition addInjectionPoint(
             Field field,
             Method setter,

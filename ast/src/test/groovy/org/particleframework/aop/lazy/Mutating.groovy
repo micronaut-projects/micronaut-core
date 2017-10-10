@@ -13,18 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.aop.lazy
+
+import org.particleframework.aop.Around
+import org.particleframework.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
 
 /**
- * Marks a bean definition that is proxying another
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ProxyingBeanDefinition<T> extends BeanDefinition<T> {
 
-    /**
-     * @return The target definition
-     */
-    BeanDefinition<T> getTarget();
+@Around(proxyTarget = true, lazy = true)
+@Type(ArgMutatingInterceptor.class)
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+public @interface Mutating {
+    String value();
 }
+

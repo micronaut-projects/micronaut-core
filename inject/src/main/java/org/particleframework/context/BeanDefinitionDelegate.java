@@ -17,7 +17,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.ValueResolver;
+import org.particleframework.core.value.ValueResolver;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.core.naming.Named;
 import org.particleframework.inject.*;
@@ -34,7 +34,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class BeanDefinitionDelegate<T> implements ProxyingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver {
+class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver {
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
 
@@ -194,7 +194,7 @@ class BeanDefinitionDelegate<T> implements ProxyingBeanDefinition<T>, BeanFactor
         this.attributes.put(name, value);
     }
 
-    interface ProxyInitializingBeanDefinition<T> extends ProxyingBeanDefinition<T>, InitializingBeanDefinition<T> {
+    interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
         @Override
         default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -205,7 +205,7 @@ class BeanDefinitionDelegate<T> implements ProxyingBeanDefinition<T>, BeanFactor
         }
     }
 
-    interface ProxyDisosableBeanDefinition<T> extends ProxyingBeanDefinition<T>, DisposableBeanDefinition<T> {
+    interface ProxyDisosableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
         @Override
         default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -216,7 +216,7 @@ class BeanDefinitionDelegate<T> implements ProxyingBeanDefinition<T>, BeanFactor
         }
     }
 
-    interface ProxyValidatingBeanDefinitino<T> extends ProxyingBeanDefinition<T>, ValidatedBeanDefinition<T> {
+    interface ProxyValidatingBeanDefinitino<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
         @Override
         default T validate(BeanResolutionContext resolutionContext, T instance) {
             BeanDefinition<T> definition = getTarget();

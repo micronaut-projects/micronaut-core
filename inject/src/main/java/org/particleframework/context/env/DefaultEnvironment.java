@@ -1,7 +1,7 @@
 package org.particleframework.context.env;
 
-import org.particleframework.config.MapPropertyResolver;
-import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.value.MapPropertyResolver;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -10,7 +10,6 @@ import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.order.OrderUtil;
-import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
 
@@ -20,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**

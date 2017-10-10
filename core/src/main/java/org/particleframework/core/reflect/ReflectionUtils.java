@@ -139,6 +139,23 @@ public class ReflectionUtils {
     }
 
     /**
+     * Finds a method on the given type for the given name
+     *
+     * @param type The type
+     * @param name The name
+     * @param argumentTypes The argument types
+     * @return An {@link Optional} contains the method or empty
+     * @throws NoSuchMethodError If the method doesn't exist
+     */
+    public static Method getRequiredInternalMethod(Class type, String name, Class... argumentTypes) {
+        try {
+            return type.getDeclaredMethod(name, argumentTypes);
+        } catch (NoSuchMethodException e) {
+            return findMethod(type, name, argumentTypes)
+                    .orElseThrow(()-> newNoSuchMethodInternalError(type, name, argumentTypes));
+        }
+    }
+    /**
      * Finds a field on the given type for the given name
      *
      * @param type The type
@@ -229,5 +246,12 @@ public class ReflectionUtils {
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
         return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName() + ". This could indicate a classpath issue, or out-of-date class metadata. Check your classpath and recompile classes as necessary.");
+    }
+
+    public static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {
+        Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
+        String argsAsText = stringStream.collect(Collectors.joining(","));
+
+        return new NoSuchMethodError("Particle method "+ declaringType.getName() +"."+name+"("+argsAsText+") not found. Most likely reason for this issue is that you are running a newer version of Particle with code compiled against an older version. Please recompile the offending classes");
     }
 }

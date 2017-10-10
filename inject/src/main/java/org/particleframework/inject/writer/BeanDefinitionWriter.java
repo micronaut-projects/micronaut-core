@@ -172,7 +172,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
-    private final ClassVisitor classWriter;
+    private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
     private final String beanDefinitionInternalName;
@@ -289,6 +289,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes.add(BeanFactory.class);
     }
 
+    /**
+     * @return The underlying class writer
+     */
+    public ClassVisitor getClassWriter() {
+        return classWriter;
+    }
+
     @Override
     public List<TypeAnnotationSource> getAnnotationSources() {
         return annotationSourceList;
@@ -309,6 +316,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return scope;
     }
 
+    @Override
+    public void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType) {
+        this.interfaceTypes.add(interfaceType);
+    }
     @Override
     public void visitSuperType(String name) {
         this.superType = getTypeReference(name);
@@ -697,7 +708,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodExecutorClassName,
                 methodProxyShortName,
                 isInterface);
-        // TODO: fix so that exec classes are inner
+        // TODO: fix so that exec classes are static inner
 //        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);
         executableMethodWriter.visitMethod(
                 declaringType,

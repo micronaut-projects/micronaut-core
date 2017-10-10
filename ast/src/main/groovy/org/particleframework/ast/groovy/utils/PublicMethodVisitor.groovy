@@ -65,7 +65,7 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
     }
 
     protected boolean isAcceptable(MethodNode node) {
-        node.isPublic() && !node.isStatic() && !node.isSynthetic()
+        node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isFinal()
     }
 
     abstract void accept(MethodNode methodNode)

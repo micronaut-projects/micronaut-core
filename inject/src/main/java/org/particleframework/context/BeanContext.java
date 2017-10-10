@@ -1,13 +1,6 @@
 package org.particleframework.context;
 
-import org.particleframework.context.exceptions.NonUniqueBeanException;
-import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.BeanDefinition;
-
-import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * <p>The core BeanContext abstraction which which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
@@ -17,26 +10,10 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, ExecutionHandleLocator, BeanLocator {
+public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, ExecutionHandleLocator, BeanLocator, BeanDefinitionRegistry {
 
-    /**
-     * Return whether the bean of the given type is contained within this context
-     *
-     * @param beanType The bean type
-     * @return True if it is
-     */
-    default boolean containsBean(Class beanType) {
-        return containsBean(beanType, null);
-    }
-
-    /**
-     * Return whether the bean of the given type is contained within this context
-     *
-     * @param beanType The bean type
-     * @param qualifier The qualifier for the bean
-     * @return True if it is
-     */
-    boolean containsBean(Class beanType, Qualifier qualifier);
+    @Override
+    <T> BeanContext registerSingleton(Class<T> type, T singleton);
 
     /**
      * Inject an existing instance
@@ -116,52 +93,12 @@ public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, Exe
      */
     ClassLoader getClassLoader();
 
-    /**
-     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
-     *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by invoking any {@link javax.annotation.PostConstruct} hooks.</p>
-     *
-     * <p>If no bean definition data is found the bean is registered as is.</p>
-     *
-     * @param singleton The singleton bean
-     *
-     * @return This bean context
-     */
+    @Override
     default BeanContext registerSingleton(Object singleton) {
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
     }
 
-    /**
-     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
-     *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by invoking any {@link javax.annotation.PostConstruct} hooks.</p>
-     *
-     * <p>If no bean definition data is found the bean is registered as is.</p>
-     *
-     * @param singleton The singleton bean
-     *
-     * @return This bean context
-     */
-    <T> BeanContext registerSingleton(Class<T> type, T singleton);
-
-    /**
-     * Obtain a bean configuration by name
-     *
-     * @param configurationName The configuration name
-     * @return An optional with the configuration either present or not
-     */
-    Optional<BeanConfiguration> findBeanConfiguration(String configurationName);
-
-    /**
-     * Obtain a {@link BeanDefinition} for the given type
-     *
-     * @param beanType The type
-     * @param <T> The concrete type
-     * @return An {@link Optional} of the bean definition
-     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
-     */
-    <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType);
 
     /**
      * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}

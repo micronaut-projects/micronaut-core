@@ -1,16 +1,14 @@
 package org.particleframework.annotation.processing;
 
-import org.particleframework.core.convert.OptionalValues;
+import org.particleframework.core.value.OptionalValues;
 
 import javax.inject.Qualifier;
-import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 class AnnotationUtils {
@@ -261,10 +259,17 @@ class AnnotationUtils {
      * @return An {@link OptionalValues}
      */
     public <T> OptionalValues<T> resolveAttributesOfType(Class<T> type, Element element, String annotationType) {
-        return findAnnotation(element, annotationType)
-                .map(annotationMirror -> {
+        List<AnnotationMirror> mirrors = Arrays.asList(findAnnotationsWithStereotype(element, annotationType));
+        Collections.reverse(mirrors);
+        if(!mirrors.isEmpty()) {
+            Map<CharSequence, T> newValues = new LinkedHashMap<>();
+            for (AnnotationMirror annotationMirror : mirrors) {
+                TypeElement typeElement = (TypeElement) annotationMirror.getAnnotationType().asElement();
+                if(!typeElement.getQualifiedName().toString().equals(annotationType)) {
+                    annotationMirror = findAnnotation( typeElement, annotationType).orElse(null);
+                }
+                if(annotationMirror != null) {
                     Map<? extends ExecutableElement, ? extends AnnotationValue> values = annotationMirror.getElementValues();
-                    Map<CharSequence, T> newValues = new LinkedHashMap<>();
                     values.forEach((exec, value) -> {
                         String key = exec.getSimpleName().toString();
                         if (value != null) {
@@ -274,10 +279,11 @@ class AnnotationUtils {
                             }
                         }
                     });
-                    return newValues;
-                })
-                .map(charSequenceTMap -> OptionalValues.of(type, charSequenceTMap))
-                .orElse(OptionalValues.empty());
+                }
+            }
+            return OptionalValues.of(type, newValues);
+        }
+        return OptionalValues.empty();
     }
 
 

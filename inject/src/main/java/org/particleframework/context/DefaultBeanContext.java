@@ -2,8 +2,6 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.particleframework.context.annotation.ForEach;
-import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.exceptions.BeanInstantiationException;
@@ -50,6 +48,9 @@ public class DefaultBeanContext implements BeanContext {
     protected final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
 
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
+            .maximumSize(30)
+            .build();
+    private final Cache<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = Caffeine.newBuilder()
             .maximumSize(30)
             .build();
     private final Cache<Class, Collection<BeanDefinition>> beanCandidateCache = Caffeine.newBuilder()
@@ -186,6 +187,7 @@ public class DefaultBeanContext implements BeanContext {
         return Optional.empty();
     }
 
+
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
         if (bean != null) {
@@ -221,7 +223,7 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, null, false, true);
+            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, null, false, true, true).orElse(null);
             if (beanDefinition != null) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanDefinition, singleton));
@@ -249,21 +251,24 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
-        BeanKey beanKey = new BeanKey(beanType, null);
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+        BeanKey beanKey = new BeanKey(beanType, qualifier);
         BeanRegistration reg = singletonObjects.get(beanKey);
         if (reg != null) {
             return Optional.of(reg.beanDefinition);
         }
-        Collection<BeanDefinition<T>> beanCandidates = findBeanCandidatesInternal(beanType);
+        Collection<BeanDefinition<T>> beanCandidates = new ArrayList<>(findBeanCandidatesInternal(beanType));
+        if(qualifier != null) {
+            beanCandidates = qualifier.reduce(beanType, beanCandidates.stream()).collect(Collectors.toList());
+        }
+        filterProxiedTypes(beanCandidates, true);
         if (beanCandidates.isEmpty()) {
             return Optional.empty();
         } else {
             if (beanCandidates.size() == 1) {
                 return Optional.of(beanCandidates.iterator().next());
             } else {
-                BeanDefinition<T> concreteCandidate = findConcreteCandidate(beanType, null, true, true);
-                return Optional.of(concreteCandidate);
+                return findConcreteCandidate(beanType, null, true, true, true);
             }
         }
     }
@@ -271,14 +276,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public boolean containsBean(Class beanType, Qualifier qualifier) {
         BeanKey beanKey = new BeanKey(beanType, qualifier);
-        if (singletonObjects.containsKey(beanKey)) {
-            return true;
-        } else {
-            Collection<BeanDefinition> beanCandidates = findBeanCandidatesInternal(beanType);
-            return beanCandidates
-                    .stream()
-                    .anyMatch(beanDefinition -> !beanDefinition.isProvided());
-        }
+        return singletonObjects.containsKey(beanKey) || findConcreteCandidate(beanType, qualifier, false, false, true).isPresent();
     }
 
     @Override
@@ -302,54 +300,16 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
-        if (candidates.isEmpty()) {
-            return Stream.empty();
-        } else {
-            BeanKey beanKey = new BeanKey(beanType, qualifier);
-            BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
-            if (beanRegistration != null) {
-                return Stream.of(beanRegistration.bean);
-            } else {
-                Iterator<BeanDefinition<T>> candidateIterator = candidates.iterator();
-
-                Stream.Builder<T> streamBuilder = Stream.builder();
-                while(candidateIterator.hasNext()) {
-
-                    BeanDefinition<T> definition = candidateIterator.next();
-
-                    if (definition.isSingleton()) {
-                        BeanRegistration<T> candidateRegistration = singletonObjects.get(beanKey);
-                        if (candidateRegistration != null) {
-                            streamBuilder.accept(candidateRegistration.bean);
-                        } else {
-                            synchronized (singletonObjects) {
-                                T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
-                                if(createdBean != null) {
-                                    registerSingletonBean(definition, beanType, createdBean, qualifier, candidates.size() == 1);
-                                    streamBuilder.accept(createdBean);
-                                }
-                            }
-                        }
-                    } else {
-                        T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, null);
-                        if(createdBean != null) {
-                            streamBuilder.accept(createdBean);
-                        }
-                    }
-                }
-                return streamBuilder.build();
-            }
-        }
+        return getBeansOfTypeInternal(resolutionContext, beanType, qualifier).stream();
     }
 
     @Override
     public <T> T inject(T instance) {
-        Class<?> beanType = instance.getClass();
-        BeanDefinition definition = findConcreteCandidate(beanType, null, true, true);
-        if (definition != null) {
-            definition.inject(this, instance);
-        }
+        Class<T> beanType = (Class<T>) instance.getClass();
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, null, true, true, true);
+        concreteCandidate.ifPresent(def ->
+                def.inject(this, instance)
+        );
         return instance;
     }
 
@@ -360,9 +320,9 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Map<String, Object> argumentValues) {
-        BeanDefinition<T> candidate = findConcreteCandidate(beanType, qualifier, true, false);
-        if(candidate != null) {
-            T createdBean = doCreateBean(new DefaultBeanResolutionContext(this, candidate), candidate, qualifier, false, argumentValues);
+        Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false, true);
+        if(candidate.isPresent()) {
+            T createdBean = doCreateBean(new DefaultBeanResolutionContext(this, candidate.get()), candidate.get(), qualifier, false, argumentValues);
             if(createdBean == null) {
                 throw new NoSuchBeanException(beanType);
             }
@@ -387,18 +347,23 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (bean != null) {
-            BeanDefinition<T> definition = findConcreteCandidate(beanType, null, false, true);
-            if (definition instanceof DisposableBeanDefinition) {
-                ((DisposableBeanDefinition<T>) definition).dispose(this, bean);
-            }
+            Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, null, false, true, true);
+            T finalBean = bean;
+            concreteCandidate.ifPresent(definition -> {
+                    if (definition instanceof DisposableBeanDefinition) {
+                        ((DisposableBeanDefinition<T>) definition).dispose(this, finalBean);
+                    }
+                }
+            );
 
         }
         return bean;
     }
 
     <T> T createBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        BeanDefinition<T> candidate = findConcreteCandidate(beanType, qualifier, true, false);
-        if (candidate != null) {
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, true, false, true);
+        if (concreteCandidate.isPresent()) {
+            BeanDefinition<T> candidate = concreteCandidate.get();
             if(resolutionContext == null) {
                 resolutionContext = new DefaultBeanResolutionContext(this, candidate);
             }
@@ -412,9 +377,10 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     <T> T inject(BeanResolutionContext resolutionContext, BeanDefinition requestingBeanDefinition, T instance) {
-        Class<?> beanType = instance.getClass();
-        BeanDefinition definition = findConcreteCandidate(beanType, null, false, true);
-        if (definition != null) {
+        Class<T> beanType = (Class<T>) instance.getClass();
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, null, false, true, true);
+        if (concreteCandidate.isPresent()) {
+            BeanDefinition definition = concreteCandidate.get();
             if (requestingBeanDefinition != null && requestingBeanDefinition.equals(definition)) {
                 // bail out, don't inject for bean definition in creation
                 return instance;
@@ -437,6 +403,33 @@ public class DefaultBeanContext implements BeanContext {
         return getBeanProvider(resolutionContext, beanType, null);
     }
 
+    @Override
+    public <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier) {
+        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, Qualifiers.byType(ProxyTarget.class)) : Qualifiers.byType(ProxyTarget.class);
+        BeanDefinition<T> definition = getProxiedBeanDefinition(beanType, qualifier);
+        return getBeanForDefinition(new DefaultBeanResolutionContext(this, definition), beanType, proxyQualifier, true, definition);
+    }
+
+    @Override
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class[] arguments) {
+        BeanDefinition<T> definition = getProxiedBeanDefinition(beanType, null);
+        return definition.findMethod(method, arguments);
+    }
+
+    @Override
+    public <T> Optional<BeanDefinition<T>> findProxiedBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, Qualifiers.byType(ProxyTarget.class)) : Qualifiers.byType(ProxyTarget.class);
+        BeanKey key = new BeanKey(beanType, proxyQualifier);
+
+        BeanRegistration<T> beanRegistration = singletonObjects.get(key);
+        if (beanRegistration != null) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
+            }
+            return Optional.of(beanRegistration.beanDefinition);
+        }
+        return findConcreteCandidateNoCache(beanType, qualifier, true, false, false);
+    }
 
     public <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
@@ -444,8 +437,9 @@ public class DefaultBeanContext implements BeanContext {
             return new ResolvedProvider<>(beanRegistration.bean);
         }
 
-        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, true, false);
-        if (definition != null) {
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, true, false, true);
+        if (concreteCandidate.isPresent()) {
+            BeanDefinition<T> definition = concreteCandidate.get();
             return new UnresolvedProvider<>(definition.getType(), this);
         } else {
             throw new NoSuchBeanException(beanType);
@@ -731,10 +725,11 @@ public class DefaultBeanContext implements BeanContext {
             }
             return bean;
         }
-        BeanDefinition<T> definition = findConcreteCandidate(beanType, qualifier, throwNonUnique, false);
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, throwNonUnique, false, true);
 
 
-        if (definition != null) {
+        if (concreteCandidate.isPresent()) {
+            BeanDefinition<T> definition = concreteCandidate.get();
 
             if (definition.isProvided() && beanType == definition.getType()) {
                 if(throwNoSuchBean) {
@@ -795,13 +790,25 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T> The bean generic type
      * @return The concrete bean definition candidate
      */
-    private <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, boolean includeProvided) {
-        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
+    @SuppressWarnings("unchecked")
+    private <T> Optional<BeanDefinition<T>> findConcreteCandidate(
+            Class<T> beanType,
+            Qualifier<T> qualifier,
+            boolean throwNonUnique,
+            boolean includeProvided,
+            boolean filterProxied) {
+        return (Optional) beanConcreteCandidateCache.get(new BeanKey(beanType, qualifier), beanKey ->
+                (Optional)findConcreteCandidateNoCache(beanType, qualifier, throwNonUnique, includeProvided, filterProxied)
+        );
 
-        if (!includeProvided) {
-            candidates = candidates.stream()
-                    .filter(def -> !def.isProvided())
-                    .collect(Collectors.toList());
+    }
+
+    private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, boolean includeProvided, boolean filterProxied) {
+        Collection<BeanDefinition<T>> candidates = new ArrayList<>( findBeanCandidatesInternal(beanType) );
+        filterProxiedTypes(candidates, filterProxied);
+
+        if(!includeProvided) {
+            candidates.removeIf(BeanDefinition::isProvided);
         }
 
 
@@ -812,13 +819,13 @@ public class DefaultBeanContext implements BeanContext {
                 definition = candidates.iterator().next();
             } else {
                 if (qualifier != null) {
-                    if(LOG.isDebugEnabled()) {
+                    if (LOG.isDebugEnabled()) {
                         LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                     }
                     Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
                     List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                     if (beanDefinitionList.isEmpty()) {
-                        if(LOG.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
                         }
                         return null;
@@ -827,39 +834,53 @@ public class DefaultBeanContext implements BeanContext {
                     Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
                             .filter(BeanDefinition::isPrimary)
                             .findFirst();
-                    if (primary.isPresent()) {
-                        return primary.get();
-                    } else {
-                        definition = lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList);
-                    }
+                    definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
                 } else {
-                    if(LOG.isDebugEnabled()) {
+                    if (LOG.isDebugEnabled()) {
                         LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
                     }
                     Optional<BeanDefinition<T>> primary = candidates.stream()
                             .filter(BeanDefinition::isPrimary)
                             .findFirst();
                     if (primary.isPresent()) {
-                        return primary.get();
+                        definition = primary.get();
                     } else {
-                        definition = lastChanceResolve(beanType, null,throwNonUnique, candidates);
+                        definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
                     }
                 }
             }
         }
-        if(LOG.isDebugEnabled()) {
-            if(definition != null) {
-                if(qualifier != null) {
+        if (LOG.isDebugEnabled()) {
+            if (definition != null) {
+                if (qualifier != null) {
                     LOG.debug("Found concrete candidate [{}] for type: {} {} ", definition, qualifier, beanType.getName());
-                }
-                else {
+                } else {
                     LOG.debug("Found concrete candidate [{}] for type: {} ", definition, beanType.getName());
                 }
             }
         }
-        return definition;
+        return Optional.ofNullable(definition);
     }
 
+    private <T> void filterProxiedTypes(Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
+        Set<Class> proxiedTypes = new HashSet<>();
+        for (BeanDefinition<T> candidate : candidates) {
+            if(candidate instanceof ProxyBeanDefinition) {
+                if(filterProxied) {
+                    proxiedTypes.add(((ProxyBeanDefinition) candidate).getTargetDefinitionType());
+                }
+                else {
+                    proxiedTypes.add(candidate.getClass());
+                }
+            }
+
+        }
+        if(!proxiedTypes.isEmpty()) {
+            candidates.removeIf(candidate ->
+                    proxiedTypes.contains(candidate.getClass())
+            );
+        }
+    }
 
 
     private <T> BeanDefinition<T> lastChanceResolve(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, Collection<BeanDefinition<T>> candidates) {
@@ -867,6 +888,10 @@ public class DefaultBeanContext implements BeanContext {
             return candidates.iterator().next();
         }
         else {
+
+            if(candidates.size() == 1) {
+                return candidates.iterator().next();
+            }
 
             BeanDefinition<T> definition = null;
             Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
@@ -1152,6 +1177,7 @@ public class DefaultBeanContext implements BeanContext {
             beansOfTypeList.add(createdBean);
         }
     }
+
 
     private static abstract class AbstractExectionHandle<T, R> implements MethodExecutionHandle<R> {
         protected final ExecutableMethod<T, R> method;

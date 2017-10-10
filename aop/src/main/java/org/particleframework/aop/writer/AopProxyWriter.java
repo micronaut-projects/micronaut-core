@@ -16,19 +16,21 @@
 package org.particleframework.aop.writer;
 
 import org.objectweb.asm.*;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.particleframework.aop.*;
 import org.particleframework.aop.internal.InterceptorChain;
 import org.particleframework.aop.internal.MethodInterceptorChain;
 import org.particleframework.context.BeanContext;
-import org.particleframework.core.convert.OptionalValues;
+import org.particleframework.context.BeanLocator;
+import org.particleframework.context.ExecutionHandleLocator;
+import org.particleframework.context.Qualifier;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.value.OptionalValues;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.BeanFactory;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.ProxyBeanDefinition;
 import org.particleframework.inject.writer.*;
 
 import java.io.File;
@@ -49,26 +51,33 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor {
 
-    private static final java.lang.reflect.Method METHOD_BEAN_FACTORY_BUILD = ReflectionUtils.getDeclaredMethod(BeanFactory.class, "build", BeanContext.class, BeanDefinition.class)
-            .orElseThrow(() -> new IllegalStateException("BeanFactory.build(..) method not found. Incompatible version of Particle on the classpath?"));
-
-    private static final java.lang.reflect.Method METHOD_GET_REQUIRED_METHOD = ReflectionUtils.getDeclaredMethod(BeanDefinition.class, "getRequiredMethod", String.class, Class[].class)
-            .orElseThrow(() -> new IllegalStateException("BeanFactory.build(..) method not found. Incompatible version of Particle on the classpath?"));
-
-    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveIntroductionInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
-        new IllegalStateException("InterceptorChain.resolveIntroductionInterceptors(..) method not found. Incompatible version of Particle?")
-);
-
-    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getDeclaredMethod(InterceptorChain.class, "resolveAroundInterceptors", AnnotatedElement.class, Interceptor[].class).orElseThrow(() ->
-            new IllegalStateException("InterceptorChain.resolveAroundInterceptors(..) method not found. Incompatible version of Particle?")
+    public static final Method METHOD_GET_PROXY_TARGET = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    ExecutionHandleLocator.class,
+                    "getProxyTargetMethod",
+                    Class.class,
+                    String.class,
+                    Class[].class
+            )
     );
+    public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+            BeanLocator.class,
+            "getProxyTargetBean",
+            Class.class,
+            Qualifier.class
+    ));
+    private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", AnnotatedElement.class, Interceptor[].class);
+
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", AnnotatedElement.class, Interceptor[].class);
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Particle?")
     );
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
+    private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
     private static final Type FIELD_TYPE_PROXY_METHODS = Type.getType(ExecutableMethod[].class);
     private static final Type EXECUTABLE_METHOD_TYPE = Type.getType(ExecutableMethod.class);
@@ -76,14 +85,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
     public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
     public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
-    public static final String FIELD_PARENT_BEAN = "$PARENT_BEAN";
     public static final String FIELD_TARGET = "$target";
-    public static final Type TYPE_BEAN_DEFINITION = Type.getType(BeanDefinition.class);
     public static final String FIELD_READ_WRITE_LOCK = "$target_rwl";
     public static final Type TYPE_READ_WRITE_LOCK = Type.getType(ReentrantReadWriteLock.class);
     public static final String FIELD_READ_LOCK = "$target_rl";
     public static final String FIELD_WRITE_LOCK = "$target_wl";
     public static final Type TYPE_LOCK = Type.getType(Lock.class);
+    public static final Type TYPE_BEAN_LOCATOR = Type.getType(BeanLocator.class);
+    public static final String METHOD_RESOLVE_TARGET = "$resolveTarget";
 
     private final String packageName;
     private final String targetClassShortName;
@@ -97,7 +106,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final boolean hotswap;
     private final boolean lazy;
     private final boolean isInterface;
-    private final BeanDefinitionVisitor parentWriter;
+    private final BeanDefinitionWriter parentWriter;
     private final boolean isIntroduction;
     private boolean isProxyTarget;
     private final String parentBeanDefinitionName;
@@ -123,7 +132,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param parent The parent {@link BeanDefinitionWriter}
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
-    public AopProxyWriter(BeanDefinitionVisitor parent,
+    public AopProxyWriter(BeanDefinitionWriter parent,
                           Object... interceptorTypes) {
         this(parent, OptionalValues.empty(), interceptorTypes);
     }
@@ -135,7 +144,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param parent The parent {@link BeanDefinitionWriter}
      * @param interceptorTypes The annotation types of the {@link Interceptor} instances to be injected
      */
-    public AopProxyWriter(BeanDefinitionVisitor parent,
+    public AopProxyWriter(BeanDefinitionWriter parent,
                           OptionalValues<Boolean> settings,
                           Object... interceptorTypes) {
         this.isIntroduction = false;
@@ -235,6 +244,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public Type getScope() {
         return proxyBeanDefinitionWriter.getScope();
+    }
+
+    @Override
+    public void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType) {
+        proxyBeanDefinitionWriter.visitBeanDefinitionInterface(interfaceType);
     }
 
     @Override
@@ -425,7 +439,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         // second argument: this or target
         overriddenMethodGenerator.loadThis();
         if( isProxyTarget ) {
-            if(hotswap) {
+            if(hotswap || lazy) {
                overriddenMethodGenerator.invokeInterface(Type.getType(InterceptedProxy.class), Method.getMethod("java.lang.Object interceptedTarget()") );
             }
             else {
@@ -515,104 +529,123 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
 
+        GeneratorAdapter targetDefinitionGenerator = null;
+        if(parentWriter != null) {
+            proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
+            ClassVisitor pcw = proxyBeanDefinitionWriter.getClassWriter();
+            targetDefinitionGenerator = new GeneratorAdapter(pcw.visitMethod(ACC_PUBLIC,
+                    METHOD_PROXY_TARGET_TYPE.getName(),
+                    METHOD_PROXY_TARGET_TYPE.getDescriptor(),
+                    null, null
+
+            ), ACC_PUBLIC, METHOD_PROXY_TARGET_TYPE.getName(), METHOD_PROXY_TARGET_TYPE.getDescriptor());
+            targetDefinitionGenerator.loadThis();
+            targetDefinitionGenerator.push(getTypeReference(parentWriter.getBeanDefinitionName()));
+            targetDefinitionGenerator.returnValue();
+        }
+
+
         Class interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
+        Type targetType = getTypeReference(targetClassFullName);
+
+        // add the $beanLocator field
+
         if(isProxyTarget) {
-            interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
-
-            // add the $PARENT bean field
-            addParentBeanField(proxyClassWriter);
-
-            // add the $target field for the target bean
-            Type targetType = getTypeReference(targetClassFullName);
-            int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
             proxyClassWriter.visitField(
-                    modifiers,
-                    FIELD_TARGET,
-                    targetType.getDescriptor(),
+                    ACC_PRIVATE | ACC_FINAL,
+                    FIELD_BEAN_LOCATOR,
+                    TYPE_BEAN_LOCATOR.getDescriptor(),
                     null,
                     null
             );
-            if(hotswap) {
-                // Add ReadWriteLock field
-                // private final ReentrantReadWriteLock $target_rwl = new ReentrantReadWriteLock();
-                proxyClassWriter.visitField(
-                    ACC_PRIVATE | ACC_FINAL,
-                        FIELD_READ_WRITE_LOCK,
-                        TYPE_READ_WRITE_LOCK.getDescriptor(),
-                        null,null
-                );
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.newInstance(TYPE_READ_WRITE_LOCK);
-                proxyConstructorGenerator.dup();
-                proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR );
-                proxyConstructorGenerator.putField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
 
-                // Add Read Lock field
-                // private final Lock $target_rl = $target_rwl.readLock();
-                proxyClassWriter.visitField(
-                        ACC_PRIVATE | ACC_FINAL,
-                        FIELD_READ_LOCK,
-                        TYPE_LOCK.getDescriptor(),
-                        null,null
-                );
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
-                proxyConstructorGenerator.invokeInterface(
-                        Type.getType(ReadWriteLock.class),
-                        Method.getMethod(Lock.class.getName() + " readLock()")
-                );
-                proxyConstructorGenerator.putField(proxyType, FIELD_READ_LOCK, TYPE_LOCK );
-
-                // Add Write Lock field
-                // private final Lock $target_wl = $target_rwl.writeLock();
-                proxyClassWriter.visitField(
-                        ACC_PRIVATE | ACC_FINAL,
-                        FIELD_WRITE_LOCK,
-                        Type.getDescriptor(Lock.class),
-                        null,null
-                );
-
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.loadThis();
-                proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
-                proxyConstructorGenerator.invokeInterface(
-                        Type.getType(ReadWriteLock.class),
-                        Method.getMethod(Lock.class.getName() + " writeLock()")
-                );
-                proxyConstructorGenerator.putField(proxyType, FIELD_WRITE_LOCK, TYPE_LOCK );
+            if(lazy) {
+                interceptedInterface = InterceptedProxy.class;
             }
+            else {
+                interceptedInterface = hotswap ? HotSwappableInterceptedProxy.class : InterceptedProxy.class;
 
-            // add the logic to create to the bean instance
-            proxyConstructorGenerator.loadThis();
-            // second argument: the bean definition
-            proxyConstructorGenerator.getStatic(
-                    proxyType,
-                    FIELD_PARENT_BEAN,
-                    TYPE_BEAN_DEFINITION
-            );
-            // first argument: the bean context
-            proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
-            // second argument: the bean definition
-            proxyConstructorGenerator.getStatic(
-                    proxyType,
-                    FIELD_PARENT_BEAN,
-                    TYPE_BEAN_DEFINITION
+                // add the $target field for the target bean
+                int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
+                proxyClassWriter.visitField(
+                        modifiers,
+                        FIELD_TARGET,
+                        targetType.getDescriptor(),
+                        null,
+                        null
+                );
+                if(hotswap) {
+                    // Add ReadWriteLock field
+                    // private final ReentrantReadWriteLock $target_rwl = new ReentrantReadWriteLock();
+                    proxyClassWriter.visitField(
+                            ACC_PRIVATE | ACC_FINAL,
+                            FIELD_READ_WRITE_LOCK,
+                            TYPE_READ_WRITE_LOCK.getDescriptor(),
+                            null,null
+                    );
+                    proxyConstructorGenerator.loadThis();
+                    proxyConstructorGenerator.newInstance(TYPE_READ_WRITE_LOCK);
+                    proxyConstructorGenerator.dup();
+                    proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR );
+                    proxyConstructorGenerator.putField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
+
+                    // Add Read Lock field
+                    // private final Lock $target_rl = $target_rwl.readLock();
+                    proxyClassWriter.visitField(
+                            ACC_PRIVATE | ACC_FINAL,
+                            FIELD_READ_LOCK,
+                            TYPE_LOCK.getDescriptor(),
+                            null,null
+                    );
+                    proxyConstructorGenerator.loadThis();
+                    proxyConstructorGenerator.loadThis();
+                    proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
+                    proxyConstructorGenerator.invokeInterface(
+                            Type.getType(ReadWriteLock.class),
+                            Method.getMethod(Lock.class.getName() + " readLock()")
+                    );
+                    proxyConstructorGenerator.putField(proxyType, FIELD_READ_LOCK, TYPE_LOCK );
+
+                    // Add Write Lock field
+                    // private final Lock $target_wl = $target_rwl.writeLock();
+                    proxyClassWriter.visitField(
+                            ACC_PRIVATE | ACC_FINAL,
+                            FIELD_WRITE_LOCK,
+                            Type.getDescriptor(Lock.class),
+                            null,null
                     );
 
-            // invoke the build method to build the proxy target
-            proxyConstructorGenerator.invokeInterface(Type.getType(BeanFactory.class), Method.getMethod(
-                    METHOD_BEAN_FACTORY_BUILD
-            ));
-            pushCastToType(proxyConstructorGenerator, targetClassFullName);
-            proxyConstructorGenerator.putField(proxyType, FIELD_TARGET, targetType);
+                    proxyConstructorGenerator.loadThis();
+                    proxyConstructorGenerator.loadThis();
+                    proxyConstructorGenerator.getField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
+                    proxyConstructorGenerator.invokeInterface(
+                            Type.getType(ReadWriteLock.class),
+                            Method.getMethod(Lock.class.getName() + " writeLock()")
+                    );
+                    proxyConstructorGenerator.putField(proxyType, FIELD_WRITE_LOCK, TYPE_LOCK );
+                }
+            }
+            // assign the bean locator
+            proxyConstructorGenerator.loadThis();
+            proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
+            proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
+
+
+            Method resolveTargetMethodDesc = writeResolveTargetMethod(proxyClassWriter, targetType);
+
+            if(!lazy) {
+                proxyConstructorGenerator.loadThis();
+                proxyConstructorGenerator.loadThis();
+                proxyConstructorGenerator.invokeVirtual(proxyType, resolveTargetMethodDesc);
+                proxyConstructorGenerator.putField(proxyType, FIELD_TARGET, targetType);
+            }
 
             // Write the Object interceptedTarget() method
-            writeInterceptedTargetMethod(proxyClassWriter, targetType);
+            writeInterceptedTargetMethod(proxyClassWriter, targetType, resolveTargetMethodDesc);
 
             // Write the swap method
             // e. T swap(T newInstance);
-            if(hotswap) {
+            if(hotswap && !lazy) {
                 writeSwapMethod(proxyClassWriter, targetType);
             }
         }
@@ -673,13 +706,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     proxyConstructorGenerator.push(i);
 
                     // Step 2: lookup the Method instance from the declaring type
-                    // $PARENT_BEAN.getRequiredMethod("test", new Class[]{String.class});
-                    proxyConstructorGenerator.getStatic(proxyType,FIELD_PARENT_BEAN, TYPE_BEAN_DEFINITION);
+                    // context.getProxyTargetMethod("test", new Class[]{String.class});
+                    proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
+
+                    proxyConstructorGenerator.push(targetType);
 
                     pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.argumentTypes);
                     proxyConstructorGenerator.invokeInterface(
-                            TYPE_BEAN_DEFINITION,
-                            Method.getMethod(METHOD_GET_REQUIRED_METHOD)
+                            Type.getType(ExecutionHandleLocator.class),
+                            METHOD_GET_PROXY_TARGET
                     );
                     // Step 3: store the result in the array
                     proxyConstructorGenerator.visitInsn(AASTORE);
@@ -717,49 +752,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         this.constructorWriter.visitEnd();
         proxyBeanDefinitionWriter.visitBeanDefinitionEnd();
+        if(targetDefinitionGenerator != null) {
+            targetDefinitionGenerator.visitMaxs(1,1);
+            targetDefinitionGenerator.visitEnd();
+        }
+
         proxyClassWriter.visitEnd();
     }
 
-    private void writeSwapMethod(ClassWriter proxyClassWriter, Type targetType) {
-        GeneratorAdapter swapGenerator = startPublicMethod(proxyClassWriter, "swap", targetType.getClassName(), targetType.getClassName());
-        Label l0 = new Label();
-        Label l1 = new Label();
-        Label l2 = new Label();
-        swapGenerator.visitTryCatchBlock(
-                l0,
-                l1,
-                l2,
-                null
-        );
-        // add write lock
-        writeLock(swapGenerator);
-        swapGenerator.visitLabel(l0);
-        swapGenerator.loadThis();
-        swapGenerator.getField(proxyType,FIELD_TARGET, targetType);
-        // release write lock
-        int localRef = swapGenerator.newLocal(targetType);
-        swapGenerator.storeLocal(localRef);
-
-        // assign the new value
-        swapGenerator.loadThis();
-        swapGenerator.visitVarInsn(ALOAD, 1);
-        swapGenerator.putField(proxyType, FIELD_TARGET, targetType);
-
-        swapGenerator.visitLabel(l1);
-        writeUnlock(swapGenerator);
-        swapGenerator.loadLocal(localRef);
-        swapGenerator.returnValue();
-        swapGenerator.visitLabel(l2);
-        // release write lock in finally
-        int var = swapGenerator.newLocal(targetType);
-        swapGenerator.storeLocal(var);
-        writeUnlock(swapGenerator);
-        swapGenerator.loadLocal(var);
-        swapGenerator.throwException();
-
-        swapGenerator.visitMaxs(2,3);
-        swapGenerator.visitEnd();
-    }
 
 
     /**
@@ -936,32 +936,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         }
     }
 
-    protected void addParentBeanField(ClassWriter proxyClassWriter) {
-        assert parentBeanDefinitionName != null : "Parent bean definition should be set!";
-
-        proxyClassWriter.visitField(
-                MODIFIERS_PRIVATE_STATIC_FINAL,
-                FIELD_PARENT_BEAN,
-                Type.getDescriptor(BeanDefinition.class),
-                null,
-                null
-        );
-        GeneratorAdapter staticInitGenerator = visitStaticInitializer(proxyClassWriter);
-        Type parentType = getTypeReference(
-                parentBeanDefinitionName
-        );
-        staticInitGenerator.newInstance(parentType);
-        staticInitGenerator.dup();
-        staticInitGenerator.invokeConstructor(parentType, METHOD_DEFAULT_CONSTRUCTOR);
-        staticInitGenerator.putStatic(
-                proxyType,
-                FIELD_PARENT_BEAN,
-                TYPE_BEAN_DEFINITION
-        );
-        staticInitGenerator.visitInsn(RETURN);
-        staticInitGenerator.visitEnd();
-        staticInitGenerator.visitMaxs(DEFAULT_MAX_STACK, 1);
-    }
 
     private void readUnlock(GeneratorAdapter interceptedTargetVisitor) {
         invokeMethodOnLock(interceptedTargetVisitor, FIELD_READ_LOCK, Method.getMethod("void unlock()"));
@@ -985,48 +959,130 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         interceptedTargetVisitor.invokeInterface(TYPE_LOCK, method);
     }
 
-    private void writeInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
+    private Method writeResolveTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
+        Method resolveTargetMethodDesc = Method.getMethod(targetClassFullName + " " + METHOD_RESOLVE_TARGET + "()");
+        GeneratorAdapter resolveTargetMethod = new GeneratorAdapter(proxyClassWriter.visitMethod(
+                ACC_PRIVATE,
+                resolveTargetMethodDesc.getName(),
+                resolveTargetMethodDesc.getDescriptor(),
+                null,null
+
+        ), ACC_PRIVATE, METHOD_RESOLVE_TARGET, resolveTargetMethodDesc.getDescriptor());
+
+
+        // add the logic to create to the bean instance
+        resolveTargetMethod.loadThis();
+        // load the bean context
+        resolveTargetMethod.getField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
+
+        // 1st argument: the type
+        resolveTargetMethod.push(targetType);
+        // 2nd argument: null qualifier
+        resolveTargetMethod.visitInsn(ACONST_NULL);
+
+        resolveTargetMethod.invokeInterface(
+                TYPE_BEAN_LOCATOR,
+                METHOD_GET_PROXY_TARGET_BEAN
+
+        );
+        pushCastToType(resolveTargetMethod, targetClassFullName);
+        resolveTargetMethod.returnValue();
+        resolveTargetMethod.visitMaxs(1,1);
+        return resolveTargetMethodDesc;
+    }
+
+    private void writeSwapMethod(ClassWriter proxyClassWriter, Type targetType) {
+        GeneratorAdapter swapGenerator = startPublicMethod(proxyClassWriter, "swap", targetType.getClassName(), targetType.getClassName());
+        Label l0 = new Label();
+        Label l1 = new Label();
+        Label l2 = new Label();
+        swapGenerator.visitTryCatchBlock(
+                l0,
+                l1,
+                l2,
+                null
+        );
+        // add write lock
+        writeLock(swapGenerator);
+        swapGenerator.visitLabel(l0);
+        swapGenerator.loadThis();
+        swapGenerator.getField(proxyType,FIELD_TARGET, targetType);
+        // release write lock
+        int localRef = swapGenerator.newLocal(targetType);
+        swapGenerator.storeLocal(localRef);
+
+        // assign the new value
+        swapGenerator.loadThis();
+        swapGenerator.visitVarInsn(ALOAD, 1);
+        swapGenerator.putField(proxyType, FIELD_TARGET, targetType);
+
+        swapGenerator.visitLabel(l1);
+        writeUnlock(swapGenerator);
+        swapGenerator.loadLocal(localRef);
+        swapGenerator.returnValue();
+        swapGenerator.visitLabel(l2);
+        // release write lock in finally
+        int var = swapGenerator.newLocal(targetType);
+        swapGenerator.storeLocal(var);
+        writeUnlock(swapGenerator);
+        swapGenerator.loadLocal(var);
+        swapGenerator.throwException();
+
+        swapGenerator.visitMaxs(2,3);
+        swapGenerator.visitEnd();
+    }
+
+
+    private void writeInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType, Method resolveTargetMethodDesc) {
         // add interceptedTarget() method
         GeneratorAdapter interceptedTargetVisitor = startPublicMethod(
                 proxyClassWriter,
                 "interceptedTarget",
                 Object.class.getName());
-        int localRef = -1;
-        Label l1 = null;
-        Label l2 = null;
-        if(hotswap) {
-            Label l0 = new Label();
-            l1 = new Label();
-            l2 = new Label();
-            interceptedTargetVisitor.visitTryCatchBlock(
-                    l0,
-                    l1,
-                    l2,
-                    null
-            );
-            // add read lock
-            readLock(interceptedTargetVisitor);
-            interceptedTargetVisitor.visitLabel(l0);
+
+        if(lazy) {
+            interceptedTargetVisitor.loadThis();
+            interceptedTargetVisitor.invokeVirtual(proxyType, resolveTargetMethodDesc);
+            interceptedTargetVisitor.returnValue();
         }
-        interceptedTargetVisitor.loadThis();
-        interceptedTargetVisitor.getField(proxyType,FIELD_TARGET, targetType);
-        if(hotswap) {
-            // release read lock
-            localRef = interceptedTargetVisitor.newLocal(targetType);
-            interceptedTargetVisitor.storeLocal(localRef);
-            interceptedTargetVisitor.visitLabel(l1);
-            readUnlock(interceptedTargetVisitor);
-            interceptedTargetVisitor.loadLocal(localRef);
-        }
-        interceptedTargetVisitor.returnValue();
-        if(localRef > -1) {
-            interceptedTargetVisitor.visitLabel(l2);
-            // release read lock in finally
-            int var = interceptedTargetVisitor.newLocal(targetType);
-            interceptedTargetVisitor.storeLocal(var);
-            readUnlock(interceptedTargetVisitor);
-            interceptedTargetVisitor.loadLocal(var);
-            interceptedTargetVisitor.throwException();
+        else {
+            int localRef = -1;
+            Label l1 = null;
+            Label l2 = null;
+            if(hotswap) {
+                Label l0 = new Label();
+                l1 = new Label();
+                l2 = new Label();
+                interceptedTargetVisitor.visitTryCatchBlock(
+                        l0,
+                        l1,
+                        l2,
+                        null
+                );
+                // add read lock
+                readLock(interceptedTargetVisitor);
+                interceptedTargetVisitor.visitLabel(l0);
+            }
+            interceptedTargetVisitor.loadThis();
+            interceptedTargetVisitor.getField(proxyType,FIELD_TARGET, targetType);
+            if(hotswap) {
+                // release read lock
+                localRef = interceptedTargetVisitor.newLocal(targetType);
+                interceptedTargetVisitor.storeLocal(localRef);
+                interceptedTargetVisitor.visitLabel(l1);
+                readUnlock(interceptedTargetVisitor);
+                interceptedTargetVisitor.loadLocal(localRef);
+            }
+            interceptedTargetVisitor.returnValue();
+            if(localRef > -1) {
+                interceptedTargetVisitor.visitLabel(l2);
+                // release read lock in finally
+                int var = interceptedTargetVisitor.newLocal(targetType);
+                interceptedTargetVisitor.storeLocal(var);
+                readUnlock(interceptedTargetVisitor);
+                interceptedTargetVisitor.loadLocal(var);
+                interceptedTargetVisitor.throwException();
+            }
         }
 
         interceptedTargetVisitor.visitMaxs(1,2);

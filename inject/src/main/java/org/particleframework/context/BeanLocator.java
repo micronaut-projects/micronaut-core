@@ -111,4 +111,14 @@ public interface BeanLocator {
     default <T> Stream<T> streamOfType(Class<T> beanType) {
         return streamOfType(beanType, null);
     }
+
+    /**
+     * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned
+     *
+     * @param beanType The bean type
+     * @param qualifier The bean qualifier
+     * @param <T> The generic type
+     * @return The proxied instance
+     */
+    <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier);
 }

@@ -6,7 +6,7 @@ import org.particleframework.aop.Introduction;
 import org.particleframework.aop.writer.AopProxyWriter;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.*;
-import org.particleframework.core.convert.OptionalValues;
+import org.particleframework.core.value.OptionalValues;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
@@ -152,22 +152,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             processed.add(className);
             beanDefinitionClassWriter.setContextScope(
                 annotationUtils.hasStereotype(beanClassElement, Context.class));
-            if(beanDefinitionWriter instanceof ProxyingBeanDefinitionVisitor) {
-                String proxiedBeanDefinitionName = ((ProxyingBeanDefinitionVisitor) beanDefinitionWriter).getProxiedBeanDefinitionName();
-                if(proxiedBeanDefinitionName != null) {
-                    beanDefinitionClassWriter.setReplaceBeanDefinitionName(
-                            proxiedBeanDefinitionName
-                    );
-                }
-            }
-            else {
 
-                Optional<AnnotationMirror> replacesAnn =
-                        annotationUtils.findAnnotationWithStereotype(beanClassElement, Replaces.class);
+            Optional<AnnotationMirror> replacesAnn =
+                    annotationUtils.findAnnotationWithStereotype(beanClassElement, Replaces.class);
 
-                replacesAnn.ifPresent(annotationMirror -> annotationUtils.getAnnotationAttributeValue(annotationMirror, "value")
-                           .ifPresent(beanDefinitionClassWriter::setReplaceBeanName));
-            }
+            replacesAnn.ifPresent(annotationMirror -> annotationUtils.getAnnotationAttributeValue(annotationMirror, "value")
+                       .ifPresent(beanDefinitionClassWriter::setReplaceBeanName));
 
             JavaFileObject beanDefClassFileObject = filer.createClassFile(className);
             try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
@@ -567,7 +557,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if(aopWriter == null) {
                 aopProxyWriter
                         = new AopProxyWriter(
-                        beanWriter,
+                        (BeanDefinitionWriter) beanWriter,
                         aopSettings,
                         interceptorTypes
 

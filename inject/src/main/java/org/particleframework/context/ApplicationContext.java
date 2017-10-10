@@ -1,7 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.env.Environment;
-import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;
 
 import java.util.function.Consumer;
@@ -41,6 +41,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
 
     /**
      * Allow configuration the {@link Environment}
+     *
      * @param consumer The consumer
      * @return This context
      */

@@ -4,14 +4,12 @@ import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
-import org.codehaus.groovy.ast.expr.Expression
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
-import org.particleframework.core.convert.OptionalValues
+import org.particleframework.core.value.OptionalValues
 
 import javax.inject.Inject
 import javax.inject.Qualifier
 import javax.inject.Scope
-import javax.lang.model.element.Element
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
@@ -89,11 +87,22 @@ class AnnotationStereoTypeFinder {
      */
     List<AnnotationNode> findAnnotationsWithStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
         List<AnnotationNode> foundAnnotations = []
+        findAnnotationsInternal(annotatedNode, stereotype.getName(), foundAnnotations)
+        return foundAnnotations.unique()
+    }
+    /**
+     * Find all the annotations for the given stereotype
+     *
+     * @param annotatedNode The annotated node
+     * @param stereotype The stereotype
+     * @return A list of annotations
+     */
+    List<AnnotationNode> findAnnotationsWithStereoType(AnnotatedNode annotatedNode, String stereotype) {
+        List<AnnotationNode> foundAnnotations = []
         findAnnotationsInternal(annotatedNode, stereotype, foundAnnotations)
         return foundAnnotations.unique()
     }
-
-    private void findAnnotationsInternal(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype, List<AnnotationNode>
+    private void findAnnotationsInternal(AnnotatedNode annotatedNode, String stereotype, List<AnnotationNode>
             foundAnnotations) {
         AnnotationNode foundAnn = findAnnotationWithStereoType(annotatedNode, stereotype)
         if(foundAnn != null) {
@@ -141,20 +150,28 @@ class AnnotationStereoTypeFinder {
      * @param type The type
      * @param node The The node
      * @param annotationType The annotation type
-     * @param <T> The {@link org.particleframework.core.convert.OptionalValues}
-     * @return An {@link org.particleframework.core.convert.OptionalValues}
+     * @param <T> The {@link OptionalValues}
+     * @return An {@link OptionalValues}
      */
     def <T> OptionalValues<T> resolveAttributesOfType(Class<T> type, AnnotatedNode node, String annotationType) {
-        AnnotationNode ann = AstAnnotationUtils.findAnnotation(node, annotationType)
-        if(ann != null) {
+        List<AnnotationNode> annotations = findAnnotationsWithStereoType(node, annotationType).reverse()
+        if(!annotations.isEmpty()) {
             Map<CharSequence, T> values = [:]
-            for(entry in ann.members) {
-                def v = entry.value
-                if(v instanceof ConstantExpression) {
-                    v = ((ConstantExpression)v).value
+            for(ann in annotations) {
+                if(ann.classNode.name != annotationType) {
+                    ann = AstAnnotationUtils.findAnnotation(ann.classNode, annotationType)
                 }
-                if(v != null && type.isInstance(v)) {
-                    values.put(entry.key, (T)v )
+                if(ann != null) {
+
+                    for(entry in ann.members) {
+                        def v = entry.value
+                        if(v instanceof ConstantExpression) {
+                            v = ((ConstantExpression)v).value
+                        }
+                        if(v != null && type.isInstance(v)) {
+                            values.put(entry.key, (T)v )
+                        }
+                    }
                 }
             }
             return OptionalValues.of(type, values)

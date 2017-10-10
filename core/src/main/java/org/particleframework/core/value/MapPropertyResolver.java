@@ -1,4 +1,4 @@
-package org.particleframework.config;
+package org.particleframework.core.value;
 
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;

@@ -60,7 +60,7 @@ public class ParticleApplication {
         CommandLine commandLine = CommandLine.parse(args);
 
         String environmentToUse = environment == null ? deduceEnvironment() : environment;
-        ApplicationContext applicationContext = new DefaultApplicationContext(environmentToUse);
+        ApplicationContext applicationContext = ApplicationContext.build(environmentToUse);
         applicationContext.registerSingleton(commandLine);
 
         // Add packages to scan
