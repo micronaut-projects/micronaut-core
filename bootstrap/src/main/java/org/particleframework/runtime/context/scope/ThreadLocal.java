@@ -15,7 +15,6 @@
  */
 package org.particleframework.runtime.context.scope;
 
-import javax.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -29,7 +28,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Scope
 @ScopedProxy
 @Documented
 @Retention(RUNTIME)

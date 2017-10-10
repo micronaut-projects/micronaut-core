@@ -18,6 +18,7 @@ package org.particleframework.runtime.context.scope;
 import org.particleframework.aop.Around;
 import org.particleframework.context.annotation.Type;
 
+import javax.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -26,11 +27,14 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * A meta annotation for a scoped proxy
+ *
+ * @see ThreadLocal
  * @author Graeme Rocher
  * @since 1.0
  */
 @Around(proxyTarget = true, lazy = true)
-@Type(ScopedProxyInterceptor.class)
+@Scope
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
