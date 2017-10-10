@@ -29,7 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Around(proxyTarget = true)
+@Around(proxyTarget = true, lazy = true)
 @Type(ScopedProxyInterceptor.class)
 @Documented
 @Retention(RUNTIME)

@@ -414,12 +414,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
                 ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
+                OptionalValues<Boolean> aopSettings = annotationUtils.resolveAttributesOfType(Boolean.class, beanMethod, AROUND_TYPE);
+                Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
+                for (CharSequence setting : aopSettings) {
+                    Optional<Boolean> entry = aopSettings.get(setting);
+                    entry.ifPresent(val ->
+                        finalSettings.put(setting, val)
+                    );
+                }
+                finalSettings.put(Interceptor.PROXY_TARGET, true);
                 AopProxyWriter proxyWriter = resolveAopProxyWriter(
                         beanMethodWriter,
-                        OptionalValues.of(Boolean.class, CollectionUtils.createMap(
-                        Interceptor.PROXY_TARGET, true,
-                                Interceptor.HOTSWAP, false
-                        )),
+                        OptionalValues.of(Boolean.class, finalSettings),
                         true,
                         constructorData,
                         interceptorTypes);

@@ -47,7 +47,8 @@ class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycle<Thre
         String key = identifier.toString();
         T bean = (T) values.get(key);
         if(bean == null) {
-            values.put(key, provider.get());
+            bean = provider.get();
+            values.put(key, bean);
         }
         return bean;
     }

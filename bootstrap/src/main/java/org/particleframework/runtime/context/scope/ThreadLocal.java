@@ -33,6 +33,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @ScopedProxy
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.TYPE})
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface ThreadLocal {
 }

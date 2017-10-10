@@ -352,12 +352,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                    Map<CharSequence, Object> aopSettings = [:]
-                    aopSettings.put(Interceptor.PROXY_TARGET, true)
-                    aopSettings.put(Interceptor.LAZY, false)
+                    OptionalValues<Boolean> aopSettings = stereoTypeFinder.resolveAttributesOfType(Boolean.class, methodNode,AROUND_TYPE )
+                    Map<CharSequence, Object> finalSettings = [:]
+                    for(key in aopSettings) {
+                        finalSettings.put(key, aopSettings.get(key).get())
+                    }
+                    finalSettings.put(Interceptor.PROXY_TARGET, true)
+
                     AopProxyWriter proxyWriter = new AopProxyWriter(
                             beanMethodWriter,
-                            OptionalValues.of(Boolean.class,(Map<CharSequence, Object>)aopSettings),
+                            OptionalValues.of(Boolean.class,finalSettings),
                             interceptorTypeReferences)
                     if(producedType.isInterface()) {
                         proxyWriter.visitBeanDefinitionConstructor()
@@ -723,6 +727,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getSetterName(propertyNode.name),
                             genericTypeList,
                             isConfigurationProperties
+                    )
+                }
+            }
+            else if(isAopProxyType && !propertyNode.isStatic()) {
+                AopProxyWriter aopWriter = (AopProxyWriter)aopProxyWriter
+                if(aopProxyWriter != null) {
+                    Map<String, Map<String,Object>> resolvedGenericTypes = [(propertyNode.name):AstGenericUtils.extractPlaceholders(propertyNode.type)]
+                    Map<String, Object> resolvedArguments = [(propertyNode.name):AstGenericUtils.resolveTypeReference(propertyNode.type)]
+                    Map<String, Object> resolvedQualifiers = [(propertyNode.name):resolveQualifier(propertyNode.field)]
+                    aopWriter.visitAroundMethod(
+                            propertyNode.getDeclaringClass().name,
+                            void.class,
+                            Collections.emptyMap(),
+                            getSetterName(propertyNode.name),
+                            resolvedArguments,
+                            resolvedQualifiers,
+                            resolvedGenericTypes
                     )
                 }
             }

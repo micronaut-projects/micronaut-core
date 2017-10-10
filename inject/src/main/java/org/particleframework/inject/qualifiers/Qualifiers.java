@@ -13,7 +13,6 @@ import java.lang.annotation.Annotation;
  * @since 1.0
  */
 public class Qualifiers {
-
     /**
      * Build a qualifier from other qualifiers
      *
