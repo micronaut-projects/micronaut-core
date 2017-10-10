@@ -1,7 +1,7 @@
 package org.particleframework.context.condition;
 
 import groovy.lang.GroovySystem;
-import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Requires;

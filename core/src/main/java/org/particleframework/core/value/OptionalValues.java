@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.convert;
+package org.particleframework.core.value;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -59,17 +59,6 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
      * @return The values
      */
     static <T> OptionalValues<T> of(Class<T> type, Map<CharSequence, ?> values ) {
-        ValueResolver resolver = ValueResolver.of(values);
-        return new OptionalValues<T>() {
-            @Override
-            public Optional<T> get(CharSequence name) {
-                return resolver.get(name, type);
-            }
-
-            @Override
-            public Iterator<CharSequence> iterator() {
-                return values.keySet().iterator();
-            }
-        };
+        return new MapOptionalValues<>(type, values);
     }
 }

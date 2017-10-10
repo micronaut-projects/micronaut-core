@@ -16,6 +16,7 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.Type;
+import org.particleframework.inject.BeanDefinition;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +54,13 @@ public interface BeanDefinitionVisitor {
      * @return The scope type
      */
     Type getScope();
+
+    /**
+     * Visit a marker interface on the generated bean definition
+     *
+     * @param interfaceType The interface type
+     */
+    void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType);
 
     /**
      * Alter the super class of this bean definition

@@ -408,7 +408,12 @@ public class AnnotationUtil {
     public static Collection<Annotation> findAnnotationsWithStereoType(AnnotatedElement[] candidates, Class<?> stereotype) {
         Collection<Annotation> annotations = new ArrayList<>();
         for (AnnotatedElement candidate : candidates) {
-            annotations.addAll(findAnnotationsWithStereoType(candidate, stereotype));
+            Collection<? extends Annotation> found = findAnnotationsWithStereoType(candidate, stereotype);
+            for (Annotation annotation : found) {
+                if(!annotations.contains(annotation)) {
+                    annotations.add(annotation);
+                }
+            }
         }
         return annotations;
     }
@@ -439,31 +444,37 @@ public class AnnotationUtil {
         Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
         while(classToSearch != Object.class && classToSearch != null) {
             Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
-            declaredMethod.ifPresent(superMethod ->
-                    annotations.addAll( findAnnotationsWithStereoTypeNoCache(superMethod, stereotype))
-            );
+            declaredMethod.ifPresent(superMethod -> fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(superMethod, stereotype)));
             classToSearch = classToSearch.getSuperclass();
         }
         Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
         for (Class itfe : allInterfaces) {
             Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
             declaredMethod.ifPresent(interfaceMethod ->
-                    annotations.addAll( findAnnotationsWithStereoTypeNoCache(interfaceMethod, stereotype))
+                fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(interfaceMethod, stereotype))
             );
         }
-        annotations.addAll(findAnnotationsWithStereoTypeNoCache(method.getDeclaringClass(), stereotype));
+        fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(method.getDeclaringClass(), stereotype));
         return annotations.isEmpty() ? Collections.emptyList() : annotations;
     }
 
+    private static void fillAnnotations(Collection annotations, Collection toAdd) {
+        for (Object ann : toAdd) {
+            if(!annotations.contains(ann)) {
+                annotations.add(ann);
+            }
+        }
+    }
+
     private static Collection<Annotation> findAnnotationsWithStereoTypeNoCache(Class type, String stereotypeName) {
-        Collection annotationList = new ArrayList();
+        Collection<Annotation> annotationList = new ArrayList<>();
         Class classToSearch = type;
         while(classToSearch != Object.class && classToSearch != null) {
             Annotation[] annotations = classToSearch.getAnnotations();
-            annotationList.addAll(findAnnotationsWithStereoType(stereotypeName, annotations));
+            fillAnnotations(annotationList, findAnnotationsWithStereoType(stereotypeName, annotations));
             Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
             for (Class itfe : allInterfaces) {
-                annotationList.addAll(findAnnotationsWithStereoType(stereotypeName, itfe.getAnnotations()));
+                fillAnnotations(annotationList, findAnnotationsWithStereoType(stereotypeName, itfe.getAnnotations()));
             }
             classToSearch = classToSearch.getSuperclass();
         }
@@ -498,7 +509,7 @@ public class AnnotationUtil {
                 }
             }
         }
-        annotations.addAll(findAnnotationsByTypeNoCache(method.getDeclaringClass(), annotationType));
+        fillAnnotations(annotations, findAnnotationsByTypeNoCache(method.getDeclaringClass(), annotationType));
         return annotations.isEmpty() ? Collections.emptyList() : annotations;
     }
 
@@ -509,15 +520,16 @@ public class AnnotationUtil {
             Annotation[] annotations = classToSearch.getAnnotations();
             for (Annotation annotation : annotations) {
                 if( annotation.annotationType() == annotationType ) {
-                    annotationList.add((T) annotation);
+                    if(!annotationList.contains(annotation)) {
+                        annotationList.add((T) annotation);
+                    }
                 }
             }
             classToSearch = classToSearch.getSuperclass();
         }
         Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(type);
         for (Class itfe : allInterfaces) {
-            Collection<T> anns = findAnnotationsByTypeNoCache(itfe, annotationType);
-            annotationList.addAll(anns);
+            fillAnnotations(annotationList, findAnnotationsByTypeNoCache(itfe, annotationType));
         }
         return annotationList.isEmpty() ? Collections.emptyList() : annotationList;
     }

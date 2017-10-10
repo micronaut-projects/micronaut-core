@@ -15,11 +15,9 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    Properties props = new Properties()
-    new File("../../gradle.properties").withReader { props.load(it) }
-    compileOnly "org.particleframework:java-inject:${props.projectVersion}"
-    compile "org.particleframework:http-server-netty:${props.projectVersion}"
-    compile "org.particleframework.configuration:jackson:${props.projectVersion}"
+    compileOnly "org.particleframework:java-inject:${projectVersion}"
+    compile "org.particleframework:http-server-netty:${projectVersion}"
+    compile "org.particleframework.configuration:jackson:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 shadowJar {

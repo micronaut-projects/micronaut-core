@@ -1,6 +1,4 @@
-package org.particleframework.config;
-
-import org.particleframework.context.exceptions.BeanContextException;
+package org.particleframework.core.value;
 
 /**
  * Thrown when a property cannot be resolved
@@ -8,7 +6,7 @@ import org.particleframework.context.exceptions.BeanContextException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class PropertyNotFoundException extends ConfigurationException {
+public class PropertyNotFoundException extends ValueException {
 
     public PropertyNotFoundException(String name, Class type) {
         super("No property found for name ["+name+"] and type ["+type.getName()+"]");

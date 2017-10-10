@@ -15,7 +15,7 @@
  */
 package org.particleframework.context.env;
 
-import org.particleframework.config.ConfigurationException;
+import org.particleframework.core.value.ValueException;
 import org.particleframework.core.util.Toggleable;
 
 import java.io.IOException;
@@ -57,7 +57,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 processInput(input, finalMap);
             }
             catch (IOException e){
-                throw new ConfigurationException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
+                throw new ValueException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
             }
         }
     }

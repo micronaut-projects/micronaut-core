@@ -21,16 +21,16 @@ import org.springframework.core.env.PropertyResolver;
 import java.util.Optional;
 
 /**
- * Adapts a {@link org.particleframework.config.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}
+ * Adapts a {@link org.particleframework.core.value.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class PropertyResolverAdapter implements PropertyResolver {
 
-    final org.particleframework.config.PropertyResolver target;
+    final org.particleframework.core.value.PropertyResolver target;
 
-    public PropertyResolverAdapter(org.particleframework.config.PropertyResolver target) {
+    public PropertyResolverAdapter(org.particleframework.core.value.PropertyResolver target) {
         this.target = target;
     }
 

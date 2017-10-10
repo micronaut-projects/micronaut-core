@@ -16,6 +16,7 @@
 package org.particleframework.core.convert;
 
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.value.ValueResolver;
 
 import java.util.*;
 import java.util.function.BiConsumer;

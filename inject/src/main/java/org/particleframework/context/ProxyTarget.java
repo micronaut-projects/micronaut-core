@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.context.scope;
+package org.particleframework.context;
 
+import javax.inject.Qualifier;
 import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A {@link org.particleframework.context.scope.CustomScope} that stores objects in thread local storage
+ * A qualifier for a proxy target
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@ScopedProxy
+@Qualifier
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface ThreadLocal {
+@interface ProxyTarget {
 }

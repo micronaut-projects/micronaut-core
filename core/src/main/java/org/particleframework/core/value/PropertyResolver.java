@@ -1,11 +1,8 @@
-package org.particleframework.config;
+package org.particleframework.core.value;
 
 import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.ValueResolver;
 import org.particleframework.core.type.Argument;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 
 /**

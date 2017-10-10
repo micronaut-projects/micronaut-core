@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.convert;
+package org.particleframework.core.value;
+
+import org.particleframework.core.convert.ConversionService;
 
 import java.util.Map;
 import java.util.Optional;
@@ -40,5 +42,20 @@ class MapValueResolver implements ValueResolver {
             return Optional.of((T) v);
         }
         return ConversionService.SHARED.convert(v, requiredType);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MapValueResolver that = (MapValueResolver) o;
+
+        return map.equals(that.map);
+    }
+
+    @Override
+    public int hashCode() {
+        return map.hashCode();
     }
 }

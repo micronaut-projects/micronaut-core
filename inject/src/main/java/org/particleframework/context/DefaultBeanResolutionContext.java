@@ -2,8 +2,6 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.MutableConvertibleValuesMap;
-import org.particleframework.core.convert.ValueResolver;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 

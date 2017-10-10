@@ -22,11 +22,10 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.*
-import org.particleframework.core.convert.OptionalValues
+import org.particleframework.core.value.OptionalValues
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtils
-import org.particleframework.core.util.CollectionUtils
 import org.particleframework.core.util.StringUtils
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
@@ -35,7 +34,6 @@ import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.inject.writer.BeanDefinitionClassWriter
 import org.particleframework.inject.writer.BeanDefinitionVisitor
 import org.particleframework.inject.writer.BeanDefinitionWriter
-import org.particleframework.inject.writer.ProxyingBeanDefinitionVisitor
 import org.particleframework.inject.writer.TypeAnnotationSource
 
 import javax.annotation.PostConstruct
@@ -138,25 +136,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     beanClassWriter.visitAnnotationSource(annotationSource)
                 }
                 beanClassWriter.setContextScope(stereoTypeFinder.hasStereoType(beanClassNode, Context.name))
-                if(beanDefWriter instanceof ProxyingBeanDefinitionVisitor) {
-                    String proxiedBeanDefinitionName = ((ProxyingBeanDefinitionVisitor) beanDefWriter).getProxiedBeanDefinitionName();
-                    if(proxiedBeanDefinitionName != null) {
-                        beanClassWriter.setReplaceBeanDefinitionName(
-                                proxiedBeanDefinitionName
-                        )
-                    }
-                }
-                else {
 
-                    AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
-                    if(replacesAnn != null) {
-                        beanClassWriter.setReplaceBeanName(((ClassExpression)replacesAnn.getMember("value")).type.name)
-                    }
+                AnnotationNode replacesAnn = AstAnnotationUtils.findAnnotation(beanClassNode, Replaces.class.name)
+                if(replacesAnn != null) {
+                    beanClassWriter.setReplaceBeanName(((ClassExpression)replacesAnn.getMember("value")).type.name)
                 }
                 beanDefinitionClassName = beanClassWriter.getBeanDefinitionClassName()
                 beanClassWriter.writeTo(classesDir)
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
+                if(e.message == null) {
+                    e.printStackTrace(System.err)
+                }
             }
 
             if (beanDefinitionClassName != null) {
@@ -166,7 +157,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 catch (Throwable e) {
                     abort = true
+
                     AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanTypeName}]: $e.message")
+                    if(e.message == null) {
+                        e.printStackTrace(System.err)
+                    }
                 }
                 if(!abort) {
                     try {
@@ -174,6 +169,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         beanDefWriter.writeTo(classesDir)
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanTypeName}]: $e.message")
+                        if(e.message == null) {
+                            e.printStackTrace(System.err)
+                        }
+
                     }
                 }
             }
@@ -353,12 +352,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(stereoTypeFinder.hasStereoType(methodNode, AROUND_TYPE)) {
                     AnnotationNode[] annotations = stereoTypeFinder.findAnnotationsWithStereoType(methodNode, Around)
                     Object[] interceptorTypeReferences = resolveTypeReferences(annotations)
-                    Map<CharSequence, Object> aopSettings = [:]
-                    aopSettings.put(Interceptor.PROXY_TARGET, true)
-                    aopSettings.put(Interceptor.LAZY, false)
+                    OptionalValues<Boolean> aopSettings = stereoTypeFinder.resolveAttributesOfType(Boolean.class, methodNode,AROUND_TYPE )
+                    Map<CharSequence, Object> finalSettings = [:]
+                    for(key in aopSettings) {
+                        finalSettings.put(key, aopSettings.get(key).get())
+                    }
+                    finalSettings.put(Interceptor.PROXY_TARGET, true)
+
                     AopProxyWriter proxyWriter = new AopProxyWriter(
                             beanMethodWriter,
-                            OptionalValues.of(Boolean.class,(Map<CharSequence, Object>)aopSettings),
+                            OptionalValues.of(Boolean.class,finalSettings),
                             interceptorTypeReferences)
                     if(producedType.isInterface()) {
                         proxyWriter.visitBeanDefinitionConstructor()
@@ -538,7 +541,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             )
 
 
-                            if(proxyWriter != null) {
+                            if(proxyWriter != null && !methodNode.isFinal()) {
 
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
@@ -566,7 +569,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (proxyWriter == null) {
 
                 proxyWriter = new AopProxyWriter(
-                        beanWriter,
+                        (BeanDefinitionWriter)beanWriter,
                         aopSettings,
                         interceptorTypeReferences)
 
@@ -587,9 +590,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 this.aopProxyWriter = proxyWriter
 
                 def node = new AnnotatedNode()
-                def replaces = new AnnotationNode(makeCached(Replaces))
-                replaces.setMember('value', classX(targetClass.plainNodeReference))
-                node.addAnnotation(replaces)
                 beanDefinitionWriters.put(node, proxyWriter)
             }
             proxyWriter
@@ -623,22 +623,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         protected Object[] resolveTypeReferences(AnnotationNode[] annotationNodes) {
             return annotationNodes.collect() { AnnotationNode node -> AstGenericUtils.resolveTypeReference(node.classNode) } as Object[]
-        }
-
-        protected List<Object> resolveGenericTypes(ClassNode type) {
-            List<Object> generics = []
-            for(gt in type.genericsTypes) {
-                if(!gt.isPlaceholder()) {
-                    generics.add(AstGenericUtils.resolveTypeReference(gt.type))
-                }
-                else if(gt.isWildcard()) {
-                    ClassNode[] upperBounds = gt.upperBounds
-                    if(upperBounds != null && upperBounds.length == 1) {
-                        generics.add(AstGenericUtils.resolveTypeReference(upperBounds[0]))
-                    }
-                }
-            }
-            return generics
         }
 
         protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
@@ -743,6 +727,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getSetterName(propertyNode.name),
                             genericTypeList,
                             isConfigurationProperties
+                    )
+                }
+            }
+            else if(isAopProxyType && !propertyNode.isStatic()) {
+                AopProxyWriter aopWriter = (AopProxyWriter)aopProxyWriter
+                if(aopProxyWriter != null) {
+                    Map<String, Map<String,Object>> resolvedGenericTypes = [(propertyNode.name):AstGenericUtils.extractPlaceholders(propertyNode.type)]
+                    Map<String, Object> resolvedArguments = [(propertyNode.name):AstGenericUtils.resolveTypeReference(propertyNode.type)]
+                    Map<String, Object> resolvedQualifiers = [(propertyNode.name):resolveQualifier(propertyNode.field)]
+                    aopWriter.visitAroundMethod(
+                            propertyNode.getDeclaringClass().name,
+                            void.class,
+                            Collections.emptyMap(),
+                            getSetterName(propertyNode.name),
+                            resolvedArguments,
+                            resolvedQualifiers,
+                            resolvedGenericTypes
                     )
                 }
             }

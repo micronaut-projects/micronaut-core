@@ -16,6 +16,8 @@
 package org.particleframework.runtime.context.scope
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.annotation.Bean
+import org.particleframework.context.annotation.Factory
 import spock.lang.Ignore
 import spock.lang.Specification
 
@@ -26,10 +28,9 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
 class ThreadLocalScopeSpec extends Specification {
 
-    void "test thread local scope"() {
+    void "test thread local scope on class"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run("test")
         B b = applicationContext.getBean(B)
@@ -39,11 +40,59 @@ class ThreadLocalScopeSpec extends Specification {
 
         boolean isolated = false
         Thread.start {
-            isolated = b.a.num == 0
+            isolated = b.a.total() == 0
+            b.a.setNum(4)
+            assert b.a.total() == 4
         }.join()
 
 
         then:
+        b.a.total() == 2
+        isolated
+
+    }
+
+    void "test thread local scope on interface"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run("test")
+        BAndInterface b = applicationContext.getBean(BAndInterface)
+
+        when:
+        b.a.num = 2
+
+        boolean isolated = false
+        Thread.start {
+            isolated = b.a.total() == 0
+            b.a.setNum(4)
+            assert b.a.total() == 4
+        }.join()
+
+
+        then:
+        b.a.total() == 2
+        isolated
+
+    }
+
+
+    void "test thread local scope on factory"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run("test")
+        BAndFactory b = applicationContext.getBean(BAndFactory)
+
+        when:
+        b.a.num = 2
+
+        boolean isolated = false
+        Thread.start {
+            isolated = b.a.total() == 0
+            b.a.setNum(4)
+            assert b.a.total() == 4
+        }.join()
+
+
+        then:
+        b.a.total() == 2
         isolated
 
     }
@@ -67,6 +116,70 @@ class B {
     }
 
     A getA() {
+        return a
+    }
+}
+
+interface IA {
+    void setNum(int num)
+
+    int total()
+}
+
+@ThreadLocal
+class AImpl implements IA {
+    int num
+
+    int total() {
+        return num
+    }
+}
+
+@Singleton
+class BAndInterface {
+    private IA a
+
+    BAndInterface(IA a) {
+        this.a = a
+    }
+
+    IA getA() {
+        return a
+    }
+}
+
+interface IA2 {
+    void setNum(int num)
+
+    int total()
+}
+
+class A2Impl implements IA2 {
+    int num
+
+    int total() {
+        return num
+    }
+}
+
+@Factory
+class  IA2Factory {
+    @Bean
+    @ThreadLocal
+    IA2 a() {
+        return new A2Impl()
+    }
+}
+
+@Singleton
+class BAndFactory {
+    private IA2 a
+
+    BAndFactory(IA2 a) {
+        this.a = a
+    }
+
+    IA2 getA() {
         return a
     }
 }

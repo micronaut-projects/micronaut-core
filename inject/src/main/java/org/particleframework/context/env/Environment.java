@@ -1,6 +1,6 @@
 package org.particleframework.context.env;
 
-import org.particleframework.config.PropertyResolver;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.ServiceLocator;
 import org.particleframework.core.convert.ConversionService;
@@ -16,10 +16,7 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
-
-import static java.util.stream.Stream.builder;
 
 /**
  * The current application environment

@@ -15,6 +15,8 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.value.OptionalValues;
+
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
@@ -156,7 +158,7 @@ public class MediaType implements CharSequence {
     protected final String subtype;
     protected final String type;
     protected final String extension;
-    protected final Map<String, String> parameters;
+    protected final Map<CharSequence, String> parameters;
 
     private BigDecimal qualityNumberField;
 
@@ -275,8 +277,8 @@ public class MediaType implements CharSequence {
     /**
      * @return The parameters to the media type
      */
-    public Map<String, String> getParameters() {
-        return Collections.unmodifiableMap(parameters);
+    public OptionalValues<String> getParameters() {
+        return OptionalValues.of(String.class, parameters);
     }
 
     /**

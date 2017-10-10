@@ -1,6 +1,6 @@
 package org.particleframework.context.env.groovy;
 
-import org.particleframework.config.ConfigurationException;
+import org.particleframework.core.value.ValueException;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.context.env.PropertySource;
@@ -49,10 +49,10 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
                     }
                 }
                 catch (IOException e){
-                    throw new ConfigurationException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
+                    throw new ValueException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
                 }
                 catch (Throwable e) {
-                    throw new ConfigurationException("Exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
+                    throw new ValueException("Exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
                 }
             }
 

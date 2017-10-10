@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.context.scope;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+package org.particleframework.inject;
 
 /**
- * A {@link org.particleframework.context.scope.CustomScope} that stores objects in thread local storage
+ * Marks a bean definition that is delegating to another definition.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@ScopedProxy
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface ThreadLocal {
+public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
+
+    /**
+     * @return The target definition
+     */
+    BeanDefinition<T> getTarget();
 }
