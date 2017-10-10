@@ -15,8 +15,14 @@
  */
 package org.particleframework.http.util;
 
+import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
+import java.util.Optional;
 
 /**
  * Utility methods for HTTP handling
@@ -35,5 +41,35 @@ public class HttpUtil {
     public static boolean isFormData(HttpRequest request) {
         MediaType contentType = request.getContentType();
         return contentType != null && (contentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+    }
+
+    /**
+     * Resolve the {@link Charset} to use for the request
+     *
+     * @param request The request
+     * @return An {@link Optional} of {@link Charset}
+     */
+    public static Optional<Charset> resolveCharset(HttpRequest request) {
+        try {
+            MediaType contentType = request.getContentType();
+            Optional<Charset> optional = Optional.empty();
+            if(contentType != null) {
+                optional = contentType
+                        .getParameters()
+                        .get(MediaType.CHARSET_PARAMETER)
+                        .map(Charset::forName);
+            }
+            if(optional.isPresent()) {
+                return optional;
+            }
+            else {
+                return request
+                            .getHeaders()
+                            .findFirst(HttpHeaders.ACCEPT_CHARSET)
+                            .map(Charset::forName);
+            }
+        } catch (UnsupportedCharsetException e) {
+            return Optional.empty();
+        }
     }
 }

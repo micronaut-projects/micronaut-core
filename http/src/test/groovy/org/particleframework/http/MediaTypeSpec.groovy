@@ -15,6 +15,7 @@
  */
 package org.particleframework.http
 
+import org.particleframework.core.value.OptionalValues
 import spock.lang.Specification
 
 /**
@@ -31,7 +32,7 @@ class MediaTypeSpec extends Specification {
         mediaType.toString() == fullName
         mediaType.name == expectedName
         mediaType.extension == expectedExt
-        mediaType.parameters == expectedParams
+        mediaType.parameters == OptionalValues.of(String,expectedParams)
         mediaType.qualityAsNumber == quality
         mediaType.subtype == subtype
         mediaType.type == type

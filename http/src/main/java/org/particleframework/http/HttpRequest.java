@@ -1,6 +1,7 @@
 package org.particleframework.http;
 
 import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.util.HttpUtil;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -77,20 +78,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The request character encoding
      */
     default Charset getCharacterEncoding() {
-        MediaType contentType = getContentType();
-        String charset = contentType != null ? contentType.getParameters().get(MediaType.CHARSET_PARAMETER) : null;
-        try {
-            if(charset != null) {
-                return Charset.forName(charset);
-            }
-            else {
-                return getHeaders().findFirst(HttpHeaders.ACCEPT_CHARSET)
-                            .map(Charset::forName)
-                            .orElse(StandardCharsets.UTF_8);
-            }
-        } catch (UnsupportedCharsetException e) {
-            return StandardCharsets.UTF_8;
-        }
+        return HttpUtil.resolveCharset(this).orElse(null);
     }
 
 }

@@ -15,33 +15,35 @@
  */
 package org.particleframework.core.value;
 
-import org.particleframework.core.convert.ConversionService;
-
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * A simple map based implementation of the {@link ValueResolver} interface
+ * Default implementation of {@link OptionalValues}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class MapValueResolver implements ValueResolver {
-    final Map<CharSequence, ?> map;
+class MapOptionalValues<T> implements OptionalValues<T> {
+    private final Class<?> type;
+    private final Map<CharSequence, ?> values;
+    private final ValueResolver resolver;
 
-    MapValueResolver(Map<CharSequence, ?> map) {
-        this.map = map;
+    public MapOptionalValues(Class<?> type, Map<CharSequence, ?> values) {
+        this.type = type;
+        this.values = values;
+        this.resolver = ValueResolver.of(values);
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        Object v = map.get(name);
-        if(v == null) return Optional.empty();
+    public Optional<T> get(CharSequence name) {
+        return resolver.get(name, (Class)type);
+    }
 
-        if(requiredType.isInstance(v)) {
-            return Optional.of((T) v);
-        }
-        return ConversionService.SHARED.convert(v, requiredType);
+    @Override
+    public Iterator<CharSequence> iterator() {
+        return values.keySet().iterator();
     }
 
     @Override
@@ -49,13 +51,13 @@ class MapValueResolver implements ValueResolver {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        MapValueResolver that = (MapValueResolver) o;
+        MapOptionalValues that = (MapOptionalValues) o;
 
-        return map.equals(that.map);
+        return values.equals(that.values);
     }
 
     @Override
     public int hashCode() {
-        return map.hashCode();
+        return values.hashCode();
     }
 }

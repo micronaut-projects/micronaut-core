@@ -52,6 +52,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private final URI uri;
     private final NettyHttpRequestHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
+    private final HttpServerConfiguration serverConfiguration;
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
     private Locale locale;
@@ -59,6 +60,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private List<ByteBuf> receivedContent  = new ArrayList<>();
     private Object body;
     private MediaType mediaType;
+    private Charset charset;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
 
@@ -69,6 +71,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
                             HttpServerConfiguration serverConfiguration) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(conversionService, "ConversionService cannot be null");
+        this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
@@ -91,8 +94,25 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return channelHandlerContext;
     }
 
+    /**
+     * @return The received content as an array of {@link ByteBuf}
+     */
     public ByteBuf[] getReceivedContent() {
         return receivedContent.toArray(new ByteBuf[receivedContent.size()]);
+    }
+
+    @Override
+    public Charset getCharacterEncoding() {
+        Charset charset = this.charset;
+        if (charset == null) {
+            synchronized (this) { // double check
+                charset = this.charset;
+                if (charset == null) {
+                    this.charset = charset = initCharset();
+                }
+            }
+        }
+        return charset;
     }
 
     @Override
@@ -217,7 +237,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         this.body = body;
     }
 
-
     /**
      * @return Obtains the matched route
      */
@@ -225,6 +244,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     public RouteMatch<Object> getMatchedRoute() {
         return matchedRoute;
     }
+
 
     @Internal
     void addContent(HttpContent httpContent) {
@@ -237,6 +257,34 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         } else {
             receivedContent.add(byteBuf);
         }
+    }
+
+    @Internal
+    void setMatchedRoute(RouteMatch<Object> matchedRoute) {
+        this.matchedRoute = matchedRoute;
+    }
+
+
+    @Internal
+    void setBodyRequired(boolean bodyRequired) {
+        this.bodyRequired = bodyRequired;
+    }
+
+
+
+    @Internal
+    boolean isBodyRequired() {
+        return bodyRequired || org.particleframework.http.util.HttpUtil.isFormData(this);
+    }
+
+    @Internal
+    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
+        NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
+        parameters.setPostRequestDecoder(postRequestDecoder);
+    }
+
+    public static NettyHttpRequest lookup(ChannelHandlerContext ctx) {
+        return ctx.channel().attr(NettyHttpRequest.KEY).get();
     }
 
     private URI decodePath(String uri) {
@@ -254,31 +302,8 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
-
-    @Internal
-    void setMatchedRoute(RouteMatch<Object> matchedRoute) {
-        this.matchedRoute = matchedRoute;
-    }
-
-
-
-    @Internal
-    void setBodyRequired(boolean bodyRequired) {
-        this.bodyRequired = bodyRequired;
-    }
-
-    @Internal
-    boolean isBodyRequired() {
-        return bodyRequired || org.particleframework.http.util.HttpUtil.isFormData(this);
-    }
-
-    @Internal
-    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
-        NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
-        parameters.setPostRequestDecoder(postRequestDecoder);
-    }
-
-    public static NettyHttpRequest lookup(ChannelHandlerContext ctx) {
-        return ctx.channel().attr(NettyHttpRequest.KEY).get();
+    private Charset initCharset() {
+        Charset characterEncoding = HttpRequest.super.getCharacterEncoding();
+        return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
 }
