@@ -15,11 +15,11 @@
  */
 package example
 
-import grails.gorm.transactions.ReadOnly
 import grails.gorm.transactions.Transactional
 import org.particleframework.stereotype.Controller
 
 import javax.annotation.PostConstruct
+import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
@@ -30,14 +30,16 @@ import javax.inject.Singleton
 @Singleton
 class BookController {
 
-    @ReadOnly
+    @Inject
+    BookService bookService
+
     List<Book> index() {
-        Book.list()
+        bookService.list()
     }
 
     @Transactional
     @PostConstruct
     void setup() {
-        new Book(title: "The Stand").save()
+        bookService.save 'The Stand'
     }
 }
