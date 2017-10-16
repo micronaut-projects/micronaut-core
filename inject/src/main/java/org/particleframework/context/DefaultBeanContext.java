@@ -18,6 +18,7 @@ package org.particleframework.context;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
@@ -1047,9 +1048,18 @@ public class DefaultBeanContext implements BeanContext {
         BeanKey createdBeanKey = new BeanKey(createdType, qualifier);
         Optional<Annotation> qualifierAnn = beanDefinition.findAnnotationWithStereoType(javax.inject.Qualifier.class);
         if(qualifierAnn.isPresent()) {
-            BeanKey qualifierKey = new BeanKey(createdType, Qualifiers.byAnnotation(qualifierAnn.get()));
-            if(!qualifierKey.equals(createdBeanKey)) {
-                singletonObjects.put(qualifierKey, registration);
+
+            Annotation annotation = qualifierAnn.get();
+            if(annotation.annotationType() == Primary.class) {
+                BeanKey primaryBeanKey = new BeanKey(beanType, null);
+                singletonObjects.put(primaryBeanKey, registration);
+            }
+            else {
+
+                BeanKey qualifierKey = new BeanKey(createdType, Qualifiers.byAnnotation(annotation));
+                if(!qualifierKey.equals(createdBeanKey)) {
+                    singletonObjects.put(qualifierKey, registration);
+                }
             }
         }
         else {
