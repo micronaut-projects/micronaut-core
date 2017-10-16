@@ -26,7 +26,6 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ForEachSpec extends Specification {
-    @Ignore
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -94,7 +93,6 @@ class ForEachSpec extends Specification {
 
     }
 
-    @Ignore
     void "test configuration properties binding by bean type"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -164,7 +162,6 @@ class ForEachSpec extends Specification {
     }
 
 
-    @Ignore
     void "test configuration properties binding by bean type with primary"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")

@@ -1,5 +1,6 @@
 package org.particleframework.inject.foreach;
 
+import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.ForEach;
 
 import java.net.URL;
@@ -32,7 +33,8 @@ public class MyConfiguration {
         return defaultPort;
     }
 
-    static class Inner {
+    @ConfigurationProperties("inner")
+    public static class Inner {
         String enabled;
 
         public String getEnabled() {
