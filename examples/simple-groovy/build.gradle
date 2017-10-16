@@ -16,7 +16,7 @@ repositories {
 dependencies {
     Properties props = new Properties()
     new File("../../gradle.properties").withReader { props.load(it) }
-    compileOnly "org.particleframework:ast:${props.projectVersion}"
+    compileOnly "org.particleframework:inject-groovy:${props.projectVersion}"
     compile "org.codehaus.groovy:groovy:$props.groovyVersion"
     compile "org.particleframework:http-server-netty:${props.projectVersion}"
     compile "org.particleframework.configuration:jackson:${props.projectVersion}"

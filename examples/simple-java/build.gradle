@@ -15,7 +15,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    compileOnly "org.particleframework:java-inject:${projectVersion}"
+    compileOnly "org.particleframework:inject-java:${projectVersion}"
     compile "org.particleframework:http-server-netty:${projectVersion}"
     compile "org.particleframework.configuration:jackson:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"

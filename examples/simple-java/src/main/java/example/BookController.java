@@ -18,6 +18,7 @@ package example;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Get;
 
+import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 
@@ -26,6 +27,7 @@ import java.util.List;
  * @since 1.0
  */
 @Controller
+@Singleton
 public class BookController {
 
     @Get
