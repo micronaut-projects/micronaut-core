@@ -476,7 +476,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType) {
-        return getBean(resolutionContext, beanType, null);
+        return getBeanInternal(resolutionContext, beanType, null, true, true);
     }
 
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
@@ -781,7 +781,11 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> T getBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
+    private <T> T getBeanForDefinition(
+            BeanResolutionContext resolutionContext,
+            Class<T> beanType, Qualifier<T> qualifier,
+            boolean throwNoSuchBean,
+            BeanDefinition<T> definition) {
         if (definition.isSingleton()) {
             return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
         } else {
@@ -1221,7 +1225,16 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> void addCandidateToList(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<T> candidate, Collection<T> beansOfTypeList, Qualifier<T> qualifier, boolean singleCandidate) {
-        T bean = getBeanForDefinition(resolutionContext, beanType, qualifier, false, candidate);
+        T bean;
+        if (candidate.isSingleton()) {
+            synchronized (singletonObjects) {
+                bean = doCreateBean(resolutionContext, candidate, qualifier, true, null);
+                registerSingletonBean(candidate, beanType, bean, qualifier, singleCandidate);
+            }
+        } else {
+            bean = getScopedBeanForDefinition(resolutionContext, beanType, qualifier, true, candidate);
+        }
+
         beansOfTypeList.add(bean);
     }
 

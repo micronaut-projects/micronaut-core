@@ -8,11 +8,10 @@ import spock.lang.Specification
  */
 class PrimarySpec extends Specification {
 
-//    @Ignore
     void "test the @Primary annotation influences bean selection"() {
 
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        BeanContext context = BeanContext.run()
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
