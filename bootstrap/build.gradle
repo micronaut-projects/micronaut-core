@@ -4,8 +4,8 @@ dependencies {
     compile project(":aop")
     compile 'javax.validation:validation-api:2.0.0.Final'
 
-    compileOnly project(":java-inject")
-    testCompile project(":java-inject")
-    testCompile project(":ast")
+    compileOnly project(":inject-java")
+    testCompile project(":inject-java")
+    testCompile project(":inject-groovy")
     testCompile "org.grails:grails-datastore-gorm:6.1.7.RELEASE"
 }

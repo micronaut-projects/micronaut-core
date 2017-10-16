@@ -5,15 +5,15 @@ dependencies {
 
 
 
-    compileOnly project(":ast")
-    compileOnly project(":java-inject")
+    compileOnly project(":inject-groovy")
+    compileOnly project(":inject-java")
 
     compile 'com.typesafe.netty:netty-reactive-streams-http:2.0.0'
     compile "io.netty:netty-codec-http:$nettyVersion"
 
     testCompile project(":configurations/jackson")
-    testCompile project(":ast")
-    testCompile project(":java-inject")
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
     testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
 

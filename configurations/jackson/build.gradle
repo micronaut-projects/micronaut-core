@@ -5,7 +5,7 @@ dependencies {
     compile 'com.fasterxml.jackson.datatype:jackson-datatype-jsr353:2.9.0'
 
     compileOnly project(":http-server-netty")
-    compileOnly project(":java-inject")
+    compileOnly project(":inject-java")
 
     testRuntime project(":http-server-netty")
 }

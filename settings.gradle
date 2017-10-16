@@ -1,10 +1,10 @@
 rootProject.name = 'particle'
 
-include "ast"
+include "aop"
 include "core"
 include "inject"
-include "java-inject"
-include "aop"
+include "inject-java"
+include "inject-groovy"
 include "spring"
 include "http"
 include "router"
