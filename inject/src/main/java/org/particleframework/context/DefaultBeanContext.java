@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -286,7 +301,12 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> T getBean(Class<T> beanType, Qualifier<T> qualifier) {
-        return getBean(null, beanType, qualifier);
+        return getBeanInternal(null, beanType, qualifier, true, true);
+    }
+
+    @Override
+    public <T> T getBean(Class<T> beanType) {
+        return getBeanInternal(null, beanType, null, true, true);
     }
 
     @Override
@@ -460,10 +480,6 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        // allow injection the bean context
-        if (thisInterfaces.contains(beanType)) {
-            return (T) this;
-        }
         return getBeanInternal(resolutionContext, beanType, qualifier, true, true);
     }
 
@@ -720,6 +736,11 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> T getBeanInternal(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, boolean throwNoSuchBean) {
+        // allow injection the bean context
+        if (thisInterfaces.contains(beanType)) {
+            return (T) this;
+        }
+
         BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
         if (beanRegistration != null) {
             if(LOG.isDebugEnabled()) {

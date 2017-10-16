@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.annotation.processing;
 
 import org.particleframework.aop.Around;
@@ -10,7 +25,6 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
-import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.inject.writer.*;
@@ -154,9 +168,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 annotationUtils.hasStereotype(beanClassElement, Context.class));
 
             Optional<AnnotationMirror> replacesAnn =
-                    annotationUtils.findAnnotationWithStereotype(beanClassElement, Replaces.class);
+                    annotationUtils.findAnnotationWithStereotypeInHierarchy(beanClassElement, Replaces.class);
 
-            replacesAnn.ifPresent(annotationMirror -> annotationUtils.getAnnotationAttributeValue(annotationMirror, "value")
+            replacesAnn.ifPresent(annotationMirror -> annotationUtils.getAnnotationAttributeValueAsString(annotationMirror, "value")
                        .ifPresent(beanDefinitionClassWriter::setReplaceBeanName));
 
             JavaFileObject beanDefClassFileObject = filer.createClassFile(className);
@@ -191,7 +205,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
 
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE);
-            this.aopSettings = isAopProxyType ? annotationUtils.resolveAttributesOfType(Boolean.class, concreteClass, AROUND_TYPE) : OptionalValues.empty();
+            this.aopSettings = isAopProxyType ? annotationUtils.resolveAttributesOfStereotype(Boolean.class, concreteClass, AROUND_TYPE) : OptionalValues.empty();
             this.isExecutableType = isAopProxyType  || annotationUtils.hasStereotype(concreteClass, Executable.class);
         }
 
@@ -299,7 +313,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if(isAopProxyType) {
                             AnnotationMirror[] mirrors = annotationUtils
-                                    .findAnnotationsWithStereotype(concreteClass, Around.class.getName());
+                                    .findAnnotationsWithStereotypeInHierarchy(concreteClass, Around.class.getName());
                             Object[] interceptorTypes = modelUtils.resolveTypeReferences(mirrors);
                             resolveAopProxyWriter(
                                     beanDefinitionWriter,
@@ -384,7 +398,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         void visitBeanFactoryMethod(ExecutableElement beanMethod) {
-            AnnotationMirror beanAnnotation = annotationUtils.findAnnotationWithStereotype(beanMethod, Bean.class)
+            AnnotationMirror beanAnnotation = annotationUtils.findAnnotationWithStereotypeInHierarchy(beanMethod, Bean.class)
                                                             .orElseThrow(()-> new IllegalStateException("bean annotation cannot be null"));
             TypeMirror returnType = beanMethod.getReturnType();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
@@ -409,12 +423,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             );
 
             if(annotationUtils.hasStereotype(beanMethod,AROUND_TYPE)) {
-                AnnotationMirror[] annotationMirrors = annotationUtils.findAnnotationsWithStereotype(beanMethod, AROUND_TYPE);
+                AnnotationMirror[] annotationMirrors = annotationUtils.findAnnotationsWithStereotypeInHierarchy(beanMethod, AROUND_TYPE);
                 Object[] interceptorTypes = modelUtils.resolveTypeReferences(annotationMirrors);
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
                 ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
-                OptionalValues<Boolean> aopSettings = annotationUtils.resolveAttributesOfType(Boolean.class, beanMethod, AROUND_TYPE);
+                OptionalValues<Boolean> aopSettings = annotationUtils.resolveAttributesOfStereotype(Boolean.class, beanMethod, AROUND_TYPE);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
                 for (CharSequence setting : aopSettings) {
                     Optional<Boolean> entry = aopSettings.get(setting);
@@ -480,7 +494,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }, proxyWriter);
             }
 
-            annotationUtils.getAnnotationAttributeValue(beanAnnotation, "preDestroy")
+            annotationUtils.getAnnotationAttributeValueAsString(beanAnnotation, "preDestroy")
                 .ifPresent(destroyMethodName -> {
                     TypeElement destroyMethodDeclaringClass = (TypeElement)typeUtils.asElement(returnType);
                     beanMethodWriter.visitPreDestroyMethod(
@@ -519,9 +533,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 AnnotationMirror[] mirrors = annotationUtils
-                                                .findAnnotationsWithStereotype(method, Around.class.getName());
+                                                .findAnnotationsWithStereotypeInHierarchy(method, Around.class.getName());
 
-                OptionalValues<Boolean> settings = annotationUtils.resolveAttributesOfType(
+                OptionalValues<Boolean> settings = annotationUtils.resolveAttributesOfStereotype(
                         Boolean.class,
                         method,
                         Around.class.getName()
@@ -696,7 +710,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
 
                 TypeElement declaringClass = modelUtils.classElementFor(variable);
-                Object qualifierRef = annotationUtils.resolveQualifier(variable);
+                String qualifierRef = annotationUtils.resolveQualifier(variable);
 
                 boolean isPrivate = modelUtils.isPrivate(variable);
                 boolean requiresReflection = isPrivate
@@ -745,7 +759,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (!writer.isValidated() && annotationUtils.hasStereotype(field, "javax.validation.Constraint")) {
                     writer.setValidated(true);
                 }
-                Object qualifierRef = annotationUtils.resolveQualifier(field);
+                String qualifierRef = annotationUtils.resolveQualifier(field);
                 Object fieldType = modelUtils.resolveTypeReference(field.asType());
                 Map<String, Object> genericTypes = Collections.emptyMap();
                 TypeKind typeKind = field.asType().getKind();
@@ -812,7 +826,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeMirror providerTypeParam =
                 genericUtils.interfaceGenericTypeFor(typeElement, Provider.class);
             Optional<AnnotationMirror> scopeAnn =
-                annotationUtils.findAnnotationWithStereotype(typeElement, Scope.class);
+                annotationUtils.findAnnotationWithStereotypeInHierarchy(typeElement, Scope.class);
             Optional<AnnotationMirror> singletonAnn =
                 annotationUtils.findAnnotationWithStereotype(typeElement, Singleton.class);
 
@@ -835,16 +849,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private AopProxyWriter createAopWriterFor(TypeElement typeElement) {
             Optional<AnnotationMirror> scopeAnn =
-                    annotationUtils.findAnnotationWithStereotype(typeElement, Scope.class);
+                    annotationUtils.findAnnotationWithStereotypeInHierarchy(typeElement, Scope.class);
             Optional<AnnotationMirror> singletonAnn =
                     annotationUtils.findAnnotationWithStereotype(typeElement, Singleton.class);
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
             AnnotationMirror[] aroundMirrors = annotationUtils
-                    .findAnnotationsWithStereotype(typeElement, Around.class.getName());
+                    .findAnnotationsWithStereotypeInHierarchy(typeElement, Around.class.getName());
             AnnotationMirror[] introductionMirrors = annotationUtils
-                    .findAnnotationsWithStereotype(typeElement, Introduction.class.getName());
+                    .findAnnotationsWithStereotypeInHierarchy(typeElement, Introduction.class.getName());
             AnnotationMirror[] annotationMirrors = ArrayUtils.concat(aroundMirrors, introductionMirrors);
             Object[] interceptorTypes = modelUtils.resolveTypeReferences(annotationMirrors);
 
@@ -862,7 +876,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType) {
             Optional<AnnotationMirror> scopeAnn =
-                    annotationUtils.findAnnotationWithStereotype(method, Scope.class);
+                    annotationUtils.findAnnotationWithStereotypeInHierarchy(method, Scope.class);
             Optional<AnnotationMirror> singletonAnn =
                     annotationUtils.findAnnotationWithStereotype(method, Singleton.class);
 
@@ -900,7 +914,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 String argName = paramElement.getSimpleName().toString();
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
-                Object qualifier = annotationUtils.resolveQualifier(paramElement);
+                String qualifier = annotationUtils.resolveQualifier(paramElement);
                 if (qualifier != null) {
                     params.addQualifierType(argName, qualifier);
                 }
