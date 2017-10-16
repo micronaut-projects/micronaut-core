@@ -210,7 +210,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
-            if(annotationUtils.hasStereotype(concreteClass, ConfigurationProperties.class)) {
+            if(annotationUtils.hasStereotype(concreteClass, ConfigurationReader.class)) {
                 return true;
             }
             else {

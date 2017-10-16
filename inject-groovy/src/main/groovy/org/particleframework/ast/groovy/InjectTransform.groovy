@@ -266,7 +266,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         static boolean isConfigurationProperties(ClassNode targetClassNode) {
-            if( new AnnotationStereoTypeFinder().hasStereoType(targetClassNode, ConfigurationProperties) ) {
+            if( new AnnotationStereoTypeFinder().hasStereoType(targetClassNode, ConfigurationReader) ) {
                 return true
             }
             else {

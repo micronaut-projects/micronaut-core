@@ -2,6 +2,7 @@ package org.particleframework.core.annotation;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
@@ -58,6 +59,35 @@ public class AnnotationUtil {
         }
     };
 
+
+    /**
+     * Find the value of the annotation dynamically
+     *
+     * @param annotation The annotation
+     * @param requiredType The required requiredType
+     * @param attribute The attribute
+     * @param <T> The value requiredType
+     * @return An {@link Optional} of the value if it is present
+     */
+    public static <T> Optional<T> findValueOfType(Annotation annotation, Class<T> requiredType, String attribute) {
+        Class<? extends Annotation> annotationType = annotation.annotationType();
+        Optional<Method> method = ReflectionUtils.getDeclaredMethod(annotationType, attribute);
+        return method.flatMap( m -> ConversionService.SHARED.convert( ReflectionUtils.invokeMethod(annotation, m), requiredType) );
+    }
+
+
+
+    /**
+     * Find the value of the annotation dynamically
+     *
+     * @param annotation The annotation
+     * @param requiredType The required requiredType
+     * @param <T> The value requiredType
+     * @return An {@link Optional} of the value if it is present
+     */
+    public static <T> Optional<T> findValueOfType(Annotation annotation, Class<T> requiredType) {
+        return findValueOfType(annotation, requiredType, "value");
+    }
     /**
      * Finds an annotation on the given class for the given stereotype
      *

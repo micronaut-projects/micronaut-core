@@ -100,6 +100,17 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     protected void registerDefaultConverters() {
+        // String[] -> String
+        addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
+            if(object == null || object.length == 0) return Optional.empty();
+
+            StringJoiner joiner = new StringJoiner("");
+            for (String string : object) {
+                joiner.add(string);
+            }
+            return Optional.of(joiner.toString());
+        });
+
         // CharSequence -> Long for bytes
         addConverter(CharSequence.class, Number.class, new ReadableBytesTypeConverter());
 

@@ -28,6 +28,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
+@ConfigurationReader
 public @interface ConfigurationProperties {
     /**
      * @return The prefix to use to resolve the properties
