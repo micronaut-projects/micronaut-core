@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A simple type safe abstraction over a
+ * A simple type safe abstraction over a map of optional values
  *
  * @author Graeme Rocher
  * @since 1.0

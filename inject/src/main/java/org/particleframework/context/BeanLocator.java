@@ -89,6 +89,15 @@ public interface BeanLocator {
     <T> Collection<T> getBeansOfType(Class<T> beanType);
 
     /**
+     * Get all beans of the given type
+     *
+     * @param beanType The bean type
+     * @param <T> The bean type parameter
+     * @return The found beans
+     */
+    <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier);
+
+    /**
      * Obtain a stream of beans of the given type
      *
      * @param beanType The bean type

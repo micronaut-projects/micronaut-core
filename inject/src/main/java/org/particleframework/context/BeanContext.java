@@ -15,6 +15,8 @@
  */
 package org.particleframework.context;
 
+import org.particleframework.context.event.ApplicationEventPublisher;
+
 import java.util.Map;
 
 /**
@@ -25,7 +27,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, ExecutionHandleLocator, BeanLocator, BeanDefinitionRegistry {
+public interface BeanContext extends LifeCycle<BeanContext>, ServiceLocator, ExecutionHandleLocator, BeanLocator, BeanDefinitionRegistry, ApplicationEventPublisher {
 
     @Override
     <T> BeanContext registerSingleton(Class<T> type, T singleton);
