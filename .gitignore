@@ -7,3 +7,8 @@ out/
 *.db
 *.log
 *.iml
+.classpath
+.factorypath
+bin/
+.settings/
+.project

@@ -798,14 +798,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> Annotation resolveScope(Class<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
-        if(definition instanceof ProxyBeanDefinition) {
-            Optional<BeanDefinition<T>> proxied = findProxiedBeanDefinition(beanType, qualifier);
-            return proxied.map(BeanDefinition::getScope).orElse(definition.getScope());
-        }
-        return definition.getScope();
-
-    }
 
     private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier) {
         T bean = null;
