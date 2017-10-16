@@ -11,7 +11,7 @@ import java.io.IOException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface LifeCycle<T extends LifeCycle> extends Closeable  {
+public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable  {
     /**
      * Starts the lifecyle component
      */
