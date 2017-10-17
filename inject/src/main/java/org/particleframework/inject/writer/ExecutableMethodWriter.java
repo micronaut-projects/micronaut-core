@@ -168,7 +168,7 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
 
         if (hasArgs) {
 
-            // 3rd Argument: Create a call to createMap from generic types
+            // 3rd Argument: Create a call to mapOf from generic types
             pushBuildArgumentsForMethod(
                     generatorAdapter,
                     ga -> ga.getStatic(

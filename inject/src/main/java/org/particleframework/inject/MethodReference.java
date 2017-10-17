@@ -64,4 +64,12 @@ public interface MethodReference extends AnnotationSource {
                 .toArray(Class[]::new);
     }
 
+    /**
+     * @return The argument types
+     */
+    default String[] getArgumentNames() {
+        return Arrays.stream(getArguments())
+                .map(Argument::getName)
+                .toArray(String[]::new);
+    }
 }

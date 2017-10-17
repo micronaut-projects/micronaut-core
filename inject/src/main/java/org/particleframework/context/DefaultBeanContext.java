@@ -270,6 +270,11 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+        if(Object.class == beanType) {
+            // optimization for object resolve
+            return Optional.empty();
+        }
+
         BeanKey beanKey = new BeanKey(beanType, qualifier);
         BeanRegistration reg = singletonObjects.get(beanKey);
         if (reg != null) {
@@ -286,7 +291,7 @@ public class DefaultBeanContext implements BeanContext {
             if (beanCandidates.size() == 1) {
                 return Optional.of(beanCandidates.iterator().next());
             } else {
-                return findConcreteCandidate(beanType, null, true, true, true);
+                return findConcreteCandidate(beanType, null, false, true, true);
             }
         }
     }

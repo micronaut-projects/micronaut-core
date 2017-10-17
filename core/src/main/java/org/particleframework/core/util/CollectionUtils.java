@@ -61,7 +61,7 @@ public class CollectionUtils {
      * @param values The values
      * @return The created map
      */
-    public static Map createMap(Object... values) {
+    public static Map mapOf(Object... values) {
         int len = values.length;
         if(len % 2 != 0) throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
 
@@ -85,5 +85,19 @@ public class CollectionUtils {
             set.add(iterator.next());
         }
         return set;
+    }
+
+    /**
+     * Creates a set of the given objects
+     *
+     * @param objects The objects
+     * @param <T> The type
+     * @return The set
+     */
+    public static <T> Set<T> setOf(T...objects) {
+        if(objects == null || objects.length == 0) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(Arrays.asList(objects));
     }
 }
