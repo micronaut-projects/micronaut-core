@@ -104,7 +104,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
 
     @Override
     public B getTarget() {
-        return null;
+        return target;
     }
 
     @Override

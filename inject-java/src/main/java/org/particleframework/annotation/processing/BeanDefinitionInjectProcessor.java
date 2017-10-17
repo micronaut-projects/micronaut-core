@@ -944,8 +944,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     case DECLARED:
                         DeclaredType declaredType = (DeclaredType) typeMirror;
 
+
                         TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
-                        assert (typeElement != null) : "typeElement cannot be null";
+                        if(typeElement == null) {
+                            typeElement = (TypeElement) declaredType.asElement();
+                        }
 
                         params.addParameter(argName, modelUtils.resolveTypeReference(typeElement));
 

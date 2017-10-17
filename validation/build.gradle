@@ -1,0 +1,10 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":inject")
+    compile project(":aop")
+    compile "javax.validation:validation-api:$validationVersion"
+
+    testCompile project(":inject-java")
+    testRuntime project(":configurations/hibernate-validator")
+}
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

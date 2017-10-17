@@ -14,6 +14,7 @@ include "router"
 include "spring"
 //include "runtime-green-lightning"
 include "test-suite"
+include "validation"
 
 // configurations
 include "configurations/hibernate-validator"

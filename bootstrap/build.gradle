@@ -2,7 +2,7 @@ dependencies {
     compile project(":inject")
     compile project(":http")
     compile project(":aop")
-    compile 'javax.validation:validation-api:2.0.0.Final'
+    compile "javax.validation:validation-api:$validationVersion"
 
     compileOnly project(":inject-java")
     testCompile project(":inject-java")

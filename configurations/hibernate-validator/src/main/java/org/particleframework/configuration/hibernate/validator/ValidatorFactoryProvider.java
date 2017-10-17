@@ -17,6 +17,7 @@ package org.particleframework.configuration.hibernate.validator;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
+import org.particleframework.context.annotation.Value;
 import org.particleframework.context.env.Environment;
 
 import javax.inject.Inject;
@@ -47,6 +48,8 @@ public class ValidatorFactoryProvider {
     @Inject
     protected Optional<ParameterNameProvider> parameterNameProvider = Optional.empty();
 
+    @Value("hibernate.validator.ignoreXmlConfiguration:true")
+    protected boolean ignoreXmlConfiguration = true;
 
     @Singleton
     @Bean
@@ -59,7 +62,9 @@ public class ValidatorFactoryProvider {
         constraintValidatorFactory.ifPresent(validatorConfiguration::constraintValidatorFactory);
         parameterNameProvider.ifPresent(validatorConfiguration::parameterNameProvider);
 
-        validatorConfiguration.ignoreXmlConfiguration();
+        if(ignoreXmlConfiguration) {
+            validatorConfiguration.ignoreXmlConfiguration();
+        }
         environment.ifPresent(env -> {
             Optional<Properties> config = env.getProperty("hibernate.validator", Properties.class);
             config.ifPresent(properties -> {

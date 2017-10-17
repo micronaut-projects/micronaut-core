@@ -1,7 +1,11 @@
 dependencies {
-    compile project(":inject-java")
+    compileOnly project(":inject-java")
+    compile project(":inject")
+    compile project(":validation")
     compile 'org.hibernate:hibernate-validator:5.4.1.Final'
     compileOnly 'org.glassfish.web:el-impl:2.2.1-b05'
+    compileOnly project(":router")
+
     runtime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile project(":inject-groovy")
 }

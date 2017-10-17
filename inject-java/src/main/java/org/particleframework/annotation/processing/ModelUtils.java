@@ -195,7 +195,12 @@ class ModelUtils {
 
     Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
-        return resolveTypeReference(type);
+        if(type != null) {
+            return resolveTypeReference(type);
+        }
+        else {
+            return typeElement.getQualifiedName().toString();
+        }
     }
 
     boolean isObjectClass(TypeElement element) {

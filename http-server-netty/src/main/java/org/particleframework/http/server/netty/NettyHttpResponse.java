@@ -118,11 +118,16 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
+    public NettyHttpResponse replace(ByteBuf body) {
+        this.nettyResponse = this.nettyResponse.replace(body);
+        return this;
+    }
+
     /**
      * Lookup the response from the context
      *
-     * @param ctx The response
-     * @return
+     * @param ctx The context
+     * @return The {@link NettyHttpResponse}
      */
     public static NettyHttpResponse getOrCreate(ChannelHandlerContext ctx) {
         Attribute<NettyHttpResponse> attr = ctx
@@ -136,8 +141,17 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         return nettyHttpResponse;
     }
 
-    public NettyHttpResponse replace(ByteBuf body) {
-        this.nettyResponse = this.nettyResponse.replace(body);
-        return this;
+    /**
+     * Lookup the response from the context
+     *
+     * @param context The context
+     * @return The {@link NettyHttpResponse}
+     */
+    public static Optional<NettyHttpResponse> get(ChannelHandlerContext context) {
+        Attribute<NettyHttpResponse> attr = context
+                .channel()
+                .attr(KEY);
+        NettyHttpResponse res = attr.get();
+        return res == null ? Optional.empty() : Optional.of(res);
     }
 }

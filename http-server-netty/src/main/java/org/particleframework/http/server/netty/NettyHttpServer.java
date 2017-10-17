@@ -492,7 +492,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                     ChannelFuture channelFuture;
                     if (result == null) {
-                        result = context.channel().attr(NettyHttpResponse.KEY).get();
+                        result = NettyHttpResponse.get(context).orElse(null);
                         if (result == null) {
                             result = HttpResponse.ok();
                         }

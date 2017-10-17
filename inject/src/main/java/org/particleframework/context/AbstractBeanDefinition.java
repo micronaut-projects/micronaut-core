@@ -556,9 +556,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
 
     private Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument, Object defaultValue) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushMethodArgumentResolve(this, injectionPoint, argument);
         if (context instanceof ApplicationContext) {
-            BeanResolutionContext.Path path = resolutionContext.getPath();
-            path.pushMethodArgumentResolve(this, injectionPoint, argument);
             // can't use orElseThrow here due to compiler bug
             try {
                 Value valAnn = argument.getAnnotation(Value.class);
@@ -599,6 +599,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 path.pop();
             }
         } else {
+            path.pop();
             throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
         }
     }
@@ -907,48 +908,54 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Internal
     protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint, Object defaultValue) throws Throwable {
-        if (context instanceof PropertyResolver) {
-            Field field = injectionPoint.getField();
-            Value valueAnn = field.getAnnotation(Value.class);
-            Class<?> fieldType = field.getType();
-            if (isInnerConfiguration(fieldType)) {
-                return context.createBean(fieldType);
-            } else {
-                Class<?> beanType = injectionPoint.getDeclaringBean().getType();
-                Class<?> declaringClass = field.getDeclaringClass();
-
-                String valString = resolveValueString(
-                        resolutionContext,
-                        declaringClass,
-                        beanType,
-                        injectionPoint.getName(),
-                        valueAnn
-                );
-                Argument fieldArgument = injectionPoint.asArgument();
-                Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
-                if (!value.isPresent() && fieldType == Optional.class) {
-                    return value;
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        path.pushFieldResolve(this, injectionPoint);
+        try {
+            if (context instanceof PropertyResolver) {
+                Field field = injectionPoint.getField();
+                Value valueAnn = field.getAnnotation(Value.class);
+                Class<?> fieldType = field.getType();
+                if (isInnerConfiguration(fieldType)) {
+                    return context.createBean(fieldType);
                 } else {
-                    if (isConfigurationProperties && valueAnn == null) {
-                        return value.orElseGet(() -> {
-                            String cliOption = resolveCliOption(declaringClass, field.getName());
-                            if (cliOption != null) {
-                                return resolveValue((ApplicationContext) context,
-                                        fieldArgument,
-                                        fieldType,
-                                        cliOption)
-                                        .orElse(defaultValue);
-                            } else {
-                                return defaultValue;
-                            }
-                        });
+                    Class<?> beanType = injectionPoint.getDeclaringBean().getType();
+                    Class<?> declaringClass = field.getDeclaringClass();
+
+                    String valString = resolveValueString(
+                            resolutionContext,
+                            declaringClass,
+                            beanType,
+                            injectionPoint.getName(),
+                            valueAnn
+                    );
+                    Argument fieldArgument = injectionPoint.asArgument();
+                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
+                    if (!value.isPresent() && fieldType == Optional.class) {
+                        return value;
                     } else {
-                        return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
+                        if (isConfigurationProperties && valueAnn == null) {
+                            return value.orElseGet(() -> {
+                                String cliOption = resolveCliOption(declaringClass, field.getName());
+                                if (cliOption != null) {
+                                    return resolveValue((ApplicationContext) context,
+                                            fieldArgument,
+                                            fieldType,
+                                            cliOption)
+                                            .orElse(defaultValue);
+                                } else {
+                                    return defaultValue;
+                                }
+                            });
+                        } else {
+                            return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
+                        }
                     }
                 }
+            } else {
+                throw new DependencyInjectionException(resolutionContext, injectionPoint, "@Value requires a BeanContext that implements PropertyResolver");
             }
-        } else {
-            throw new DependencyInjectionException(resolutionContext, injectionPoint, "@Value requires a BeanContext that implements PropertyResolver");
+        } finally {
+            path.pop();
         }
     }
 
