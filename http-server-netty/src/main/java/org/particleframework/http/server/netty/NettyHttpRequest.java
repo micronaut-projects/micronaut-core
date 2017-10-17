@@ -221,9 +221,16 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
      */
     @Internal
     public void release() {
-        receivedContent.forEach(ByteBuf::release);
+        for (ByteBuf byteBuf : receivedContent) {
+            if(byteBuf.refCnt() != 0) {
+                byteBuf.release();
+            }
+        }
         if(this.body != null && body instanceof ByteBuf) {
-            ((ByteBuf)this.body).release();
+            ByteBuf body = (ByteBuf) this.body;
+            if(body.refCnt() != 0) {
+                body.release();
+            }
         }
     }
 

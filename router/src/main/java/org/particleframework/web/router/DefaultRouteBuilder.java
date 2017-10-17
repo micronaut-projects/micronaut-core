@@ -18,6 +18,8 @@ package org.particleframework.web.router;
 
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.inject.MethodExecutionHandle;
@@ -57,15 +59,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public String resolveUri(Class type) {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
+
+        @Override
+        public String resolveUri(String property) {
+            if( StringUtils.isEmpty(property) ) return "/";
+            if(property.charAt(0) != '/') {
+                return '/' + NameUtils.hyphenate(property, true);
+            }
+            return property;
+        }
     };
 
 
     static final Object NO_VALUE = new Object();
 
 
-    private final ExecutionHandleLocator executionHandleLocator;
-    private final UriNamingStrategy uriNamingStrategy;
-    private final ConversionService<?> conversionService;
+    protected final ExecutionHandleLocator executionHandleLocator;
+    protected final UriNamingStrategy uriNamingStrategy;
+    protected final ConversionService<?> conversionService;
 
     private DefaultUriRoute currentParentRoute = null;
     private List<UriRoute> uriRoutes = new ArrayList<>();

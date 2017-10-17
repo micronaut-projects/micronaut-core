@@ -16,11 +16,11 @@
 package org.particleframework.runtime;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.DefaultApplicationContext;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
+import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.runtime.exceptions.ApplicationStartupException;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -56,7 +56,7 @@ public class ParticleApplication {
     /**
      * @return Run this {@link ParticleApplication}
      */
-    public ApplicationContext run() {
+    public ApplicationContext start() {
         CommandLine commandLine = CommandLine.parse(args);
 
         String environmentToUse = environment == null ? deduceEnvironment() : environment;
@@ -258,6 +258,23 @@ public class ParticleApplication {
     }
 
     /**
+     * Run the application on a Random port
+     *
+     * @return The {@link ApplicationContext}
+     */
+    public static ApplicationContext runOnRandomPort() {
+        return run(new Class[0], "-port", String.valueOf(SocketUtils.findAvailableTcpPort()));
+    }
+
+    /**
+     * Run the application on a Random port
+     * @param properties Any custom properties
+     * @return The {@link ApplicationContext}
+     */
+    public static ApplicationContext runOnRandomPort(Map<String, Object> properties) {
+        return build("-port", String.valueOf(SocketUtils.findAvailableTcpPort())).properties(properties).start();
+    }
+    /**
      * Run the application for the given arguments.
      *
      * @param cls The application class
@@ -279,7 +296,7 @@ public class ParticleApplication {
         return new ParticleApplication()
                 .classes(classes)
                 .args(args)
-                .run();
+                .start();
     }
 
     /**

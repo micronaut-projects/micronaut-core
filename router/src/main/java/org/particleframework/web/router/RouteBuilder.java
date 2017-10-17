@@ -19,6 +19,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.core.naming.conventions.TypeConvention;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.stereotype.Controller;
 
@@ -856,6 +857,20 @@ public interface RouteBuilder {
                 }
             }
             return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
+        }
+
+        /**
+         * Resolve the URI to use for the given type
+         *
+         * @param property The property
+         * @return The URI to use
+         */
+        default String resolveUri(String property) {
+            if( StringUtils.isEmpty(property) ) return "/";
+            if(property.charAt(0) != '/') {
+                return '/' + NameUtils.decapitalize(property);
+            }
+            return property;
         }
 
         /**

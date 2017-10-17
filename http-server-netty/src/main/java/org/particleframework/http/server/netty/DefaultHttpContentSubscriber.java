@@ -60,7 +60,6 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<ByteB
         else {
             addContent(httpContent);
         }
-        httpContent.release();
     }
 
     protected void addContent(HttpContent httpContent) {

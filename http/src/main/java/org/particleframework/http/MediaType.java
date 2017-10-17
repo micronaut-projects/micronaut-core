@@ -346,6 +346,26 @@ public class MediaType implements CharSequence {
         return name.hashCode();
     }
 
+    /**
+     * Create a new {@link MediaType} from the given text
+     *
+     * @param mediaType The text
+     * @return The {@link MediaType}
+     */
+    public static MediaType of(CharSequence mediaType) {
+        return new MediaType(mediaType.toString());
+    }
+
+    /**
+     * Create a new {@link MediaType} from the given text
+     *
+     * @param mediaType The text
+     * @return The {@link MediaType}
+     */
+    public static MediaType[] of(CharSequence... mediaType) {
+        return Arrays.stream(mediaType).map(txt -> new MediaType(txt.toString())).toArray(MediaType[]::new);
+    }
+
     private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {
         BigDecimal bd;
         try {

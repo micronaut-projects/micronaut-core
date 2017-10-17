@@ -1462,6 +1462,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         return false;
     }
+
     private void defineBuilderMethod(Map<String, Object> qualifierTypes) {
         Optional<Object> argumentQualifier = qualifierTypes != null ? qualifierTypes.values().stream().filter(this::isArgumentType).findFirst() : Optional.empty();
         boolean isParametrized = argumentQualifier.isPresent();
@@ -1558,6 +1559,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitBeanDefinitionConstructorInternal(Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
         if (constructorVisitor == null) {
+            Optional<Object> argumentQualifier = qualifierTypes != null ? qualifierTypes.values().stream().filter(this::isArgumentType).findFirst() : Optional.empty();
+            boolean isParametrized = argumentQualifier.isPresent();
+            if(isParametrized) {
+                superType = TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION;
+            }
+
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_CONSTRUCTOR, TYPE_CONSTRUCTOR.getDescriptor(), null, null);
 

@@ -20,6 +20,7 @@ import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.util.Completable;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.context.annotation.Executable;
 
@@ -72,6 +73,10 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
             }
         }
 
+        if(processor instanceof Completable) {
+            ((Completable) processor).complete();
+        }
+
         return processor;
     }
 
@@ -88,6 +93,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         return result;
     }
 
+    // TODO: Performance of this will degrade as application grows, need to alter this to only process classes annotated with @Executable
     private Map<Class<? extends Annotation>, List<ExecutableMethod>> loadExecutableMethods(ApplicationContext applicationContext) {
         Iterable<ExecutableMethod> executableMethods = applicationContext.findServices(ExecutableMethod.class);
         Map<Class<? extends Annotation>, List<ExecutableMethod>> result = new LinkedHashMap<>();

@@ -416,12 +416,15 @@ public class NettyHttpServer implements EmbeddedServer {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Bad request: Unbindable arguments for route: " + route);
             }
-            context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                    .addListener(createCloseListener(request.getNativeRequest()));
+            try {
+                context.writeAndFlush(handleBadRequest(request, binderRegistry))
+                        .addListener(createCloseListener(request.getNativeRequest()));
+            } finally {
+                request.release();
+            }
         } else {
 
             // decorate the execution of the route so that it runs an async executor
-            // TODO: Allow customization of thread pool to execute actions
             route = prepareRouteForExecution(route, request, binderRegistry);
 
             request.setMatchedRoute(route);
@@ -518,6 +521,8 @@ public class NettyHttpServer implements EmbeddedServer {
                     });
                 } catch (Throwable e) {
                     context.pipeline().fireExceptionCaught(e);
+                } finally {
+                    request.release();
                 }
             });
             return null;

@@ -1173,7 +1173,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private String resolveConfigPropertiesValue(Class<?> supertype) {
         Optional<String> value = AnnotationUtil.findAnnotationWithStereoType(supertype, ConfigurationReader.class)
-                .flatMap(ann -> AnnotationUtil.findValueOfType(ann, String.class));
+                .flatMap(ann -> {
+                    Optional<String> val = AnnotationUtil.findValueOfType(ann, String.class);
+                    return val.map(v -> {
+                        Optional<String> prefix = AnnotationUtil.findValueOfType(ann, String.class, "prefix");
+                        return prefix.map(s -> s + '.' + v).orElse(v);
+                    });
+                });
 
         return value.orElseGet(() -> {
                     ForEach ann = supertype.getAnnotation(ForEach.class);

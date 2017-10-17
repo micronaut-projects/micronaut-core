@@ -902,27 +902,29 @@ public class DefaultBeanContext implements BeanContext {
         int size = candidates.size();
         BeanDefinition<T> definition = null;
         if (size > 0) {
-            if (size == 1) {
-                definition = candidates.iterator().next();
-            } else {
-                if (qualifier != null) {
+            if (qualifier != null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
+                }
+                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
+                List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
+                if (beanDefinitionList.isEmpty()) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
+                        LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
                     }
-                    Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
-                    List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
-                    if (beanDefinitionList.isEmpty()) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
-                        }
-                        return null;
-                    }
+                    return Optional.empty();
+                }
 
-                    Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
-                            .filter(BeanDefinition::isPrimary)
-                            .findFirst();
-                    definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
-                } else {
+                Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
+                        .filter(BeanDefinition::isPrimary)
+                        .findFirst();
+                definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
+            } else {
+                if (size == 1) {
+                    definition = candidates.iterator().next();
+                }
+                else {
+
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
                     }

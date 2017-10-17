@@ -36,7 +36,7 @@ abstract class AbstractParticleSpec extends Specification {
                             ParticleApplication.build('-port',String.valueOf(serverPort))
                                                .include(configurationNames() as String[])
                                                .properties(getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName])
-                                               .run()
+                                               .start()
 
     @Shared String server = "http://localhost:$serverPort"
     @Shared OkHttpClient client = new OkHttpClient()
