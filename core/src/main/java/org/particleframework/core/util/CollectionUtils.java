@@ -72,4 +72,18 @@ public class CollectionUtils {
         }
         return answer;
     }
+
+    /**
+     * Convert an {@link Iterator} to a {@link Set}
+     * @param iterator The iterator
+     * @param <T> The type
+     * @return The set
+     */
+    public static <T> Set<T> iteratorToSet(Iterator<T> iterator) {
+        Set<T> set = new HashSet<>();
+        while(iterator.hasNext()) {
+            set.add(iterator.next());
+        }
+        return set;
+    }
 }

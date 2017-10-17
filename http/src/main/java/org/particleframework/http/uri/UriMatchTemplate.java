@@ -162,6 +162,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
 
         @Override
+        public String toString() {
+            return getUri();
+        }
+
+        @Override
         public int hashCode() {
             int result = uri.hashCode();
             result = 31 * result + variables.hashCode();

@@ -19,10 +19,14 @@ import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinde
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
+import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.core.type.Argument;
 
+import java.nio.charset.Charset;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -47,6 +51,17 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         String parameterName = annotation == null ? argument.getName() : annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
+
+        Locale locale = source.getLocale();
+        Charset characterEncoding = source.getCharacterEncoding();
+
+        Optional<T> result = doBind(argument, parameters, parameterName, locale, characterEncoding);
+        if(!result.isPresent() && annotation == null && HttpMethod.requiresRequestBody(source.getMethod())) {
+            Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
+            if(body.isPresent()) {
+                return doBind(argument, body.get(), parameterName, locale, characterEncoding);
+            }
+        }
+        return result;
     }
 }

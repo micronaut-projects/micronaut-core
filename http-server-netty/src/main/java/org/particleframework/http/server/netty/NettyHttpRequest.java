@@ -36,6 +36,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance
@@ -53,16 +54,20 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private final NettyHttpRequestHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
+    private final ConversionService<?> conversionService;
+    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
     private Locale locale;
     private URI path;
     private List<ByteBuf> receivedContent  = new ArrayList<>();
     private Object body;
+
     private MediaType mediaType;
     private Charset charset;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
+    private boolean nonBlockingBinderRegistered;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -72,6 +77,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(conversionService, "ConversionService cannot be null");
         this.serverConfiguration = serverConfiguration;
+        this.conversionService = conversionService;
         this.channelHandlerContext = ctx;
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
@@ -210,10 +216,20 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Override
     public T getBody() {
         Object body = this.body;
-        if(body == null) {
+        if(body == null && !receivedContent.isEmpty()) {
             this.body = body = Unpooled.unmodifiableBuffer(getReceivedContent());
         }
         return (T)body;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T1> Optional<T1> getBody(Class<T1> type) {
+        T body = getBody();
+        if(body == null) {
+            return Optional.empty();
+        }
+        return convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(body, aClass));
     }
 
     /**
@@ -242,6 +258,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Internal
     public void setBody(T body) {
         this.body = body;
+        this.convertedBodies.clear();
     }
 
     /**
@@ -281,13 +298,22 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     @Internal
     boolean isBodyRequired() {
-        return bodyRequired || org.particleframework.http.util.HttpUtil.isFormData(this);
+        return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
     }
 
     @Internal
     void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
         NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
         parameters.setPostRequestDecoder(postRequestDecoder);
+    }
+
+    @Internal
+    void setNonBlockingBinderRegistered(boolean nonBlockingBinderRegistered) {
+        this.nonBlockingBinderRegistered = nonBlockingBinderRegistered;
+    }
+    @Internal
+    boolean isNonBlockingBinderRegistered() {
+        return nonBlockingBinderRegistered;
     }
 
     public static NettyHttpRequest lookup(ChannelHandlerContext ctx) {
@@ -313,4 +339,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         Charset characterEncoding = HttpRequest.super.getCharacterEncoding();
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
+
+
 }

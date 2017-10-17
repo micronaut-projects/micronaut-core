@@ -85,10 +85,14 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
     protected UriTemplate buildUriTemplate(ExecutableMethod<Object, Object> method, String id) {
         UriTemplate template = new UriTemplate(uriNamingStrategy.resolveUri(id));
         for (Argument argument : method.getArguments()) {
-            if(argument.getAnnotations().length == 0 || argument.getAnnotation(Parameter.class) != null) {
+            if(isPathParameter(argument)) {
                 template = template.nest("/{" + argument.getName() + "}");
             }
         }
         return template;
+    }
+
+    protected boolean isPathParameter(Argument argument) {
+        return argument.getAnnotations().length == 0 || argument.getAnnotation(Parameter.class) != null;
     }
 }

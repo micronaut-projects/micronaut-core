@@ -18,6 +18,19 @@ import java.util.concurrent.CompletableFuture
  */
 class JsonBodyBindingSpec extends AbstractParticleSpec {
 
+    void "test parse body into parameters if no @Body specified"() {
+        when:
+        def json = '{"name":"Fred", "age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/params")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Body: Foo(\"Fred\", 10)"
+    }
 
     void  "test simple string-based body parsing"() {
 
@@ -230,6 +243,11 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
     @Controller(produces = org.particleframework.http.MediaType.APPLICATION_JSON)
     static class JsonController {
+
+        @Post
+        String params(String name, int age) {
+            "Body: ${new Foo(name: name, age: age)}"
+        }
 
         @Post
         String string(@Body String text) {

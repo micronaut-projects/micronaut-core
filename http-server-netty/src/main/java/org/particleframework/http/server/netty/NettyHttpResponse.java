@@ -29,6 +29,10 @@ import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * Delegates to Netty's {@link DefaultFullHttpResponse}
  *
@@ -39,17 +43,21 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     public static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
     protected FullHttpResponse nettyResponse;
+    private final ConversionService conversionService;
     final NettyHttpRequestHeaders headers;
     private B body;
+    private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
 
     public NettyHttpResponse(DefaultFullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.conversionService = conversionService;
     }
 
     public NettyHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.conversionService = conversionService;
     }
 
 
@@ -78,6 +86,19 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public B getBody() {
         return body;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T1> Optional<T1> getBody(Class<T1> type) {
+        return convertedBodies.computeIfAbsent(type, aClass -> {
+            B body = getBody();
+            if(body != null) {
+                return conversionService.convert(body, aClass);
+            }
+            return Optional.empty();
+
+        });
     }
 
     @Override

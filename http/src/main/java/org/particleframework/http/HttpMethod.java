@@ -74,4 +74,26 @@ public enum HttpMethod implements CharSequence {
     public CharSequence subSequence(int start, int end) {
         return name().subSequence(start, end);
     }
+
+    /**
+     * Whether the given method requires a request body
+     *
+     * @param method The {@link HttpMethod}
+     * @return True if it does
+     */
+    public static boolean requiresRequestBody(HttpMethod method) {
+        return method != null && (method.equals(POST) || method.equals(PUT) || method.equals(PATCH));
+    }
+
+    /**
+     * Whether the given method allows a request body
+     *
+     * @param method The {@link HttpMethod}
+     * @return True if it does
+     */
+    public static boolean permitsRequestBody(HttpMethod method) {
+        return requiresRequestBody(method)
+                || method.equals(OPTIONS)
+                || method.equals(DELETE);
+    }
 }

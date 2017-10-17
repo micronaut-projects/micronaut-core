@@ -18,7 +18,9 @@ package org.particleframework.management.endpoint.processors;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.uri.UriTemplate;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.management.endpoint.Endpoint;
@@ -52,5 +54,10 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder impl
             POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
                 .accept(MediaType.of(annotation.consumes()));
         });
+    }
+
+    @Override
+    protected boolean isPathParameter(Argument argument) {
+        return argument.getAnnotation(Parameter.class) != null;
     }
 }

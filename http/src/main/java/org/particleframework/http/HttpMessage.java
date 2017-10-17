@@ -16,6 +16,7 @@
 package org.particleframework.http;
 
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Common interface for HTTP messages
@@ -38,6 +39,14 @@ public interface HttpMessage<B> {
      * @return The request body
      */
     B getBody();
+
+    /**
+     * Return the body as the given type
+     * @param type The type of the body
+     * @param <T> The generic type
+     * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
+     */
+    <T> Optional<T> getBody(Class<T> type);
 
     /**
      * @return The locale of the message

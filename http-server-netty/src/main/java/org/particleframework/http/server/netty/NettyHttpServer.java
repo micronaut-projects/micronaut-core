@@ -418,7 +418,7 @@ public class NettyHttpServer implements EmbeddedServer {
             }
             try {
                 context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                        .addListener(createCloseListener(request.getNativeRequest()));
+                        .addListener(ChannelFutureListener.CLOSE);
             } finally {
                 request.release();
             }
@@ -429,7 +429,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
             request.setMatchedRoute(route);
 
-            if (!request.isBodyRequired()) {
+            if ((request.isNonBlockingBinderRegistered() && route.isExecutable()) || !request.isBodyRequired()) {
                 // The request body is not required so simply execute the route
                 route.execute();
             } else {
@@ -487,7 +487,7 @@ public class NettyHttpServer implements EmbeddedServer {
                     try {
                         result = finalRoute.execute();
                     } catch (RoutingException e) {
-                        result = HttpResponse.badRequest();
+                        result = handleBadRequest(request, binderRegistry);
                     }
 
                     ChannelFuture channelFuture;
@@ -508,16 +508,28 @@ public class NettyHttpServer implements EmbeddedServer {
                     }
                     channelFuture = context.writeAndFlush(result);
 
-                    channelFuture.addListener(future -> {
+                    Object finalResult = result;
+                    channelFuture.addListener((ChannelFuture future) -> {
                         if (!future.isSuccess()) {
                             Throwable cause = future.cause();
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error encoding response: " + cause.getMessage(), cause);
                             }
-                            if (context.channel().isWritable()) {
+                            Channel channel = context.channel();
+                            if (channel.isWritable()) {
                                 context.pipeline().fireExceptionCaught(cause);
                             }
+                            else {
+                                channel.close();
+                            }
                         }
+                        else if(finalResult instanceof HttpResponse) {
+                            HttpResponse res = (HttpResponse) finalResult;
+                            if(res.getStatus().getCode() >= 300) {
+                                future.channel().close();
+                            }
+                        }
+
                     });
                 } catch (Throwable e) {
                     context.pipeline().fireExceptionCaught(e);
@@ -560,6 +572,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                             if (bindingResult.isPresent()) {
                                 argumentValues.put(argumentName, bindingResult.get());
+                                request.setNonBlockingBinderRegistered(true);
                             }
 
                         } else {
@@ -576,7 +589,7 @@ public class NettyHttpServer implements EmbeddedServer {
                             argumentValues.put(argumentName, bindingResult);
                         } else if (bindingResult.isPresent()) {
                             argumentValues.put(argumentName, bindingResult.get());
-                        } else if (HttpUtil.isFormData(request)) {
+                        } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
                             argumentValues.put(argumentName, (Supplier<Optional>) () ->
                                     argumentBinder.bind(argument, request)
                             );
