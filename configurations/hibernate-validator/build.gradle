@@ -2,10 +2,12 @@ dependencies {
     compileOnly project(":inject-java")
     compile project(":inject")
     compile project(":validation")
-    compile 'org.hibernate:hibernate-validator:5.4.1.Final'
+    compile 'org.hibernate:hibernate-validator:6.0.2.Final'
     compileOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     compileOnly project(":router")
 
-    runtime 'org.glassfish.web:el-impl:2.2.1-b05'
+    runtime group: 'javax.el', name: 'javax.el-api', version: '3.0.0'
+    runtime 'org.glassfish:javax.el:3.0.1-b08'
     testCompile project(":inject-groovy")
 }
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -4,7 +4,7 @@ plugins {
     id "application"
 }
 mainClassName = "example.Application"
-applicationDefaultJvmArgs = ["-verbose"]
+applicationDefaultJvmArgs = [""]
 jar {
     manifest {
         attributes 'Main-Class': "example.Application"
@@ -19,7 +19,7 @@ dependencies {
     compile "org.particleframework:http-server-netty:${projectVersion}"
     compile "org.particleframework:validation:${projectVersion}"
     compile "org.particleframework.configuration:jackson:${projectVersion}"
-    compile "org.particleframework.configuration:hibernate.validation:${projectVersion}"
+    compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 shadowJar {

@@ -35,12 +35,12 @@ import java.util.List;
 public class BookController {
 
     @Get
-    List<Book> index() {
+    public List<Book> index() {
         return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
     }
 
     @Post("/save")
-    Book saveBook(@NotBlank String title) {
+    public Book saveBook(@NotBlank String title) {
         return new Book(title);
     }
 
