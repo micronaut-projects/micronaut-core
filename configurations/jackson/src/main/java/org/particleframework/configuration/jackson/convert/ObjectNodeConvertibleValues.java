@@ -17,6 +17,7 @@ package org.particleframework.configuration.jackson.convert;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ValueNode;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleValues;
 import org.particleframework.core.util.CollectionUtils;

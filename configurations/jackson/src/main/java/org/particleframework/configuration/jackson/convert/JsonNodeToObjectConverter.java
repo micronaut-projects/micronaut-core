@@ -20,6 +20,7 @@ package org.particleframework.configuration.jackson.convert;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 
@@ -44,7 +45,7 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
     public Optional<Object> convert(JsonNode node, Class<Object> targetType, ConversionContext context) {
 
         try {
-            if(CharSequence.class.isAssignableFrom(targetType)) {
+            if(CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
                 return Optional.of(node.toString());
             }
             else {

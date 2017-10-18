@@ -34,7 +34,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         then:
         client.newCall(
                 request.build()
-        ).execute().body().string() == "Body: Foo(\"Fred\", 10)"
+        ).execute().body().string() == "Body: Foo(Fred, 10)"
     }
 
     void  "test simple string-based body parsing"() {
