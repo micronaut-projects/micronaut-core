@@ -27,7 +27,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Action;
-import org.particleframework.web.router.annotation.Consumes;
+import org.particleframework.http.annotation.Consumes;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
@@ -54,8 +54,8 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
             Controller controllerAnn = optional.get();
 
             Class[] argumentTypes = method.getArgumentTypes();
-            if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[0])) {
-                Class argumentType = argumentTypes[0];
+            if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[argumentTypes.length - 1])) {
+                Class argumentType = argumentTypes[argumentTypes.length-1];
                 ErrorRoute errorRoute = error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
                 errorRoute = (ErrorRoute) processAccepts(controllerAnn, errorRoute);
                 processAccepts(declaringType.getAnnotation(Consumes.class), errorRoute);

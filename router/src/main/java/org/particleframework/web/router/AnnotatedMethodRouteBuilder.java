@@ -20,6 +20,7 @@ import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Consumes;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.*;

@@ -31,7 +31,7 @@ public class StringUtils {
      * @param str The string
      * @return True if is
      */
-    public static boolean isEmpty(@Nullable  String str) {
+    public static boolean isEmpty(@Nullable  CharSequence str) {
         return str == null || str.length() == 0;
     }
 
@@ -42,7 +42,7 @@ public class StringUtils {
      * @param str The string
      * @return True if is
      */
-    public static boolean isNotEmpty(@Nullable  String str) {
+    public static boolean isNotEmpty(@Nullable  CharSequence str) {
         return !isEmpty(str);
     }
 }

@@ -20,7 +20,7 @@ import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.HttpContentSubscriber;
 import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
 import org.particleframework.http.server.netty.NettyHttpRequest;
-import org.particleframework.web.router.annotation.Consumes;
+import org.particleframework.http.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 
 import javax.inject.Singleton;

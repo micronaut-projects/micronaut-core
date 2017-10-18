@@ -45,7 +45,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param body The body
      * @return This response object
      */
-    MutableHttpResponse<B> setBody(B body);
+    MutableHttpResponse<B> body(B body);
 
     /**
      * Sets the response status

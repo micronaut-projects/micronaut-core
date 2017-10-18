@@ -93,18 +93,18 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
 
     @Override
     default Iterator<Map.Entry<String, V>> iterator() {
-        Iterator<String> headerNames = getNames().iterator();
+        Iterator<String> names = getNames().iterator();
         return new Iterator<Map.Entry<String, V>>() {
             @Override
             public boolean hasNext() {
-                return headerNames.hasNext();
+                return names.hasNext();
             }
 
             @Override
             public Map.Entry<String, V> next() {
                 if(!hasNext()) throw new NoSuchElementException();
 
-                String name = headerNames.next();
+                String name = names.next();
                 return new Map.Entry<String, V>() {
                     @Override
                     public String getKey() {
@@ -113,7 +113,7 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
 
                     @Override
                     public V getValue() {
-                        return (V) get(name, getValueType()).orElse(null);
+                        return get(name, getValueType()).orElse(null);
                     }
 
                     @Override

@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.value;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +40,12 @@ class MapOptionalValues<T> implements OptionalValues<T> {
     @Override
     public Optional<T> get(CharSequence name) {
         return resolver.get(name, (Class)type);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<T> values() {
+        return (Collection<T>) values.values();
     }
 
     @Override

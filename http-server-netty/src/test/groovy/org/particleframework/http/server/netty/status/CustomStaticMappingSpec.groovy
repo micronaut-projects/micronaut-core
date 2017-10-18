@@ -9,7 +9,7 @@ import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
-import org.particleframework.web.router.annotation.Consumes
+import org.particleframework.http.annotation.Consumes
 import org.particleframework.web.router.annotation.Error
 import org.particleframework.web.router.annotation.Get
 import org.particleframework.web.router.annotation.Post

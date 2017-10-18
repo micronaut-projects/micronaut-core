@@ -1,21 +1,18 @@
 package org.particleframework.configuration.jackson;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.context.annotation.Type;
+import org.particleframework.core.reflect.GenericTypeUtils;
 
 import javax.inject.Inject;
 import java.text.SimpleDateFormat;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.TimeZone;
+import java.util.*;
 
 /**
  * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}
@@ -27,8 +24,19 @@ import java.util.TimeZone;
 public class ObjectMapperFactory {
 
 
+    public static final String PARTICLE_MODULE = "particle";
+
     @Inject
     protected Module[] jacksonModules = new Module[0];
+
+    @Inject
+    protected JsonSerializer[] serializers = new JsonSerializer[0];
+
+    @Inject
+    protected JsonDeserializer[] deserializers = new JsonDeserializer[0];
+
+    @Inject
+    protected BeanSerializerModifier[] beanSerializerModifiers = new BeanSerializerModifier[0];
 
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}
@@ -44,9 +52,60 @@ public class ObjectMapperFactory {
         ObjectMapper objectMapper = jsonFactory.map(ObjectMapper::new)
                                                .orElseGet(ObjectMapper::new);
 
+        objectMapper.findAndRegisterModules();
         objectMapper.registerModules(jacksonModules);
+        SimpleModule module = new SimpleModule(PARTICLE_MODULE);
+        for (JsonSerializer serializer : serializers) {
+            Class<? extends JsonSerializer> type = serializer.getClass();
+            Type annotation = type.getAnnotation(Type.class);
+            if(annotation != null) {
+                Class[] value = annotation.value();
+                for (Class aClass : value) {
+                    module.addSerializer(aClass, serializer);
+                }
+            }
+            else {
+                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                if(targetType.isPresent()) {
+                    module.addSerializer(targetType.get(), serializer);
+                }
+                else {
+                    module.addSerializer(serializer);
+                }
+            }
+
+        }
+        for (JsonDeserializer deserializer : deserializers) {
+            Class<? extends JsonDeserializer> type = deserializer.getClass();
+            Type annotation = type.getAnnotation(Type.class);
+            if(annotation != null) {
+                Class[] value = annotation.value();
+                for (Class aClass : value) {
+                    module.addDeserializer(aClass, deserializer);
+                }
+            }
+            else {
+                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                if(targetType.isPresent()) {
+                    module.addDeserializer(targetType.get(), deserializer);
+                }
+            }
+        }
+        objectMapper.registerModule(module);
+
+        for (BeanSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
+            objectMapper.setSerializerFactory(
+                    objectMapper.getSerializerFactory().withSerializerModifier(
+                            beanSerializerModifier
+                    ));
+        }
+
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         jacksonConfiguration.ifPresent((configuration)->{
+            Set<JsonInclude.Include> serializationInclusion = configuration.getSerializationInclusion();
+            for (JsonInclude.Include include : serializationInclusion) {
+                objectMapper.setSerializationInclusion(include);
+            }
             String dateFormat = configuration.getDateFormat();
             if(dateFormat != null) {
                 objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));

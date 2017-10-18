@@ -16,12 +16,10 @@
 package org.particleframework.configuration.jackson.server.http;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpResponse;
-import org.particleframework.http.HttpStatus;
-import org.particleframework.http.MediaType;
+import org.particleframework.http.*;
+import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
-import org.particleframework.web.router.annotation.Produces;
+import org.particleframework.http.annotation.Produces;
 
 import javax.inject.Singleton;
 
@@ -37,6 +35,9 @@ public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingExce
     @Override
     public Object handle(HttpRequest request, JsonProcessingException exception) {
         // TODO: Send JSON back with detailed error
-        return HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
+        MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
+        VndError body = new VndError("Invalid JSON: " + exception.getMessage());
+        response.body(body);
+        return response;
     }
 }

@@ -62,7 +62,23 @@ public class GenericTypeUtils {
             ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             if(actualTypeArguments.length == 1) {
-                return Optional.of((Class) actualTypeArguments[0]);
+                Type actualTypeArgument = actualTypeArguments[0];
+                return resolveParameterizedTypeArgument(actualTypeArgument);
+            }
+        }
+        return Optional.empty();
+    }
+
+    protected static Optional<Class> resolveParameterizedTypeArgument(Type actualTypeArgument) {
+        ParameterizedType pt;
+        if(actualTypeArgument instanceof Class)  {
+            return Optional.of((Class) actualTypeArgument);
+        }
+        else if(actualTypeArgument instanceof ParameterizedType) {
+            pt = (ParameterizedType) actualTypeArgument;
+            Type rawType = pt.getRawType();
+            if(rawType instanceof Class) {
+                return Optional.of((Class)rawType);
             }
         }
         return Optional.empty();
@@ -78,19 +94,12 @@ public class GenericTypeUtils {
         Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
         if(genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
-            Type[] actualTypeArguments = pt.getActualTypeArguments();
-            if(actualTypeArguments != null) {
-                typeArguments = new Class[actualTypeArguments.length];
-                for (int i = 0; i < actualTypeArguments.length; i++) {
-                    Type actualTypeArgument = actualTypeArguments[i];
-                    if(actualTypeArgument instanceof Class) {
-                        typeArguments[i] = (Class)actualTypeArgument;
-                    }
-                }
-            }
+            typeArguments = resolveParameterizedType(pt);
         }
         return typeArguments;
     }
+
+
 
 
     /**
@@ -101,17 +110,14 @@ public class GenericTypeUtils {
      */
     public static Optional<Class> resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
-        Class genericClass = null;
         if (genericType instanceof ParameterizedType) {
             Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
             if (typeArguments.length>0) {
                 Type typeArg = typeArguments[0];
-                if(typeArg instanceof Class) {
-                    genericClass = (Class) typeArg;
-                }
+                return resolveParameterizedTypeArgument(typeArg);
             }
         }
-        return genericClass != null ? Optional.of(genericClass) : Optional.empty();
+        return Optional.empty();
     }
 
     /**
@@ -124,19 +130,7 @@ public class GenericTypeUtils {
         Class[] genericClasses = ReflectionUtils.EMPTY_CLASS_ARRAY;
         Type genericType = field != null ? field.getGenericType() : null;
         if (genericType instanceof ParameterizedType) {
-            Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
-            if (typeArguments.length>0) {
-                genericClasses = new Class[typeArguments.length];
-                for (int i = 0; i < typeArguments.length; i++) {
-                    Type typeArgument = typeArguments[i];
-                    if(typeArgument instanceof Class) {
-                        genericClasses[i] = (Class) typeArgument;
-                    }
-                    else {
-                        return ReflectionUtils.EMPTY_CLASS_ARRAY;
-                    }
-                }
-            }
+            return resolveParameterizedType(((ParameterizedType) genericType));
         }
         return genericClasses;
     }
@@ -183,5 +177,25 @@ public class GenericTypeUtils {
             superclass = superType.getGenericSuperclass();
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    private static Class[] resolveParameterizedType(ParameterizedType pt) {
+        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
+        Type[] actualTypeArguments = pt.getActualTypeArguments();
+        if(actualTypeArguments != null && actualTypeArguments.length > 0) {
+            typeArguments = new Class[actualTypeArguments.length];
+            for (int i = 0; i < actualTypeArguments.length; i++) {
+                Type actualTypeArgument = actualTypeArguments[i];
+                Optional<Class> opt = resolveParameterizedTypeArgument(actualTypeArgument);
+                if(opt.isPresent()) {
+                    typeArguments[i] = opt.get();
+                }
+                else {
+                    typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
+                    break;
+                }
+            }
+        }
+        return typeArguments;
     }
 }

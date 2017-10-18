@@ -76,9 +76,6 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
 
             @Override
             public void onError(Throwable t) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error processing JSON body: " + t.getMessage(), t);
-                }
                 error.set(t);
                 ctx.pipeline().fireExceptionCaught(t);
             }
@@ -140,9 +137,6 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
 
     @Override
     public void onError(Throwable t) {
-        if (LOG.isErrorEnabled()) {
-            LOG.error("Error processing JSON body: " + t.getMessage(), t);
-        }
         error.set(t);
         ctx.pipeline().fireExceptionCaught(t);
     }

@@ -77,6 +77,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(HttpHeaders.class, (RequestArgumentBinder<HttpHeaders>) (argument, source) -> Optional.of(source.getHeaders()));
+        byType.put(HttpRequest.class, (RequestArgumentBinder<HttpRequest>) (argument, source) -> Optional.of(source));
         byType.put(HttpParameters.class, (RequestArgumentBinder<HttpParameters>) (argument, source) -> Optional.of(source.getParameters()));
         byType.put(Cookies.class, (RequestArgumentBinder<Cookies>) (argument, source) -> Optional.of(source.getCookies()));
         byType.put(Cookie.class, (RequestArgumentBinder<Cookie>)(argument, source) -> {

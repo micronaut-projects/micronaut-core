@@ -15,10 +15,8 @@
  */
 package org.particleframework.core.value;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.BiConsumer;
 
 /**
  * A simple type safe abstraction over a map of optional values
@@ -42,6 +40,38 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
     Optional<V> get(CharSequence name);
 
     /**
+     * @return The values
+     */
+    Collection<V> values();
+
+    /**
+     * @return Whether the {@link OptionalValues} is empty
+     */
+    default boolean isEmpty() {
+        return values().isEmpty();
+    }
+
+    /**
+     * Performs the given action for each entry in this {@link OptionalValues} until all entries
+     * have been processed or the action throws an exception.   Unless
+     * otherwise specified by the implementing class, actions are performed in
+     * the order of entry set iteration (if an iteration order is specified.)
+     * Exceptions thrown by the action are relayed to the caller.
+     *
+     * @param action The action to be performed for each entry
+     * @throws NullPointerException if the specified action is null
+     * removed during iteration
+     */
+    default void forEach(BiConsumer<CharSequence, ? super V> action) {
+        Objects.requireNonNull(action);
+        for (CharSequence k : this) {
+            get(k).ifPresent(v ->
+                    action.accept(k, v)
+            );
+        }
+    }
+
+    /**
      * An empty {@link OptionalValues}
      *
      * @param <T> The generic type
@@ -61,4 +91,6 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
     static <T> OptionalValues<T> of(Class<T> type, Map<CharSequence, ?> values ) {
         return new MapOptionalValues<>(type, values);
     }
+
+
 }

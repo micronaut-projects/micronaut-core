@@ -136,10 +136,13 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                 if(value instanceof Supplier) {
                     Supplier supplier = (Supplier) value;
                     Object o = supplier.get();
-                    Object fv = value;
-                    o = o instanceof Optional ? ((Optional<?>)o).orElseThrow(()-> new RoutingException("Unable to convert value [" + fv + "] for argument: " + argument)) : o;
+
+                    if(o instanceof Optional) {
+                        o = ((Optional<?>)o).orElseThrow(()-> new RoutingException("Required argument [" + argument + "] not specified"));
+                    }
                     if(o != null) {
                         Optional<?> result = conversionService.convert(o, argument.getType());
+                        Object fv = value;
                         argumentList.add(result.orElseThrow(() -> new RoutingException("Unable to convert value [" + fv + "] for argument: " + argument)));
                     }
                     else {

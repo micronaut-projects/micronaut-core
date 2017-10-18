@@ -59,6 +59,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
             for (int i = 0; i < classes.length; i++) {
                 Class left = classes[i];
                 Class right = typeArguments[i];
+                if(right == Object.class) continue;
                 if(left != right && !left.isAssignableFrom(right)) {
                     return false;
                 }

@@ -59,6 +59,15 @@ public interface HttpResponseFactory {
     <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
 
     /**
+     * Return a response for the given status
+     *
+     * @param status The status
+     * @param body The body
+     * @return The response
+     */
+    <T> MutableHttpResponse<T> status(HttpStatus status, T body);
+
+    /**
      * @return The ok response
      */
     default <T> MutableHttpResponse<T> ok() {

@@ -34,7 +34,14 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
     public <T> MutableHttpResponse<T> ok(T body) {
         MutableHttpResponse<T> ok = new NettyHttpResponse<>(ConversionService.SHARED);
 
-        return body != null ? ok.setBody(body) : ok;
+        return body != null ? ok.body(body) : ok;
+    }
+
+    @Override
+    public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
+        MutableHttpResponse<T> ok = new NettyHttpResponse<>(ConversionService.SHARED);
+        ok.status(status);
+        return body != null ? ok.body(body) : ok;
     }
 
     @Override

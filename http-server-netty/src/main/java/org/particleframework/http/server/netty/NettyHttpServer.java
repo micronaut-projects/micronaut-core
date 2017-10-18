@@ -211,7 +211,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                                         .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
 
                                         ctx.writeAndFlush(unsupportedResult)
-                                                .addListener(createCloseListener(msg));
+                                                .addListener(ChannelFutureListener.CLOSE);
                                     } else {
                                         if (LOG.isDebugEnabled()) {
                                             LOG.debug("Matched route {} - {} to controller {}", nettyHttpRequest.getMethod(), nettyHttpRequest.getPath(), route.getDeclaringType().getName());
@@ -261,10 +261,6 @@ public class NettyHttpServer implements EmbeddedServer {
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
 
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-                                }
-
                                 NettyHttpRequest nettyHttpRequest = ctx.channel().attr(NettyHttpRequest.KEY).get();
 
                                 if (nettyHttpRequest != null) {
@@ -309,6 +305,10 @@ public class NettyHttpServer implements EmbeddedServer {
 
                                 Object errorResponse;
                                 try {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                                    }
+
                                     errorResponse = findStatusRoute(HttpStatus.INTERNAL_SERVER_ERROR, nettyHttpRequest, binderRegistry)
                                             .map(RouteMatch::execute)
                                             .orElse(HttpResponse.serverError());
@@ -465,7 +465,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         LOG.debug("Request body expected, but was empty.");
                     }
                     context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                            .addListener(createCloseListener(nativeRequest));
+                            .addListener(ChannelFutureListener.CLOSE);
 
                 }
             }

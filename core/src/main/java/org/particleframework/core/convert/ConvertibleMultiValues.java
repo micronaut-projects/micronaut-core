@@ -16,6 +16,7 @@
 package org.particleframework.core.convert;
 
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.value.OptionalValues;
 
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -121,5 +122,16 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      */
     default <T> Optional<T> getFirst(CharSequence name, Class<T> requiredType) {
         return get(name, requiredType);
+    }
+
+    /**
+     * Creates a new {@link OptionalValues} for the given type and values
+     *
+     * @param values A map of values
+     * @param <T> The target generic type
+     * @return The values
+     */
+    static <T> ConvertibleMultiValues<T> of( Map<CharSequence, List<T>> values ) {
+        return new ConvertibleMultiValuesMap<>(values);
     }
 }

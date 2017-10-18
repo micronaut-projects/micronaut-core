@@ -1,11 +1,13 @@
 package org.particleframework.configuration.jackson;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.core.util.CollectionUtils;
 
 import java.util.*;
 
@@ -18,14 +20,22 @@ import java.util.*;
 @ConfigurationProperties("jackson")
 public class JacksonConfiguration {
 
-    private String dateFormat;
-    private Locale locale;
-    private TimeZone timeZone;
-    private Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
-    private Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
-    private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
-    private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
-    private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
+    protected String dateFormat;
+    protected Locale locale;
+    protected TimeZone timeZone;
+    protected Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
+    protected Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
+    protected Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
+    protected Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
+    protected Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
+    protected Set<JsonInclude.Include> serializationInclusion = CollectionUtils.setOf(JsonInclude.Include.NON_ABSENT, JsonInclude.Include.NON_EMPTY);
+
+    /**
+     * @return The default serialization inclusion settings
+     */
+    public Set<JsonInclude.Include> getSerializationInclusion() {
+        return serializationInclusion;
+    }
 
     /**
      * @return The default locale to use

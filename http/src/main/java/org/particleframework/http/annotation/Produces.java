@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation;
+package org.particleframework.http.annotation;
 
 import org.particleframework.http.MediaType;
-import org.particleframework.stereotype.Controller;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -26,22 +25,21 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>An annotation to indicate the {@link MediaType}s consumed by a particular component. Typically a {@link org.particleframework.stereotype.Controller}</p>
+ * <p>An annotation to indicate the {@link MediaType}s produced by a particular component. </p>
  *
- * <p>Generally with controllers one can use {@link Controller#consumes()}, however this annotation is more generic and applies
+ * <p>Generally with controllers one can use the {@code produces} attribute of the {@code Controller} annotation, however this annotation is more generic and applies
  * to any component</p>
  *
  * @author Graeme Rocher
  * @since 1.0
- * @see Controller#consumes()
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-public @interface Consumes {
+public @interface Produces {
 
     /**
-     * @return The {@link MediaType} values that this component is able to consume
+     * @return The {@link MediaType} values that this component is able to produce
      */
-    String[] value();
+    String[] value() default MediaType.APPLICATION_JSON;
 }

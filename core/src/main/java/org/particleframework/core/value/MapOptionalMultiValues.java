@@ -13,35 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package example;
+package org.particleframework.core.value;
 
-import org.particleframework.stereotype.Controller;
-import org.particleframework.validation.Validated;
-import org.particleframework.web.router.annotation.Get;
-import org.particleframework.web.router.annotation.Post;
-
-import javax.inject.Singleton;
-import javax.validation.constraints.NotBlank;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
+ * Default implementation of {@link OptionalMultiValues }
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller
-@Singleton
-@Validated
-public class BookController {
-
-    @Get
-    List<Book> index() {
-        return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
+class MapOptionalMultiValues<V> extends MapOptionalValues<List<V>> implements OptionalMultiValues<V> {
+    public MapOptionalMultiValues(Class<?> type, Map<CharSequence, ?> values) {
+        super(type, values);
     }
-
-    @Post("/save")
-    Book saveBook(@NotBlank String title) {
-        return new Book(title);
-    }
-
 }

@@ -25,6 +25,7 @@ import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Produces;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.encoders.ObjectToStringFallbackEncoder;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
@@ -70,6 +71,7 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
             out.add(Event.of((Event)msg, Unpooled.copiedBuffer(bytes)));
         }
         else {
+            Produces produces = msg.getClass().getAnnotation(Produces.class);
             byte[] bytes = objectMapper.writeValueAsBytes(msg);
             ByteBuf content = Unpooled.copiedBuffer(bytes);
             int len = bytes.length;
@@ -79,7 +81,12 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
                         .add(HttpHeaderNames.CONTENT_LENGTH, len);
             }
             if(headers.get(HttpHeaderNames.CONTENT_TYPE) == null) {
-                headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.APPLICATION_JSON_TYPE );
+                if(produces != null && produces.value().length > 0) {
+                    headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.of(produces.value()[0]) );
+                }
+                else {
+                    headers.add(HttpHeaderNames.CONTENT_TYPE, MediaType.APPLICATION_JSON_TYPE );
+                }
             }
             out.add(httpResponse.replace(content));
         }

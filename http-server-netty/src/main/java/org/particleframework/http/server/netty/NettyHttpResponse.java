@@ -113,7 +113,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> setBody(B body) {
+    public MutableHttpResponse<B> body(B body) {
         this.body = body;
         return this;
     }

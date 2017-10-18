@@ -1,12 +1,17 @@
 package org.particleframework.http.server.netty.binding
 
 import com.fasterxml.jackson.core.JsonParseException
+import groovy.json.JsonSlurper
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.http.HttpHeaders
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
+import org.particleframework.http.hateos.Link
+import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Post
@@ -83,6 +88,15 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
         response.message() == "No!! Invalid JSON"
+        response.headers().get(HttpHeaders.CONTENT_TYPE) == org.particleframework.http.MediaType.APPLICATION_VND_ERROR
+
+        when:
+        def result = new JsonSlurper().parseText(response.body().string())
+
+
+        then:
+        result['_links'].self.href == '/json/string'
+        result.message.startsWith('Invalid JSON')
 
     }
 
@@ -308,8 +322,12 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
             })
         }
 
-        HttpResponse jsonError(JsonParseException jsonParseException) {
-            return HttpResponse.status(HttpStatus.BAD_REQUEST,"No!! Invalid JSON")
+        HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
+            def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
+            def error = new VndError("Invalid JSON: ${jsonParseException.message}")
+            error.link(Link.SELF, Link.of(request.getUri()))
+            response.body(error)
+            return response
         }
     }
 

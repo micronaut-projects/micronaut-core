@@ -62,7 +62,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         );
 
         return factory.<T>status(HttpStatus.NOT_FOUND)
-                .setBody(body);
+                .body(body);
     }
 
     /**
@@ -76,6 +76,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         );
 
         return factory.status(HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body
+     *
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> badRequest(T body) {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No Server implementation found on classpath")
+        );
+
+        return  factory.status(HttpStatus.BAD_REQUEST,body);
     }
 
     /**
@@ -179,7 +192,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
         );
 
         return factory.<T>status(HttpStatus.CREATED)
-                .setBody(body);
+                .body(body);
     }
 
     /**

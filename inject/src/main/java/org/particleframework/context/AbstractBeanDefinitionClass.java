@@ -101,7 +101,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     public boolean isEnabled(BeanContext beanContext) {
         if (isPresent()) {
             if(enabled == null) {
-                Requires[] annotations = findAnnotations(Requires.class).stream().toArray(Requires[]::new);
+                Requires[] annotations = findAnnotations(Requires.class).toArray(new Requires[0]);
                 if (annotations.length == 0) {
                     Requirements requirements = getAnnotation(Requirements.class);
                     if (requirements != null) {
@@ -155,10 +155,11 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
 
             try {
                 beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
+                GenericTypeUtils.resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class);
                 present = true;
             } catch (ClassNotFoundException | NoClassDefFoundError e) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
                 }
                 present = false;
             }

@@ -17,7 +17,9 @@ repositories {
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
     compile "org.particleframework:http-server-netty:${projectVersion}"
+    compile "org.particleframework:validation:${projectVersion}"
     compile "org.particleframework.configuration:jackson:${projectVersion}"
+    compile "org.particleframework.configuration:hibernate.validation:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 shadowJar {

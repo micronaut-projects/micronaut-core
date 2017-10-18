@@ -47,9 +47,10 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
     protected void encode(ChannelHandlerContext ctx, HttpResponse msg, List<Object> out) throws Exception {
         NettyHttpResponse res = (NettyHttpResponse) msg;
         FullHttpResponse nativeResponse = res.getNativeResponse();
-                ctx.channel()
-                .attr(NettyHttpResponse.KEY)
-                .set(res);
+
+        ctx.channel()
+            .attr(NettyHttpResponse.KEY)
+            .set(res);
 
         Object body = res.getBody();
         if(body != null) {

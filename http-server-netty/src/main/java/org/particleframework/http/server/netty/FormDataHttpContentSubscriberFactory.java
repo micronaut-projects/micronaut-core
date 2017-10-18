@@ -16,10 +16,9 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
-import org.particleframework.web.router.annotation.Consumes;
+import org.particleframework.http.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 
 import javax.inject.Singleton;

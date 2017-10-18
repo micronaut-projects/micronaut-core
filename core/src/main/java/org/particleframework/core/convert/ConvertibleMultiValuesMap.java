@@ -30,14 +30,28 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     protected final Map<CharSequence, List<V>> values;
     private final ConversionService<?> conversionService;
 
+    /**
+     * Construct an empty {@link ConvertibleValuesMap}
+     */
     public ConvertibleMultiValuesMap() {
         this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
+    /**
+     * Construct a {@link ConvertibleValuesMap} from the given map
+     * @param values The map
+     */
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
         this(values, ConversionService.SHARED);
     }
+
+    /**
+     * Construct a {@link ConvertibleValuesMap} from the given map and conversion service
+     *
+     * @param values The map
+     * @param conversionService The conversion service
+     */
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
-        this.values = values;
+        this.values = Collections.unmodifiableMap(values);
         this.conversionService = conversionService;
     }
 

@@ -19,7 +19,7 @@ import org.particleframework.context.Qualifier;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.MediaType;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.web.router.annotation.Consumes;
+import org.particleframework.http.annotation.Consumes;
 
 import java.util.Arrays;
 import java.util.Set;
