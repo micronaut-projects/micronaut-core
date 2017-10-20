@@ -37,13 +37,13 @@ import java.util.Optional;
 @Singleton
 public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
 
-    private final Map<MediaType, MediaTypeReader> javaTypeMappings;
+    private final Map<String, MediaTypeReader> javaTypeMappings;
     private final ConversionService conversionService;
 
     protected FileUploadConverter(ConversionService conversionService, MediaTypeReader... mediaTypeMappings) {
         this.javaTypeMappings = new LinkedHashMap<>();
         for (MediaTypeReader mediaTypeMapping : mediaTypeMappings) {
-            javaTypeMappings.put(mediaTypeMapping.getMediaType(), mediaTypeMapping);
+            javaTypeMappings.put(mediaTypeMapping.getMediaType().getExtension(), mediaTypeMapping);
         }
         this.conversionService = conversionService;
     }
@@ -58,9 +58,14 @@ public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
                 if (charset == null) {
                     charset = context.getCharset();
                 }
-                MediaTypeReader reader = javaTypeMappings.get(mediaType);
-                Object val = reader.read(targetType, object.getByteBuf(), charset);
-                return Optional.of(val);
+                MediaTypeReader reader = javaTypeMappings.get(mediaType.getExtension());
+                if(reader != null) {
+                    Object val = reader.read(targetType, object.getByteBuf(), charset);
+                    return Optional.of(val);
+                }
+                else {
+                    return conversionService.convert(object.getByteBuf(), targetType, context);
+                }
             }
             return conversionService.convert(object.getByteBuf(), targetType, context);
         } catch (IOException e) {

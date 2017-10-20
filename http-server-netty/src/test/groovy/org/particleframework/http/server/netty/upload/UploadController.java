@@ -31,10 +31,14 @@ import javax.inject.Singleton;
 public class UploadController {
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public String receive(Data data, String title) {
+    public String receiveJson(Data data, String title) {
         return title + ": "  + data.toString();
     }
 
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public String receivePlain(String data, String title) {
+        return title + ": "  + data;
+    }
 
     public static class Data {
         String title;

@@ -6,6 +6,7 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import org.particleframework.http.server.binding.binders.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.netty.DefaultHttpContentSubscriber;
@@ -30,10 +31,12 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
         implements NonBlockingBodyArgumentBinder<CompletableFuture> {
 
     private final BeanLocator beanLocator;
+    private final HttpServerConfiguration httpServerConfiguration;
 
-    public CompletableFutureBodyBinder(BeanLocator beanLocator, ConversionService conversionService) {
+    public CompletableFutureBodyBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration, ConversionService conversionService) {
         super(conversionService);
         this.beanLocator = beanLocator;
+        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     @Override
@@ -59,9 +62,9 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
 
                     subscriber = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
-                                               .orElse(new DefaultHttpContentSubscriber(nettyHttpRequest));
+                                               .orElse(new DefaultHttpContentSubscriber(nettyHttpRequest, httpServerConfiguration ));
                 } else {
-                    subscriber = new DefaultHttpContentSubscriber(nettyHttpRequest);
+                    subscriber = new DefaultHttpContentSubscriber(nettyHttpRequest, httpServerConfiguration);
 
                 }
                 subscriber.onComplete((body) -> {

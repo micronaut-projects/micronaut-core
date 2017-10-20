@@ -452,7 +452,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         }
                     } else {
-                        Subscriber<ByteBufHolder> contentSubscriber = new DefaultHttpContentSubscriber(request);
+                        Subscriber<ByteBufHolder> contentSubscriber = new DefaultHttpContentSubscriber(request, serverConfiguration);
                         streamedHttpRequest.subscribe(contentSubscriber);
                     }
 

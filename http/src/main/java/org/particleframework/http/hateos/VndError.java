@@ -81,5 +81,16 @@ public class VndError extends AbstractResource<VndError> {
         return this;
     }
 
-
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        if(logref != null) {
+            builder.append('[').append(logref).append("] ");
+        }
+        if(path != null) {
+            builder.append(' ').append(path).append(" - ");
+        }
+        builder.append(message);
+        return builder.toString();
+    }
 }

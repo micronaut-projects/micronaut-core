@@ -3,13 +3,16 @@ package org.particleframework.http.server.netty;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -22,14 +25,16 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     protected final NettyHttpRequest nettyHttpRequest;
     protected final ChannelHandlerContext ctx;
+    protected final HttpServerConfiguration configuration;
     protected final long advertisedLength;
     protected Subscription subscription;
-    protected long receivedLength;
+    protected AtomicLong receivedLength = new AtomicLong();
     protected Throwable error;
     protected Consumer<Object> completionHandler;
 
-    public DefaultHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest) {
+    public DefaultHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
+        this.configuration = configuration;
         this.ctx = nettyHttpRequest.getChannelHandlerContext();
         this.advertisedLength = nettyHttpRequest.getContentLength();
         this.completionHandler = ( body -> {
@@ -48,17 +53,35 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
 
     @Override
     public void onNext(ByteBufHolder httpContent) {
-        receivedLength += httpContent.content().readableBytes();
+        long receivedLength = this.receivedLength.addAndGet(httpContent.content().readableBytes());
 
-        if(advertisedLength != -1 && receivedLength > advertisedLength) {
-            if(subscription != null) {
-                subscription.cancel();
-            }
-            onError(new ContentLengthExceededException(advertisedLength, receivedLength));
+        if((advertisedLength != -1 && receivedLength > advertisedLength)) {
+            fireExceedsLength(receivedLength, this.advertisedLength);
         }
         else {
-            addContent(httpContent);
+            long serverMax = configuration.getMultipart().getMaxFileSize();
+            if( receivedLength > serverMax ) {
+                fireExceedsLength(receivedLength, serverMax);
+            }
+            else {
+                addContent(httpContent);
+            }
         }
+    }
+
+    protected void fireExceedsLength(long receivedLength, long expected) {
+        ContentLengthExceededException exception = new ContentLengthExceededException(expected, receivedLength);
+        fireException(exception);
+    }
+
+    protected void fireException(Throwable exception) {
+        this.error = exception;
+        if(subscription != null) {
+            subscription.cancel();
+        }
+        ChannelPipeline pipeline = ctx.pipeline();
+        pipeline.remove("http-streams-codec-body-publisher");
+        pipeline.fireExceptionCaught(exception);
     }
 
     protected void addContent(ByteBufHolder httpContent) {
@@ -70,9 +93,7 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
         if (LOG.isDebugEnabled()) {
             LOG.debug("Error processing Request body: " + t.getMessage(), t);
         }
-        error = t;
-        subscription.cancel();
-        ctx.pipeline().fireExceptionCaught(t);
+        fireException(t);
     }
 
     @Override

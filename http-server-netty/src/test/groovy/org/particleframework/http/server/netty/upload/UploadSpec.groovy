@@ -31,7 +31,7 @@ import spock.lang.Specification
  */
 class UploadSpec extends AbstractParticleSpec {
 
-    void "test simple in-memory file upload"() {
+    void "test simple in-memory file upload with JSON"() {
         given:
         RequestBody requestBody = new MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
@@ -41,7 +41,7 @@ class UploadSpec extends AbstractParticleSpec {
 
         when:
         def request = new Request.Builder()
-                .url("$server/upload/receive")
+                .url("$server/upload/receiveJson")
                 .post(requestBody)
         def response = client.newCall(
                 request.build()
@@ -50,6 +50,50 @@ class UploadSpec extends AbstractParticleSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.body().string() == 'bar: Data{title=\'Foo\'}'
+
+    }
+
+    void "test simple in-memory file upload "() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data'))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == 'bar: some data'
+
+    }
+
+    void "test simple in-memory file upload exceeds size"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data' * 10000))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePlain")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.REQUEST_ENTITY_TOO_LARGE.code
+        response.message() =='Request Entity Too Large'
 
     }
 }

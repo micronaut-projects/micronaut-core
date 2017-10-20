@@ -36,7 +36,7 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
     private final boolean enabled;
 
     public FormDataHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
-        super(nettyHttpRequest);
+        super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
         factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
@@ -53,11 +53,12 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
     @Override
     protected void addContent(ByteBufHolder holder) {
         if(holder instanceof HttpContent) {
-            decoder.offer((HttpContent) holder);
             try {
+                HttpContent httpContent = (HttpContent) holder;
+                decoder.offer(httpContent);
                 nettyHttpRequest.offer(decoder);
             } catch (Exception e) {
-                onError(e);
+                fireException(e);
             } finally {
                 holder.release();
             }

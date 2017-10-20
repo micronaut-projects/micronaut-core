@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.exceptions;
 
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
@@ -29,6 +30,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
+@Primary
 public class ContentLengthExceededHandler implements ExceptionHandler<ContentLengthExceededException, Object>{
     @Override
     public Object handle(HttpRequest request, ContentLengthExceededException exception) {
