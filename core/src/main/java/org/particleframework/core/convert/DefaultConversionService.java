@@ -2,8 +2,9 @@ package org.particleframework.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.sun.javafx.scene.control.behavior.OptionalBoolean;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.convert.format.Format;
+import org.particleframework.core.convert.format.FormattingTypeConverter;
 import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -12,7 +13,6 @@ import org.particleframework.core.util.CollectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.MalformedURLException;
@@ -32,7 +32,6 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The default conversion service. Handles basic type conversion operations.

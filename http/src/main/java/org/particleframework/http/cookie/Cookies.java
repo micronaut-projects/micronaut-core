@@ -15,7 +15,7 @@
  */
 package org.particleframework.http.cookie;
 
-import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 
 import java.util.Optional;
 import java.util.Set;

@@ -15,7 +15,7 @@
  */
 package org.particleframework.aop;
 
-import org.particleframework.core.convert.MutableConvertibleValues;
+import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.ArgumentValue;
 import org.particleframework.core.type.Executable;
 import org.particleframework.core.type.MutableArgumentValue;

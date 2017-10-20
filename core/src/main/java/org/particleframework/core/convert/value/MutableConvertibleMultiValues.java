@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.convert;
+package org.particleframework.core.convert.value;
 
 import java.util.List;
 

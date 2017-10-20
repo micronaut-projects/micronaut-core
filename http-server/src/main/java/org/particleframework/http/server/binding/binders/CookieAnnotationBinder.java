@@ -19,7 +19,7 @@ import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinde
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.annotation.Cookie;

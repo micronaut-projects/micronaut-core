@@ -16,8 +16,8 @@
 package org.particleframework.aop.internal;
 
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.MutableConvertibleValues;
-import org.particleframework.core.convert.MutableConvertibleValuesMap;
+import org.particleframework.core.convert.value.MutableConvertibleValues;
+import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 
 import java.util.Arrays;
 import java.util.Map;

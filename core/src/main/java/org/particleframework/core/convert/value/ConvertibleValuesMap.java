@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.convert;
+package org.particleframework.core.convert.value;
 
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
 
 import java.util.LinkedHashMap;

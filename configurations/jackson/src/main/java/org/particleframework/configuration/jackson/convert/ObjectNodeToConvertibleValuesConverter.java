@@ -18,7 +18,7 @@ package org.particleframework.configuration.jackson.convert;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.TypeConverter;
 
 import javax.inject.Singleton;

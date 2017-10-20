@@ -17,7 +17,6 @@ package org.particleframework.core.convert.format;
 
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.FormattingTypeConverter;
 
 import java.util.Locale;
 import java.util.Optional;

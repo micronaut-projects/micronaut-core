@@ -16,6 +16,7 @@
 package org.particleframework.core.bind;
 
 import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
@@ -27,13 +28,13 @@ import java.util.Optional;
  * be based on type, annotation or other factors such as the request media type</p>
  *
  * <p>Unlike {@link org.particleframework.core.convert.TypeConverter} instances binders can potentially handle complex
- *  objects and typically work on conjunction with a {@link org.particleframework.core.convert.ConvertibleValues} instance</p>
+ *  objects and typically work on conjunction with a {@link ConvertibleValues} instance</p>
  *
  * <p>An {@link ArgumentBinder} can either be registered as a bean or by META-INF/services. In the case of the latter
  * it will be globally available at all times, whilst the former is only present when a {@code org.particleframework.context.BeanContext} is initialized</p>
  *
  * @see org.particleframework.core.convert.TypeConverter
- * @see org.particleframework.core.convert.ConvertibleValues
+ * @see ConvertibleValues
  *
  * @param <T> The argument type
  * @param <S> The source type

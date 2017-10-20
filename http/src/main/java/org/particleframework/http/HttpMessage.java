@@ -15,7 +15,7 @@
  */
 package org.particleframework.http;
 
-import org.particleframework.core.convert.MutableConvertibleValues;
+import org.particleframework.core.convert.value.MutableConvertibleValues;
 
 import java.util.Locale;
 import java.util.Optional;

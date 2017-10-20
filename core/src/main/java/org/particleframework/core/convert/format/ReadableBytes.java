@@ -15,8 +15,6 @@
  */
 package org.particleframework.core.convert.format;
 
-import org.particleframework.core.convert.Format;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 

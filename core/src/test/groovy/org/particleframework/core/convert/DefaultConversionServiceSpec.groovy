@@ -1,5 +1,6 @@
 package org.particleframework.core.convert
 
+import org.particleframework.core.convert.format.Format
 import org.particleframework.core.convert.format.ReadableBytes
 import org.particleframework.core.type.Argument
 import spock.lang.Specification

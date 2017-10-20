@@ -16,6 +16,8 @@
 package org.particleframework.core.bind.annotation;
 
 import org.particleframework.core.convert.*;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
 

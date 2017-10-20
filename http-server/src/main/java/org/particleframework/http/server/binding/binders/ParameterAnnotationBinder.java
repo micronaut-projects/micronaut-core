@@ -19,8 +19,8 @@ import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinde
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.convert.ConvertibleMultiValues;
-import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.annotation.Parameter;

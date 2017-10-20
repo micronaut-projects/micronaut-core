@@ -15,7 +15,7 @@
  */
 package org.particleframework.http;
 
-import org.particleframework.core.convert.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
 
 /**
  * Represents HTTP query parameters parsed from the {@link HttpRequest#getUri()}

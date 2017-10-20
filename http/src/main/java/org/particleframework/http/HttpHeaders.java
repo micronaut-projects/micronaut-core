@@ -16,7 +16,7 @@
 package org.particleframework.http;
 
 
-import org.particleframework.core.convert.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;

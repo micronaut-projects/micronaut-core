@@ -26,12 +26,10 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.BeanLocator;
-import org.particleframework.context.env.Environment;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.*;
+import org.particleframework.core.convert.value.MutableConvertibleValues;
+import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpHeaders;
@@ -39,12 +37,9 @@ import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.exceptions.ConnectionClosedException;
-import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
-import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
-import org.reactivestreams.Subscription;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -52,7 +47,6 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance
