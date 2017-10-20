@@ -1,13 +1,11 @@
 package org.particleframework.http.server.netty;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.web.router.RouteMatch;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,18 +51,24 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
 
     @Override
     public void onNext(ByteBufHolder httpContent) {
-        long receivedLength = this.receivedLength.addAndGet(httpContent.content().readableBytes());
-
-        if((advertisedLength != -1 && receivedLength > advertisedLength)) {
-            fireExceedsLength(receivedLength, this.advertisedLength);
+        if(error != null) {
+            httpContent.release();
         }
         else {
-            long serverMax = configuration.getMultipart().getMaxFileSize();
-            if( receivedLength > serverMax ) {
-                fireExceedsLength(receivedLength, serverMax);
+
+            long receivedLength = this.receivedLength.addAndGet(httpContent.content().readableBytes());
+
+            if((advertisedLength != -1 && receivedLength > advertisedLength)) {
+                fireExceedsLength(receivedLength, this.advertisedLength);
             }
             else {
-                addContent(httpContent);
+                long serverMax = configuration.getMultipart().getMaxFileSize();
+                if( receivedLength > serverMax ) {
+                    fireExceedsLength(receivedLength, serverMax);
+                }
+                else {
+                    addContent(httpContent);
+                }
             }
         }
     }
@@ -80,7 +84,9 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
             subscription.cancel();
         }
         ChannelPipeline pipeline = ctx.pipeline();
-        pipeline.remove("http-streams-codec-body-publisher");
+        if( pipeline.get("http-streams-codec-body-publisher") != null) {
+            pipeline.remove("http-streams-codec-body-publisher");
+        }
         pipeline.fireExceptionCaught(exception);
     }
 
