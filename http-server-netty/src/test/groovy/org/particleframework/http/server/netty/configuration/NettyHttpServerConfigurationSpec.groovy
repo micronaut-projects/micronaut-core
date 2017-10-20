@@ -56,7 +56,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption
-        config.host == 'localhost'
+        !config.host.isPresent()
         config.parent.threads == 8
         config.worker.threads == 8
 

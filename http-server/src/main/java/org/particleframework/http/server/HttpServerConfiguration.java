@@ -35,7 +35,7 @@ import java.util.*;
 public class HttpServerConfiguration {
 
     protected int port = 8080;
-    protected String host = "localhost";
+    protected Optional<String> host = Optional.empty();
     protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;
     @ReadableBytes
@@ -53,7 +53,7 @@ public class HttpServerConfiguration {
     /**
      * The default host
      */
-    public String getHost() {
+    public Optional<String> getHost() {
         return host;
     }
 

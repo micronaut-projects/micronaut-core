@@ -127,7 +127,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
 
         int port = serverConfiguration.getPort();
-        ChannelFuture future = serverBootstrap.group(parentGroup, workerGroup)
+        serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer() {
                     @Override
@@ -325,8 +325,18 @@ public class NettyHttpServer implements EmbeddedServer {
                         });
 
                     }
-                })
-                .bind(serverConfiguration.getHost(), port == -1 ? SocketUtils.findAvailableTcpPort() : port);
+                });
+
+        Optional<String> host = serverConfiguration.getHost();
+
+        ChannelFuture future;
+
+        if(host.isPresent()) {
+            future = serverBootstrap.bind(host.get(), port == -1 ? SocketUtils.findAvailableTcpPort() : port);
+        }
+        else {
+            future = serverBootstrap.bind(port == -1 ? SocketUtils.findAvailableTcpPort() : port);
+        }
 
         future.addListener(op -> {
             if (future.isSuccess()) {
