@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
  */
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
     /**
      * A {@link org.particleframework.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used
      */
@@ -69,6 +69,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return property;
         }
     };
+    protected static final MediaType[] ZERO_MEDIA_TYPES = new MediaType[0];
 
 
     static final Object NO_VALUE = new Object();
@@ -464,9 +465,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.uriMatchTemplate = uriTemplate;
             this.acceptedMediaTypes = mediaTypes;
             this.targetMethod = targetMethod;
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Created Route: {}", this);
-            }
         }
 
 

@@ -37,5 +37,8 @@ public @interface Patch {
      * @return The URI of the PATCH route if not specified inferred from the method name and arguments
      */
     String value() default "";
-
+    /**
+     * @return The default consumes, otherwise override from controller
+     */
+    String[] consumes() default {};
 }

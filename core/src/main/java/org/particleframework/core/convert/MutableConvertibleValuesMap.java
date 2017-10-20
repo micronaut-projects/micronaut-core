@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.convert;
 
+import java.util.Map;
+
 /**
  * Mutable version of {@link ConvertibleMultiValuesMap}
  *
@@ -23,6 +25,16 @@ package org.particleframework.core.convert;
  */
 public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> implements MutableConvertibleValues<V> {
 
+    public MutableConvertibleValuesMap() {
+    }
+
+    public MutableConvertibleValuesMap(Map<CharSequence, V> map) {
+        super(map);
+    }
+
+    public MutableConvertibleValuesMap(Map<CharSequence, V> map, ConversionService<?> conversionService) {
+        super(map, conversionService);
+    }
 
     @Override
     public MutableConvertibleValues<V> put(CharSequence key, V value) {

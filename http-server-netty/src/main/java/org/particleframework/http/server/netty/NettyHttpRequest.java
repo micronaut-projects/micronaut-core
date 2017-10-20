@@ -16,27 +16,43 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.util.AttributeKey;
+import io.netty.util.ReferenceCounted;
+import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.BeanLocator;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.*;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.exceptions.ConnectionClosedException;
+import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
+import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
+import org.reactivestreams.Subscription;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.function.Function;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance
@@ -56,28 +72,33 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private final HttpServerConfiguration serverConfiguration;
     private final ConversionService<?> conversionService;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
+    private final MutableConvertibleValues<Object> attributes;
     private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
     private Locale locale;
     private URI path;
     private List<ByteBuf> receivedContent  = new ArrayList<>();
-    private Object body;
 
+    private Object body;
     private MediaType mediaType;
     private Charset charset;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
     private boolean nonBlockingBinderRegistered;
+    private Set<String> routeArgumentNames = Collections.emptySet();
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
-                            ConversionService conversionService,
+                            ConversionService environment,
                             HttpServerConfiguration serverConfiguration) {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
-        Objects.requireNonNull(conversionService, "ConversionService cannot be null");
+        Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
+        Objects.requireNonNull(environment, "Environment cannot be null");
+
         this.serverConfiguration = serverConfiguration;
-        this.conversionService = conversionService;
+        this.conversionService = environment;
+        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
         this.nettyRequest = nettyRequest;
         this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
@@ -214,6 +235,11 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     }
 
     @Override
+    public MutableConvertibleValues<Object> getAttributes() {
+        return this.attributes;
+    }
+
+    @Override
     public T getBody() {
         Object body = this.body;
         if(body == null && !receivedContent.isEmpty()) {
@@ -238,14 +264,23 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Internal
     public void release() {
         for (ByteBuf byteBuf : receivedContent) {
-            if(byteBuf.refCnt() != 0) {
-                byteBuf.release();
-            }
+            releaseIfNecessary(byteBuf);
         }
-        if(this.body != null && body instanceof ByteBuf) {
-            ByteBuf body = (ByteBuf) this.body;
-            if(body.refCnt() != 0) {
-                body.release();
+        if(this.body != null && body instanceof ReferenceCounted) {
+            ReferenceCounted body = (ReferenceCounted) this.body;
+            releaseIfNecessary(body);
+        }
+        for (Map.Entry<String, Object> attribute : attributes) {
+            Object value = attribute.getValue();
+            releaseIfNecessary(value);
+        }
+    }
+
+    protected void releaseIfNecessary(Object value) {
+        if(value instanceof ReferenceCounted) {
+            ReferenceCounted referenceCounted = (ReferenceCounted) value;
+            if(referenceCounted.refCnt() != 0) {
+                referenceCounted.release();
             }
         }
     }
@@ -271,7 +306,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
 
     @Internal
-    void addContent(HttpContent httpContent) {
+    void addContent(ByteBufHolder httpContent) {
         ByteBuf byteBuf = httpContent
                 .content()
                 .touch();
@@ -286,6 +321,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Internal
     void setMatchedRoute(RouteMatch<Object> matchedRoute) {
         this.matchedRoute = matchedRoute;
+        this.routeArgumentNames = CollectionUtils.setOf(this.matchedRoute.getArgumentNames());
     }
 
 
@@ -302,9 +338,59 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     }
 
     @Internal
-    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
-        NettyHttpParameters parameters = (NettyHttpParameters) getParameters();
-        parameters.setPostRequestDecoder(postRequestDecoder);
+    void offer(HttpPostRequestDecoder postRequestDecoder) {
+        if(postRequestDecoder != null && !routeArgumentNames.isEmpty()) {
+            Object body = this.body;
+            if (body == null) {
+                synchronized (this) { // double check
+                    body = this.body;
+                    if (body == null) {
+                        this.body = body = new MutableConvertibleValuesMap<Object>(new ConcurrentHashMap<>(routeArgumentNames.size())) {};
+                    }
+                }
+            }
+
+            if(body instanceof MutableConvertibleValues) {
+                try {
+                    while (postRequestDecoder.hasNext()) {
+                        InterfaceHttpData interfaceHttpData = postRequestDecoder.next();
+                        String name = interfaceHttpData.getName();
+                        if(!routeArgumentNames.contains(name)) {
+                            // discard non-required arguments
+                            interfaceHttpData.release();
+                            continue;
+                        }
+
+                        switch (interfaceHttpData.getHttpDataType()) {
+                            case Attribute:
+                                Attribute attribute = (Attribute) interfaceHttpData;
+
+                                ((MutableConvertibleValues<Object>)body).put(attribute.getName(), attribute.getValue());
+                                interfaceHttpData.release();
+                                break;
+                            case FileUpload:
+                                FileUpload fileUpload = (FileUpload) interfaceHttpData;
+                                if(fileUpload.isCompleted() && fileUpload.isInMemory()) {
+                                    ((MutableConvertibleValues<Object>)body).put(fileUpload.getName(), fileUpload);
+                                }
+                                break;
+                        }
+
+                    }
+                    InterfaceHttpData partialHttpData = postRequestDecoder.currentPartialHttpData();
+                    // TODO: handle partial data and chunked data
+
+                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
+                    // ok, ignore
+                } catch (IOException e) {
+                    throw new ConnectionClosedException("Error reading request data: " + e.getMessage(), e);
+                }
+            }
+            else {
+                postRequestDecoder.destroy();
+            }
+        }
+
     }
 
     @Internal

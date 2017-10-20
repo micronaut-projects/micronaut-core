@@ -18,10 +18,10 @@ package org.particleframework.http.server.netty;
 import com.typesafe.netty.http.HttpStreamsServerHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -43,7 +43,6 @@ import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
-import org.particleframework.http.util.HttpUtil;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -61,9 +60,7 @@ import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -426,7 +423,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
             // decorate the execution of the route so that it runs an async executor
             route = prepareRouteForExecution(route, request, binderRegistry);
-
             request.setMatchedRoute(route);
 
             if ((request.isNonBlockingBinderRegistered() && route.isExecutable()) || !request.isBodyRequired()) {
@@ -439,8 +435,8 @@ public class NettyHttpServer implements EmbeddedServer {
                 if (nativeRequest instanceof StreamedHttpRequest) {
                     MediaType contentType = request.getContentType();
                     StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
-                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                            new ConsumesMediaTypeQualifier<>(contentType));
+                    ConsumesMediaTypeQualifier<HttpContentSubscriberFactory> qualifier = new ConsumesMediaTypeQualifier<>(contentType);
+                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,qualifier);
 
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
@@ -456,7 +452,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         }
                     } else {
-                        Subscriber<HttpContent> contentSubscriber = new DefaultHttpContentSubscriber(request);
+                        Subscriber<ByteBufHolder> contentSubscriber = new DefaultHttpContentSubscriber(request);
                         streamedHttpRequest.subscribe(contentSubscriber);
                     }
 

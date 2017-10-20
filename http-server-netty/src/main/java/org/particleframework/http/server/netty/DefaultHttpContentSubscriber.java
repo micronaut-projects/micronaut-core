@@ -1,6 +1,7 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
@@ -17,25 +18,23 @@ import java.util.function.Consumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultHttpContentSubscriber implements HttpContentSubscriber<ByteBuf> {
+public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     protected final NettyHttpRequest nettyHttpRequest;
-    private final RouteMatch<Object> route;
-    private final ChannelHandlerContext ctx;
-    private final long advertisedLength;
-    private Subscription subscription;
-    private long receivedLength;
-    private Throwable error;
-    private Consumer<ByteBuf> completionHandler;
+    protected final ChannelHandlerContext ctx;
+    protected final long advertisedLength;
+    protected Subscription subscription;
+    protected long receivedLength;
+    protected Throwable error;
+    protected Consumer<Object> completionHandler;
 
     public DefaultHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest) {
         this.nettyHttpRequest = nettyHttpRequest;
-        this.route = nettyHttpRequest.getMatchedRoute();
         this.ctx = nettyHttpRequest.getChannelHandlerContext();
         this.advertisedLength = nettyHttpRequest.getContentLength();
         this.completionHandler = ( body -> {
             if(error == null) {
-                route.execute();
+                nettyHttpRequest.getMatchedRoute().execute();
             }
         });
     }
@@ -48,7 +47,7 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<ByteB
     }
 
     @Override
-    public void onNext(HttpContent httpContent) {
+    public void onNext(ByteBufHolder httpContent) {
         receivedLength += httpContent.content().readableBytes();
 
         if(advertisedLength != -1 && receivedLength > advertisedLength) {
@@ -62,7 +61,7 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<ByteB
         }
     }
 
-    protected void addContent(HttpContent httpContent) {
+    protected void addContent(ByteBufHolder httpContent) {
         nettyHttpRequest.addContent(httpContent);
     }
 
@@ -72,16 +71,17 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<ByteB
             LOG.debug("Error processing Request body: " + t.getMessage(), t);
         }
         error = t;
+        subscription.cancel();
         ctx.pipeline().fireExceptionCaught(t);
     }
 
     @Override
     public void onComplete() {
-        this.completionHandler.accept((ByteBuf) nettyHttpRequest.getBody());
+        this.completionHandler.accept(nettyHttpRequest.getBody());
     }
 
     @Override
-    public HttpContentSubscriber onComplete(Consumer<ByteBuf> consumer) {
+    public HttpContentSubscriber onComplete(Consumer<Object> consumer) {
         this.completionHandler = consumer;
         return this;
     }

@@ -129,6 +129,7 @@ public class HttpServerConfiguration {
     @ConfigurationProperties("multipart")
     public static class MultipartConfiguration implements Toggleable{
         protected Optional<File> location = Optional.empty();
+        @ReadableBytes
         protected long maxFileSize = 1024;
         protected boolean enabled = true;
         protected boolean disk = false;

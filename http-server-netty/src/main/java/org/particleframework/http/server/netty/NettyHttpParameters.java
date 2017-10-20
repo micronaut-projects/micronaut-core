@@ -15,17 +15,13 @@
  */
 package org.particleframework.http.server.netty;
 
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
-import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpParameters;
 
-import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Implementation of {@link HttpParameters} for Netty
@@ -37,8 +33,11 @@ public class NettyHttpParameters implements HttpParameters {
     private final Map<String, List<String>> parameters;
     private final ConversionService conversionService;
 
-    public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
-        this.parameters = new LinkedHashMap<>(parameters);
+    NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
+        this.parameters = new LinkedHashMap<>(parameters.size());
+        for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
+            this.parameters.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+        }
         this.conversionService = conversionService;
     }
 
@@ -69,13 +68,8 @@ public class NettyHttpParameters implements HttpParameters {
 
     @Override
     public List<String> getAll(CharSequence name) {
-        List<String> value = parameters.get(name.toString());
-        if(value != null) {
-            return Collections.unmodifiableList(value);
-        }
-        else {
-            return Collections.emptyList();
-        }
+        String key = name.toString();
+        return parameters.computeIfAbsent(key, s -> Collections.emptyList());
     }
 
     @Override
@@ -87,29 +81,4 @@ public class NettyHttpParameters implements HttpParameters {
         return all.get(0);
     }
 
-    @Internal
-    void setPostRequestDecoder(HttpPostRequestDecoder postRequestDecoder) {
-        if(postRequestDecoder != null) {
-
-            List<InterfaceHttpData> bodyHttpDatas = postRequestDecoder.getBodyHttpDatas();
-            for (InterfaceHttpData bodyHttpData : bodyHttpDatas) {
-                switch (bodyHttpData.getHttpDataType()) {
-                    case Attribute:
-                        Attribute attribute = (Attribute) bodyHttpData;
-                        String name = attribute.getName();
-                        try {
-                            if(parameters.containsKey(name)) {
-                                parameters.get(name).add(attribute.getValue());
-                            }
-                            else {
-                                parameters.put(name, Collections.singletonList(attribute.getValue()));
-                            }
-                        } catch (IOException ioe) {
-                            // ignore
-                        }
-                        break;
-                }
-            }
-        }
-    }
 }

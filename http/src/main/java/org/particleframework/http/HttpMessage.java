@@ -15,6 +15,8 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.convert.MutableConvertibleValues;
+
 import java.util.Locale;
 import java.util.Optional;
 
@@ -34,6 +36,15 @@ public interface HttpMessage<B> {
      * @return The {@link HttpHeaders} object
      */
     HttpHeaders getHeaders();
+
+    /**
+     * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
+     *
+     * <p>Attributes are designed for internal data sharing and hence are isolated from headers and parameters which are client supplied</p>
+     *
+     * @return The attributes of the message
+     */
+    MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The request body

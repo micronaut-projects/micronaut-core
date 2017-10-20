@@ -2,6 +2,7 @@ package org.particleframework.configuration.jackson.server.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
@@ -38,7 +39,6 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
     private final AtomicReference<Throwable> error = new AtomicReference<>();
     private final ChannelHandlerContext ctx;
     private final NettyHttpRequest nettyHttpRequest;
-    private final RouteMatch<Object> route;
     private final long advertisedLength;
     private final long requestMaxSize;
     private long accumulatedLength = 0;
@@ -49,11 +49,10 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
         this.nettyHttpRequest = request;
         this.requestMaxSize = httpServerConfiguration.getMaxRequestSize();
         this.advertisedLength = request.getContentLength();
-        this.route = request.getMatchedRoute();
         this.ctx = request.getChannelHandlerContext();
         this.completionHandler = (jsonNode -> {
             nettyHttpRequest.setBody(jsonNode);
-            route.execute();
+            nettyHttpRequest.getMatchedRoute().execute();
         });
     }
 
@@ -103,7 +102,7 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
     }
 
     @Override
-    public void onNext(HttpContent httpContent) {
+    public void onNext(ByteBufHolder httpContent) {
         try {
             ByteBuf content = httpContent.content();
             int len = content.readableBytes();

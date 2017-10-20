@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.http.server.netty.converters;
 
-import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.HttpContent;
-import org.particleframework.core.util.Toggleable;
-import org.reactivestreams.Subscriber;
+import io.netty.buffer.ByteBuf;
+import org.particleframework.http.MediaType;
 
-import java.util.function.Consumer;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.util.Optional;
 
 /**
+ * Represents a mapping between a Java type and a {@link MediaType}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpContentSubscriber<T> extends Subscriber<ByteBufHolder>, Toggleable {
+public interface MediaTypeReader<T> {
+    /**
+     * @return The media type
+     */
+    MediaType getMediaType();
 
     /**
-     * Allows overriding the default completion handler
-     *
-     * @param consumer The consumer
-     * @return This HttpContentSubscriber
+     * @return The Java type
      */
-    HttpContentSubscriber onComplete(Consumer<T> consumer);
+    T read(Class<T> type, ByteBuf byteBuf, Charset charset) throws IOException;
 }

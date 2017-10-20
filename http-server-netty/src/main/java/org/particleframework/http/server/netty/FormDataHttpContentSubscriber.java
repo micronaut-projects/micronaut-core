@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty;
 
+import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
@@ -50,13 +51,25 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
     }
 
     @Override
-    protected void addContent(HttpContent httpContent) {
-        decoder.offer(httpContent);
+    protected void addContent(ByteBufHolder holder) {
+        if(holder instanceof HttpContent) {
+            decoder.offer((HttpContent) holder);
+            try {
+                nettyHttpRequest.offer(decoder);
+            } catch (Exception e) {
+                onError(e);
+            } finally {
+                holder.release();
+            }
+        }
+        else {
+            holder.release();
+        }
     }
 
     @Override
     public void onComplete() {
-        nettyHttpRequest.setPostRequestDecoder(decoder);
+        decoder.destroy();
         super.onComplete();
     }
 }

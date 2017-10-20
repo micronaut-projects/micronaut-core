@@ -15,6 +15,8 @@
  */
 package org.particleframework.web.router.annotation;
 
+import org.particleframework.http.MediaType;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -38,4 +40,8 @@ public @interface Post {
      */
     String value() default "";
 
+    /**
+     * @return The default consumes, otherwise override from controller
+     */
+    String[] consumes() default {};
 }

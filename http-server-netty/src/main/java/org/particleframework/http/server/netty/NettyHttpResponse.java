@@ -22,6 +22,9 @@ import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.convert.MutableConvertibleValues;
+import org.particleframework.core.convert.MutableConvertibleValuesMap;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpHeaders;
@@ -32,6 +35,7 @@ import org.particleframework.http.server.netty.cookies.NettyCookies;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Delegates to Netty's {@link DefaultFullHttpResponse}
@@ -47,16 +51,19 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     final NettyHttpRequestHeaders headers;
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
+    private final MutableConvertibleValues<Object> attributes;
 
     public NettyHttpResponse(DefaultFullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
 
     public NettyHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
 
@@ -64,6 +71,11 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @Override
     public MutableHttpHeaders getHeaders() {
         return headers;
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> getAttributes() {
+        return attributes;
     }
 
     @Override

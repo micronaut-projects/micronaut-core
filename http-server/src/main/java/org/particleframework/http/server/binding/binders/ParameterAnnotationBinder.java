@@ -50,13 +50,18 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     public Optional<T> bind(Argument<T> argument, HttpRequest source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Parameter annotation = argument.getAnnotation(Parameter.class);
-        String parameterName = annotation == null ? argument.getName() : annotation.value();
+        boolean hasAnnotation = annotation != null;
+        String parameterName = hasAnnotation ? annotation.value() : argument.getName();
 
         Locale locale = source.getLocale();
         Charset characterEncoding = source.getCharacterEncoding();
 
         Optional<T> result = doBind(argument, parameters, parameterName, locale, characterEncoding);
-        if(!result.isPresent() && annotation == null && HttpMethod.requiresRequestBody(source.getMethod())) {
+        if(!result.isPresent() && !hasAnnotation) {
+            // try attribute
+            result = doBind(argument, source.getAttributes(), parameterName, locale, characterEncoding);
+        }
+        if(!result.isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
                 return doBind(argument, body.get(), parameterName, locale, characterEncoding);

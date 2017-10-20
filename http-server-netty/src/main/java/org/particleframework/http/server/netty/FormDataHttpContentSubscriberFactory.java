@@ -40,7 +40,7 @@ public class FormDataHttpContentSubscriberFactory implements HttpContentSubscrib
     }
 
     @Override
-    public HttpContentSubscriber<ByteBuf> build(NettyHttpRequest request) {
+    public HttpContentSubscriber<Object> build(NettyHttpRequest request) {
         return new FormDataHttpContentSubscriber(request, configuration);
     }
 }
