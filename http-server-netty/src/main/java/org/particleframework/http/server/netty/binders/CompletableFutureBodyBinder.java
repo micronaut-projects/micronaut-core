@@ -2,6 +2,7 @@ package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
@@ -45,7 +46,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     }
 
     @Override
-    public Optional<CompletableFuture> bind(Argument<CompletableFuture> argument, HttpRequest source) {
+    public Optional<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
@@ -69,11 +70,11 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                 }
                 subscriber.onComplete((body) -> {
                             if (!future.isCompletedExceptionally()) {
-                                Optional<Argument<?>> firstTypeParameter = argument.getFirstTypeVariable();
+                                Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
                                 if (firstTypeParameter.isPresent()) {
                                     Argument<?> arg = firstTypeParameter.get();
                                     Class targetType = arg.getType();
-                                    Optional converted = conversionService.convert(body, targetType, ConversionContext.of(arg));
+                                    Optional converted = conversionService.convert(body, targetType, context.with(arg));
                                     if (converted.isPresent()) {
                                         future.complete(converted.get());
                                     } else {

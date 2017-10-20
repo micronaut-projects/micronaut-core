@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The default conversion service. Handles basic type conversion operations.
@@ -124,6 +125,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         ZonedDateTime result = ZonedDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
+                        context.reject(object, e);
                         return Optional.empty();
                     }
                 }
@@ -138,6 +140,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         SimpleDateFormat format = resolveFormat(context);
                         return Optional.of(format.parse(object.toString()));
                     } catch (ParseException e) {
+                        context.reject(object, e);
                         return Optional.empty();
                     }
                 }
@@ -153,6 +156,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         LocalDateTime result = LocalDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
+                        context.reject(object, e);
                         return Optional.empty();
                     }
                 }
@@ -168,6 +172,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         LocalDate result = LocalDate.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
+                        context.reject(object, e);
                         return Optional.empty();
                     }
                 }
@@ -179,6 +184,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -189,6 +195,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 Integer converted = Integer.valueOf(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -199,6 +206,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 Long converted = Long.valueOf(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -209,6 +217,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 Short converted = Short.valueOf(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -219,6 +228,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 BigDecimal converted = new BigDecimal(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -242,6 +252,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(new URL(object.toString()));
             } catch (MalformedURLException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -251,6 +262,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(new URI(object.toString()));
             } catch (URISyntaxException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -260,6 +272,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(Locale.forLanguageTag(object.toString().replace('_', '-')));
             } catch (IllegalArgumentException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -269,6 +282,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(UUID.fromString(object.toString()));
             } catch (IllegalArgumentException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -278,6 +292,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(Currency.getInstance(object.toString()));
             } catch (IllegalArgumentException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -291,6 +306,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             try {
                 return Optional.of(Charset.forName(object.toString()));
             } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
+                context.reject(object, e);
                 return Optional.empty();
             }
         });
@@ -332,6 +348,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     Enum val = Enum.valueOf(targetType, NameUtils.underscoreSeparate(stringValue).toUpperCase(Locale.ENGLISH));
                     return Optional.of(val);
                 } catch (Exception e1) {
+                    context.reject(object, e);
                     return Optional.empty();
                 }
             }
@@ -372,10 +389,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> List/Iterable
         addConverter(CharSequence.class, Iterable.class, (CharSequence object, Class<Iterable> targetType, ConversionContext context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
-            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
+            Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
+            ConversionContext newContext = context.with(componentType);
 
-            targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
+            Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
             String[] strings = object.toString().split(",");
             List list = new ArrayList();
             for (String string : strings) {
@@ -390,10 +407,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Optional handling
         addConverter(Object.class, Optional.class, (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
-            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
+            Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
+            Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
 
-            targetComponentType = ReflectionUtils.getWrapperType(targetComponentType);
+            ConversionContext newContext = context.with(componentType);
             Optional converted = convert(object, targetComponentType, newContext);
             if (converted.isPresent()) {
                 return Optional.of(converted);
@@ -417,8 +434,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
-            Class targetComponentType = typeVariable.map(arg -> (Class) arg.getType()).orElse(Object.class);
-            ConversionContext newContext = typeVariable.map(ConversionContext::of).orElse(context);
+            Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
+            Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
+
+            ConversionContext newContext = context.with(componentType);
             if (targetType.isInstance(object)) {
                 if(targetComponentType == Object.class) {
                     return Optional.of(object);
@@ -443,31 +462,19 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // Map -> Map (inner type conversion)
         addConverter(Map.class, Map.class, (object, targetType, context) -> {
-            TypeVariable<Class<Map>>[] typeParameters = targetType.getTypeParameters();
-            Class keyType = Object.class;
-            Class valueType = Object.class;
-            boolean isProperties = false;
-            ConversionContext keyContext = context;
-            ConversionContext valContext = context;
-            if (targetType.equals(Properties.class)) {
-                keyType = String.class;
-                valueType = String.class;
-                isProperties = true;
-            } else if (typeParameters.length == 2) {
+            Argument<?> keyArgument = context.getTypeVariable("K").orElse(Argument.of(String.class, "K"));
+            boolean isProperties = targetType.equals(Properties.class);
+            Argument<?> valArgument = context.getTypeVariable("V").orElseGet(() -> {
+                if(isProperties) {
+                    return Argument.of(String.class, "V");
+                }
+                return Argument.of(Object.class, "V");
+            });
+            Class keyType = keyArgument.getType();
+            Class valueType = valArgument.getType();
+            ConversionContext keyContext = context.with(keyArgument);
+            ConversionContext valContext = context.with(valArgument);
 
-                Optional<Argument<?>> keyVar = context.getTypeVariable(typeParameters[0].getName());
-
-                keyType = keyVar
-                        .map(arg -> (Class) arg.getType())
-                        .orElse(String.class);
-                keyContext = keyVar.map(ConversionContext::of).orElse(context);
-
-                Optional<Argument<?>> valVar = context.getTypeVariable(typeParameters[1].getName());
-                valueType = valVar
-                        .map(arg -> (Class) arg.getType())
-                        .orElse(Object.class);
-                valContext = valVar.map(ConversionContext::of).orElse(context);
-            }
             Map newMap = isProperties ? new Properties() : new LinkedHashMap();
 
             for (Object o : object.entrySet()) {

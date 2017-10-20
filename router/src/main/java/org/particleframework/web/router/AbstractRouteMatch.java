@@ -15,6 +15,8 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
@@ -141,9 +143,16 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                         o = ((Optional<?>)o).orElseThrow(()-> new RoutingException("Required argument [" + argument + "] not specified"));
                     }
                     if(o != null) {
-                        Optional<?> result = conversionService.convert(o, argument.getType());
-                        Object fv = value;
-                        argumentList.add(result.orElseThrow(() -> new RoutingException("Unable to convert value [" + fv + "] for argument: " + argument)));
+                        if(o instanceof ConversionError) {
+                            ConversionError conversionError = (ConversionError) o;
+                            Exception cause = conversionError.getCause();
+                            throw new RoutingException("Required argument [" + argument + "] is invalid: " + cause.getMessage(), cause);
+                        }
+                        else {
+                            ConversionContext conversionContext = ConversionContext.of(argument);
+                            Optional<?> result = conversionService.convert(o, argument.getType(), conversionContext);
+                            argumentList.add(resolveValueOrError(argument, conversionContext, result, value));
+                        }
                     }
                     else {
                         throw new RoutingException("Required argument [" + argument + "] not specified");
@@ -152,13 +161,23 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                 else if (value == DefaultRouteBuilder.NO_VALUE) {
                     throw new RoutingException("Required argument [" + argument + "] not specified");
                 } else {
-                    Object finalValue = value;
-                    Optional<?> result = conversionService.convert(finalValue, argument.getType());
-                    argumentList.add(result.orElseThrow(() -> new RoutingException("Unable to convert value [" + finalValue + "] for argument: " + argument)));
+                    ConversionContext conversionContext = ConversionContext.of(argument);
+                    Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
+                    argumentList.add(resolveValueOrError(argument, conversionContext, result, value));
                 }
             }
 
             return executableMethod.invoke(argumentList.toArray());
         }
+    }
+
+    protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result, Object originalValue) {
+        return result.orElseThrow(() -> {
+            RoutingException routingException;
+            Optional<ConversionError> lastError = conversionContext.getLastError();
+            routingException = lastError.map(conversionError -> new RoutingException("Unable to convert value [" + originalValue + "] for argument: " + argument, conversionError.getCause()))
+                                        .orElseGet(() -> new RoutingException("Unable to convert value [" + originalValue + "] for argument: " + argument));
+            return routingException;
+        });
     }
 }

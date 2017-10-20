@@ -18,8 +18,10 @@ package org.particleframework.configuration.jackson.convert;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.ValueNode;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleValues;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
 import java.util.Iterator;
@@ -50,7 +52,9 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        JsonNode jsonNode = objectNode.get(name.toString());
-        return conversionService.convert(jsonNode, requiredType);
+        String fieldName = name.toString();
+        JsonNode jsonNode = objectNode.get(fieldName);
+        Argument<T> arg = Argument.of(requiredType, fieldName);
+        return conversionService.convert(jsonNode, requiredType, ConversionContext.of(arg));
     }
 }

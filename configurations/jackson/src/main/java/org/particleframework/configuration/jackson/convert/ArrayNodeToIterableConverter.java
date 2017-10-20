@@ -34,7 +34,7 @@ public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, It
             Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             List results = new ArrayList();
             node.elements().forEachRemaining(jsonNode -> {
-                Optional converted = conversionService.convert(jsonNode, elementType);
+                Optional converted = conversionService.convert(jsonNode, elementType, context);
                 if(converted.isPresent()) {
                     results.add(converted.get());
                 }

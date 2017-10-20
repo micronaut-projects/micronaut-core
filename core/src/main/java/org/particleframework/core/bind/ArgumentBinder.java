@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.bind;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
@@ -45,9 +46,9 @@ public interface ArgumentBinder<T, S> {
     /**
      * Bind the given argument from the given source
      *
-     * @param argument The argument
+     * @param context The {@link ArgumentConversionContext}
      * @param source The source
      * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
      */
-    Optional<T> bind(Argument<T> argument, S source);
+    Optional<T> bind(ArgumentConversionContext<T> context, S source);
 }

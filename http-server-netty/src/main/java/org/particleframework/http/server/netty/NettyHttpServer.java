@@ -28,6 +28,9 @@ import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -571,10 +574,12 @@ public class NettyHttpServer implements EmbeddedServer {
                 if (registeredBinder.isPresent()) {
                     ArgumentBinder argumentBinder = registeredBinder.get();
                     String argumentName = argument.getName();
+                    ArgumentConversionContext conversionContext = ConversionContext.of(argument, request.getLocale(), request.getCharacterEncoding());
+
                     if (argumentBinder instanceof BodyArgumentBinder) {
                         if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
                             Optional bindingResult = argumentBinder
-                                    .bind(argument, request);
+                                    .bind(conversionContext, request);
 
                             if (bindingResult.isPresent()) {
                                 argumentValues.put(argumentName, bindingResult.get());
@@ -583,22 +588,27 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         } else {
                             argumentValues.put(argumentName, (Supplier<Optional>) () ->
-                                    argumentBinder.bind(argument, request)
+                                    argumentBinder.bind(conversionContext, request)
                             );
                             request.setBodyRequired(true);
                         }
                     } else {
 
                         Optional bindingResult = argumentBinder
-                                .bind(argument, request);
+                                .bind(conversionContext, request);
                         if (argument.getType() == Optional.class) {
                             argumentValues.put(argumentName, bindingResult);
                         } else if (bindingResult.isPresent()) {
                             argumentValues.put(argumentName, bindingResult.get());
                         } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
-                            argumentValues.put(argumentName, (Supplier<Optional>) () ->
-                                    argumentBinder.bind(argument, request)
-                            );
+                            argumentValues.put(argumentName, (Supplier<Optional>) () -> {
+                                Optional result = argumentBinder.bind(conversionContext, request);
+                                Optional<ConversionError> lastError = conversionContext.getLastError();
+                                if (lastError.isPresent()) {
+                                    return lastError;
+                                }
+                                return result;
+                            });
                         }
                     }
                 }

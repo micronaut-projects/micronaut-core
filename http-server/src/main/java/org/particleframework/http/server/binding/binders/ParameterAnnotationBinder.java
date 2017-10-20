@@ -17,6 +17,7 @@ package org.particleframework.http.server.binding.binders;
 
 import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.convert.ConvertibleValues;
@@ -47,8 +48,9 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     }
 
     @Override
-    public Optional<T> bind(Argument<T> argument, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
+        Argument<T> argument = context.getArgument();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         boolean hasAnnotation = annotation != null;
         String parameterName = hasAnnotation ? annotation.value() : argument.getName();
@@ -56,15 +58,15 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         Locale locale = source.getLocale();
         Charset characterEncoding = source.getCharacterEncoding();
 
-        Optional<T> result = doBind(argument, parameters, parameterName, locale, characterEncoding);
+        Optional<T> result = doBind(context, parameters, parameterName, locale, characterEncoding);
         if(!result.isPresent() && !hasAnnotation) {
             // try attribute
-            result = doBind(argument, source.getAttributes(), parameterName, locale, characterEncoding);
+            result = doBind(context, source.getAttributes(), parameterName, locale, characterEncoding);
         }
         if(!result.isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
-                return doBind(argument, body.get(), parameterName, locale, characterEncoding);
+                return doBind(context, body.get(), parameterName, locale, characterEncoding);
             }
         }
         return result;

@@ -80,11 +80,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(HttpRequest.class, (RequestArgumentBinder<HttpRequest>) (argument, source) -> Optional.of(source));
         byType.put(HttpParameters.class, (RequestArgumentBinder<HttpParameters>) (argument, source) -> Optional.of(source.getParameters()));
         byType.put(Cookies.class, (RequestArgumentBinder<Cookies>) (argument, source) -> Optional.of(source.getCookies()));
-        byType.put(Cookie.class, (RequestArgumentBinder<Cookie>)(argument, source) -> {
+        byType.put(Cookie.class, (RequestArgumentBinder<Cookie>)(context, source) -> {
             Cookies cookies = source.getCookies();
-            Cookie cookie = cookies.get(argument.getName());
+            String name = context.getArgument().getName();
+            Cookie cookie = cookies.get(name);
             if(cookie == null) {
-                cookie = cookies.get(NameUtils.hyphenate(argument.getName()));
+                cookie = cookies.get(NameUtils.hyphenate(name));
             }
             return cookie != null ? Optional.of(cookie) : Optional.empty();
         });

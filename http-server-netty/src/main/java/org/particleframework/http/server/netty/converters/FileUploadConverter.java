@@ -68,8 +68,8 @@ public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
                 }
             }
             return conversionService.convert(object.getByteBuf(), targetType, context);
-        } catch (IOException e) {
-            // TODO: conversion context errors
+        } catch (Exception e) {
+            context.reject(e);
             return Optional.empty();
         }
     }

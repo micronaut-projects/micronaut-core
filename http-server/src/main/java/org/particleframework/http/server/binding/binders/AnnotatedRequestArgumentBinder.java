@@ -17,6 +17,7 @@ package org.particleframework.http.server.binding.binders;
 
 import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 
@@ -48,7 +49,7 @@ public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends
         return new AnnotatedRequestArgumentBinder<SA, ST>() {
 
             @Override
-            public Optional<ST> bind(Argument<ST> argument, HttpRequest source) {
+            public Optional<ST> bind(ArgumentConversionContext<ST> argument, HttpRequest source) {
                 return binder.bind(argument, source);
             }
 

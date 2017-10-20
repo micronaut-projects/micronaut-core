@@ -41,6 +41,11 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     Argument[] ZERO_ARGUMENTS = new Argument[0];
 
     /**
+     * Default Object argument
+     */
+    Argument<Object> OBJECT_ARGUMENT = of(Object.class);
+
+    /**
      * @return The name of the argument
      */
     String getName();

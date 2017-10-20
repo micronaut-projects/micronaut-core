@@ -28,6 +28,8 @@ import java.nio.charset.Charset;
 import java.util.Optional;
 
 /**
+ * A {@link MediaTypeReader} for JSON
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -39,6 +41,7 @@ public class JsonMediaTypeReader<T> implements MediaTypeReader<T> {
     JsonMediaTypeReader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
+
     @Override
     public MediaType getMediaType() {
         return MediaType.APPLICATION_JSON_TYPE;

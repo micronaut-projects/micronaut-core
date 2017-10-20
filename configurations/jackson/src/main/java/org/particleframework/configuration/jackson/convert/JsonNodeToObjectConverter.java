@@ -53,6 +53,7 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
                 return Optional.of(result);
             }
         } catch (JsonProcessingException e) {
+            context.reject(e);
             return Optional.empty();
         }
     }

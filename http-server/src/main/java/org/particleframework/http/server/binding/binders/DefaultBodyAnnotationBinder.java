@@ -1,5 +1,6 @@
 package org.particleframework.http.server.binding.binders;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
@@ -19,7 +20,7 @@ import java.util.Optional;
  */
 public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
-    protected final ConversionService conversionService;
+    protected final ConversionService<?> conversionService;
 
     public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
@@ -31,23 +32,9 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
     }
 
     @Override
-    public Optional<T> bind(Argument<T> argument, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest source) {
         Object body = source.getBody();
-        return conversionService.convert(body, argument.getType(), new ConversionContext() {
-            @Override
-            public Map<String, Argument<?>> getTypeVariables() {
-                return argument.getTypeVariables();
-            }
-
-            @Override
-            public Locale getLocale() {
-                return source.getLocale();
-            }
-
-            @Override
-            public Charset getCharset() {
-                return source.getCharacterEncoding();
-            }
-        });
+        Argument<T> argument = context.getArgument();
+        return conversionService.convert(body, argument.getType(), context);
     }
 }

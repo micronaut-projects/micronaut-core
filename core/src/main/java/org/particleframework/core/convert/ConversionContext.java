@@ -26,6 +26,7 @@ import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
@@ -35,7 +36,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext extends AnnotatedElement, TypeVariableResolver {
+public interface ConversionContext extends AnnotatedElement, TypeVariableResolver, ErrorsContext {
 
 
     /**
@@ -127,6 +128,16 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
             public Annotation[] getDeclaredAnnotations() {
                 return ArrayUtils.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
             }
+
+            @Override
+            public void reject(Exception exception) {
+                thisContext.reject(exception);
+            }
+
+            @Override
+            public Iterator<ConversionError> iterator() {
+                return thisContext.iterator();
+            }
         };
     }
 
@@ -174,39 +185,10 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
      * @param charset The charset
      * @return The conversion context
      */
-    static ConversionContext of(Argument<?> argument, @Nullable Locale locale, @Nullable Charset charset) {
+    static ArgumentConversionContext of(Argument<?> argument, @Nullable Locale locale, @Nullable Charset charset) {
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
         Locale finalLocale = locale != null ? locale : Locale.ENGLISH;
-        return new ConversionContext() {
-            @Override
-            public Map<String, Argument<?>> getTypeVariables() {
-                return argument.getTypeVariables();
-            }
-
-            @Override
-            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                return argument.getAnnotation(annotationClass);
-            }
-
-            @Override
-            public Annotation[] getAnnotations() {
-                return argument.getAnnotations();
-            }
-
-            @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return argument.getDeclaredAnnotations();
-            }
-
-            @Override
-            public Locale getLocale() {
-                return finalLocale;
-            }
-
-            @Override
-            public Charset getCharset() {
-                return finalCharset;
-            }
-        };
+        return new DefaultArgumentConversionContext(argument, finalLocale, finalCharset);
     }
+
 }

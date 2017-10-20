@@ -13,11 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.jackson.convert;
+package org.particleframework.core.convert;
+
+import java.util.Optional;
 
 /**
+ * An interface for reporting conversion errors
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonConverterRegistrar {
+public interface ConversionError {
+    /**
+     * @return The cause
+     */
+    Exception getCause();
+
+    /**
+     * @return The original rejected value
+     */
+    default Optional<Object> getOriginalValue() {
+        return Optional.empty();
+    }
+
 }

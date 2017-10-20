@@ -32,6 +32,7 @@ public class ArrayNodeToArrayConverter implements TypeConverter<ArrayNode, Objec
                 Object[] result = objectMapper.treeToValue(node, targetType);
                 return Optional.of(result);
         } catch (JsonProcessingException e) {
+            context.reject(e);
             return Optional.empty();
         }
     }

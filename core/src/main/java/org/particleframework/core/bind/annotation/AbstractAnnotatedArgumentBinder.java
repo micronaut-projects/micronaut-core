@@ -38,7 +38,8 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
         this.conversionService = conversionService;
     }
 
-    protected Optional<T> doBind(Argument<T> argument, ConvertibleValues<?> values, String annotationValue, Locale locale, Charset characterEncoding) {
+    protected Optional<T> doBind(ArgumentConversionContext<T> context, ConvertibleValues<?> values, String annotationValue, Locale locale, Charset characterEncoding) {
+        Argument<T> argument = context.getArgument();
         Class<T> argumentType = argument.getType();
         Object value = resolveValue(argument, values, argumentType, annotationValue);
         if(value == null) {
@@ -53,8 +54,7 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             }
         }
 
-        ConversionContext conversionContext = ConversionContext.of(argument, locale, characterEncoding);
-        return doConvert(value, argumentType, conversionContext);
+        return doConvert(value, argumentType, context);
     }
 
     private Object resolveValue(Argument<T> argument, ConvertibleValues<?> values, Class<T> argumentType, String annotationValue) {

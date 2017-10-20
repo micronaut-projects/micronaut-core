@@ -53,6 +53,28 @@ class UploadSpec extends AbstractParticleSpec {
 
     }
 
+    void "test simple in-memory file upload with invalid JSON"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), '{"title":"Foo"'))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveJson")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+//        response.body().string() == 'bar: Data{title=\'Foo\'}'
+
+    }
+
     void "test simple in-memory file upload "() {
         given:
         RequestBody requestBody = new MultipartBody.Builder()

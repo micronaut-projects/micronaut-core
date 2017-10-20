@@ -17,6 +17,7 @@ package org.particleframework.http.server.binding.binders;
 
 import org.particleframework.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import org.particleframework.core.bind.annotation.AnnotatedArgumentBinder;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.ConvertibleMultiValues;
 import org.particleframework.core.naming.NameUtils;
@@ -43,7 +44,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    public Optional<T> bind(Argument<T> argument, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> argument, HttpRequest source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         Header annotation = argument.getAnnotation(Header.class);
         String parameterName = annotation.value();
