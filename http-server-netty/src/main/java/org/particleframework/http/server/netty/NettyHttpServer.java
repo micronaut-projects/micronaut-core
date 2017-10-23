@@ -79,7 +79,7 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_CODEC = "http-codec";
     public static final String PARTICLE_HANDLER = "particle-handler";
     public static final String CORS_HANDLER = "cors-handler";
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private volatile Channel serverChannel;
@@ -461,7 +461,7 @@ public class NettyHttpServer implements EmbeddedServer {
                             streamedHttpRequest.subscribe(subscriber);
                         } else {
                             if (LOG.isDebugEnabled()) {
-                                LOG.debug("Request body parsing not enabled for subscriber: " + subscriber.getClass().getSimpleName());
+                                LOG.debug("Request body parsing not enabled for content type: {}", contentType );
                             }
                             context.writeAndFlush(handleBadRequest(request, binderRegistry))
                                     .addListener(createCloseListener(nativeRequest));
