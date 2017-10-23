@@ -18,13 +18,13 @@ package org.particleframework.web.router;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.exceptions.ConversionErrorException;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.core.type.ReturnType;
-import org.particleframework.web.router.exceptions.RoutingException;
+import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Predicate;
@@ -140,30 +140,29 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                     Object o = supplier.get();
 
                     if(o instanceof Optional) {
-                        o = ((Optional<?>)o).orElseThrow(()-> new RoutingException("Required argument [" + argument + "] not specified"));
+                        o = ((Optional<?>)o).orElseThrow(()-> new UnsatisfiedRouteException(argument));
                     }
                     if(o != null) {
                         if(o instanceof ConversionError) {
                             ConversionError conversionError = (ConversionError) o;
-                            Exception cause = conversionError.getCause();
-                            throw new RoutingException("Required argument [" + argument + "] is invalid: " + cause.getMessage(), cause);
+                            throw new ConversionErrorException(argument, conversionError);
                         }
                         else {
                             ConversionContext conversionContext = ConversionContext.of(argument);
                             Optional<?> result = conversionService.convert(o, argument.getType(), conversionContext);
-                            argumentList.add(resolveValueOrError(argument, conversionContext, result, value));
+                            argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
                     }
                     else {
-                        throw new RoutingException("Required argument [" + argument + "] not specified");
+                        throw new UnsatisfiedRouteException(argument);
                     }
                 }
                 else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new RoutingException("Required argument [" + argument + "] not specified");
+                    throw new UnsatisfiedRouteException(argument);
                 } else {
                     ConversionContext conversionContext = ConversionContext.of(argument);
                     Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
-                    argumentList.add(resolveValueOrError(argument, conversionContext, result, value));
+                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
                 }
             }
 
@@ -171,12 +170,12 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
         }
     }
 
-    protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result, Object originalValue) {
+    protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
         return result.orElseThrow(() -> {
-            RoutingException routingException;
+            RuntimeException routingException;
             Optional<ConversionError> lastError = conversionContext.getLastError();
-            routingException = lastError.map(conversionError -> new RoutingException("Unable to convert value [" + originalValue + "] for argument: " + argument, conversionError.getCause()))
-                                        .orElseGet(() -> new RoutingException("Unable to convert value [" + originalValue + "] for argument: " + argument));
+            routingException = lastError.map(conversionError -> (RuntimeException) new ConversionErrorException(argument, conversionError))
+                                        .orElseGet(() -> new UnsatisfiedRouteException(argument));
             return routingException;
         });
     }

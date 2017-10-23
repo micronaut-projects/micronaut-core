@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty.upload
 
+import groovy.json.JsonSlurper
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
@@ -30,6 +31,11 @@ import spock.lang.Specification
  * @since 1.0
  */
 class UploadSpec extends AbstractParticleSpec {
+
+    @Override
+    Map<String, Object> getConfiguration() {
+        ['particle.server.multipart.maxFileSize':'1KB']
+    }
 
     void "test simple in-memory file upload with JSON"() {
         given:
@@ -71,7 +77,13 @@ class UploadSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-//        response.body().string() == 'bar: Data{title=\'Foo\'}'
+
+        when:
+        def json = new JsonSlurper().parseText(response.body().string())
+
+        then:
+        json.message.startsWith("Failed to convert argument [data]")
+        json.path == "/data"
 
     }
 
@@ -116,6 +128,13 @@ class UploadSpec extends AbstractParticleSpec {
         then:
         response.code() == HttpStatus.REQUEST_ENTITY_TOO_LARGE.code
         response.message() =='Request Entity Too Large'
+        def body = response.body().string()
+
+        when:
+        def json = new JsonSlurper().parseText(body)
+
+        then:
+        json.message == ("The received length [1809] exceeds the maximum content length [1024]")
 
     }
 }

@@ -13,35 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.exceptions;
+package org.particleframework.http.server.netty.converters;
 
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Produces;
-import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
+import org.particleframework.http.server.exceptions.ExceptionHandler;
+import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 
 import javax.inject.Singleton;
 
 /**
- * Default handle for {@link ContentLengthExceededException} errors
- *
+ * Handles exceptions of type {@link UnsatisfiedRouteException}
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
 @Primary
 @Produces
-public class ContentLengthExceededHandler implements ExceptionHandler<ContentLengthExceededException, HttpResponse>{
+public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRouteException, HttpResponse> {
     @Override
-    public HttpResponse handle(HttpRequest request, ContentLengthExceededException exception) {
+    public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
         VndError error = new VndError(exception.getMessage());
+        error.path('/' + exception.getArgument().getName());
         error.link(Link.SELF, Link.of(request.getUri()));
-        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
-                .body(error);
+        return HttpResponse.badRequest(error);
     }
 }
-

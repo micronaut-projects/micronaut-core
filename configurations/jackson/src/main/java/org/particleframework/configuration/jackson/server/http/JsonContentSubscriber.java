@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -41,7 +42,7 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
     private final NettyHttpRequest nettyHttpRequest;
     private final long advertisedLength;
     private final long requestMaxSize;
-    private long accumulatedLength = 0;
+    private final AtomicLong accumulatedLength = new AtomicLong();
     private Subscription subscription;
     private Consumer<JsonNode> completionHandler;
 
@@ -108,12 +109,12 @@ public class JsonContentSubscriber implements HttpContentSubscriber<JsonNode> {
             int len = content.readableBytes();
             if (len > 0) {
                 byte[] bytes;
-                accumulatedLength += (long) len;
+                long accumulatedLength = this.accumulatedLength.addAndGet(len);
                 if((advertisedLength != -1 && accumulatedLength > advertisedLength) || (accumulatedLength > requestMaxSize)) {
                     if(subscription != null) {
                         subscription.cancel();
                     }
-                    error.set(new ContentLengthExceededException(advertisedLength, accumulatedLength));
+                    error.set(new ContentLengthExceededException(advertisedLength == -1 ? requestMaxSize : advertisedLength, accumulatedLength));
                     onError(error.get());
                 }
                 if (content.hasArray()) {

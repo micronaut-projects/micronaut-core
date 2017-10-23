@@ -39,7 +39,7 @@ public class HttpServerConfiguration {
     protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;
     @ReadableBytes
-    protected long maxRequestSize = 1024 * 10; // 10MB
+    protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
     protected SslConfiguration ssl;
     protected MultipartConfiguration multipart;
     protected CorsConfiguration cors;
@@ -130,7 +130,7 @@ public class HttpServerConfiguration {
     public static class MultipartConfiguration implements Toggleable{
         protected Optional<File> location = Optional.empty();
         @ReadableBytes
-        protected long maxFileSize = 1024;
+        protected long maxFileSize = 1024 * 1024; // 1MB
         protected boolean enabled = true;
         protected boolean disk = false;
 

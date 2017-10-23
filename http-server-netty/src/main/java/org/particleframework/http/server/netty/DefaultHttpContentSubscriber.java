@@ -25,6 +25,7 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
     protected final ChannelHandlerContext ctx;
     protected final HttpServerConfiguration configuration;
     protected final long advertisedLength;
+    protected final long requestMaxSize;
     protected Subscription subscription;
     protected AtomicLong receivedLength = new AtomicLong();
     protected Throwable error;
@@ -33,6 +34,7 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
     public DefaultHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.configuration = configuration;
+        this.requestMaxSize = configuration.getMaxRequestSize();
         this.ctx = nettyHttpRequest.getChannelHandlerContext();
         this.advertisedLength = nettyHttpRequest.getContentLength();
         this.completionHandler = ( body -> {
@@ -58,8 +60,8 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
 
             long receivedLength = this.receivedLength.addAndGet(httpContent.content().readableBytes());
 
-            if((advertisedLength != -1 && receivedLength > advertisedLength)) {
-                fireExceedsLength(receivedLength, this.advertisedLength);
+            if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
+                fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
             }
             else {
                 long serverMax = configuration.getMultipart().getMaxFileSize();
