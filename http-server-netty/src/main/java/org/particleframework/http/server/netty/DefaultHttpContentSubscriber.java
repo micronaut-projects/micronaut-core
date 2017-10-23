@@ -86,8 +86,9 @@ public class DefaultHttpContentSubscriber implements HttpContentSubscriber<Objec
             subscription.cancel();
         }
         ChannelPipeline pipeline = ctx.pipeline();
-        if( pipeline.get("http-streams-codec-body-publisher") != null) {
-            pipeline.remove("http-streams-codec-body-publisher");
+        String pipelineKey = NettyHttpServer.HTTP_STREAMS_CODEC + "-body-publisher";
+        if( pipeline.get(pipelineKey) != null) {
+            pipeline.remove(pipelineKey);
         }
         pipeline.fireExceptionCaught(exception);
     }

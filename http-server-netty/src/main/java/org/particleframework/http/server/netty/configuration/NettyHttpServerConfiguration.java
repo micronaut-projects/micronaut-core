@@ -23,6 +23,8 @@ import org.particleframework.http.server.netty.NettyHttpServer;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * Allows configuring Netty within {@link NettyHttpServer}
@@ -77,12 +79,34 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     public static abstract class EventLoopConfig {
         protected int threads;
+        protected Integer ioRatio;
+        protected String executor;
 
         /**
          * @return The number of threads to use
          */
         public int getNumOfThreads() {
             return threads;
+        }
+
+        /**
+         * @return The I/O ratio to use
+         */
+        public OptionalInt getIoRatio() {
+            if(ioRatio != null) {
+                return OptionalInt.of(ioRatio);
+            }
+            return OptionalInt.empty();
+        }
+
+        /**
+         * @return The name of the configured executor to use
+         */
+        public Optional<String> getExecutorName() {
+            if(executor != null) {
+                return Optional.of(executor);
+            }
+            return Optional.empty();
         }
     }
 }

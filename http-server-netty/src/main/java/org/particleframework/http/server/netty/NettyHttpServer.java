@@ -79,6 +79,7 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_CODEC = "http-codec";
     public static final String PARTICLE_HANDLER = "particle-handler";
     public static final String CORS_HANDLER = "cors-handler";
+    
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private volatile Channel serverChannel;
@@ -120,7 +121,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public EmbeddedServer start() {
-        // TODO: allow configuration of threads and number of groups
         NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
         NioEventLoopGroup parentGroup = createParentEventLoopGroup();
         ServerBootstrap serverBootstrap = createServerBootstrap();
@@ -408,7 +408,10 @@ public class NettyHttpServer implements EmbeddedServer {
 
     private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
-            return new NioEventLoopGroup(config.getNumOfThreads());
+            Optional<ExecutorService> executorService = config.getExecutorName().flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name)));
+            NioEventLoopGroup group = executorService.map(service -> new NioEventLoopGroup(config.getNumOfThreads(), service)).orElseGet(() -> new NioEventLoopGroup(config.getNumOfThreads()));
+            config.getIoRatio().ifPresent(group::setIoRatio);
+            return group;
         } else {
             return new NioEventLoopGroup();
         }
