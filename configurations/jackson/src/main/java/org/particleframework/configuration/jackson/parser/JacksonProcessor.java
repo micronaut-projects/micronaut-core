@@ -9,14 +9,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.reactivestreams.Processor;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import org.particleframework.reactive.AbstractSingleSubscriberProcessor;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A Reactive streams publisher that publishes a {@link JsonNode} once the JSON has been fully consumed.
@@ -27,12 +23,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonProcessor implements Processor<byte[],JsonNode> {
+public class JacksonProcessor extends AbstractSingleSubscriberProcessor<JsonNode, byte[]> {
 
     private final NonBlockingJsonParser nonBlockingJsonParser;
-    private final AtomicReference<JsonNode> jsonNode = new AtomicReference<>();
-    private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private final ConcurrentLinkedQueue<Subscriber<? super JsonNode>> requested = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private String currentFieldName;
 
@@ -48,72 +41,6 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
         this(new JsonFactory());
     }
 
-    @Override
-    public void subscribe(Subscriber<? super JsonNode> subscriber) {
-        JsonNode jsonNodeObject = this.jsonNode.get();
-        Throwable thrownError = this.error.get();
-        if(thrownError != null) {
-            Subscription subscription = new Subscription() {
-                @Override
-                public void request(long n) {
-                    if (n > 0) {
-                        subscriber.onError(thrownError);
-                    }
-                }
-
-                @Override
-                public void cancel() {
-                    // no-op
-                }
-            };
-            subscriber.onSubscribe(subscription);
-        }
-        else if(jsonNodeObject != null) {
-            Subscription subscription = new Subscription() {
-                @Override
-                public void request(long n) {
-                    if (n > 0) {
-                        subscriber.onNext(jsonNodeObject);
-                        subscriber.onComplete();
-                    }
-                }
-
-                @Override
-                public void cancel() {
-                    // no-op
-                }
-            };
-            subscriber.onSubscribe(subscription);
-        }
-        else {
-
-            Subscription subscription = new Subscription() {
-                @Override
-                public void request(long n) {
-                    if (n > 0) {
-                        JsonNode jsonNode = JacksonProcessor.this.jsonNode.get();
-                        if (jsonNode == null) {
-                            requested.add(subscriber);
-                        } else {
-                            subscriber.onNext(jsonNode);
-                            subscriber.onComplete();
-                        }
-                    }
-                }
-
-                @Override
-                public void cancel() {
-                    requested.remove(subscriber);
-                }
-            };
-            subscriber.onSubscribe(subscription);
-        }
-    }
-
-    @Override
-    public void onSubscribe(Subscription s) {
-        s.request(Long.MAX_VALUE);
-    }
 
     /**
      * @return Whether more input is needed
@@ -122,21 +49,24 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
         return nonBlockingJsonParser.getNonBlockingInputFeeder().needMoreInput();
     }
 
-    /**
-     * This method should be invoked by the thread which provides the bytes that produces the fully formed JSON. This could be in chunks, using
-     * a ByteBuf or whatever form.
-     *
-     * Once fully formed JSON is produced future calls to this method will simply be ignored
-     *
-     * @param bytes The bytes
-     */
-    public void onNext(byte[] bytes) {
+    @Override
+    public void onComplete() {
+        if(needMoreInput()) {
+            onError(new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
+        }
+        else {
+            super.onComplete();
+        }
+    }
+
+    @Override
+    protected void publishDownStream(byte[] message) {
         try {
             ByteArrayFeeder byteFeeder = nonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
             while (!consumed && byteFeeder.needMoreInput()) {
                 if (byteFeeder.needMoreInput()) {
-                    byteFeeder.feedInput(bytes, 0, bytes.length);
+                    byteFeeder.feedInput(message, 0, message.length);
                     consumed = true;
                 }
 
@@ -145,44 +75,23 @@ public class JacksonProcessor implements Processor<byte[],JsonNode> {
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
                         byteFeeder.endOfInput();
-                        this.jsonNode.set(root);
-                        for (Subscriber<? super JsonNode> subscriber : requested) {
-                            subscriber.onNext(root);
-                            subscriber.onComplete();
-                        }
-                        requested.clear();
+                        resolveSubscriber()
+                                .ifPresent(subscriber ->
+                                        subscriber.onNext(root)
+                                );
                         break;
                     }
                 }
+                if(needMoreInput()) {
+                    parentSubscription.request(1);
+                }
             }
         } catch (IOException e) {
-            this.error.set(e);
-            for (Subscriber<? super JsonNode> subscriber : requested) {
-                subscriber.onError(e);
-            }
-            requested.clear();
+            onError(e);
         }
     }
 
-    @Override
-    public void onError(Throwable t) {
-        this.error.set(t);
-        for (Subscriber<? super JsonNode> subscriber : requested) {
-            subscriber.onError(t);
-        }
-        requested.clear();
-    }
 
-    @Override
-    public void onComplete() {
-        if(jsonNode.get() == null) {
-            JsonEOFException error = new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input");
-            this.error.set(error);
-            for (Subscriber<? super JsonNode> subscriber : requested) {
-                subscriber.onError(error);
-            }
-        }
-    }
 
     /**
      * @return The root node when the whole tree is built.

@@ -127,9 +127,13 @@ public interface AnnotationSource extends AnnotatedElement {
     @Override
     default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         for (AnnotatedElement annotatedElement : getAnnotatedElements()) {
-            T annotation = annotatedElement.getAnnotation(annotationClass);
-            if(annotation != null) {
-                return annotation;
+            try {
+                T annotation = annotatedElement.getAnnotation(annotationClass);
+                if(annotation != null) {
+                    return annotation;
+                }
+            } catch (ArrayStoreException | TypeNotPresentException e) {
+                // ignore, annotation that references a class not on the classpath
             }
         }
         return null;

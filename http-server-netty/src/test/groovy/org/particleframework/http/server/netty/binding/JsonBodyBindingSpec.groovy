@@ -2,6 +2,12 @@ package org.particleframework.http.server.netty.binding
 
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
+import io.reactivex.BackpressureStrategy
+import io.reactivex.Flowable
+import io.reactivex.schedulers.Schedulers
+import io.reactivex.subjects.PublishSubject
+import io.reactivex.subjects.ReplaySubject
+import io.reactivex.subscribers.DefaultSubscriber
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -15,6 +21,8 @@ import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Post
+import org.reactivestreams.Publisher
+import org.reactivestreams.Subscription
 
 import java.util.concurrent.CompletableFuture
 
@@ -68,7 +76,6 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.UNSUPPORTED_MEDIA_TYPE.code
-
     }
 
 
@@ -255,6 +262,21 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: Foo(Fred, 10)".toString()
     }
 
+    void "test publisher argument handling with POGO"() {
+
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/publisherObject")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        then:
+        client.newCall(
+                request.build()
+        ).execute().body().string() == "Foo(Fred, 10)".toString()
+    }
+
     @Controller(produces = org.particleframework.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
@@ -319,6 +341,15 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         CompletableFuture<String> futureObject(@Body CompletableFuture<Foo> future) {
             future.thenApply({ Foo foo ->
                 "Body: $foo".toString()
+            })
+        }
+
+        @Post
+        Publisher<String> publisherObject(@Body Flowable<Foo> publisher) {
+            return publisher
+                    .subscribeOn(Schedulers.io())
+                    .map({ Foo foo ->
+                        foo.toString()
             })
         }
 

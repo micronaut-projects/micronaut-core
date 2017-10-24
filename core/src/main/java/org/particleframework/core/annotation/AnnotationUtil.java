@@ -547,13 +547,9 @@ public class AnnotationUtil {
         Collection<T> annotationList = new ArrayList<>();
         Class classToSearch = type;
         while(classToSearch != Object.class && classToSearch != null) {
-            Annotation[] annotations = classToSearch.getAnnotations();
-            for (Annotation annotation : annotations) {
-                if( annotation.annotationType() == annotationType ) {
-                    if(!annotationList.contains(annotation)) {
-                        annotationList.add((T) annotation);
-                    }
-                }
+            Annotation ann = classToSearch.getAnnotation(annotationType);
+            if(ann != null && !annotationList.contains(ann)) {
+                annotationList.add((T) ann);
             }
             classToSearch = classToSearch.getSuperclass();
         }

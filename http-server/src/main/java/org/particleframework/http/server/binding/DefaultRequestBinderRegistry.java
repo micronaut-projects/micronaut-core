@@ -15,10 +15,13 @@
  */
 package org.particleframework.http.server.binding;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.core.bind.annotation.Bindable;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpParameters;
 import org.particleframework.http.HttpRequest;
@@ -34,6 +37,8 @@ import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface
@@ -48,6 +53,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Class, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
+    private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache = Caffeine.newBuilder().maximumSize(30).build();
 
     public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder...binders) {
         this.conversionService = conversionService;
@@ -61,6 +67,10 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                     Class argumentType = typedRequestArgumentBinder.argumentType();
                     byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
+                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType);
+                    for (Class itfce : allInterfaces) {
+                        byTypeAndAnnotation.put(new TypeAndAnnotation(itfce, annotationType), binder);
+                    }
                 }
                 else {
                     byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
@@ -96,7 +106,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         Optional<Annotation> annotation = argument.findAnnotationWithStereoType(Bindable.class);
         if(annotation.isPresent()) {
             Class<? extends Annotation> annotationType = annotation.get().annotationType();
-            RequestArgumentBinder<T> binder = byTypeAndAnnotation.get(new TypeAndAnnotation(argument.getType(), annotationType));
+            RequestArgumentBinder<T> binder = findBinder(argument, annotationType);
             if(binder ==  null) {
                 binder = byAnnotation.get(annotationType);
             }
@@ -111,6 +121,22 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             }
         }
         return Optional.of(new ParameterAnnotationBinder<>(conversionService));
+    }
+
+    protected <T> RequestArgumentBinder findBinder(Argument<T> argument, Class<? extends Annotation> annotationType) {
+        TypeAndAnnotation key = new TypeAndAnnotation(argument.getType(), annotationType);
+        return argumentBinderCache.get(key, key1 -> {
+            RequestArgumentBinder requestArgumentBinder = byTypeAndAnnotation.get(key1);
+            if(requestArgumentBinder == null) {
+                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(key1.type);
+                for (Class itfce : allInterfaces) {
+                    requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(itfce, annotationType));
+                    if(requestArgumentBinder != null) break;
+                }
+            }
+            return Optional.ofNullable(requestArgumentBinder);
+        }).orElse(null);
+
     }
 
     protected void registerDefaultConverters(ConversionService<?> conversionService) {

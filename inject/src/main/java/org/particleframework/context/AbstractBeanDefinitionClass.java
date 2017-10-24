@@ -101,12 +101,19 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
     public boolean isEnabled(BeanContext beanContext) {
         if (isPresent()) {
             if(enabled == null) {
-                Requires[] annotations = findAnnotations(Requires.class).toArray(new Requires[0]);
-                if (annotations.length == 0) {
-                    Requirements requirements = getAnnotation(Requirements.class);
-                    if (requirements != null) {
-                        annotations = requirements.value();
+                Requires[] annotations = new Requires[0];
+                try {
+                    Collection<Requires> found = findAnnotations(Requires.class);
+                    annotations = found.toArray(new Requires[found.size()]);
+                    if (annotations.length == 0) {
+                        Requirements requirements = getAnnotation(Requirements.class);
+                        if (requirements != null) {
+                            annotations = requirements.value();
+                        }
                     }
+                } catch (ArrayStoreException | TypeNotPresentException e) {
+                    // if this occurs, we hit @Requires(missing = Type).. so ignore
+                    return false;
                 }
                 Condition condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
                 enabled = condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
@@ -157,7 +164,7 @@ public abstract class AbstractBeanDefinitionClass implements BeanDefinitionClass
                 beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
                 GenericTypeUtils.resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class);
                 present = true;
-            } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            } catch (TypeNotPresentException | ClassNotFoundException | NoClassDefFoundError e) {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
                 }

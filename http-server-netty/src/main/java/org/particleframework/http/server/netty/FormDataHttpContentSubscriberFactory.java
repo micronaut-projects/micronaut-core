@@ -15,7 +15,6 @@
  */
 package org.particleframework.http.server.netty;
 
-import io.netty.buffer.ByteBuf;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.annotation.Consumes;
@@ -40,7 +39,7 @@ public class FormDataHttpContentSubscriberFactory implements HttpContentSubscrib
     }
 
     @Override
-    public HttpContentSubscriber<Object> build(NettyHttpRequest request) {
-        return new FormDataHttpContentSubscriber(request, configuration);
+    public HttpContentProcessor build(NettyHttpRequest request) {
+        return new FormDataHttpContentProcessor(request, configuration);
     }
 }

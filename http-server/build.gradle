@@ -1,5 +1,5 @@
 dependencies {
-    compile 'org.reactivestreams:reactive-streams:1.0.1'
+    compile project(":reactive")
     compile project(":bootstrap")
     compile project(":http")
     compileOnly project(":inject-java")

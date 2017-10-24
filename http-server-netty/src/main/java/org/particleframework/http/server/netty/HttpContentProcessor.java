@@ -16,23 +16,17 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.HttpContent;
 import org.particleframework.core.util.Toggleable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
 import java.util.function.Consumer;
 
 /**
+ * A reactive streams {@link org.reactivestreams.Processor} that processes incoming {@link ByteBufHolder} and outputs a given type
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpContentSubscriber<T> extends Subscriber<ByteBufHolder>, Toggleable {
-
-    /**
-     * Allows overriding the default completion handler
-     *
-     * @param consumer The consumer
-     * @return This HttpContentSubscriber
-     */
-    HttpContentSubscriber onComplete(Consumer<T> consumer);
+public interface HttpContentProcessor<T> extends Publisher<T>, Subscriber<ByteBufHolder>, Toggleable {
 }

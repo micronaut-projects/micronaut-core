@@ -1,11 +1,13 @@
 package org.particleframework.annotation.processing;
 
+import org.particleframework.core.reflect.ClassUtils;
+
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.lang.reflect.Array;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
@@ -105,23 +107,35 @@ class GenericUtils {
                 TypeMirror mirror = i.next();
 
                 TypeKind kind = mirror.getKind();
-                if(kind == TypeKind.DECLARED) {
-                    resolveGenericTypeParameter(resolvedParameters, parameterName, mirror);
+                switch (kind) {
+                    case ARRAY:
+                    case BOOLEAN:
+                    case BYTE:
+                    case CHAR:
+                    case DOUBLE:
+                    case FLOAT:
+                    case INT:
+                    case LONG:
+                    case SHORT:
+                        resolveGenericTypeParameterForPrimitiveOrArray(resolvedParameters, parameterName, mirror);
+                    break;
+                    case DECLARED:
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, mirror);
+                    break;
+                    case WILDCARD:
+                        WildcardType wcType = (WildcardType) mirror;
+                        TypeMirror extendsBound = wcType.getExtendsBound();
+                        TypeMirror superBound = wcType.getSuperBound();
+                        if (extendsBound != null) {
+                            resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound);
+                        }
+                        else if (superBound != null) {
+                            resolveGenericTypeParameter(resolvedParameters, parameterName, superBound);
+                        }
+                        else {
+                            resolvedParameters.put(parameterName, Object.class);
+                        }
 
-                }
-                else if(kind == TypeKind.WILDCARD) {
-                    WildcardType wcType = (WildcardType) mirror;
-                    TypeMirror extendsBound = wcType.getExtendsBound();
-                    TypeMirror superBound = wcType.getSuperBound();
-                    if (extendsBound != null) {
-                        resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound);
-                    }
-                    else if (superBound != null) {
-                        resolveGenericTypeParameter(resolvedParameters, parameterName, superBound);
-                    }
-                    else {
-                        resolvedParameters.put(parameterName, Object.class);
-                    }
                 }
             }
         }
@@ -139,32 +153,70 @@ class GenericUtils {
         }
         else {
             resolvedParameters.put(
-                  parameterName,
-                  Collections.singletonMap(
-                          resolveTypeReference(typeUtils.erasure(mirror)),
-                          resolveGenericTypes(declaredType)
-                  )
+                    parameterName,
+                    Collections.singletonMap(
+                            resolveTypeReference(typeUtils.erasure(mirror)),
+                            resolveGenericTypes(declaredType)
+                    )
             );
         }
     }
 
-    String resolveTypeReference(TypeMirror mirror) {
+    private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
+        resolvedParameters.put(
+                parameterName,
+                Collections.singletonMap(
+                        resolveTypeReference(typeUtils.erasure(mirror)),
+                        resolveGenericTypes(mirror)
+                )
+        );
+    }
+
+    Object resolveTypeReference(TypeMirror mirror) {
         TypeKind kind = mirror.getKind();
-        if (kind == WILDCARD) {
-            WildcardType wcType = (WildcardType) mirror;
-            TypeMirror extendsBound = wcType.getExtendsBound();
-            TypeMirror superBound = wcType.getSuperBound();
-            if (extendsBound == null && superBound == null) {
-                return Object.class.getName();
-            } else if (extendsBound != null) {
-                return typeUtils.erasure(extendsBound).toString();
-            } else if (superBound != null) {
-                return typeUtils.erasure(superBound).toString();
-            } else {
-                return typeUtils.getWildcardType(extendsBound, superBound).toString();
-            }
+        switch (kind) {
+            case WILDCARD:
+                WildcardType wcType = (WildcardType) mirror;
+                TypeMirror extendsBound = wcType.getExtendsBound();
+                TypeMirror superBound = wcType.getSuperBound();
+                if (extendsBound == null && superBound == null) {
+                    return Object.class.getName();
+                } else if (extendsBound != null) {
+                    return typeUtils.erasure(extendsBound).toString();
+                } else if (superBound != null) {
+                    return typeUtils.erasure(superBound).toString();
+                } else {
+                    return typeUtils.getWildcardType(extendsBound, superBound).toString();
+                }
+            case ARRAY:
+                ArrayType arrayType = (ArrayType) mirror;
+                Object reference = resolveTypeReference(arrayType.getComponentType());
+                if(reference instanceof Class) {
+                    Class componentType = (Class) reference;
+                    return Array.newInstance(componentType, 0).getClass();
+                }
+                else {
+                    return mirror.toString();
+                }
+            case BOOLEAN:
+            case BYTE:
+            case CHAR:
+            case DOUBLE:
+            case FLOAT:
+            case INT:
+            case LONG:
+            case SHORT:
+                Optional<Class> type = ClassUtils.forName(mirror.toString(), getClass().getClassLoader());
+                if(type.isPresent()) {
+                    return type.get();
+                }
+                else {
+                    throw new IllegalStateException("Unknown primitive type");
+                }
+            default:
+                return mirror.toString();
         }
-        return mirror.toString();
+
     }
 
     public DeclaredType resolveTypeVariable(Element element, TypeVariable typeVariable) {

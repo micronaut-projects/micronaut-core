@@ -15,15 +15,17 @@
  */
 package org.particleframework.configuration.jackson.server.http;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.server.netty.HttpContentSubscriber;
+import org.particleframework.http.server.netty.HttpContentProcessor;
 import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.annotation.Consumes;
 import org.reactivestreams.Subscriber;
 
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Builds the {@link Subscriber} for JSON requests
@@ -36,13 +38,15 @@ import javax.inject.Singleton;
 public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
 
     private final HttpServerConfiguration httpServerConfiguration;
+    private final Optional<JsonFactory> jsonFactory;
 
-    public JsonHttpContentSubscriberFactory(HttpServerConfiguration httpServerConfiguration) {
+    public JsonHttpContentSubscriberFactory(HttpServerConfiguration httpServerConfiguration, Optional<JsonFactory> jsonFactory) {
         this.httpServerConfiguration = httpServerConfiguration;
+        this.jsonFactory = jsonFactory;
     }
 
     @Override
-    public HttpContentSubscriber build(NettyHttpRequest request) {
-        return new JsonContentSubscriber(request, httpServerConfiguration);
+    public HttpContentProcessor build(NettyHttpRequest request) {
+        return new JsonContentProcessor(request, httpServerConfiguration, jsonFactory);
     }
 }

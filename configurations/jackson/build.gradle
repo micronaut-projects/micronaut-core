@@ -1,6 +1,6 @@
 dependencies {
     compile project(":inject")
-    compile 'org.reactivestreams:reactive-streams:1.0.1'
+    compile project(":reactive")
     compile 'com.fasterxml.jackson.core:jackson-databind:2.9.2'
     runtime 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.9.2'
 

@@ -347,27 +347,29 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
             if(body instanceof MutableConvertibleValues) {
                 try {
                     while (postRequestDecoder.hasNext()) {
-                        InterfaceHttpData interfaceHttpData = postRequestDecoder.next();
-                        String name = interfaceHttpData.getName();
-                        if(!routeArgumentNames.contains(name)) {
-                            // discard non-required arguments
-                            interfaceHttpData.release();
-                            continue;
-                        }
+                        InterfaceHttpData data = postRequestDecoder.next();
+                        String name = data.getName();
+                        try {
+                            if(!routeArgumentNames.contains(name)) {
+                                // discard non-required arguments
+                                continue;
+                            }
 
-                        switch (interfaceHttpData.getHttpDataType()) {
-                            case Attribute:
-                                Attribute attribute = (Attribute) interfaceHttpData;
+                            switch (data.getHttpDataType()) {
+                                case Attribute:
+                                    Attribute attribute = (Attribute) data;
 
-                                ((MutableConvertibleValues<Object>)body).put(attribute.getName(), attribute.getValue());
-                                interfaceHttpData.release();
-                                break;
-                            case FileUpload:
-                                FileUpload fileUpload = (FileUpload) interfaceHttpData;
-                                if(fileUpload.isCompleted() && fileUpload.isInMemory()) {
-                                    ((MutableConvertibleValues<Object>)body).put(fileUpload.getName(), fileUpload);
-                                }
-                                break;
+                                    ((MutableConvertibleValues<Object>)body).put(attribute.getName(), attribute.getValue());
+                                    break;
+                                case FileUpload:
+                                    FileUpload fileUpload = (FileUpload) data;
+                                    if(fileUpload.isCompleted() && fileUpload.isInMemory()) {
+                                        ((MutableConvertibleValues<Object>)body).put(fileUpload.getName(), fileUpload);
+                                    }
+                                    break;
+                            }
+                        } finally {
+//                            data.release();
                         }
 
                     }

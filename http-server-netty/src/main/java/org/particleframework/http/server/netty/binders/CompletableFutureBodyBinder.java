@@ -1,21 +1,22 @@
 package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
+import io.netty.buffer.ByteBufHolder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import org.particleframework.http.server.binding.binders.NonBlockingBodyArgumentBinder;
-import org.particleframework.http.server.netty.DefaultHttpContentSubscriber;
-import org.particleframework.http.server.netty.HttpContentSubscriber;
-import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
-import org.particleframework.http.server.netty.NettyHttpRequest;
+import org.particleframework.http.server.netty.*;
+import org.particleframework.http.server.netty.DefaultHttpContentProcessor;
+import org.particleframework.http.server.netty.HttpContentProcessor;
 import org.particleframework.core.type.Argument;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -54,40 +55,57 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                 MediaType contentType = source.getContentType();
                 CompletableFuture future = new CompletableFuture();
-                StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
-                HttpContentSubscriber subscriber;
+                HttpContentProcessor processor;
                 if (contentType != null) {
 
                     Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
                             new ConsumesMediaTypeQualifier<>(contentType));
 
 
-                    subscriber = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
-                                               .orElse(new DefaultHttpContentSubscriber(nettyHttpRequest, httpServerConfiguration ));
+                    processor = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
+                                               .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration ));
                 } else {
-                    subscriber = new DefaultHttpContentSubscriber(nettyHttpRequest, httpServerConfiguration);
-
+                    processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
                 }
-                subscriber.onComplete((body) -> {
-                            if (!future.isCompletedExceptionally()) {
-                                Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                                if (firstTypeParameter.isPresent()) {
-                                    Argument<?> arg = firstTypeParameter.get();
-                                    Class targetType = arg.getType();
-                                    Optional converted = conversionService.convert(body, targetType, context.with(arg));
-                                    if (converted.isPresent()) {
-                                        future.complete(converted.get());
-                                    } else {
-                                        future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
-                                    }
-                                } else {
-                                    future.complete(body);
-                                }
-                            }
-                        }
 
-                );
-                streamedHttpRequest.subscribe(subscriber);
+                processor.subscribe(new Subscriber<Object>() {
+                    Subscription subscription;
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        // a future executes immediately, so trigger demand
+                        this.subscription = s;
+                        s.request(1);
+                    }
+
+                    @Override
+                    public void onNext(Object body) {
+                        nettyHttpRequest.setBody(body);
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        future.completeExceptionally(t);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
+                        Object body = nettyHttpRequest.getBody();
+                        if (firstTypeParameter.isPresent()) {
+                            Argument<?> arg = firstTypeParameter.get();
+                            Class targetType = arg.getType();
+                            Optional converted = conversionService.convert(body, targetType, context.with(arg));
+                            if (converted.isPresent()) {
+                                future.complete(converted.get());
+                            } else {
+                                future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
+                            }
+                        } else {
+                            future.complete(body);
+                        }
+                    }
+                });
 
                 return Optional.of(future);
             } else {

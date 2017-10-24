@@ -40,7 +40,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor publisher = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor()
         Foo instance = new Foo(name: "Fred", age: 10)
 
 
@@ -51,7 +51,7 @@ class JacksonProcessorSpec extends Specification {
         JsonNode node = null
         Throwable error = null
         int nodeCount = 0
-        publisher.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<JsonNode>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
@@ -73,7 +73,19 @@ class JacksonProcessorSpec extends Specification {
                 complete = true
             }
         })
-        publisher.onNext(bytes)
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
 
         then:
         complete
@@ -96,7 +108,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor publisher = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor()
         Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
 
 
@@ -107,7 +119,7 @@ class JacksonProcessorSpec extends Specification {
         JsonNode node = null
         Throwable error = null
         int nodeCount = 0
-        publisher.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<JsonNode>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
@@ -129,7 +141,19 @@ class JacksonProcessorSpec extends Specification {
                 complete = true
             }
         })
-        publisher.onNext(bytes)
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
 
         then:
         complete
@@ -152,7 +176,7 @@ class JacksonProcessorSpec extends Specification {
     void "test incomplete JSON error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor publisher = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor()
 
 
         when:
@@ -161,7 +185,7 @@ class JacksonProcessorSpec extends Specification {
         JsonNode node = null
         Throwable error = null
         int nodeCount = 0
-        publisher.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<JsonNode>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
@@ -183,8 +207,19 @@ class JacksonProcessorSpec extends Specification {
                 complete = true
             }
         })
-        publisher.onNext(bytes)
-        publisher.onComplete()
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
         then:
         !complete
         node == null
@@ -196,7 +231,7 @@ class JacksonProcessorSpec extends Specification {
     void "test JSON syntax error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor publisher = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor()
 
 
         when:
@@ -205,7 +240,7 @@ class JacksonProcessorSpec extends Specification {
         JsonNode node = null
         Throwable error = null
         int nodeCount = 0
-        publisher.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<JsonNode>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
@@ -227,8 +262,19 @@ class JacksonProcessorSpec extends Specification {
                 complete = true
             }
         })
-        publisher.onNext(bytes)
-        publisher.onComplete()
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
         then:
         !complete
         node == null

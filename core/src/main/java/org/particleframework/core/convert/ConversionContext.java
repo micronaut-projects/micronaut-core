@@ -90,26 +90,12 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
      * @param argument The argument
      * @return The conversion context
      */
-    default ConversionContext with(Argument<?> argument) {
+    @SuppressWarnings("unchecked")
+    default <T> ArgumentConversionContext<T> with(Argument<T> argument) {
 
         ConversionContext childContext = ConversionContext.of(argument);
         ConversionContext thisContext =  this;
-        return new ConversionContext() {
-            @Override
-            public Map<String, Argument<?>> getTypeVariables() {
-                return childContext.getTypeVariables();
-            }
-
-            @Override
-            public Locale getLocale() {
-                return thisContext.getLocale();
-            }
-
-            @Override
-            public Charset getCharset() {
-                return thisContext.getCharset();
-            }
-
+        return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
             public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
                 T annotation = childContext.getAnnotation(annotationClass);

@@ -15,10 +15,15 @@
  */
 package org.particleframework.http.server.netty.upload;
 
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
+import org.particleframework.core.type.Argument;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.annotation.Consumes;
+import org.particleframework.http.annotation.Body;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Post;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 
@@ -32,12 +37,22 @@ public class UploadController {
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public String receiveJson(Data data, String title) {
-        return title + ": "  + data.toString();
+        return title + ": " + data.toString();
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public String receivePlain(String data, String title) {
-        return title + ": "  + data;
+        return title + ": " + data;
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public Publisher<HttpResponse> receivePublisher(@Body Flowable<byte[]> data/*, Flowable<String> title*/) {
+        Argument.of(byte[].class);
+        StringBuilder builder = new StringBuilder();
+        return data.subscribeOn(Schedulers.io())
+                .concatMap(bytes -> Flowable.just(builder.append(new String(bytes))))
+                .map(result -> builder.toString())
+                .map(HttpResponse::ok);
     }
 
     public static class Data {

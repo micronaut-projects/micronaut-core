@@ -1,0 +1,132 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package org.particleframework.http.server.netty.binders;
+
+import com.typesafe.netty.http.StreamedHttpRequest;
+import io.netty.buffer.ByteBufHolder;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
+import org.particleframework.context.BeanLocator;
+import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionError;
+import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.exceptions.ConversionErrorException;
+import org.particleframework.core.type.Argument;
+import org.particleframework.http.HttpRequest;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.server.binding.binders.DefaultBodyAnnotationBinder;
+import org.particleframework.http.server.binding.binders.NonBlockingBodyArgumentBinder;
+import org.particleframework.http.server.netty.DefaultHttpContentProcessor;
+import org.particleframework.http.server.netty.HttpContentProcessor;
+import org.particleframework.http.server.netty.HttpContentSubscriberFactory;
+import org.particleframework.http.server.netty.NettyHttpRequest;
+import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
+import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+
+import javax.inject.Singleton;
+import java.util.Optional;
+import java.util.function.Consumer;
+
+/**
+ * A {@link org.particleframework.http.annotation.Body} argument binder for a reactive streams {@link Publisher}
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Singleton
+public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
+
+    private final BeanLocator beanLocator;
+    private final HttpServerConfiguration httpServerConfiguration;
+
+    public PublisherBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+        super(conversionService);
+        this.beanLocator = beanLocator;
+        this.httpServerConfiguration = httpServerConfiguration;
+    }
+
+    @Override
+    public Class<Publisher> argumentType() {
+        return Publisher.class;
+    }
+
+    @Override
+    public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest source) {
+        if (source instanceof NettyHttpRequest) {
+            NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
+            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+            if (nativeRequest instanceof StreamedHttpRequest) {
+                HttpContentProcessor processor;
+                MediaType contentType = source.getContentType();
+                if (contentType != null) {
+
+                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
+                            new ConsumesMediaTypeQualifier<>(contentType));
+
+
+                    processor = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
+                            .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration ));
+                } else {
+                    processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
+                }
+
+                return Optional.of(subscriber -> processor.subscribe(new Subscriber() {
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        subscriber.onSubscribe(s);
+                    }
+
+                    @Override
+                    public void onNext(Object o) {
+                        ArgumentConversionContext<?> conversionContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
+                        if(o instanceof ByteBufHolder) {
+                            o = ((ByteBufHolder)o).content();
+                        }
+                        Optional<?> converted = conversionService.convert(o, conversionContext);
+                        if(converted.isPresent()) {
+                            subscriber.onNext(converted.get());
+                        }
+                        else {
+                            Optional<ConversionError> lastError = conversionContext.getLastError();
+                            if(lastError.isPresent()) {
+                                subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
+                            }
+                            else {
+                                subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        subscriber.onError(t);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        subscriber.onComplete();
+                    }
+                }));
+
+            }
+        }
+        return Optional.empty();
+    }
+}

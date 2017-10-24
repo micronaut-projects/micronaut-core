@@ -30,12 +30,12 @@ import java.nio.charset.Charset;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber {
+public class FormDataHttpContentProcessor extends DefaultHttpContentProcessor {
 
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
 
-    public FormDataHttpContentSubscriber(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
+    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
@@ -50,21 +50,23 @@ public class FormDataHttpContentSubscriber extends DefaultHttpContentSubscriber 
         return enabled;
     }
 
+
     @Override
-    protected void addContent(ByteBufHolder holder) {
-        if(holder instanceof HttpContent) {
+    protected void publishVerifiedContent(ByteBufHolder message) {
+        super.publishVerifiedContent(message);
+        if(message instanceof HttpContent) {
             try {
-                HttpContent httpContent = (HttpContent) holder;
+                HttpContent httpContent = (HttpContent) message;
                 decoder.offer(httpContent);
                 nettyHttpRequest.offer(decoder);
             } catch (Exception e) {
-                fireException(e);
+                onError(e);
             } finally {
-                holder.release();
+                message.release();
             }
         }
         else {
-            holder.release();
+            message.release();
         }
     }
 

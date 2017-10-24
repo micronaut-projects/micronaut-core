@@ -13,19 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package example;
-
-import io.netty.util.ResourceLeakDetector;
-import org.particleframework.runtime.ParticleApplication;
 
 /**
+ * <p>This package contains a set of reactive primitives designed to bridge Reactive libraries such as RxJava and Reactor</p>
+ *
+ * <p>The design of this package is such that it is not seen as replacement for reactive frameworks, but rather allows the user to choose the
+ * library to use without the framework itself being dependent on any particular library.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Application {
-
-    public static void main(String[] args) {
-        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
-        ParticleApplication.run(Application.class);
-    }
-}
+package org.particleframework.reactive;

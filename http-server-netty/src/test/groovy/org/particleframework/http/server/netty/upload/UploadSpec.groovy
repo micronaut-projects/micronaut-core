@@ -113,7 +113,7 @@ class UploadSpec extends AbstractParticleSpec {
         given:
         RequestBody requestBody = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data' * 10000))
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data' * 1000))
                 .addFormDataPart("title", "bar")
                 .build()
 
@@ -134,7 +134,29 @@ class UploadSpec extends AbstractParticleSpec {
         def json = new JsonSlurper().parseText(body)
 
         then:
-        json.message == ("The received length [1809] exceeds the maximum content length [1024]")
+        json.message == ("The received length [1810] exceeds the maximum content length [1024]")
+    }
+
+    @Ignore
+    void "test non-blocking upload with publisher"() {
+        given:
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("text/plain"), 'some data' * 50))
+                .addFormDataPart("title", "bar")
+                .build()
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receivePublisher")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == 'some data' * 50
 
     }
 }

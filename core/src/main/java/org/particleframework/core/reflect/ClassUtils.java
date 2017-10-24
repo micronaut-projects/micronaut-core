@@ -1,5 +1,7 @@
 package org.particleframework.core.reflect;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -10,7 +12,35 @@ import java.util.Optional;
  */
 public class ClassUtils {
 
+    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
     public static final String CLASS_EXTENSION = ".class";
+
+    static {
+        COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
+        COMMON_CLASS_MAP.put(byte.class.getName(), byte.class);
+        COMMON_CLASS_MAP.put(int.class.getName(), int.class);
+        COMMON_CLASS_MAP.put(long.class.getName(), long.class);
+        COMMON_CLASS_MAP.put(double.class.getName(), double.class);
+        COMMON_CLASS_MAP.put(float.class.getName(), float.class);
+        COMMON_CLASS_MAP.put(char.class.getName(), char.class);
+
+        COMMON_CLASS_MAP.put(boolean[].class.getName(), boolean[].class);
+        COMMON_CLASS_MAP.put(byte[].class.getName(), byte[].class);
+        COMMON_CLASS_MAP.put(int[].class.getName(), int[].class);
+        COMMON_CLASS_MAP.put(long[].class.getName(), long[].class);
+        COMMON_CLASS_MAP.put(double[].class.getName(), double[].class);
+        COMMON_CLASS_MAP.put(float[].class.getName(), float[].class);
+        COMMON_CLASS_MAP.put(char[].class.getName(), char[].class);
+
+        COMMON_CLASS_MAP.put(Boolean.class.getName(), Boolean.class);
+        COMMON_CLASS_MAP.put(Byte.class.getName(), Byte.class);
+        COMMON_CLASS_MAP.put(Integer.class.getName(), Integer.class);
+        COMMON_CLASS_MAP.put(Long.class.getName(), Long.class);
+        COMMON_CLASS_MAP.put(Double.class.getName(),Double.class);
+        COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
+        COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
+        COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+    }
 
     /**
      * <p>Converts a URI to a class file reference to the class name</p>
@@ -47,7 +77,13 @@ public class ClassUtils {
      */
     public static Optional<Class> forName(String name, ClassLoader classLoader) {
         try {
-            return Optional.of(Class.forName(name, true, classLoader));
+            Optional<Class> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
+            if(commonType.isPresent()) {
+                return commonType;
+            }
+            else {
+                return Optional.of(Class.forName(name, true, classLoader));
+            }
         } catch (ClassNotFoundException e) {
             return Optional.empty();
         }

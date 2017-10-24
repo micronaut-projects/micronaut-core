@@ -55,6 +55,7 @@ import org.particleframework.web.router.UriRouteMatch;
 import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -450,15 +451,14 @@ public class NettyHttpServer implements EmbeddedServer {
                 HttpRequest nativeRequest = request.getNativeRequest();
                 if (nativeRequest instanceof StreamedHttpRequest) {
                     MediaType contentType = request.getContentType();
-                    StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
                     ConsumesMediaTypeQualifier<HttpContentSubscriberFactory> qualifier = new ConsumesMediaTypeQualifier<>(contentType);
                     Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,qualifier);
 
                     if (subscriberBean.isPresent()) {
                         HttpContentSubscriberFactory factory = subscriberBean.get();
-                        HttpContentSubscriber subscriber = factory.build(request);
-                        if (subscriber.isEnabled()) {
-                            streamedHttpRequest.subscribe(subscriber);
+                        HttpContentProcessor processor = factory.build(request);
+                        if (processor.isEnabled()) {
+                            processor.subscribe(buildSubscriber(request, context, route));
                         } else {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("Request body parsing not enabled for content type: {}", contentType );
@@ -468,8 +468,8 @@ public class NettyHttpServer implements EmbeddedServer {
 
                         }
                     } else {
-                        Subscriber<ByteBufHolder> contentSubscriber = new DefaultHttpContentSubscriber(request, serverConfiguration);
-                        streamedHttpRequest.subscribe(contentSubscriber);
+                        HttpContentProcessor defaultProcessor = new DefaultHttpContentProcessor(request, serverConfiguration);
+                        defaultProcessor.subscribe(buildSubscriber(request, context, route));
                     }
 
                 } else {
@@ -483,6 +483,39 @@ public class NettyHttpServer implements EmbeddedServer {
             }
 
         }
+    }
+
+    private Subscriber<Object> buildSubscriber(NettyHttpRequest request, ChannelHandlerContext context, RouteMatch<Object> finalRoute) {
+        return new Subscriber<Object>() {
+            Subscription subscription;
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(1);
+            }
+
+            @Override
+            public void onNext(Object message) {
+                if(message instanceof ByteBufHolder) {
+                    request.addContent((ByteBufHolder) message);
+                }
+                else {
+                    request.setBody(message);
+                }
+
+                subscription.request(1);
+            }
+            @Override
+            public void onError(Throwable t) {
+                subscription.cancel();
+                context.pipeline().fireExceptionCaught(t);
+            }
+
+            @Override
+            public void onComplete() {
+                finalRoute.execute();
+            }
+        };
     }
 
     private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
