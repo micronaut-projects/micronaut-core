@@ -34,11 +34,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThreadedBufferingSubscriber<R> implements Publisher<T> {
-    protected final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
+    private final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
 
     @Override
     protected void doOnComplete() {
-        resolveSubscriber().ifPresent(Subscriber::onComplete);
+        currentSubscriber().ifPresent(Subscriber::onComplete);
     }
 
     @Override
@@ -48,12 +48,12 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
 
     @Override
     protected void doOnSubscribe(Subscription subscription) {
-        resolveSubscriber().ifPresent(this::provideSubscription);
+        currentSubscriber().ifPresent(this::provideSubscription);
     }
 
     @Override
     protected void doOnError(Throwable t) {
-        resolveSubscriber().ifPresent(subscriber -> subscriber.onError(t));
+        currentSubscriber().ifPresent(subscriber -> subscriber.onError(t));
     }
 
     @Override
@@ -89,11 +89,19 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
      *
      * @return An {@link Optional} of the subscriber
      */
-    protected Optional<Subscriber<? super T>> resolveSubscriber() {
+    protected Optional<Subscriber<? super T>> currentSubscriber() {
         return Optional.ofNullable(this.subscriber.get());
     }
 
-
+    /**
+     * Resolve the current {@link Subscriber}
+     *
+     * @return An {@link Optional} of the subscriber
+     * @throws IllegalStateException If no {@link Subscriber} is present
+     */
+    protected Subscriber<? super T> getSubscriber() {
+        return Optional.ofNullable(this.subscriber.get()).orElseThrow(()-> new IllegalStateException("No subscriber present!"));
+    }
     private void provideSubscription(Subscriber<? super T> subscriber) {
         subscriber.onSubscribe(new Subscription() {
             @Override
@@ -167,7 +175,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     private void illegalDemand() {
-        resolveSubscriber().ifPresent(subscriber -> subscriber.onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification")));
+        currentSubscriber().ifPresent(subscriber -> subscriber.onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification")));
         state = BackPressureState.DONE;
     }
 

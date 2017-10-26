@@ -43,7 +43,7 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     }
 
     protected void publishVerifiedContent(ByteBufHolder message) {
-        resolveSubscriber().ifPresent(subscriber -> subscriber.onNext(message));
+        currentSubscriber().ifPresent(subscriber -> subscriber.onNext(message));
     }
 
     @Override
@@ -74,7 +74,7 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     protected void fireExceedsLength(long receivedLength, long expected) {
         state = BackPressureState.DONE;
         parentSubscription.cancel();
-        resolveSubscriber().ifPresent(subscriber -> subscriber.onError(new ContentLengthExceededException(expected, receivedLength)));
+        currentSubscriber().ifPresent(subscriber -> subscriber.onError(new ContentLengthExceededException(expected, receivedLength)));
     }
 
 }

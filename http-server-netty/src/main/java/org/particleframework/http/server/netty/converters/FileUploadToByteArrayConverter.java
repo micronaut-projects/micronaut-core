@@ -17,8 +17,10 @@ package org.particleframework.http.server.netty.converters;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.util.ReferenceCountUtil;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.http.server.netty.multipart.ChunkedFileUpload;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -31,19 +33,24 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class FileUploadToByteArrayConverter implements TypeConverter<FileUpload, byte[]> {
+public class FileUploadToByteArrayConverter implements TypeConverter<ChunkedFileUpload, byte[]> {
     @Override
-    public Optional<byte[]> convert(FileUpload upload, Class<byte[]> targetType, ConversionContext context) {
+    public Optional<byte[]> convert(ChunkedFileUpload upload, Class<byte[]> targetType, ConversionContext context) {
         try {
-            ByteBuf byteBuf = upload.getByteBuf();
-            if(byteBuf.hasArray() && upload.isCompleted()) {
-                return Optional.of(byteBuf.array());
-            }
-            else {
-                int len = byteBuf.readableBytes();
-                byte[] bytes = new byte[len];
-                byteBuf.readBytes(bytes);
-                return Optional.of(bytes);
+            ByteBuf byteBuf = null;
+            try {
+                byteBuf = upload.getCurrentChunk();
+                if(byteBuf.hasArray() && upload.isCompleted()) {
+                    return Optional.of(byteBuf.array());
+                }
+                else {
+                    int len = byteBuf.readableBytes();
+                    byte[] bytes = new byte[len];
+                    byteBuf.readBytes(bytes);
+                    return Optional.of(bytes);
+                }
+            } finally {
+                ReferenceCountUtil.release(byteBuf);
             }
 
         } catch (IOException e) {

@@ -75,7 +75,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
                         byteFeeder.endOfInput();
-                        resolveSubscriber()
+                        currentSubscriber()
                                 .ifPresent(subscriber ->
                                         subscriber.onNext(root)
                                 );

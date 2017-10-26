@@ -17,6 +17,8 @@ package org.particleframework.http.server.netty.upload;
 
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.functions.BiFunction;
+import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.particleframework.core.type.Argument;
@@ -91,7 +93,8 @@ public class UploadController {
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
-        return data.map( d -> HttpResponse.ok(d.toString()));
+        return data.flatMap(Flowable::just, (left, right) -> left == right ? left.toString() : left.toString() + " " + right.toString())
+                   .map(HttpResponse::ok);
     }
 
     public static class Data {

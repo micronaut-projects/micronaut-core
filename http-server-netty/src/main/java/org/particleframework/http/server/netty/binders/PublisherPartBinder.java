@@ -16,7 +16,7 @@
 package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
-import io.netty.buffer.CompositeByteBuf;
+import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
@@ -33,13 +33,13 @@ import org.particleframework.http.server.netty.FormDataHttpContentProcessor;
 import org.particleframework.http.server.netty.HttpContentProcessor;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+import org.particleframework.http.server.netty.multipart.ChunkedFileUpload;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -76,8 +76,7 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
             if (nativeRequest instanceof StreamedHttpRequest) {
                 return Optional.of(subscriber -> {
                     Subscriber<HttpData> contentSubscriber = new CompletionAwareSubscriber<HttpData>() {
-                        HttpData currentPartial = null;
-                        CompositeByteBuf partialData = null;
+                        int position = 0;
 
                         @Override
                         protected void doOnSubscribe(Subscription subscription) {
@@ -89,27 +88,18 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                             String partName = data.getName();
                             if(partName.equals(expectedInputName) ) {
 
+                                if(data instanceof FileUpload) {
+                                    FileUpload upload = (FileUpload) data;
+                                    position += upload.length();
+                                    data = new ChunkedFileUpload(position, upload);
+                                }
+
                                 Optional<?> converted = conversionService.convert(data, typeContext);
                                 if(converted.isPresent()) {
                                     subscriber.onNext(converted.get());
                                 }
                                 else {
-                                    if(!data.isCompleted()) {
-                                        Optional<ConversionError> lastError = typeContext.getLastError();
-                                        // if there was an error then this is not partial data
-                                        if( lastError.isPresent() ) {
-                                            onError(new ConversionErrorException(argument, lastError.get()));
-                                        }
-                                        else {
-                                            try {
-                                                currentPartial = data;
-                                                getPartialData().addComponent(data.getByteBuf());
-                                            } catch (IOException e) {
-                                                onError(e);
-                                            }
-                                        }
-                                    }
-                                    else {
+                                    if(data.isCompleted()) {
                                         Optional<ConversionError> lastError = typeContext.getLastError();
                                         if( lastError.isPresent() ) {
                                             onError(new ConversionErrorException(argument, lastError.get()));
@@ -118,14 +108,15 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                                             onError(new UnsatisfiedRouteException(argument));
                                         }
                                     }
+                                    else {
+                                        // not enough data so keep going
+                                        subscription.request(1);
+                                    }
                                 }
                             }
                             else {
+
                                 // not the data we want so keep going
-                                subscription.request(1);
-                            }
-                            if(!data.isCompleted()) {
-                                currentPartial = data;
                                 subscription.request(1);
                             }
                         }
@@ -140,11 +131,6 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                             subscriber.onComplete();
                         }
 
-                        CompositeByteBuf getPartialData() {
-                            if(partialData == null)
-                                partialData = nettyHttpRequest.getChannelHandlerContext().alloc().compositeBuffer();
-                            return partialData;
-                        }
                     };
                     HttpContentProcessor processor = new FormDataHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
                     processor.subscribe(contentSubscriber);
