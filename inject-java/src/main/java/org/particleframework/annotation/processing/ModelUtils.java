@@ -221,22 +221,7 @@ class ModelUtils {
             }
         } else if (type.getKind() != VOID) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
-            Name qualifiedName = typeElement.getQualifiedName();
-            NestingKind nestingKind = typeElement.getNestingKind();
-            if( nestingKind == NestingKind.MEMBER) {
-                TypeElement enclosingElement = typeElement;
-                StringBuilder builder = new StringBuilder();
-                while(nestingKind == NestingKind.MEMBER) {
-                    enclosingElement = (TypeElement) typeElement.getEnclosingElement();
-                    nestingKind = enclosingElement.getNestingKind();
-                    builder.insert(0,'$').insert(1,typeElement.getSimpleName());
-                }
-                Name enclosingName = enclosingElement.getQualifiedName();
-                result = enclosingName.toString() + builder;
-            }
-            else {
-                result = qualifiedName.toString();
-            }
+            result = resolveTypeReferenceForTypeElement(typeElement);
         }
         return result;
     }
@@ -318,9 +303,29 @@ class ModelUtils {
 
     public Object resolveTypeReference(Element element) {
         if(element instanceof TypeElement) {
-            return ((TypeElement)element).getQualifiedName().toString();
+            TypeElement typeElement = (TypeElement) element;
+            return resolveTypeReferenceForTypeElement(typeElement);
         }
         return null;
+    }
+
+    Object resolveTypeReferenceForTypeElement(TypeElement typeElement) {
+        Name qualifiedName = typeElement.getQualifiedName();
+        NestingKind nestingKind = typeElement.getNestingKind();
+        if( nestingKind == NestingKind.MEMBER) {
+            TypeElement enclosingElement = typeElement;
+            StringBuilder builder = new StringBuilder();
+            while(nestingKind == NestingKind.MEMBER) {
+                enclosingElement = (TypeElement) typeElement.getEnclosingElement();
+                nestingKind = enclosingElement.getNestingKind();
+                builder.insert(0,'$').insert(1,typeElement.getSimpleName());
+            }
+            Name enclosingName = enclosingElement.getQualifiedName();
+            return enclosingName.toString() + builder;
+        }
+        else {
+            return qualifiedName.toString();
+        }
     }
 
 

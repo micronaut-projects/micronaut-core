@@ -53,7 +53,7 @@ public class UploadController {
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receivePublisher(@Part Flowable<byte[]> data/*, @Part Flowable<String> title*/) {
+    public Publisher<HttpResponse> receivePublisher(@Part Flowable<byte[]> data) {
         StringBuilder builder = new StringBuilder();
         AtomicLong length = new AtomicLong(0);
         PublishSubject<HttpResponse> subject = PublishSubject.create();
@@ -87,6 +87,11 @@ public class UploadController {
             }
         });
         return subject.toFlowable(BackpressureStrategy.ERROR);
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
+        return data.map( d -> HttpResponse.ok(d.toString()));
     }
 
     public static class Data {

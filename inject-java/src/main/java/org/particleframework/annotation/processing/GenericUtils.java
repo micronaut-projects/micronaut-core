@@ -17,10 +17,12 @@ class GenericUtils {
 
     private final Elements elementUtils;
     private final Types typeUtils;
+    private final ModelUtils modelUtils;
 
-    GenericUtils(Elements elementUtils,Types typeUtils) {
+    GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
+        this.modelUtils = modelUtils;
     }
 
     /**
@@ -182,11 +184,11 @@ class GenericUtils {
                 if (extendsBound == null && superBound == null) {
                     return Object.class.getName();
                 } else if (extendsBound != null) {
-                    return typeUtils.erasure(extendsBound).toString();
+                    return resolveTypeReference(typeUtils.erasure(extendsBound));
                 } else if (superBound != null) {
-                    return typeUtils.erasure(superBound).toString();
+                    return resolveTypeReference(superBound);
                 } else {
-                    return typeUtils.getWildcardType(extendsBound, superBound).toString();
+                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound));
                 }
             case ARRAY:
                 ArrayType arrayType = (ArrayType) mirror;
@@ -196,7 +198,7 @@ class GenericUtils {
                     return Array.newInstance(componentType, 0).getClass();
                 }
                 else {
-                    return mirror.toString();
+                    return modelUtils.resolveTypeReference(mirror);
                 }
             case BOOLEAN:
             case BYTE:
@@ -214,7 +216,7 @@ class GenericUtils {
                     throw new IllegalStateException("Unknown primitive type");
                 }
             default:
-                return mirror.toString();
+                return modelUtils.resolveTypeReference(mirror);
         }
 
     }

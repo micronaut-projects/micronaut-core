@@ -37,7 +37,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils,typeUtils);
         this.annotationUtils = new AnnotationUtils(elementUtils);
-        this.genericUtils = new GenericUtils(elementUtils,typeUtils);
+        this.genericUtils = new GenericUtils(elementUtils,typeUtils, modelUtils);
 
         Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
         URI baseDir = null;

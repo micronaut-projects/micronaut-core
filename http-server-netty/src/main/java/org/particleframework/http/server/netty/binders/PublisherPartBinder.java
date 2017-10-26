@@ -43,6 +43,8 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
+ * Binds a Reactive streams {@link Publisher} to a {@link Part} argument
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -84,7 +86,8 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
 
                         @Override
                         protected void doOnNext(HttpData data) {
-                            if(data.getName().equals(expectedInputName) ) {
+                            String partName = data.getName();
+                            if(partName.equals(expectedInputName) ) {
 
                                 Optional<?> converted = conversionService.convert(data, typeContext);
                                 if(converted.isPresent()) {

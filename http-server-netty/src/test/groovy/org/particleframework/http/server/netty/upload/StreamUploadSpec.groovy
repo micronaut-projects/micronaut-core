@@ -19,8 +19,10 @@ import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
+import spock.lang.Ignore
 import spock.lang.Specification
 
 /**
@@ -30,7 +32,7 @@ import spock.lang.Specification
 class StreamUploadSpec extends AbstractParticleSpec {
 
 
-    void "test non-blocking upload with publisher"() {
+    void "test non-blocking upload with publisher receiving bytes"() {
         given:
         def data = 'some data ' * 500
         RequestBody requestBody = new MultipartBody.Builder()
@@ -51,6 +53,32 @@ class StreamUploadSpec extends AbstractParticleSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.body().string().length() == data.length()
+
+    }
+
+    @Ignore // not yet implemented
+    void "test non-blocking upload with publisher receiving converted JSON"() {
+        given:
+        def data = '{"title:"Test"}'
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+                .addFormDataPart("title", "bar")
+                .build()
+
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/recieveFlowData")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.headers().get(HttpHeaders.CONTENT_TYPE) == "application/json"
+        response.body().string() == ''
 
     }
 }
