@@ -18,10 +18,12 @@ package org.particleframework.http.server.netty;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.*;
 import io.netty.util.AttributeKey;
+import io.netty.util.DefaultAttributeMap;
 import io.netty.util.ReferenceCounted;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.*;
@@ -51,7 +53,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettyHttpRequest<T> implements HttpRequest<T> {
+public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequest<T> {
 
     public static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
@@ -75,9 +77,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private Charset charset;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
-    private boolean nonBlockingBinderRegistered;
-    private Set<String> routeArgumentNames = Collections.emptySet();
-    private InterfaceHttpData currentPartialHttpData;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -87,7 +86,9 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
         Objects.requireNonNull(environment, "Environment cannot be null");
-
+        Channel channel = ctx.channel();
+        if(channel != null)
+            channel.attr(KEY).set(this);
         this.serverConfiguration = serverConfiguration;
         this.conversionService = environment;
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
@@ -255,6 +256,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
      */
     @Internal
     public void release() {
+        channelHandlerContext.channel().attr(KEY).set(null);
         for (ByteBuf byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
@@ -313,91 +315,16 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Internal
     void setMatchedRoute(RouteMatch<Object> matchedRoute) {
         this.matchedRoute = matchedRoute;
-        this.routeArgumentNames = CollectionUtils.setOf(this.matchedRoute.getArgumentNames());
     }
-
 
     @Internal
     void setBodyRequired(boolean bodyRequired) {
         this.bodyRequired = bodyRequired;
     }
 
-
     @Internal
     boolean isBodyRequired() {
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
-    }
-
-    @Internal
-    void offer(HttpPostRequestDecoder postRequestDecoder) {
-        if (postRequestDecoder != null && !routeArgumentNames.isEmpty()) {
-            Object body = this.body;
-            if (body == null) {
-                synchronized (this) { // double check
-                    body = this.body;
-                    if (body == null) {
-                        this.body = body = new MutableConvertibleValuesMap<Object>(new ConcurrentHashMap<>(routeArgumentNames.size())) {
-                        };
-                    }
-                }
-            }
-
-            if (body instanceof MutableConvertibleValues) {
-                try {
-                    while (postRequestDecoder.hasNext()) {
-                        InterfaceHttpData data = postRequestDecoder.next();
-                        String name = data.getName();
-                        if (!routeArgumentNames.contains(name)) {
-                            // discard non-required arguments
-                            continue;
-                        }
-
-                        switch (data.getHttpDataType()) {
-
-
-                            case Attribute:
-                                try {
-                                    Attribute attribute = (Attribute) data;
-
-                                    ((MutableConvertibleValues<Object>) body).put(attribute.getName(), attribute.getValue());
-                                } finally {
-                                    data.release();
-                                }
-                                break;
-                            case FileUpload:
-                                FileUpload fileUpload = (FileUpload) data;
-                                if (fileUpload.isCompleted() && fileUpload.isInMemory()) {
-                                    ((MutableConvertibleValues<Object>) body).put(fileUpload.getName(), fileUpload);
-                                }
-                                break;
-                            case InternalAttribute:
-                                data.release();
-                        }
-
-                    }
-                    this.currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-
-
-                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
-                    // ok, ignore
-                } catch (IOException e) {
-                    throw new ConnectionClosedException("Error reading request data: " + e.getMessage(), e);
-                }
-            } else {
-                postRequestDecoder.destroy();
-            }
-        }
-
-    }
-
-    @Internal
-    void setNonBlockingBinderRegistered(boolean nonBlockingBinderRegistered) {
-        this.nonBlockingBinderRegistered = nonBlockingBinderRegistered;
-    }
-
-    @Internal
-    boolean isNonBlockingBinderRegistered() {
-        return nonBlockingBinderRegistered;
     }
 
     private URI decodePath(String uri) {
@@ -413,14 +340,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private QueryStringDecoder createDecoder(String uri) {
         Charset charset = getCharacterEncoding();
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
-    }
-
-    @Internal
-    HttpData currentPartialHttpData() {
-        if(currentPartialHttpData instanceof HttpData) {
-            return (HttpData) currentPartialHttpData;
-        }
-        return null;
     }
 
     private Charset initCharset() {

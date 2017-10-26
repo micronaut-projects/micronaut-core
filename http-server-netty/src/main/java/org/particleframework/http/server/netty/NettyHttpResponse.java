@@ -42,7 +42,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
-    private static final String KEY = "$particle.response";
+    private static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
     protected FullHttpResponse nettyResponse;
     private final ConversionService conversionService;
@@ -140,7 +140,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @return The {@link NettyHttpResponse}
      */
     public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
-        return request.getAttributes().get(KEY, NettyHttpResponse.class).orElse((NettyHttpResponse)HttpResponse.ok());
+        return getOr(request, HttpResponse.ok());
     }
 
     /**
@@ -150,10 +150,13 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @return The {@link NettyHttpResponse}
      */
     public static NettyHttpResponse getOr(NettyHttpRequest<?> request, HttpResponse<?> alternative) {
-        return request.getAttributes().get(KEY, NettyHttpResponse.class).orElseGet(() -> {
-            request.getAttributes().put(KEY, alternative);
-            return (NettyHttpResponse) alternative;
-        });
+        Attribute<NettyHttpResponse> attr = request.attr(KEY);
+        NettyHttpResponse nettyHttpResponse = attr.get();
+        if(nettyHttpResponse == null) {
+            nettyHttpResponse = (NettyHttpResponse)alternative;
+            attr.set(nettyHttpResponse);
+        }
+        return nettyHttpResponse;
     }
     /**
      * Lookup the response from the request
@@ -162,7 +165,8 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @return The {@link NettyHttpResponse}
      */
     public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
-        return request.getAttributes().get(KEY, NettyHttpResponse.class);
+        NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
+        return Optional.ofNullable(nettyHttpResponse);
     }
 
     /**
@@ -171,14 +175,8 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param request The request
      * @return The {@link NettyHttpResponse}
      */
-    public static Optional<NettyHttpResponse> set(org.particleframework.http.HttpRequest<?> request, HttpResponse<?> response) {
-        MutableConvertibleValues<Object> attributes = request.getAttributes();
-        if(response == null) {
-            attributes.remove(KEY);
-        }
-        else {
-            attributes.put(KEY, response);
-        }
+    public static Optional<NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
+        request.attr(KEY).set((NettyHttpResponse) response);
         return Optional.ofNullable((NettyHttpResponse) response);
     }
 }

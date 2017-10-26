@@ -450,7 +450,6 @@ public class NettyHttpServer implements EmbeddedServer {
 
                             if (bindingResult.isPresent()) {
                                 argumentValues.put(argumentName, bindingResult.get());
-                                request.setNonBlockingBinderRegistered(true);
                             }
 
                         } else {
@@ -468,9 +467,6 @@ public class NettyHttpServer implements EmbeddedServer {
                         } else if (bindingResult.isPresent()) {
                             argumentValues.put(argumentName, bindingResult.get());
                         } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
-                            if(CollectionUtils.setOf(Publisher.class, Future.class).stream().anyMatch(type -> type.isAssignableFrom(argument.getType()))) {
-                                request.setNonBlockingBinderRegistered(true);
-                            }
                             argumentValues.put(argumentName, (UnresolvedArgument) () -> {
                                 Optional result = argumentBinder.bind(conversionContext, request);
                                 Optional<ConversionError> lastError = conversionContext.getLastError();

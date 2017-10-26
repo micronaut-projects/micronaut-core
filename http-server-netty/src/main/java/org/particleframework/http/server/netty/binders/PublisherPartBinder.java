@@ -77,7 +77,7 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                 return Optional.of(subscriber -> {
                     Subscriber<HttpData> contentSubscriber = new CompletionAwareSubscriber<HttpData>() {
                         int position = 0;
-
+                        String partName;
                         @Override
                         protected void doOnSubscribe(Subscription subscription) {
                             subscriber.onSubscribe(subscription);
@@ -85,7 +85,12 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
 
                         @Override
                         protected void doOnNext(HttpData data) {
-                            String partName = data.getName();
+                            String name = data.getName();
+                            if(partName == null || !partName.equals(name)) {
+                                // reset the position
+                                position = 0;
+                            }
+                            partName = name;
                             if(partName.equals(expectedInputName) ) {
 
                                 if(data instanceof FileUpload) {
@@ -115,7 +120,6 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                                 }
                             }
                             else {
-
                                 // not the data we want so keep going
                                 subscription.request(1);
                             }
