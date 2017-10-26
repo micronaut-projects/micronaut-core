@@ -47,7 +47,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-//        response.message() == "No!! Invalid JSON" TODO: FIXME
+        response.message() == "No!! Invalid JSON"
         response.headers().get(HttpHeaders.CONTENT_TYPE) == org.particleframework.http.MediaType.APPLICATION_VND_ERROR
 
         when:
@@ -100,7 +100,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         then:
         result['_links'].self.href == '/json/string'
         result.message.startsWith('Invalid JSON')
-        //        response.message() == "No!! Invalid JSON" TODO: FIXMEresponse.message() == "No!! Invalid JSON"
+        response.message() == "No!! Invalid JSON"
     }
 
     void "test parse body into parameters if no @Body specified"() {
