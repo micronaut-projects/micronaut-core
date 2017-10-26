@@ -19,6 +19,7 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.type.Argument;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.util.*;
 
@@ -47,18 +48,8 @@ class DefaultArgumentConversionContext implements ArgumentConversionContext {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return argument.getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return argument.getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return argument.getDeclaredAnnotations();
+    public AnnotatedElement[] getAnnotatedElements() {
+        return new AnnotatedElement[] { argument };
     }
 
     @Override

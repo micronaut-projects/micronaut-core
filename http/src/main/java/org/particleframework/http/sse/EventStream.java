@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EventStream extends Consumer<Subscriber<Event>>  {
+public interface EventStream extends Consumer<Subscriber<? super Event>>  {
 
     /**
      * A stream for the given consumer. The consumer accepts a {@link Subscriber} with which the API implementer can send events
@@ -34,7 +34,7 @@ public interface EventStream extends Consumer<Subscriber<Event>>  {
      * @param subscriber The subscriber
      * @return The EventStream
      */
-    static EventStream of(Consumer<Subscriber<Event>> subscriber) {
+    static EventStream of(Consumer<Subscriber<? super Event>> subscriber) {
         return subscriber::accept;
     }
 

@@ -15,6 +15,9 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.bind.annotation.Bindable;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
@@ -25,10 +28,12 @@ import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Abstract implementation of the {@link RouteMatch} interface
@@ -41,12 +46,41 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
     protected final MethodExecutionHandle<R> executableMethod;
     protected final List<Predicate<HttpRequest>> conditions;
     protected final ConversionService<?> conversionService;
+    protected final Map<String, Argument> requiredInputs;
 
     protected AbstractRouteMatch(List<Predicate<HttpRequest>> conditions, MethodExecutionHandle<R> executableMethod, ConversionService<?> conversionService) {
         this.conditions = conditions;
         this.executableMethod = executableMethod;
         this.conversionService = conversionService;
+        Argument[] requiredArguments = executableMethod.getArguments();
+        this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+        for (Argument requiredArgument : requiredArguments) {
+            Optional<Annotation> ann = requiredArgument.findAnnotationWithStereoType(Bindable.class);
+            if(ann.isPresent()) {
+                Optional<String> value = AnnotationUtil.findValueOfType(ann.get(), String.class);
+                requiredInputs.put(value.orElse(requiredArgument.getName()), requiredArgument);
+            }
+            else {
+                requiredInputs.put(requiredArgument.getName(), requiredArgument);
+            }
+        }
 
+    }
+
+    @Override
+    public boolean isRequiredInput(String name) {
+        return requiredInputs.containsKey(name);
+    }
+
+    @Override
+    public boolean isExecutable() {
+        Map<String, Object> variables = getVariables();
+        for (Argument argument : requiredInputs.values()) {
+            Object value = variables.get(argument.getName());
+            if( value == null || value instanceof UnresolvedArgument)
+                return false;
+        }
+        return true;
     }
 
     @Override
@@ -135,27 +169,29 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                 } else if (argumentValues.containsKey(name)) {
                     value = argumentValues.get(name);
                 }
-                if(value instanceof Supplier) {
-                    Supplier supplier = (Supplier) value;
-                    Object o = supplier.get();
+                if(value instanceof UnresolvedArgument) {
+                    UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
+                    Optional o = unresolved.get();
 
-                    if(o instanceof Optional) {
-                        o = ((Optional<?>)o).orElseThrow(()-> new UnsatisfiedRouteException(argument));
-                    }
-                    if(o != null) {
-                        if(o instanceof ConversionError) {
-                            ConversionError conversionError = (ConversionError) o;
+
+                    if(o.isPresent()) {
+                        Object resolved = o.get();
+                        if(resolved instanceof ConversionError) {
+                            ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);
                         }
                         else {
                             ConversionContext conversionContext = ConversionContext.of(argument);
-                            Optional<?> result = conversionService.convert(o, argument.getType(), conversionContext);
+                            Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
                     }
                     else {
                         throw new UnsatisfiedRouteException(argument);
                     }
+                }
+                else if(value instanceof ConversionError) {
+                    throw new ConversionErrorException(argument, (ConversionError) value);
                 }
                 else if (value == DefaultRouteBuilder.NO_VALUE) {
                     throw new UnsatisfiedRouteException(argument);
@@ -179,4 +215,37 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
             return routingException;
         });
     }
+
+    @Override
+    public RouteMatch<R> fulfill(Map<String, Object> argumentValues) {
+        Map<String, Object> oldVariables = getVariables();
+        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
+        for (Argument requiredArgument : getArguments()) {
+            String name = requiredArgument.getName();
+            Object value = argumentValues.get(name);
+            if(value != null) {
+                if(value instanceof UnresolvedArgument) {
+                    newVariables.put(name, value);
+                }
+                else {
+                    ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
+                    Optional converted = conversionService.convert(value, conversionContext);
+                    Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
+                    if(result != null) {
+                        newVariables.put(name, result);
+                    }
+                }
+            }
+        }
+        Set<String> argumentNames = argumentValues.keySet();
+        List<Argument> requiredArguments = getRequiredArguments()
+                .stream()
+                .filter(arg -> !argumentNames.contains(arg.getName()))
+                .collect(Collectors.toList());
+
+
+        return newFulfilled(newVariables, requiredArguments);
+    }
+
+    protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 }

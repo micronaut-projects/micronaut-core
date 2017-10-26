@@ -101,4 +101,11 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
     default boolean isExecutable() {
         return getRequiredArguments().size() == 0;
     }
+
+    /**
+     * Return whether the given named input is required by this route
+     * @param name The name of the input
+     * @return True if it is
+     */
+    boolean isRequiredInput(String name);
 }

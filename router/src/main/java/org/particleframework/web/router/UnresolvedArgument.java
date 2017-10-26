@@ -13,23 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package example;
+package org.particleframework.web.router;
+
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
+ * Represents an unresolved argument to a {@link org.particleframework.web.router.Route}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class Book {
-    private String title;
-
-    public Book(String title) {
-        this.title = title;
-    }
-
-    public Book() {
-    }
-
-    public String getTitle() {
-        return title;
-    }
+@FunctionalInterface
+public interface UnresolvedArgument<T> extends Supplier<Optional<T>> {
 }

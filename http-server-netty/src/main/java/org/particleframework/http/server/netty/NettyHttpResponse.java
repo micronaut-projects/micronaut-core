@@ -24,10 +24,8 @@ import io.netty.util.AttributeKey;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.http.*;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.HttpStatus;
-import org.particleframework.http.MutableHttpHeaders;
-import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 
@@ -35,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Delegates to Netty's {@link DefaultFullHttpResponse}
@@ -43,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
-    public static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
+    private static final String KEY = "$particle.response";
 
     protected FullHttpResponse nettyResponse;
     private final ConversionService conversionService;
@@ -137,32 +136,49 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     /**
      * Lookup the response from the context
      *
-     * @param ctx The context
+     * @param request The context
      * @return The {@link NettyHttpResponse}
      */
-    public static NettyHttpResponse getOrCreate(ChannelHandlerContext ctx) {
-        Attribute<NettyHttpResponse> attr = ctx
-                .channel()
-                .attr(KEY);
-        NettyHttpResponse nettyHttpResponse = attr.get();
-        if(nettyHttpResponse == null) {
-            nettyHttpResponse = (NettyHttpResponse)HttpResponse.ok();
-            attr.set(nettyHttpResponse);
-        }
-        return nettyHttpResponse;
+    public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
+        return request.getAttributes().get(KEY, NettyHttpResponse.class).orElse((NettyHttpResponse)HttpResponse.ok());
     }
 
     /**
      * Lookup the response from the context
      *
-     * @param context The context
+     * @param request The context
      * @return The {@link NettyHttpResponse}
      */
-    public static Optional<NettyHttpResponse> get(ChannelHandlerContext context) {
-        Attribute<NettyHttpResponse> attr = context
-                .channel()
-                .attr(KEY);
-        NettyHttpResponse res = attr.get();
-        return res == null ? Optional.empty() : Optional.of(res);
+    public static NettyHttpResponse getOr(NettyHttpRequest<?> request, HttpResponse<?> alternative) {
+        return request.getAttributes().get(KEY, NettyHttpResponse.class).orElseGet(() -> {
+            request.getAttributes().put(KEY, alternative);
+            return (NettyHttpResponse) alternative;
+        });
+    }
+    /**
+     * Lookup the response from the request
+     *
+     * @param request The request
+     * @return The {@link NettyHttpResponse}
+     */
+    public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
+        return request.getAttributes().get(KEY, NettyHttpResponse.class);
+    }
+
+    /**
+     * Lookup the response from the request
+     *
+     * @param request The request
+     * @return The {@link NettyHttpResponse}
+     */
+    public static Optional<NettyHttpResponse> set(org.particleframework.http.HttpRequest<?> request, HttpResponse<?> response) {
+        MutableConvertibleValues<Object> attributes = request.getAttributes();
+        if(response == null) {
+            attributes.remove(KEY);
+        }
+        else {
+            attributes.put(KEY, response);
+        }
+        return Optional.ofNullable((NettyHttpResponse) response);
     }
 }

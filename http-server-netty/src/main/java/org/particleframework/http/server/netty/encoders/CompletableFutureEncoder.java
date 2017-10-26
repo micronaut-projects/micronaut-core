@@ -17,6 +17,7 @@ package org.particleframework.http.server.netty.encoders;
 
 import io.netty.channel.*;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,6 @@ import java.util.function.BiConsumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ChannelHandler.Sharable
 public class CompletableFutureEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(CompletableFutureEncoder.class);
 
@@ -65,11 +65,9 @@ public class CompletableFutureEncoder extends ChannelOutboundHandlerAdapter impl
 
     @Singleton
     public static class CompletableFutureEncoderFactory implements ChannelHandlerFactory {
-        private final CompletableFutureEncoder completableFutureEncoder = new CompletableFutureEncoder();
-
         @Override
-        public ChannelHandler build(Channel channel) {
-            return completableFutureEncoder;
+        public ChannelHandler build(NettyHttpRequestProvider requestProvider) {
+            return new CompletableFutureEncoder();
         }
     }
 }

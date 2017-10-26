@@ -15,13 +15,13 @@
  */
 package org.particleframework.http.server.netty.encoders;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.FullHttpResponse;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 
@@ -35,8 +35,13 @@ import java.util.List;
  * @since 1.0
  */
 
-@ChannelHandler.Sharable
 public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> implements Ordered {
+
+    private final ChannelHandlerFactory.NettyHttpRequestProvider request;
+
+    public HttpResponseEncoder(ChannelHandlerFactory.NettyHttpRequestProvider request) {
+        this.request = request;
+    }
 
     @Override
     public boolean acceptOutboundMessage(Object msg) throws Exception {
@@ -47,10 +52,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
     protected void encode(ChannelHandlerContext ctx, HttpResponse msg, List<Object> out) throws Exception {
         NettyHttpResponse res = (NettyHttpResponse) msg;
         FullHttpResponse nativeResponse = res.getNativeResponse();
-
-        ctx.channel()
-            .attr(NettyHttpResponse.KEY)
-            .set(res);
+        NettyHttpResponse.set(request.get(), res);
 
         Object body = res.getBody();
         if(body != null) {
@@ -59,15 +61,14 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<HttpResponse> i
         else {
             out.add(nativeResponse);
         }
+
     }
 
     @Singleton
     public static class HttpResponseEncoderFactory implements ChannelHandlerFactory {
-        private final HttpResponseEncoder httpResponseEncoder = new HttpResponseEncoder();
-
         @Override
-        public ChannelHandler build(Channel channel) {
-            return httpResponseEncoder;
+        public ChannelHandler build(NettyHttpRequestProvider provider) {
+            return new HttpResponseEncoder(provider);
         }
     }
 }

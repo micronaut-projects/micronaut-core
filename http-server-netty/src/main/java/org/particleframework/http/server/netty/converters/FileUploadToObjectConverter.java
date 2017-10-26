@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty.converters;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -35,12 +36,12 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
+public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Object> {
 
     private final Map<String, MediaTypeReader> javaTypeMappings;
     private final ConversionService conversionService;
 
-    protected FileUploadConverter(ConversionService conversionService, MediaTypeReader... mediaTypeMappings) {
+    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeReader... mediaTypeMappings) {
         this.javaTypeMappings = new LinkedHashMap<>();
         for (MediaTypeReader mediaTypeMapping : mediaTypeMappings) {
             javaTypeMappings.put(mediaTypeMapping.getMediaType().getExtension(), mediaTypeMapping);
@@ -51,7 +52,12 @@ public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
     @Override
     public Optional<Object> convert(FileUpload object, Class<Object> targetType, ConversionContext context) {
         try {
+            if(!object.isCompleted()) {
+                return Optional.empty();
+            }
+
             String contentType = object.getContentType();
+            ByteBuf byteBuf = object.getByteBuf();
             if (contentType != null) {
                 MediaType mediaType = new MediaType(contentType);
                 Charset charset = object.getCharset();
@@ -60,14 +66,14 @@ public class FileUploadConverter implements TypeConverter<FileUpload, Object> {
                 }
                 MediaTypeReader reader = javaTypeMappings.get(mediaType.getExtension());
                 if(reader != null) {
-                    Object val = reader.read(targetType, object.getByteBuf(), charset);
+                    Object val = reader.read(targetType, byteBuf, charset);
                     return Optional.of(val);
                 }
                 else {
-                    return conversionService.convert(object.getByteBuf(), targetType, context);
+                    return conversionService.convert(byteBuf, targetType, context);
                 }
             }
-            return conversionService.convert(object.getByteBuf(), targetType, context);
+            return conversionService.convert(byteBuf, targetType, context);
         } catch (Exception e) {
             context.reject(e);
             return Optional.empty();

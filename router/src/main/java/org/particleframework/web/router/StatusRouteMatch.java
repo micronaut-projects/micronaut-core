@@ -48,17 +48,7 @@ public class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
     }
 
     @Override
-    public RouteMatch<T> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariables();
-        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
-        newVariables.putAll(argumentValues);
-        Set<String> argumentNames = argumentValues.keySet();
-        List<Argument> requiredArguments = getRequiredArguments()
-                .stream()
-                .filter(arg -> !argumentNames.contains(arg.getName()))
-                .collect(Collectors.toList());
-
-
+    protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new StatusRouteMatch<T>(httpStatus, executableMethod, conditions, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {

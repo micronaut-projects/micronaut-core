@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.core.async.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
@@ -87,19 +88,20 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                     processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
                 }
 
-                return Optional.of(subscriber -> processor.subscribe(new Subscriber() {
+                return Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber() {
+
                     @Override
-                    public void onSubscribe(Subscription s) {
-                        subscriber.onSubscribe(s);
+                    protected void doOnSubscribe(Subscription subscription) {
+                        subscriber.onSubscribe(subscription);
                     }
 
                     @Override
-                    public void onNext(Object o) {
+                    protected void doOnNext(Object message) {
                         ArgumentConversionContext<?> conversionContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                        if(o instanceof ByteBufHolder) {
-                            o = ((ByteBufHolder)o).content();
+                        if(message instanceof ByteBufHolder) {
+                            message = ((ByteBufHolder)message).content();
                         }
-                        Optional<?> converted = conversionService.convert(o, conversionContext);
+                        Optional<?> converted = conversionService.convert(message, conversionContext);
                         if(converted.isPresent()) {
                             subscriber.onNext(converted.get());
                         }
@@ -115,16 +117,16 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                     }
 
                     @Override
-                    public void onError(Throwable t) {
+                    protected void doOnError(Throwable t) {
                         subscriber.onError(t);
                     }
 
                     @Override
-                    public void onComplete() {
+                    protected void doOnComplete() {
                         subscriber.onComplete();
                     }
-                }));
 
+                }));
             }
         }
         return Optional.empty();

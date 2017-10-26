@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
@@ -53,10 +52,15 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
     public static final AsciiString RETRY_PREFIX = new AsciiString("retry: ", StandardCharsets.UTF_8);
     public static final AsciiString COMMENT_PREFIX = new AsciiString(": ", StandardCharsets.UTF_8);
     public static final AsciiString NEWLINE = new AsciiString("\n", StandardCharsets.UTF_8);
+    private final ChannelHandlerFactory.NettyHttpRequestProvider requestProvider;
+
+    public EventStreamEncoder(ChannelHandlerFactory.NettyHttpRequestProvider requestProvider) {
+        this.requestProvider = requestProvider;
+    }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        NettyHttpRequest request = NettyHttpRequest.lookup(ctx);
+
         if (msg instanceof EventStream) {
             EventStream stream = (EventStream) msg;
             HttpResponse streamResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -72,6 +76,7 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
                                             @Override
                                             protected void complete() {
                                                 channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(future -> {
+                                                            NettyHttpRequest request = requestProvider.get();
                                                             if (request == null || !request.getHeaders().isKeepAlive()) {
                                                                 channel.pipeline()
                                                                         .writeAndFlush(org.particleframework.http.HttpResponse.noContent())
@@ -113,7 +118,7 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
             Event event = (Event) msg;
             Object data = event.getData();
             if(data instanceof CharSequence) {
-                data = Unpooled.copiedBuffer((CharSequence)data, request.getCharacterEncoding());
+                data = Unpooled.copiedBuffer((CharSequence)data, requestProvider.get().getCharacterEncoding());
             }
 
             if (data instanceof ByteBuf) {
@@ -157,11 +162,9 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
 
     @Singleton
     public static class Factory implements ChannelHandlerFactory {
-        private final EventStreamEncoder encoder = new EventStreamEncoder();
-
         @Override
-        public ChannelHandler build(Channel channel) {
-            return encoder;
+        public ChannelHandler build(NettyHttpRequestProvider requestProvider) {
+            return new EventStreamEncoder(requestProvider);
         }
     }
 }

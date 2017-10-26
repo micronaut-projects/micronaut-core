@@ -23,6 +23,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.concurrent.TimeUnit
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -40,6 +42,9 @@ abstract class AbstractParticleSpec extends Specification {
 
     @Shared String server = "http://localhost:$serverPort"
     @Shared OkHttpClient client = new OkHttpClient()
+                                            .newBuilder()
+//                                            .readTimeout(1, TimeUnit.MINUTES)
+                                            .build()
 
     Collection<String> configurationNames() {
         ['org.particleframework.configuration.jackson','org.particleframework.web.router']

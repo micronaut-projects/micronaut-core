@@ -7,7 +7,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.reactive.AbstractSingleSubscriberProcessor;
+import org.particleframework.core.async.SingleThreadedBufferingProcessor;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultHttpContentProcessor extends AbstractSingleSubscriberProcessor<ByteBufHolder, ByteBufHolder> implements HttpContentProcessor<ByteBufHolder> {
+public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcessor<ByteBufHolder, ByteBufHolder> implements HttpContentProcessor<ByteBufHolder> {
     protected final NettyHttpRequest nettyHttpRequest;
     protected final ChannelHandlerContext ctx;
     protected final HttpServerConfiguration configuration;
@@ -47,7 +47,7 @@ public class DefaultHttpContentProcessor extends AbstractSingleSubscriberProcess
     }
 
     @Override
-    protected void publishDownStream(ByteBufHolder message) {
+    protected void onMessage(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
@@ -72,7 +72,7 @@ public class DefaultHttpContentProcessor extends AbstractSingleSubscriberProcess
     }
 
     protected void fireExceedsLength(long receivedLength, long expected) {
-        state = State.DONE;
+        state = BackPressureState.DONE;
         parentSubscription.cancel();
         resolveSubscriber().ifPresent(subscriber -> subscriber.onError(new ContentLengthExceededException(expected, receivedLength)));
     }

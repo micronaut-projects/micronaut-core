@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.convert;
 
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.type.Argument;
@@ -36,7 +37,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext extends AnnotatedElement, TypeVariableResolver, ErrorsContext {
+public interface ConversionContext extends AnnotationSource, TypeVariableResolver, ErrorsContext {
 
 
     /**
@@ -70,18 +71,8 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
     }
 
     @Override
-    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return null;
-    }
-
-    @Override
-    default Annotation[] getAnnotations() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
-    @Override
-    default Annotation[] getDeclaredAnnotations() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
+    default AnnotatedElement[] getAnnotatedElements() {
+        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     }
 
     /**
@@ -148,7 +139,7 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
      * @param argument The argument
      * @return The conversion context
      */
-    static ConversionContext of(Argument<?> argument) {
+    static ArgumentConversionContext of(Argument<?> argument) {
         return of(argument, null,null);
     }
 
@@ -159,7 +150,7 @@ public interface ConversionContext extends AnnotatedElement, TypeVariableResolve
      * @param locale The locale
      * @return The conversion context
      */
-    static ConversionContext of(Argument<?> argument, @Nullable Locale locale) {
+    static ArgumentConversionContext of(Argument<?> argument, @Nullable Locale locale) {
         return of(argument, locale,null);
     }
 

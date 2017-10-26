@@ -3,6 +3,7 @@ package org.particleframework.http.server.netty.binders;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.buffer.ByteBufHolder;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.core.async.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
@@ -68,28 +69,25 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                     processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
                 }
 
-                processor.subscribe(new Subscriber<Object>() {
-                    Subscription subscription;
+                processor.subscribe(new CompletionAwareSubscriber() {
                     @Override
-                    public void onSubscribe(Subscription s) {
-                        // a future executes immediately, so trigger demand
-                        this.subscription = s;
-                        s.request(1);
-                    }
-
-                    @Override
-                    public void onNext(Object body) {
-                        nettyHttpRequest.setBody(body);
+                    protected void doOnSubscribe(Subscription subscription) {
                         subscription.request(1);
                     }
 
                     @Override
-                    public void onError(Throwable t) {
+                    protected void doOnNext(Object message) {
+                        nettyHttpRequest.setBody(message);
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
                         future.completeExceptionally(t);
                     }
 
                     @Override
-                    public void onComplete() {
+                    protected void doOnComplete() {
                         Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
                         Object body = nettyHttpRequest.getBody();
                         if (firstTypeParameter.isPresent()) {

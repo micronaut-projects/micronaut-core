@@ -15,6 +15,9 @@
  */
 package example;
 
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
+import org.particleframework.http.annotation.Body;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.validation.Validated;
 import org.particleframework.web.router.annotation.Get;
@@ -44,4 +47,8 @@ public class BookController {
         return new Book(title);
     }
 
+    @Post("/upload")
+    public Flowable<Book> uploadBook(@Body Flowable<Book> bookFlowable) {
+        return bookFlowable.subscribeOn(Schedulers.io());
+    }
 }

@@ -4,6 +4,7 @@ import org.anarres.gradle.plugin.jarjar.JarjarTask
 // Declare all dependencies in this map and not with the dependencies block!
 def deps = [
         compile: [
+                [group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'],
                 [group:'com.github.ben-manes.caffeine',name:'caffeine', version:'2.5.0']
         ]
 ]

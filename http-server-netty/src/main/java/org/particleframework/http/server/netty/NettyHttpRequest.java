@@ -20,10 +20,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import io.netty.handler.codec.http.multipart.*;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 import org.particleframework.core.annotation.Internal;
@@ -71,7 +68,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private NettyCookies nettyCookies;
     private Locale locale;
     private URI path;
-    private List<ByteBuf> receivedContent  = new ArrayList<>();
+    private List<ByteBuf> receivedContent = new ArrayList<>();
 
     private Object body;
     private MediaType mediaType;
@@ -80,6 +77,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     private boolean bodyRequired;
     private boolean nonBlockingBinderRegistered;
     private Set<String> routeArgumentNames = Collections.emptySet();
+    private InterfaceHttpData currentPartialHttpData;
 
 
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -236,17 +234,17 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     @Override
     public T getBody() {
         Object body = this.body;
-        if(body == null && !receivedContent.isEmpty()) {
+        if (body == null && !receivedContent.isEmpty()) {
             this.body = body = Unpooled.unmodifiableBuffer(getReceivedContent());
         }
-        return (T)body;
+        return (T) body;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
         T body = getBody();
-        if(body == null) {
+        if (body == null) {
             return Optional.empty();
         }
         return convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(body, aClass));
@@ -260,7 +258,7 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         for (ByteBuf byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
-        if(this.body != null && body instanceof ReferenceCounted) {
+        if (this.body != null && body instanceof ReferenceCounted) {
             ReferenceCounted body = (ReferenceCounted) this.body;
             releaseIfNecessary(body);
         }
@@ -271,9 +269,9 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     }
 
     protected void releaseIfNecessary(Object value) {
-        if(value instanceof ReferenceCounted) {
+        if (value instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) value;
-            if(referenceCounted.refCnt() != 0) {
+            if (referenceCounted.refCnt() != 0) {
                 referenceCounted.release();
             }
         }
@@ -325,7 +323,6 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     }
 
 
-
     @Internal
     boolean isBodyRequired() {
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
@@ -333,56 +330,60 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
 
     @Internal
     void offer(HttpPostRequestDecoder postRequestDecoder) {
-        if(postRequestDecoder != null && !routeArgumentNames.isEmpty()) {
+        if (postRequestDecoder != null && !routeArgumentNames.isEmpty()) {
             Object body = this.body;
             if (body == null) {
                 synchronized (this) { // double check
                     body = this.body;
                     if (body == null) {
-                        this.body = body = new MutableConvertibleValuesMap<Object>(new ConcurrentHashMap<>(routeArgumentNames.size())) {};
+                        this.body = body = new MutableConvertibleValuesMap<Object>(new ConcurrentHashMap<>(routeArgumentNames.size())) {
+                        };
                     }
                 }
             }
 
-            if(body instanceof MutableConvertibleValues) {
+            if (body instanceof MutableConvertibleValues) {
                 try {
                     while (postRequestDecoder.hasNext()) {
                         InterfaceHttpData data = postRequestDecoder.next();
                         String name = data.getName();
-                        try {
-                            if(!routeArgumentNames.contains(name)) {
-                                // discard non-required arguments
-                                continue;
-                            }
+                        if (!routeArgumentNames.contains(name)) {
+                            // discard non-required arguments
+                            continue;
+                        }
 
-                            switch (data.getHttpDataType()) {
-                                case Attribute:
+                        switch (data.getHttpDataType()) {
+
+
+                            case Attribute:
+                                try {
                                     Attribute attribute = (Attribute) data;
 
-                                    ((MutableConvertibleValues<Object>)body).put(attribute.getName(), attribute.getValue());
-                                    break;
-                                case FileUpload:
-                                    FileUpload fileUpload = (FileUpload) data;
-                                    if(fileUpload.isCompleted() && fileUpload.isInMemory()) {
-                                        ((MutableConvertibleValues<Object>)body).put(fileUpload.getName(), fileUpload);
-                                    }
-                                    break;
-                            }
-                        } finally {
-//                            data.release();
+                                    ((MutableConvertibleValues<Object>) body).put(attribute.getName(), attribute.getValue());
+                                } finally {
+                                    data.release();
+                                }
+                                break;
+                            case FileUpload:
+                                FileUpload fileUpload = (FileUpload) data;
+                                if (fileUpload.isCompleted() && fileUpload.isInMemory()) {
+                                    ((MutableConvertibleValues<Object>) body).put(fileUpload.getName(), fileUpload);
+                                }
+                                break;
+                            case InternalAttribute:
+                                data.release();
                         }
 
                     }
-                    InterfaceHttpData partialHttpData = postRequestDecoder.currentPartialHttpData();
-                    // TODO: handle partial data and chunked data
+                    this.currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
+
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
                     // ok, ignore
                 } catch (IOException e) {
                     throw new ConnectionClosedException("Error reading request data: " + e.getMessage(), e);
                 }
-            }
-            else {
+            } else {
                 postRequestDecoder.destroy();
             }
         }
@@ -393,13 +394,10 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
     void setNonBlockingBinderRegistered(boolean nonBlockingBinderRegistered) {
         this.nonBlockingBinderRegistered = nonBlockingBinderRegistered;
     }
+
     @Internal
     boolean isNonBlockingBinderRegistered() {
         return nonBlockingBinderRegistered;
-    }
-
-    public static NettyHttpRequest lookup(ChannelHandlerContext ctx) {
-        return ctx.channel().attr(NettyHttpRequest.KEY).get();
     }
 
     private URI decodePath(String uri) {
@@ -417,10 +415,16 @@ public class NettyHttpRequest<T> implements HttpRequest<T> {
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
+    @Internal
+    HttpData currentPartialHttpData() {
+        if(currentPartialHttpData instanceof HttpData) {
+            return (HttpData) currentPartialHttpData;
+        }
+        return null;
+    }
+
     private Charset initCharset() {
         Charset characterEncoding = HttpRequest.super.getCharacterEncoding();
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
-
-
 }

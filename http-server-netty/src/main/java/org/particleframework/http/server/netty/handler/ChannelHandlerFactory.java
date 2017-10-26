@@ -15,8 +15,10 @@
  */
 package org.particleframework.http.server.netty.handler;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
+import org.particleframework.http.server.netty.NettyHttpRequest;
+
+import java.util.function.Supplier;
 
 /**
  * Factory interface for building {@link ChannelHandler} instances
@@ -29,8 +31,13 @@ public interface ChannelHandlerFactory {
     /**
      * Constructs a new {@link ChannelHandler}
      *
-     * @param channel The channel instance
+     * @param requestProvider The channel instance
      * @return The new {@link ChannelHandler}
      */
-    ChannelHandler build(Channel channel);
+    ChannelHandler build(NettyHttpRequestProvider requestProvider);
+
+
+    interface NettyHttpRequestProvider extends Supplier<NettyHttpRequest> {
+
+    }
 }

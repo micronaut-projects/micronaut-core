@@ -17,12 +17,12 @@ package org.particleframework.http.server.netty.encoders;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.http.sse.Event;
@@ -37,10 +37,14 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ChannelHandler.Sharable
 public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Object> implements Ordered {
 
     public static final int ORDER = Ordered.LOWEST_PRECEDENCE;
+    private final ChannelHandlerFactory.NettyHttpRequestProvider request;
+
+    public ObjectToStringFallbackEncoder(ChannelHandlerFactory.NettyHttpRequestProvider provider) {
+        this.request = provider;
+    }
 
     @Override
     public int getOrder() {
@@ -54,9 +58,7 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-        NettyHttpResponse res = NettyHttpResponse.getOrCreate(ctx);
-
-
+        NettyHttpResponse res = NettyHttpResponse.getOrCreate(request.get());
         String string = msg.toString();
         ByteBuf content = Unpooled.copiedBuffer(string, StandardCharsets.UTF_8);
         if(msg instanceof Event) {
@@ -77,12 +79,15 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
     }
 
     @Singleton
-    public static class ObjectToStringFallbackEncoderFactory implements ChannelHandlerFactory {
-        private final ObjectToStringFallbackEncoder objectToStringFallbackEncoder = new ObjectToStringFallbackEncoder();
+    public static class ObjectToStringFallbackEncoderFactory implements ChannelHandlerFactory, Ordered {
+        @Override
+        public int getOrder() {
+            return ORDER;
+        }
 
         @Override
-        public ChannelHandler build(Channel channel) {
-            return objectToStringFallbackEncoder;
+        public ChannelHandler build(NettyHttpRequestProvider provider) {
+            return new ObjectToStringFallbackEncoder(provider);
         }
     }
 }

@@ -17,10 +17,11 @@ package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import io.netty.handler.codec.http.multipart.*;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.nio.charset.Charset;
 
@@ -30,10 +31,11 @@ import java.nio.charset.Charset;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FormDataHttpContentProcessor extends DefaultHttpContentProcessor {
+public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<HttpData> {
 
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
+    private InterfaceHttpData currentPartialHttpData;
 
     public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
@@ -52,17 +54,55 @@ public class FormDataHttpContentProcessor extends DefaultHttpContentProcessor {
 
 
     @Override
-    protected void publishVerifiedContent(ByteBufHolder message) {
-        super.publishVerifiedContent(message);
+    public void onSubscribe(Subscription subscription) {
+        this.parentSubscription = subscription;
+        Subscriber<? super HttpData> subscriber = this.subscriber.get();
+
+        if(!verifyState(subscriber)) {
+            return;
+        }
+
+        subscriber.onSubscribe(subscription);
+    }
+
+    @Override
+    protected void publishMessage(ByteBufHolder message) {
+        Subscriber<? super HttpData> subscriber = this.subscriber.get();
+        verifyState(subscriber);
+
         if(message instanceof HttpContent) {
             try {
                 HttpContent httpContent = (HttpContent) message;
-                decoder.offer(httpContent);
-                nettyHttpRequest.offer(decoder);
-            } catch (Exception e) {
+                HttpPostRequestDecoder postRequestDecoder = this.decoder;
+                postRequestDecoder.offer(httpContent);
+                while (postRequestDecoder.hasNext()) {
+                    InterfaceHttpData data = postRequestDecoder.next();
+                    try {
+                        switch (data.getHttpDataType()) {
+                            case Attribute:
+                                Attribute attribute = (Attribute) data;
+                                subscriber.onNext(attribute);
+                                break;
+                            case FileUpload:
+                                FileUpload fileUpload = (FileUpload) data;
+                                if (fileUpload.isCompleted()) {
+                                    subscriber.onNext(fileUpload);
+                                }
+                                break;
+                        }
+                    } finally {
+                        data.release();
+                    }
+
+                }
+                this.currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
+                if(currentPartialHttpData instanceof HttpData) {
+                    subscriber.onNext((HttpData)currentPartialHttpData);
+                }
+            } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
+                // ok, ignore
+            } catch (Throwable e) {
                 onError(e);
-            } finally {
-                message.release();
             }
         }
         else {
@@ -71,8 +111,26 @@ public class FormDataHttpContentProcessor extends DefaultHttpContentProcessor {
     }
 
     @Override
-    public void onComplete() {
-        decoder.destroy();
-        super.onComplete();
+    public void onError(Throwable t) {
+        try {
+            Subscriber<? super HttpData> subscriber = this.subscriber.get();
+            verifyState(subscriber);
+            subscriber.onError(t);
+            parentSubscription.cancel();
+        } finally {
+            decoder.destroy();
+        }
     }
+
+    @Override
+    public void onComplete() {
+        try {
+            Subscriber<? super HttpData> subscriber = this.subscriber.get();
+            verifyState(subscriber);
+            subscriber.onComplete();
+        } finally {
+            decoder.destroy();
+        }
+    }
+
 }

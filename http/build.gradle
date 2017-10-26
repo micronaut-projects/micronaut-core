@@ -1,4 +1,3 @@
 dependencies {
-    compileOnly 'org.reactivestreams:reactive-streams:1.0.1'
     compile project(":core")
 }

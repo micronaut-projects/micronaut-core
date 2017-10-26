@@ -4,7 +4,6 @@
 * HTTPS Support
 * Data Binding for form data
 * File Uploads
-* HttpRequest attributes
 * RxJava 1/2 Support
 * WebInterceptors
 * WebSockets

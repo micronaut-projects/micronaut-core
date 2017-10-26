@@ -154,7 +154,7 @@ public class DefaultRouter implements Router {
     public <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error) {
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<T>> match = errorRoute.match(originatingClass, error);
-            if(match.isPresent()) {
+             if(match.isPresent()) {
                 return match;
             }
         }

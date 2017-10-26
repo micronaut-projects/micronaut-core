@@ -16,18 +16,17 @@
 package org.particleframework.web.router;
 
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
-import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs
@@ -84,16 +83,11 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
 
     @Override
     public UriRouteMatch<T> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariables();
-        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
-        newVariables.putAll(argumentValues);
-        Set<String> argumentNames = argumentValues.keySet();
-        List<Argument> requiredArguments = getRequiredArguments()
-                .stream()
-                .filter(arg -> !argumentNames.contains(arg.getName()))
-                .collect(Collectors.toList());
+        return (UriRouteMatch<T>) super.fulfill(argumentValues);
+    }
 
-
+    @Override
+    protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {

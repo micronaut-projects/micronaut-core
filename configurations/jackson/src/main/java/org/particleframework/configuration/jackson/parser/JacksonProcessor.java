@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.particleframework.reactive.AbstractSingleSubscriberProcessor;
+import org.particleframework.core.async.SingleThreadedBufferingProcessor;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonProcessor extends AbstractSingleSubscriberProcessor<JsonNode, byte[]> {
+public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], JsonNode> {
 
     private final NonBlockingJsonParser nonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
@@ -50,17 +50,17 @@ public class JacksonProcessor extends AbstractSingleSubscriberProcessor<JsonNode
     }
 
     @Override
-    public void onComplete() {
+    protected void doOnComplete() {
         if(needMoreInput()) {
             onError(new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         }
         else {
-            super.onComplete();
+            super.doOnComplete();
         }
     }
 
     @Override
-    protected void publishDownStream(byte[] message) {
+    protected void onMessage(byte[] message) {
         try {
             ByteArrayFeeder byteFeeder = nonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
