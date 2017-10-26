@@ -7,7 +7,7 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.core.async.SingleThreadedBufferingProcessor;
+import org.particleframework.core.async.processor.SingleThreadedBufferingProcessor;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;

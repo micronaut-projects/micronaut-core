@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.particleframework.core.async.SingleThreadedBufferingProcessor;
+import org.particleframework.core.async.processor.SingleThreadedBufferingProcessor;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -52,7 +52,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void doOnComplete() {
         if(needMoreInput()) {
-            onError(new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
+            doOnError(new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         }
         else {
             super.doOnComplete();

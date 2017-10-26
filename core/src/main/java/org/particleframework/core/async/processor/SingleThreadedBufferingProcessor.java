@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.async;
+package org.particleframework.core.async.processor;
 
+import org.particleframework.core.async.subscriber.SingleThreadedBufferingSubscriber;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;

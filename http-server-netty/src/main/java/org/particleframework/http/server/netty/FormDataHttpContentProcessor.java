@@ -35,7 +35,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
-    private InterfaceHttpData currentPartialHttpData;
 
     public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
@@ -54,21 +53,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
 
     @Override
-    public void onSubscribe(Subscription subscription) {
-        this.parentSubscription = subscription;
-        Subscriber<? super HttpData> subscriber = this.subscriber.get();
-
-        if(!verifyState(subscriber)) {
-            return;
-        }
-
-        subscriber.onSubscribe(subscription);
-    }
-
-    @Override
-    protected void publishMessage(ByteBufHolder message) {
-        Subscriber<? super HttpData> subscriber = this.subscriber.get();
-        verifyState(subscriber);
+    protected void onData(ByteBufHolder message) {
+        Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if(message instanceof HttpContent) {
             try {
@@ -95,9 +81,9 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                     }
 
                 }
-                this.currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
+                InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if(currentPartialHttpData instanceof HttpData) {
-                    subscriber.onNext((HttpData)currentPartialHttpData);
+                    subscriber.onNext((HttpData) currentPartialHttpData);
                 }
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
                 // ok, ignore
@@ -111,26 +97,13 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     }
 
     @Override
-    public void onError(Throwable t) {
-        try {
-            Subscriber<? super HttpData> subscriber = this.subscriber.get();
-            verifyState(subscriber);
-            subscriber.onError(t);
-            parentSubscription.cancel();
-        } finally {
-            decoder.destroy();
-        }
+    protected void doAfterOnError(Throwable throwable) {
+        decoder.destroy();
     }
 
     @Override
-    public void onComplete() {
-        try {
-            Subscriber<? super HttpData> subscriber = this.subscriber.get();
-            verifyState(subscriber);
-            subscriber.onComplete();
-        } finally {
-            decoder.destroy();
-        }
+    protected void doAfterComplete() {
+        decoder.destroy();
     }
 
 }

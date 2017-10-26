@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.async;
+package org.particleframework.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;

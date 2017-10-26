@@ -17,10 +17,8 @@ package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.LastHttpContent;
 import org.particleframework.context.BeanLocator;
-import org.particleframework.core.async.CompletionAwareSubscriber;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
@@ -38,12 +36,10 @@ import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * A {@link org.particleframework.http.annotation.Body} argument binder for a reactive streams {@link Publisher}

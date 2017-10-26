@@ -17,13 +17,12 @@ package org.particleframework.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpMessage;
 import io.netty.buffer.ByteBufHolder;
+import org.particleframework.core.async.processor.SingleSubscriberProcessor;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes
@@ -31,26 +30,13 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AbstractHttpContentProcessor<T> implements HttpContentProcessor<T> {
+public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberProcessor<ByteBufHolder,T> implements HttpContentProcessor<T> {
 
-    protected static final Subscription EMPTY_SUBSCRIPTION = new Subscription() {
-        @Override
-        public void request(long n) {
-        }
-
-        @Override
-        public void cancel() {
-
-        }
-    };
-
-    protected final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
     protected final NettyHttpRequest nettyHttpRequest;
     protected final long advertisedLength;
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
-    protected Subscription parentSubscription;
 
     public AbstractHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
@@ -59,20 +45,21 @@ public abstract class AbstractHttpContentProcessor<T> implements HttpContentProc
         this.configuration = configuration;
     }
 
+    /**
+     * Called after verifying the data of the message
+     *
+     * @param message The message
+     */
+    protected abstract void onData(ByteBufHolder message);
+
     @Override
-    public void subscribe(Subscriber<? super T> subscriber) {
-        if(!this.subscriber.compareAndSet(null, subscriber)) {
-            subscriber.onSubscribe(EMPTY_SUBSCRIPTION);
-            subscriber.onError(new IllegalStateException("Only one subscriber allowed"));
-        }
-        else {
-            StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
-            message.subscribe(this);
-        }
+    protected final void doSubscribe(Subscriber<? super T> subscriber) {
+        StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
+        message.subscribe(this);
     }
 
     @Override
-    public final void onNext(ByteBufHolder message) {
+    protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
@@ -84,28 +71,16 @@ public abstract class AbstractHttpContentProcessor<T> implements HttpContentProc
                 fireExceedsLength(receivedLength, serverMax);
             }
             else {
-                publishMessage(message);
+                onData(message);
             }
         }
     }
 
-    protected void fireExceedsLength(long receivedLength, long expected) {
-        parentSubscription.cancel();
-        onError(new ContentLengthExceededException(expected, receivedLength));
-    }
-
-    protected boolean verifyState(Subscriber<? super T> subscriber) {
-        if(subscriber == null) {
-            throw new IllegalStateException("No subscriber present!");
+    private void fireExceedsLength(long receivedLength, long expected) {
+        try {
+            onError(new ContentLengthExceededException(expected, receivedLength));
+        } finally {
+            parentSubscription.cancel();
         }
-
-        boolean hasParent = parentSubscription != null;
-        if(!hasParent) {
-            subscriber.onSubscribe(EMPTY_SUBSCRIPTION);
-            subscriber.onError(new IllegalStateException("Upstream publisher must be subscribed to first"));
-        }
-        return hasParent;
     }
-
-    protected abstract void publishMessage(ByteBufHolder message);
 }

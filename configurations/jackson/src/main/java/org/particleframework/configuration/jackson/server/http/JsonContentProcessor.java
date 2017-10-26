@@ -2,21 +2,17 @@ package org.particleframework.configuration.jackson.server.http;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.typesafe.netty.http.StreamedHttpMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
-import org.particleframework.core.async.CompletionAwareSubscriber;
-import org.particleframework.http.exceptions.ContentLengthExceededException;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.*;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * This class will handle subscribing to a JSON stream and binding once the events are complete in a non-blocking manner
@@ -35,11 +31,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     }
 
     @Override
-    public void onSubscribe(Subscription subscription) {
-        this.parentSubscription = subscription;
-        Subscriber<? super JsonNode> subscriber = this.subscriber.get();
-
-        if(!verifyState(subscriber)) {
+    protected void doOnSubscribe(Subscription subscription, Subscriber<? super JsonNode> subscriber) {
+        if(parentSubscription == null) {
             return;
         }
 
@@ -79,13 +72,11 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             }
         });
 
-
         jacksonProcessor.onSubscribe(subscription);
-
     }
 
     @Override
-    protected void publishMessage(ByteBufHolder message) {
+    protected void onData(ByteBufHolder message) {
         ByteBuf content = message.content();
         byte[] bytes;
         try {
@@ -102,14 +93,13 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     }
 
     @Override
-    public void onError(Throwable t) {
-        jacksonProcessor.onError(t);
+    protected void doAfterOnError(Throwable throwable) {
+        jacksonProcessor.onError(throwable);
     }
 
     @Override
-    public void onComplete() {
+    protected void doOnComplete() {
         jacksonProcessor.onComplete();
+        super.doOnComplete();
     }
-
-
 }

@@ -26,10 +26,10 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import org.particleframework.core.async.CompletionAwareSubscriber;
-import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
+import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionError;
@@ -40,14 +40,13 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.*;
+import org.particleframework.http.exceptions.InternalServerException;
+import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.binding.binders.BodyArgumentBinder;
 import org.particleframework.http.server.binding.binders.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.cors.CorsHandler;
-import org.particleframework.http.exceptions.InternalServerException;
-import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
-import org.particleframework.web.router.UnresolvedArgument;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
 import org.particleframework.inject.qualifiers.Qualifiers;
@@ -55,8 +54,8 @@ import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
+import org.particleframework.web.router.UnresolvedArgument;
 import org.particleframework.web.router.UriRouteMatch;
-import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.reactivestreams.Publisher;
@@ -251,11 +250,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
         if (!route.isExecutable() && !request.isBodyRequired()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Bad request: Unbindable arguments for route: " + route);
-            }
-            context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                    .addListener(ChannelFutureListener.CLOSE);
+            badRoute(route, request, binderRegistry, context);
         } else {
 
             // decorate the execution of the route so that it runs an async executor
@@ -265,7 +260,7 @@ public class NettyHttpServer implements EmbeddedServer {
                 // The request body is not required so simply execute the route
                 route = prepareRouteForExecution(route, request, binderRegistry);
                 route.execute();
-            } else {
+            } else if(HttpMethod.permitsRequestBody(request.getMethod())){
 
                 // The request body is required, so at this point we must have a StreamedHttpRequest
                 HttpRequest nativeRequest = request.getNativeRequest();
@@ -301,8 +296,19 @@ public class NettyHttpServer implements EmbeddedServer {
 
                 }
             }
+            else {
+                badRoute(route, request, binderRegistry, context);
+            }
 
         }
+    }
+
+    private void badRoute(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Bad request: Unsatisfiable route reached: " + route);
+        }
+        context.writeAndFlush(handleBadRequest(request, binderRegistry))
+                .addListener(ChannelFutureListener.CLOSE);
     }
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request, ChannelHandlerContext context, RouteMatch<Object> finalRoute) {

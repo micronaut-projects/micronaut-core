@@ -1,9 +1,8 @@
 package org.particleframework.http.server.netty.binders;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
-import io.netty.buffer.ByteBufHolder;
 import org.particleframework.context.BeanLocator;
-import org.particleframework.core.async.CompletionAwareSubscriber;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
@@ -16,7 +15,6 @@ import org.particleframework.http.server.netty.DefaultHttpContentProcessor;
 import org.particleframework.http.server.netty.HttpContentProcessor;
 import org.particleframework.core.type.Argument;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;

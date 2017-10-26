@@ -18,7 +18,7 @@ package org.particleframework.http.server.netty.binders;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.handler.codec.http.multipart.HttpData;
-import org.particleframework.core.async.CompletionAwareSubscriber;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;

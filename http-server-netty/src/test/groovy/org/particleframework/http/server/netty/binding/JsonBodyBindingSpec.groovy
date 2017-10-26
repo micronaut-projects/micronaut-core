@@ -31,6 +31,47 @@ import java.util.concurrent.CompletableFuture
  * Created by graemerocher on 25/08/2017.
  */
 class JsonBodyBindingSpec extends AbstractParticleSpec {
+    void "test simple string-based body parsing with incomplete JSON"() {
+
+        when:
+        def json = '{"title":"The Stand"'
+        def request = new Request.Builder()
+                .url("$server/json/string")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.BAD_REQUEST.code
+
+
+        when:
+        def body = response.body().string()
+        def result = new JsonSlurper().parseText(body)
+        then:
+        result['_links'].self.href == '/json/string'
+        result.message.startsWith('Invalid JSON')
+        response.message() == "No!! Invalid JSON"
+    }
+
+    void "test parse body into parameters if no @Body specified"() {
+        when:
+        def json = '{"name":"Fred", "age":10}'
+        def request = new Request.Builder()
+                .url("$server/json/params")
+                .header("Content-Length", json.length().toString())
+                .post(RequestBody.create(MediaType.parse("application/json"), json))
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == "Body: Foo(Fred, 10)"
+    }
 
     void "test simple string-based body parsing with invalid JSON"() {
 
@@ -77,47 +118,6 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         ).execute().body().string() == "Body: [title:The Stand]"
     }
 
-    void "test simple string-based body parsing with incomplete JSON"() {
-
-        when:
-        def json = '{"title":"The Stand"'
-        def request = new Request.Builder()
-                .url("$server/json/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
-
-        then:
-        response.code() == HttpStatus.BAD_REQUEST.code
-
-
-        when:
-        def body = response.body().string()
-        def result = new JsonSlurper().parseText(body)
-        then:
-        result['_links'].self.href == '/json/string'
-        result.message.startsWith('Invalid JSON')
-        response.message() == "No!! Invalid JSON"
-    }
-
-    void "test parse body into parameters if no @Body specified"() {
-        when:
-        def json = '{"name":"Fred", "age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/params")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        then:
-        response.code() == HttpStatus.OK.code
-        response.body().string() == "Body: Foo(Fred, 10)"
-    }
 
     void  "test simple string-based body parsing"() {
 

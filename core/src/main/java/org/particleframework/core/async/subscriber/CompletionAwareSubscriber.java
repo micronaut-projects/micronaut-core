@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.async;
+package org.particleframework.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A {@link Subscriber} that tracks completion state using a {@link AtomicBoolean}
+ *
+ * @param <T> the type of element signaled.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -61,7 +63,7 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T> {
 
     @Override
     public final void onError(Throwable t) {
-        if(subscription != null) {
+        if(subscription != null && complete.compareAndSet(false, true)) {
             subscription.cancel();
             doOnError(t);
         }
@@ -70,7 +72,11 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T> {
     @Override
     public final void onComplete() {
         if(complete.compareAndSet(false, true)) {
-            doOnComplete();
+            try {
+                doOnComplete();
+            } catch (Exception e) {
+                doOnError(e);
+            }
         }
     }
     /**
