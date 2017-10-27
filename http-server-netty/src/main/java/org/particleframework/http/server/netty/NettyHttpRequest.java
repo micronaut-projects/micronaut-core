@@ -17,6 +17,7 @@ package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -70,7 +71,7 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     private NettyCookies nettyCookies;
     private Locale locale;
     private URI path;
-    private List<ByteBuf> receivedContent = new ArrayList<>();
+    private List<ByteBufHolder> receivedContent = new ArrayList<>();
 
     private Object body;
     private MediaType mediaType;
@@ -112,13 +113,6 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
      */
     public ChannelHandlerContext getChannelHandlerContext() {
         return channelHandlerContext;
-    }
-
-    /**
-     * @return The received content as an array of {@link ByteBuf}
-     */
-    public ByteBuf[] getReceivedContent() {
-        return receivedContent.toArray(new ByteBuf[receivedContent.size()]);
     }
 
     @Override
@@ -236,9 +230,19 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     public T getBody() {
         Object body = this.body;
         if (body == null && !receivedContent.isEmpty()) {
-            this.body = body = Unpooled.unmodifiableBuffer(getReceivedContent());
+            this.body = body = buildBody();
         }
         return (T) body;
+    }
+
+    protected CompositeByteBuf buildBody() {
+        int size = receivedContent.size();
+        CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
+        for (ByteBufHolder holder : receivedContent) {
+            ByteBuf content = holder.content();
+            byteBufs.addComponent(true, content);
+        }
+        return byteBufs;
     }
 
     @SuppressWarnings("unchecked")
@@ -257,7 +261,7 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     @Internal
     public void release() {
         channelHandlerContext.channel().attr(KEY).set(null);
-        for (ByteBuf byteBuf : receivedContent) {
+        for (ByteBufHolder byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
         if (this.body != null && body instanceof ReferenceCounted) {
@@ -301,14 +305,11 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
 
     @Internal
     void addContent(ByteBufHolder httpContent) {
-        ByteBuf byteBuf = httpContent
-                .content()
-                .touch();
-        int contentBytes = byteBuf.readableBytes();
-        if (contentBytes == 0) {
-            byteBuf.release();
-        } else {
-            receivedContent.add(byteBuf);
+        if(httpContent instanceof HttpData) {
+            // TODO: handle binding attributes
+        }
+        else {
+            receivedContent.add(httpContent);
         }
     }
 

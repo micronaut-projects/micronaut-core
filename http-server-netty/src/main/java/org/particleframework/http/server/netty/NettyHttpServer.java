@@ -369,6 +369,9 @@ public class NettyHttpServer implements EmbeddedServer {
                                 }
                                 routeMatch = routeMatch.fulfill(Collections.singletonMap(name, input));
                             }
+                            else {
+                                request.addContent(data);
+                            }
                         }
                     }
                     else {
