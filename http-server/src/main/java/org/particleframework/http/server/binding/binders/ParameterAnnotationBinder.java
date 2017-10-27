@@ -37,7 +37,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Parameter, T, HttpRequest> implements AnnotatedRequestArgumentBinder<Parameter, T> {
+public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Parameter, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Parameter, T> {
     public ParameterAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
@@ -48,14 +48,14 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         boolean hasAnnotation = annotation != null;
         String parameterName = hasAnnotation ? annotation.value() : argument.getName();
 
-        Locale locale = source.getLocale();
+        Locale locale = source.getLocale().orElse(null);
         Charset characterEncoding = source.getCharacterEncoding();
 
         Optional<T> result = doBind(context, parameters, parameterName, locale, characterEncoding);

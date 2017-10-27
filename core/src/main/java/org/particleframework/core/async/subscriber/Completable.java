@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.binding.binders;
+package org.particleframework.core.async.subscriber;
 
-import org.particleframework.http.HttpRequest;
-import org.particleframework.core.bind.ArgumentBinder;
+import org.reactivestreams.Subscriber;
 
 /**
- * A binder that binds from an {@link HttpRequest}
+ * Interface that exposes a callback to indicate when an operation has been completed
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RequestArgumentBinder<T> extends ArgumentBinder<T, HttpRequest<?>>{
+public interface Completable {
+
+    /**
+     * * Successful terminal state. To be called when the operation is complete
+     *
+     * @see Subscriber#onComplete()
+     */
+    void onComplete();
 }

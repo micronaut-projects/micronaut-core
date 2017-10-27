@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.converters;
+package org.particleframework.http.server.netty.multipart;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.FileUpload;
@@ -21,6 +21,7 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.server.netty.converters.MediaTypeReader;
 
 import javax.inject.Singleton;
 import java.io.IOException;

@@ -10,6 +10,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * <p>Common interface for HTTP request implementations</p>
@@ -55,7 +56,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     @Override
-    default Locale getLocale() {
+    default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
                 .map((text)-> {
                     int len = text.length();
@@ -70,13 +71,13 @@ public interface HttpRequest<B> extends HttpMessage<B> {
                     }
                     return text;
                 })
-                .map(Locale::forLanguageTag)
-                .orElse(Locale.getDefault());
+                .map(Locale::forLanguageTag);
     }
 
     /**
      * @return The request character encoding
      */
+    // TODO: should return Optional
     default Charset getCharacterEncoding() {
         return HttpUtil.resolveCharset(this).orElse(null);
     }

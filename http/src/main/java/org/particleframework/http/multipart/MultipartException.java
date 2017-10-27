@@ -13,18 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.util;
+package org.particleframework.http.multipart;
+
+import org.particleframework.http.exceptions.HttpException;
 
 /**
- * Interface that exposes a callback to indicate when an operation has been completed
+ * Exception thrown during multi part handling
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Completable {
+public class MultipartException extends HttpException {
+    public MultipartException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    /**
-     * To be called when the operation is complete
-     */
-    void complete();
+    public MultipartException(String message) {
+        super(message);
+    }
 }

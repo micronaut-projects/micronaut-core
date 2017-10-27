@@ -17,7 +17,8 @@ package org.particleframework.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpMessage;
 import io.netty.buffer.ByteBufHolder;
-import org.particleframework.core.async.processor.SingleSubscriberProcessor;
+import io.netty.handler.codec.http.multipart.HttpData;
+import org.particleframework.core.async.processor.SingleThreadedBufferingProcessor;
 import org.particleframework.http.exceptions.ContentLengthExceededException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.reactivestreams.Subscriber;
@@ -30,57 +31,71 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberProcessor<ByteBufHolder,T> implements HttpContentProcessor<T> {
+public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThreadedBufferingProcessor<ByteBufHolder,T> implements HttpContentProcessor<T> {
 
     protected final NettyHttpRequest nettyHttpRequest;
     protected final long advertisedLength;
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
+    private final long partMaxSize;
 
-    public AbstractHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
+    public AbstractBufferingHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
         this.advertisedLength = nettyHttpRequest.getContentLength();
         this.requestMaxSize = configuration.getMaxRequestSize();
         this.configuration = configuration;
+        this.partMaxSize = configuration.getMultipart().getMaxFileSize();
     }
 
-    /**
-     * Called after verifying the data of the message
-     *
-     * @param message The message
-     */
-    protected abstract void onData(ByteBufHolder message);
 
     @Override
-    protected final void doSubscribe(Subscriber<? super T> subscriber) {
+    public void subscribe(Subscriber<? super T> downstreamSubscriber) {
+        super.subscribe(downstreamSubscriber);
+        subscribeUpstream();
+    }
+
+    private void subscribeUpstream() {
         StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
         message.subscribe(this);
     }
 
     @Override
     protected final void doOnNext(ByteBufHolder message) {
-        long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
+        long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
             fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
         }
         else {
-            long serverMax = configuration.getMultipart().getMaxFileSize();
-            if( receivedLength > serverMax ) {
-                fireExceedsLength(receivedLength, serverMax);
-            }
-            else {
-                onData(message);
-            }
+            onUpstreamMessage(message);
         }
     }
 
-    private void fireExceedsLength(long receivedLength, long expected) {
+    protected boolean verifyPartDefinedSize(ByteBufHolder message) {
+        long partLength = message instanceof HttpData ? ((HttpData)message).definedLength() : -1;
+        boolean validPart = partLength > partMaxSize;
+        if(validPart) {
+            fireExceedsLength(partLength, partMaxSize);
+            return false;
+        }
+        return true;
+    }
+
+    private long resolveLength(ByteBufHolder message) {
+        if(message instanceof HttpData) {
+            return ((HttpData)message).length();
+        }
+        else {
+            return message.content().readableBytes();
+        }
+    }
+
+    protected void fireExceedsLength(long receivedLength, long expected) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));
         } finally {
-            parentSubscription.cancel();
+            upstreamSubscription.cancel();
         }
     }
 }

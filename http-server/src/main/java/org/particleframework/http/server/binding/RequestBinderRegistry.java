@@ -24,5 +24,5 @@ import org.particleframework.http.HttpRequest;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest> {
+public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest<?>> {
 }

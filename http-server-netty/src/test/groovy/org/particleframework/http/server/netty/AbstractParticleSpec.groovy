@@ -34,16 +34,16 @@ abstract class AbstractParticleSpec extends Specification {
     static final SPEC_NAME_PROPERTY = 'spec.name'
 
     @Shared int serverPort = SocketUtils.findAvailableTcpPort()
+    @Shared File uploadDir = File.createTempDir()
     @Shared @AutoCleanup ApplicationContext applicationContext =
                             ParticleApplication.build('-port',String.valueOf(serverPort))
                                                .include(configurationNames() as String[])
                                                .properties(getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName])
                                                .start()
-
     @Shared String server = "http://localhost:$serverPort"
     @Shared OkHttpClient client = new OkHttpClient()
                                             .newBuilder()
-//                                            .readTimeout(1, TimeUnit.MINUTES)
+                                            .readTimeout(1, TimeUnit.MINUTES)
                                             .build()
 
     Collection<String> configurationNames() {
@@ -51,6 +51,11 @@ abstract class AbstractParticleSpec extends Specification {
     }
 
     Map<String, Object> getConfiguration() {
-        [:]
+        ['particle.server.multipart.location':uploadDir.absolutePath]
+    }
+
+
+    def cleanupSpec()  {
+        uploadDir.delete()
     }
 }

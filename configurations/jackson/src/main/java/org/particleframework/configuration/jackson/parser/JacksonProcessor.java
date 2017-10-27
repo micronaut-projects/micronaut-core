@@ -60,7 +60,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     }
 
     @Override
-    protected void onMessage(byte[] message) {
+    protected void onUpstreamMessage(byte[] message) {
         try {
             ByteArrayFeeder byteFeeder = nonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
@@ -75,7 +75,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
                         byteFeeder.endOfInput();
-                        currentSubscriber()
+                        currentDownstreamSubscriber()
                                 .ifPresent(subscriber ->
                                         subscriber.onNext(root)
                                 );
@@ -83,7 +83,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     }
                 }
                 if(needMoreInput()) {
-                    parentSubscription.request(1);
+                    upstreamSubscription.request(1);
                 }
             }
         } catch (IOException e) {

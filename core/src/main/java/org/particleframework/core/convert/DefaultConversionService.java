@@ -11,6 +11,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
+import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
@@ -100,6 +101,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     protected void registerDefaultConverters() {
+
+        // String -> File
+        addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
+
         // String[] -> String
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
             if(object == null || object.length == 0) return Optional.empty();

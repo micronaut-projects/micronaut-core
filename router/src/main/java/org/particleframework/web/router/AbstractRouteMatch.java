@@ -72,6 +72,12 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
         return requiredInputs.containsKey(name);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public Optional<Argument<?>> getRequiredInput(String name) {
+        return Optional.ofNullable(requiredInputs.get(name));
+    }
+
     @Override
     public boolean isExecutable() {
         Map<String, Object> variables = getVariables();

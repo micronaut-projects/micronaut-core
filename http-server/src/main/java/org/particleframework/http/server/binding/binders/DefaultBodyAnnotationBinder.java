@@ -32,7 +32,7 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Object body = source.getBody();
         Argument<T> argument = context.getArgument();
         return conversionService.convert(body, argument.getType(), context);

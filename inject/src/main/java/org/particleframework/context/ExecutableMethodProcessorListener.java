@@ -20,7 +20,7 @@ import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.core.util.Completable;
+import org.particleframework.core.async.subscriber.Completable;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.context.annotation.Executable;
 
@@ -74,7 +74,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         }
 
         if(processor instanceof Completable) {
-            ((Completable) processor).complete();
+            ((Completable) processor).onComplete();
         }
 
         return processor;

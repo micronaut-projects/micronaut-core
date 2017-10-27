@@ -19,11 +19,9 @@ import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody
-import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import spock.lang.Ignore
-import spock.lang.Specification
 
 /**
  * @author Graeme Rocher
@@ -31,6 +29,61 @@ import spock.lang.Specification
  */
 class StreamUploadSpec extends AbstractParticleSpec {
 
+
+
+
+    void "test upload FileUpload object via transferTo"() {
+        given:
+        def data = '{"title":"Test"}'
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("title", "bar")
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+                .build()
+
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveFileUpload")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def result = response.body().string()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == "Uploaded"
+    }
+
+    void "test upload big FileUpload object via transferTo"() {
+        given:
+        def val = 'Big '+ 'xxxx' * 500
+        def data = '{"title":"'+val+'"}'
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("title", "bar")
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+                .build()
+
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveFileUpload")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def result = response.body().string()
+
+        def file = new File(uploadDir, "bar.json")
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == "Uploaded"
+        file.exists()
+        file.text == data
+    }
 
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
@@ -45,6 +98,33 @@ class StreamUploadSpec extends AbstractParticleSpec {
         when:
         def request = new Request.Builder()
                 .url("$server/upload/receivePublisher")
+                .post(requestBody)
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        def result = response.body().string()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result.length() == data.length()
+        result == data
+
+    }
+
+    @Ignore
+    void "test non-blocking upload with publisher receiving two objects"() {
+        given:
+        def data = '{"title":"Test"}'
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("data", "data.json", RequestBody.create(MediaType.parse("application/json"), data))
+                .addFormDataPart("title", "bar")
+                .build()
+
+
+        when:
+        def request = new Request.Builder()
+                .url("$server/upload/receiveTwoFlowParts")
                 .post(requestBody)
         def response = client.newCall(
                 request.build()
@@ -78,7 +158,6 @@ class StreamUploadSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-//        response.headers().get(HttpHeaders.CONTENT_TYPE) == "application/json" // TODO: fix content type header
         response.body().string() == 'Data{title=\'Test\'}'
 
         when:"a large document with partial data is uploaded"
@@ -98,7 +177,6 @@ class StreamUploadSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-//        response.headers().get(HttpHeaders.CONTENT_TYPE) == "application/json" // TODO: fix content type header
         response.body().string().contains(val) // TODO: optimize this to use Jackson non-blocking and JsonNode
 
 

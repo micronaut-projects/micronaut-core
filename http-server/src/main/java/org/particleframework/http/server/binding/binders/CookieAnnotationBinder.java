@@ -34,7 +34,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Cookie, T, HttpRequest> implements AnnotatedRequestArgumentBinder<Cookie, T> {
+public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Cookie, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Cookie, T> {
     public CookieAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
@@ -45,11 +45,11 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> argument, HttpRequest source) {
+    public Optional<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleValues<org.particleframework.http.cookie.Cookie> parameters = source.getCookies();
         Cookie annotation = argument.getAnnotation(Cookie.class);
         String parameterName = annotation.value();
-        return doBind(argument, parameters, parameterName, source.getLocale(), source.getCharacterEncoding());
+        return doBind(argument, parameters, parameterName, source.getLocale().orElse(null), source.getCharacterEncoding());
     }
 
     @Override

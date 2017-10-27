@@ -21,6 +21,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -65,6 +66,15 @@ public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSub
         Subscriber<? super R> subscriber = this.subscriber.get();
         verifyState(subscriber);
         return subscriber;
+    }
+
+    /**
+     * Get the current {@link Subscriber}
+     * @return An {@link Optional} subscriber
+     */
+    protected Optional<Subscriber<? super R>> currentSubscriber() {
+        Subscriber<? super R> subscriber = this.subscriber.get();
+        return Optional.ofNullable(subscriber);
     }
 
     /**

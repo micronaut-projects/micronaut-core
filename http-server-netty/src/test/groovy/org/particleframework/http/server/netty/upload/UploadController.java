@@ -23,9 +23,11 @@ import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Part;
+import org.particleframework.http.multipart.FileUpload;
 import org.particleframework.stereotype.Controller;
 import org.particleframework.web.router.annotation.Post;
 import org.reactivestreams.Publisher;
@@ -52,6 +54,12 @@ public class UploadController {
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
     public String receivePlain(String data, String title) {
         return title + ": " + data;
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public Publisher<HttpResponse> receiveFileUpload(FileUpload data, String title) {
+        return Flowable.fromPublisher(data.transferTo(title + ".json"))
+                       .map(success -> success ? HttpResponse.ok( "Uploaded" ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
     }
 
     @Post(consumes = MediaType.MULTIPART_FORM_DATA)
@@ -95,6 +103,11 @@ public class UploadController {
     public Publisher<HttpResponse> recieveFlowData(@Part Flowable<Data> data) {
         return data.flatMap(Flowable::just, (left, right) -> left == right ? left.toString() : left.toString() + " " + right.toString())
                    .map(HttpResponse::ok);
+    }
+
+    @Post(consumes = MediaType.MULTIPART_FORM_DATA)
+    public Publisher<HttpResponse> receiveTwoFlowParts(@Part Flowable<Data> dataPublisher, @Part Flowable<String> titlePublisher) {
+        return titlePublisher.zipWith(dataPublisher, (title, data) -> HttpResponse.ok( title + ": " + data.toString() ));
     }
 
     public static class Data {

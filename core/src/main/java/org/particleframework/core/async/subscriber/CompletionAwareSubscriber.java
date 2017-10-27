@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class CompletionAwareSubscriber<T> implements Subscriber<T> {
+public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emitter<T> {
     private final AtomicBoolean complete = new AtomicBoolean(false);
 
     protected Subscription subscription;

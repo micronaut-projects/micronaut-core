@@ -75,6 +75,15 @@ public interface PropertyResolver extends ValueResolver {
      * Resolve the given property for the given name
      *
      * @param name The name
+     * @return An optional containing the property value if it exists
+     */
+    default Optional<Object> getProperty(String name) {
+        return getProperty(name, Object.class);
+    }
+    /**
+     * Resolve the given property for the given name
+     *
+     * @param name The name
      * @param requiredType The required type
      * @param defaultValue The default value
      * @param <T> The concrete type

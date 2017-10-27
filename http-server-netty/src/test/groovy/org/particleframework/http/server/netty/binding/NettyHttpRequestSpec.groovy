@@ -88,7 +88,7 @@ class NettyHttpRequestSpec extends Specification {
         fullURI == uri
         request.path.toString() == expectedPath
         request.method == HttpMethod."$method"
-        request.locale.toString() == locale
+        request.locale.get().toString() == locale
 
         where:
         method | uri        | headers                                                                         | content | locale

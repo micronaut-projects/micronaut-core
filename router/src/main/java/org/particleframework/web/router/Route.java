@@ -32,7 +32,7 @@ import java.util.function.Predicate;
 public interface Route {
 
     /**
-     * Applies the given media type the route
+     * Applies the given accepted media type the route
      *
      * @param mediaType The media type
      * @return A new route with the media type applied

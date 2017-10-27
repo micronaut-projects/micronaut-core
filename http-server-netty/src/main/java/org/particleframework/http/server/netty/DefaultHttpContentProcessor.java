@@ -46,14 +46,14 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     }
 
     @Override
-    public final void subscribe(Subscriber<? super ByteBufHolder> subscriber) {
+    public final void subscribe(Subscriber<? super ByteBufHolder> downstreamSubscriber) {
         StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
         message.subscribe(this );
-        super.subscribe(subscriber);
+        super.subscribe(downstreamSubscriber);
     }
 
     @Override
-    protected void onMessage(ByteBufHolder message) {
+    protected void onUpstreamMessage(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
@@ -86,13 +86,13 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     }
 
     private void fireExceedsLength(long receivedLength, long expected) {
-        state = BackPressureState.DONE;
-        parentSubscription.cancel();
-        currentSubscriber().ifPresent(subscriber -> subscriber.onError(new ContentLengthExceededException(expected, receivedLength)));
+        upstreamState = BackPressureState.DONE;
+        upstreamSubscription.cancel();
+        currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onError(new ContentLengthExceededException(expected, receivedLength)));
     }
 
     private void publishVerifiedContent(ByteBufHolder message) {
-        currentSubscriber().ifPresent(subscriber -> subscriber.onNext(message));
+        currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onNext(message));
     }
 
 }

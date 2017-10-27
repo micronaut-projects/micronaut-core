@@ -49,6 +49,7 @@ public interface HttpMessage<B> {
     /**
      * @return The request body
      */
+    // TODO: should return Optional
     B getBody();
 
     /**
@@ -62,10 +63,9 @@ public interface HttpMessage<B> {
     /**
      * @return The locale of the message
      */
-    default Locale getLocale() {
+    default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
-                .map(Locale::new)
-                .orElse(null);
+                .map(Locale::new);
     }
 
     /**
@@ -80,6 +80,7 @@ public interface HttpMessage<B> {
      * The request or response content type
      * @return The content type
      */
+    // TODO: should return Optional
     default MediaType getContentType() {
         return getHeaders()
                 .contentType()

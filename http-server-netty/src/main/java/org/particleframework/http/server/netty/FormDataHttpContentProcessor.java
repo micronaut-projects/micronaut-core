@@ -26,7 +26,9 @@ import org.reactivestreams.Subscription;
 import java.nio.charset.Charset;
 
 /**
- * Decodes {@link org.particleframework.http.MediaType#MULTIPART_FORM_DATA} in a non-blocking manner
+ * <p>Decodes {@link org.particleframework.http.MediaType#MULTIPART_FORM_DATA} in a non-blocking manner</p>
+ *
+ * <p>Designed to be used by a single thread</p>
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -34,63 +34,71 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThreadedBufferingSubscriber<R> implements Publisher<T> {
-    private final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
+    private final AtomicReference<Subscriber<? super T>> downstreamSubscriber = new AtomicReference<>();
 
     @Override
     protected void doOnComplete() {
-        currentSubscriber().ifPresent(Subscriber::onComplete);
+        try {
+            currentDownstreamSubscriber().ifPresent(Subscriber::onComplete);
+        } catch (Exception e) {
+            onError(e);
+        }
     }
 
     @Override
     protected void doOnNext(R message) {
-        onMessage(message);
+        onUpstreamMessage(message);
     }
 
     @Override
     protected void doOnSubscribe(Subscription subscription) {
-        currentSubscriber().ifPresent(this::provideSubscription);
+        currentDownstreamSubscriber().ifPresent(this::provideDownstreamSubscription);
     }
 
     @Override
     protected void doOnError(Throwable t) {
-        currentSubscriber().ifPresent(subscriber -> subscriber.onError(t));
+        currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onError(t));
     }
 
     @Override
-    public void subscribe(Subscriber<? super T> subscriber) {
-        if(!this.subscriber.compareAndSet(null, subscriber)) {
+    public void subscribe(Subscriber<? super T> downstreamSubscriber) {
+        subscribeDownstream(downstreamSubscriber);
+    }
+
+    protected void subscribeDownstream(Subscriber<? super T> downstreamSubscriber) {
+        if(!this.downstreamSubscriber.compareAndSet(null, downstreamSubscriber)) {
             throw new IllegalStateException("Only one subscriber allowed");
         }
-        switch (state) {
+        switch (upstreamState) {
             case NO_SUBSCRIBER:
-                if (buffer.isEmpty()) {
-                    state = BackPressureState.IDLE;
+                if (upstreamBuffer.isEmpty()) {
+                    upstreamState = BackPressureState.IDLE;
                 } else {
-                    state = BackPressureState.BUFFERING;
+                    upstreamState = BackPressureState.BUFFERING;
                 }
                 break;
             case IDLE:
             case BUFFERING:
             case FLOWING:
-                provideSubscription(subscriber);
+                provideDownstreamSubscription(downstreamSubscriber);
         }
     }
 
 
     /**
-     * Publish a downstream message
+     * Called when an message is received from the upstream {@link Subscriber}
      *
      * @param message The message
      */
-    protected abstract void onMessage(R message);
+    protected abstract void onUpstreamMessage(R message);
 
     /**
      * Resolve the current {@link Subscriber}
      *
      * @return An {@link Optional} of the subscriber
      */
-    protected Optional<Subscriber<? super T>> currentSubscriber() {
-        return Optional.ofNullable(this.subscriber.get());
+    protected Optional<Subscriber<? super T>> currentDownstreamSubscriber() {
+        return Optional.ofNullable(this.downstreamSubscriber.get());
     }
 
     /**
@@ -99,84 +107,9 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
      * @return An {@link Optional} of the subscriber
      * @throws IllegalStateException If no {@link Subscriber} is present
      */
-    protected Subscriber<? super T> getSubscriber() {
-        return Optional.ofNullable(this.subscriber.get()).orElseThrow(()-> new IllegalStateException("No subscriber present!"));
-    }
-    private void provideSubscription(Subscriber<? super T> subscriber) {
-        subscriber.onSubscribe(new Subscription() {
-            @Override
-            public synchronized void request(long n) {
-                processDemand(n);
-                parentSubscription.request(n);
-            }
-
-            @Override
-            public synchronized void cancel() {
-                parentSubscription.cancel();
-            }
-        });
+    protected Subscriber<? super T> getDownstreamSubscriber() {
+        return Optional.ofNullable(this.downstreamSubscriber.get()).orElseThrow(()-> new IllegalStateException("No subscriber present!"));
     }
 
-    private void processDemand(long demand) {
-        switch (state) {
-            case BUFFERING:
-            case FLOWING:
-                if( registerDemand(demand) ) {
-                    flushBuffer();
-                }
-                break;
-
-            case DEMANDING:
-                registerDemand(demand);
-                break;
-
-            case IDLE:
-                if (registerDemand(demand)) {
-                    state = BackPressureState.DEMANDING;
-                    flushBuffer();
-                }
-                break;
-            default:
-
-        }
-    }
-
-
-    private boolean registerDemand(long demand) {
-
-        if (demand <= 0) {
-            illegalDemand();
-            return false;
-        } else {
-            if (pendingDemand < Long.MAX_VALUE) {
-                pendingDemand += demand;
-                if (pendingDemand < 0) {
-                    pendingDemand = Long.MAX_VALUE;
-                }
-            }
-            return true;
-        }
-    }
-
-    private void flushBuffer() {
-        while (!buffer.isEmpty() && (pendingDemand > 0 || pendingDemand == Long.MAX_VALUE)) {
-            onMessage(buffer.remove());
-        }
-        if (buffer.isEmpty()) {
-            if (pendingDemand > 0) {
-                if (state == BackPressureState.BUFFERING) {
-                    state = BackPressureState.DEMANDING;
-                } // otherwise we're flowing
-                parentSubscription.request(pendingDemand);
-            } else if (state == BackPressureState.BUFFERING) {
-                state = BackPressureState.IDLE;
-            }
-        }
-    }
-
-    private void illegalDemand() {
-        currentSubscriber().ifPresent(subscriber -> subscriber.onError(new IllegalArgumentException("Request for 0 or negative elements in violation of Section 3.9 of the Reactive Streams specification")));
-        state = BackPressureState.DONE;
-    }
 
 }

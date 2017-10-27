@@ -25,6 +25,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
@@ -49,8 +50,10 @@ import org.particleframework.http.server.cors.CorsHandler;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.server.netty.multipart.NettyPart;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
+import org.particleframework.runtime.executor.IOExecutorService;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -65,12 +68,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -99,6 +104,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final ExecutorSelector executorSelector;
+    private final ExecutorService ioExecutor;
 
     @Inject
     public NettyHttpServer(
@@ -107,6 +113,7 @@ public class NettyHttpServer implements EmbeddedServer {
             Optional<Router> router,
             RequestBinderRegistry binderRegistry,
             BeanLocator beanLocator,
+            @Named(IOExecutorService.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             ChannelHandlerFactory[] channelHandlerFactories
     ) {
@@ -114,6 +121,7 @@ public class NettyHttpServer implements EmbeddedServer {
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
+        this.ioExecutor = ioExecutor;
         this.beanLocator = beanLocator;
         this.executorSelector = executorSelector;
         this.environment = environment;
@@ -313,7 +321,9 @@ public class NettyHttpServer implements EmbeddedServer {
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request, ChannelHandlerContext context, RouteMatch<Object> finalRoute) {
         return new CompletionAwareSubscriber<Object>() {
+            NettyPart currentPart;
             RouteMatch<Object> routeMatch = finalRoute;
+            AtomicBoolean executed = new AtomicBoolean(false);
 
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -322,12 +332,43 @@ public class NettyHttpServer implements EmbeddedServer {
 
             @Override
             protected void doOnNext(Object message) {
+                boolean executed = this.executed.get();
                 if(message instanceof ByteBufHolder) {
                     if(message instanceof HttpData) {
                         HttpData data = (HttpData) message;
                         String name = data.getName();
-                        if(routeMatch.isRequiredInput(name)) {
-                            routeMatch = routeMatch.fulfill(Collections.singletonMap(name, data));
+                        if(executed) {
+                            if(currentPart != null) {
+                                if( currentPart.getName().equals(name) ) {
+                                    FileUpload upload = (FileUpload) data;
+                                    currentPart.onNext(upload);
+                                    if(upload.isCompleted()) {
+                                        currentPart.onComplete();
+                                    }
+                                }
+                                else {
+                                    onComplete();
+                                }
+                            }
+                            else {
+                                onComplete();
+                            }
+                        }
+                        else {
+                            Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
+
+                            if(requiredInput.isPresent()) {
+                                Object input = data;
+                                if(data instanceof FileUpload) {
+                                    Argument<?> argument = requiredInput.get();
+                                    FileUpload fileUpload = (FileUpload) data;
+                                    if(org.particleframework.http.multipart.FileUpload.class.isAssignableFrom(argument.getType())) {
+                                        currentPart = createPart(fileUpload);
+                                        input = currentPart;
+                                    }
+                                }
+                                routeMatch = routeMatch.fulfill(Collections.singletonMap(name, input));
+                            }
                         }
                     }
                     else {
@@ -338,7 +379,27 @@ public class NettyHttpServer implements EmbeddedServer {
                     request.setBody(message);
                 }
 
-                subscription.request(1);
+
+                if(!executed) {
+                    if(routeMatch.isExecutable()) {
+                        // we have enough data to satisfy the route, continue
+                        doOnComplete();
+                    }
+                    else {
+                        // the route is not yet executable, so keep going
+                        subscription.request(1);
+                    }
+                }
+            }
+
+            private NettyPart createPart(FileUpload fileUpload) {
+                NettyPart nettyPart = new NettyPart(
+                        fileUpload,
+                        serverConfiguration.getMultipart(),
+                        ioExecutor,
+                        subscription
+                );
+                return nettyPart;
             }
 
             @Override
@@ -348,11 +409,13 @@ public class NettyHttpServer implements EmbeddedServer {
 
             @Override
             protected void doOnComplete() {
-                try {
-                    routeMatch = prepareRouteForExecution(routeMatch, request, binderRegistry);
-                    routeMatch.execute();
-                } catch (Exception e) {
-                    context.pipeline().fireExceptionCaught(e);
+                if(executed.compareAndSet(false, true)) {
+                    try {
+                        routeMatch = prepareRouteForExecution(routeMatch, request, binderRegistry);
+                        routeMatch.execute();
+                    } catch (Exception e) {
+                        context.pipeline().fireExceptionCaught(e);
+                    }
                 }
             }
 
@@ -425,7 +488,7 @@ public class NettyHttpServer implements EmbeddedServer {
                 .filter(RouteMatch::isExecutable);
     }
 
-    private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+    private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, NettyHttpRequest<?> request, RequestBinderRegistry binderRegistry) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
@@ -441,7 +504,7 @@ public class NettyHttpServer implements EmbeddedServer {
                 if (registeredBinder.isPresent()) {
                     ArgumentBinder argumentBinder = registeredBinder.get();
                     String argumentName = argument.getName();
-                    ArgumentConversionContext conversionContext = ConversionContext.of(argument, request.getLocale(), request.getCharacterEncoding());
+                    ArgumentConversionContext conversionContext = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
 
                     if (argumentBinder instanceof BodyArgumentBinder) {
                         if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {

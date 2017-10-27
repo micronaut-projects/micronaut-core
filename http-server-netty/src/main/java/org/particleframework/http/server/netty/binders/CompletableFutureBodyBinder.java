@@ -46,7 +46,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     }
 
     @Override
-    public Optional<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest source) {
+    public Optional<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();

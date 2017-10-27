@@ -150,17 +150,17 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     }
 
     @Override
-    public Locale getLocale() {
+    public Optional<Locale> getLocale() {
         Locale locale = this.locale;
         if (locale == null) {
             synchronized (this) { // double check
                 locale = this.locale;
                 if (locale == null) {
-                    this.locale = locale = HttpRequest.super.getLocale();
+                    this.locale = locale = HttpRequest.super.getLocale().orElse(null);
                 }
             }
         }
-        return locale;
+        return Optional.ofNullable(locale);
     }
 
     @Override

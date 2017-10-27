@@ -24,5 +24,5 @@ import org.particleframework.http.HttpRequest;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest> {
+public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest<?>> {
 }

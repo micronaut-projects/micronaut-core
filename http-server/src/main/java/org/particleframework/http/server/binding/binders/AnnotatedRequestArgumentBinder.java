@@ -34,7 +34,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends RequestArgumentBinder<T>, AnnotatedArgumentBinder<A, T, HttpRequest> {
+public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends RequestArgumentBinder<T>, AnnotatedArgumentBinder<A, T, HttpRequest<?>> {
 
     /**
      * Create a binder from an annotation type and another binder
@@ -45,11 +45,11 @@ public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends
      * @param <ST> The argument type
      * @return The {@link AnnotatedRequestArgumentBinder}
      */
-    static <SA extends Annotation, ST> AnnotatedRequestArgumentBinder of(Class<SA> annotationType, ArgumentBinder<ST, HttpRequest> binder) {
+    static <SA extends Annotation, ST> AnnotatedRequestArgumentBinder of(Class<SA> annotationType, ArgumentBinder<ST, HttpRequest<?>> binder) {
         return new AnnotatedRequestArgumentBinder<SA, ST>() {
 
             @Override
-            public Optional<ST> bind(ArgumentConversionContext<ST> argument, HttpRequest source) {
+            public Optional<ST> bind(ArgumentConversionContext<ST> argument, HttpRequest<?> source) {
                 return binder.bind(argument, source);
             }
 

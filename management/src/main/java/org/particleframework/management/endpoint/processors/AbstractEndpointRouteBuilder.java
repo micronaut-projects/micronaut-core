@@ -19,7 +19,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.util.Completable;
+import org.particleframework.core.async.subscriber.Completable;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.uri.UriTemplate;
 import org.particleframework.inject.BeanDefinition;
@@ -78,7 +78,7 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
     }
 
     @Override
-    public final void complete() {
+    public final void onComplete() {
         endpointIds.clear();
     }
 

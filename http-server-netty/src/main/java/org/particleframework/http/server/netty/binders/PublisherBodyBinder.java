@@ -65,7 +65,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     }
 
     @Override
-    public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest source) {
+    public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();

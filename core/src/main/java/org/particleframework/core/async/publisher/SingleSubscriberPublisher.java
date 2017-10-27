@@ -19,6 +19,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -40,8 +41,7 @@ public abstract  class SingleSubscriberPublisher<T> implements Publisher<T> {
         }
     };
 
-    protected final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
-
+    private final AtomicReference<Subscriber<? super T>> subscriber = new AtomicReference<>();
 
     @Override
     public final void subscribe(Subscriber<? super T> subscriber) {
@@ -60,4 +60,11 @@ public abstract  class SingleSubscriberPublisher<T> implements Publisher<T> {
      * @see Publisher#subscribe(Subscriber)
      */
     protected abstract void doSubscribe(Subscriber<? super T> subscriber);
+
+    /**
+     * @return Obtain the current subscriber
+     */
+    protected Optional<Subscriber<? super T>> currentSubscriber() {
+        return Optional.ofNullable(subscriber.get());
+    }
 }

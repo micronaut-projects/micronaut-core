@@ -58,7 +58,8 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-        NettyHttpResponse res = NettyHttpResponse.getOrCreate(request.get());
+        NettyHttpRequest request = this.request.get();
+        NettyHttpResponse res = NettyHttpResponse.getOrCreate(request);
         String string = msg.toString();
         ByteBuf content = Unpooled.copiedBuffer(string, StandardCharsets.UTF_8);
         if(msg instanceof Event) {

@@ -19,10 +19,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.MethodExecutionHandle;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -107,5 +104,14 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
      * @param name The name of the input
      * @return True if it is
      */
-    boolean isRequiredInput(String name);
+    default boolean isRequiredInput(String name) {
+        return getRequiredInput(name).isPresent();
+    }
+
+    /**
+     * Return whether the given named input is required by this route
+     * @param name The name of the input
+     * @return True if it is
+     */
+    Optional<Argument<?>> getRequiredInput(String name);
 }
