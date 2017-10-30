@@ -23,9 +23,7 @@ import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
-import java.util.Iterator;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Simple facade over a Jackson {@link ObjectNode} to make it a {@link ConvertibleValues}
@@ -47,6 +45,15 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
     public Set<String> getNames() {
         Iterator<String> fieldNames = objectNode.fieldNames();
         return CollectionUtils.iteratorToSet(fieldNames);
+    }
+
+    @Override
+    public Collection<V> values() {
+        List<V> values = new ArrayList<>();
+        for (JsonNode jsonNode : objectNode) {
+            values.add((V) jsonNode);
+        }
+        return Collections.unmodifiableCollection(values);
     }
 
     @Override

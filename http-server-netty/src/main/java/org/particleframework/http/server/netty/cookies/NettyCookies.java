@@ -74,6 +74,11 @@ public class NettyCookies implements Cookies {
         return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType.getType(), ConversionContext.of(requiredType))));
     }
 
+    @Override
+    public Collection<Cookie> values() {
+        return Collections.unmodifiableCollection(cookies.values());
+    }
+
     public static class NettyCookie implements Cookie {
         private final io.netty.handler.codec.http.cookie.Cookie nettyCookie;
         public NettyCookie(io.netty.handler.codec.http.cookie.Cookie nettyCookie) {

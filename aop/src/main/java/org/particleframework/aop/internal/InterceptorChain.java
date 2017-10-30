@@ -169,6 +169,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     }
 
     @Override
+    public Collection<Object> values() {
+        return attributes.values();
+    }
+
+    @Override
     public InterceptorChain<B,R> remove(CharSequence key) {
         attributes.remove(key);
         return this;

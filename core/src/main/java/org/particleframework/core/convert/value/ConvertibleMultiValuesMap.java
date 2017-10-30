@@ -101,4 +101,9 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     public Set<String> getNames() {
         return values.keySet().stream().map(CharSequence::toString).collect(Collectors.toSet());
     }
+
+    @Override
+    public Collection<List<V>> values() {
+        return Collections.unmodifiableCollection(values.values());
+    }
 }

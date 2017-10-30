@@ -21,9 +21,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.MutableHttpHeaders;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Delegates to Netty's {@link io.netty.handler.codec.http.HttpHeaders}
@@ -66,6 +64,16 @@ class NettyHttpRequestHeaders implements MutableHttpHeaders {
     @Override
     public Set<String> getNames() {
         return nettyHeaders.names();
+    }
+
+    @Override
+    public Collection<List<String>> values() {
+        Set<String> names = getNames();
+        List<List<String>> values = new ArrayList<>();
+        for (String name : names) {
+            values.add(getAll(name));
+        }
+        return Collections.unmodifiableList(values);
     }
 
     @Override

@@ -19,10 +19,7 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -70,5 +67,10 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     @Override
     public Set<String> getNames() {
         return map.keySet().stream().map(CharSequence::toString).collect(Collectors.toSet());
+    }
+
+    @Override
+    public Collection<V> values() {
+        return Collections.unmodifiableCollection(map.values());
     }
 }

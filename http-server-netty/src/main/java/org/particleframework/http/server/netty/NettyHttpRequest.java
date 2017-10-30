@@ -23,9 +23,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.*;
-import io.netty.util.AttributeKey;
-import io.netty.util.DefaultAttributeMap;
-import io.netty.util.ReferenceCounted;
+import io.netty.util.*;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.*;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
@@ -88,8 +86,9 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
         Objects.requireNonNull(environment, "Environment cannot be null");
         Channel channel = ctx.channel();
-        if(channel != null)
+        if(channel != null) {
             channel.attr(KEY).set(this);
+        }
         this.serverConfiguration = serverConfiguration;
         this.conversionService = environment;
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
@@ -260,7 +259,6 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
      */
     @Internal
     public void release() {
-        channelHandlerContext.channel().attr(KEY).set(null);
         for (ByteBufHolder byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
@@ -346,5 +344,27 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     private Charset initCharset() {
         Charset characterEncoding = HttpRequest.super.getCharacterEncoding();
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
+    }
+
+    /**
+     * Lookup the current request from the context
+     * @param ctx The context
+     * @return The request or null if it is not present
+     */
+    public static NettyHttpRequest get(ChannelHandlerContext ctx) {
+        Channel channel = ctx.channel();
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        return attr.get();
+    }
+
+    /**
+     * Lookup the current request from the context
+     * @param ctx The context
+     * @return The request or null if it is not present
+     */
+    public static NettyHttpRequest current(ChannelHandlerContext ctx) {
+        NettyHttpRequest current = get(ctx);
+        if(current == null) throw new IllegalStateException("Current request not present");
+        return current;
     }
 }

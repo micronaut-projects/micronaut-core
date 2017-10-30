@@ -17,8 +17,7 @@ package org.particleframework.http.server.netty.encoders;
 
 import io.netty.channel.*;
 import org.particleframework.core.order.Ordered;
-import org.particleframework.http.server.netty.NettyHttpRequest;
-import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -33,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 @ChannelHandler.Sharable
+@Singleton
 public class PublisherEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
     @Override
     public int getOrder() {
@@ -85,13 +85,4 @@ public class PublisherEncoder extends ChannelOutboundHandlerAdapter implements O
         }
     }
 
-    @Singleton
-    public static class PublisherEncoderFactory implements ChannelHandlerFactory {
-        private final PublisherEncoder publisherEncoder = new PublisherEncoder();
-
-        @Override
-        public ChannelHandler build(NettyHttpRequestProvider provider) {
-            return publisherEncoder;
-        }
-    }
 }

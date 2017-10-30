@@ -23,6 +23,8 @@ import java.util.stream.Stream;
 /**
  * Creates a Server Sent Event (SSE) stream
  *
+ * TODO: Change this to implement Publisher
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -45,7 +47,7 @@ public interface EventStream extends Consumer<Subscriber<? super Event>>  {
      * @return The Stream
      */
     static EventStream of(Object...objects) {
-        return subscriber -> {
+        return of( subscriber -> {
             for (Object object : objects) {
                 if(object instanceof Event) {
                     subscriber.onNext((Event) object);
@@ -55,7 +57,7 @@ public interface EventStream extends Consumer<Subscriber<? super Event>>  {
                 }
             }
             subscriber.onComplete();
-        };
+        });
     }
 
     /**
@@ -65,7 +67,7 @@ public interface EventStream extends Consumer<Subscriber<? super Event>>  {
      * @return The Stream
      */
     static EventStream of(Stream<?> stream) {
-        return subscriber -> {
+        return of(subscriber -> {
             stream.forEach( object -> {
                 if(object instanceof Event) {
                     subscriber.onNext((Event) object);
@@ -75,6 +77,6 @@ public interface EventStream extends Consumer<Subscriber<? super Event>>  {
                 }
             });
             subscriber.onComplete();
-        };
+        });
     }
 }

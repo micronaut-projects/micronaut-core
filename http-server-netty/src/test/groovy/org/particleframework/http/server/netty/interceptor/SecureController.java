@@ -13,31 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.handler;
+package org.particleframework.http.server.netty.interceptor;
 
-import io.netty.channel.ChannelHandler;
-import org.particleframework.http.server.netty.NettyHttpRequest;
-
-import java.util.function.Supplier;
+import org.particleframework.http.HttpResponse;
+import org.particleframework.stereotype.Controller;
 
 /**
- * Factory interface for building {@link ChannelHandler} instances
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ChannelHandlerFactory {
+@Controller
+public class SecureController {
 
-    /**
-     * Constructs a new {@link ChannelHandler}
-     *
-     * @param requestProvider The channel instance
-     * @return The new {@link ChannelHandler}
-     */
-    ChannelHandler build(NettyHttpRequestProvider requestProvider);
-
-
-    interface NettyHttpRequestProvider extends Supplier<NettyHttpRequest> {
-
+    public HttpResponse index(String username) {
+        return HttpResponse.ok("Authenticated: " + username);
     }
 }

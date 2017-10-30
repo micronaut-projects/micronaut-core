@@ -21,6 +21,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
@@ -41,6 +42,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     private static final AttributeKey<NettyHttpResponse> KEY = AttributeKey.valueOf(NettyHttpResponse.class.getSimpleName());
 
@@ -139,6 +141,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param request The context
      * @return The {@link NettyHttpResponse}
      */
+    @Internal
     public static NettyHttpResponse getOrCreate(NettyHttpRequest<?> request) {
         return getOr(request, HttpResponse.ok());
     }
@@ -149,6 +152,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param request The context
      * @return The {@link NettyHttpResponse}
      */
+    @Internal
     public static NettyHttpResponse getOr(NettyHttpRequest<?> request, HttpResponse<?> alternative) {
         Attribute<NettyHttpResponse> attr = request.attr(KEY);
         NettyHttpResponse nettyHttpResponse = attr.get();
@@ -164,6 +168,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param request The request
      * @return The {@link NettyHttpResponse}
      */
+    @Internal
     public static Optional<NettyHttpResponse> get(NettyHttpRequest<?> request) {
         NettyHttpResponse nettyHttpResponse = request.attr(KEY).get();
         return Optional.ofNullable(nettyHttpResponse);
@@ -175,6 +180,7 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
      * @param request The request
      * @return The {@link NettyHttpResponse}
      */
+    @Internal
     public static Optional<NettyHttpResponse> set(NettyHttpRequest<?> request, HttpResponse<?> response) {
         request.attr(KEY).set((NettyHttpResponse) response);
         return Optional.ofNullable((NettyHttpResponse) response);

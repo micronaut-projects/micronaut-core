@@ -16,7 +16,10 @@
 package org.particleframework.http;
 
 import org.particleframework.core.convert.value.MutableConvertibleValues;
+import org.particleframework.core.value.OptionalValues;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -31,7 +34,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpMessage<B> {
+public interface HttpMessage<B> extends OptionalValues<Object> {
     /**
      * @return The {@link HttpHeaders} object
      */
@@ -45,6 +48,32 @@ public interface HttpMessage<B> {
      * @return The attributes of the message
      */
     MutableConvertibleValues<Object> getAttributes();
+
+    @Override
+    default Optional<Object> get(CharSequence name) {
+        return getAttributes().get(name, Object.class);
+    }
+
+    @Override
+    default Collection<Object> values() {
+        return getAttributes().values();
+    }
+
+    @Override
+    default Iterator<CharSequence> iterator() {
+        Iterator<String> i = getAttributes().getNames().iterator();
+        return new Iterator<CharSequence>() {
+            @Override
+            public boolean hasNext() {
+                return i.hasNext();
+            }
+
+            @Override
+            public CharSequence next() {
+                return i.next();
+            }
+        };
+    }
 
     /**
      * @return The request body

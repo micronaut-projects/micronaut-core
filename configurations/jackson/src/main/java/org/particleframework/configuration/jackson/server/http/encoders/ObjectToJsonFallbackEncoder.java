@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandler;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
@@ -28,7 +29,7 @@ import org.particleframework.http.annotation.Produces;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.encoders.ObjectToStringFallbackEncoder;
-import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.particleframework.http.sse.Event;
 
 import javax.inject.Singleton;
@@ -38,16 +39,16 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
+@ChannelHandler.Sharable
+@Singleton
 public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object> implements Ordered {
 
     public static final int ORDER = ObjectToStringFallbackEncoder.ORDER - 50;
 
     private final ObjectMapper objectMapper;
-    private final ChannelHandlerFactory.NettyHttpRequestProvider request;
 
-    public ObjectToJsonFallbackEncoder(ObjectMapper objectMapper, ChannelHandlerFactory.NettyHttpRequestProvider request) {
+    public ObjectToJsonFallbackEncoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
-        this.request = request;
     }
 
     @Override
@@ -62,7 +63,7 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-        NettyHttpResponse res = NettyHttpResponse.getOrCreate(request.get());
+        NettyHttpResponse res = NettyHttpResponse.getOrCreate(NettyHttpRequest.current(ctx));
         FullHttpResponse httpResponse = res.getNativeResponse();
 
 
@@ -93,18 +94,4 @@ public class ObjectToJsonFallbackEncoder extends MessageToMessageEncoder<Object>
         }
     }
 
-    @Singleton
-    public static class Factory implements ChannelHandlerFactory {
-
-        private final ObjectMapper objectMapper;
-
-        public Factory(ObjectMapper objectMapper) {
-            this.objectMapper = objectMapper;
-        }
-
-        @Override
-        public ChannelHandler build(NettyHttpRequestProvider requestProvider) {
-            return new ObjectToJsonFallbackEncoder(objectMapper, requestProvider);
-        }
-    }
 }

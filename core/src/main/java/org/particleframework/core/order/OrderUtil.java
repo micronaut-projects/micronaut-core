@@ -68,6 +68,19 @@ public class OrderUtil {
             return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
         }));
     }
+
+    /**
+     * Sort the given array in reverse order
+     *
+     * @param array The array to sort
+     */
+    public static void reverseSort(Object[] array) {
+        Arrays.sort(array,Collections.reverseOrder((o1, o2) -> {
+            int order1 = getOrder(o1);
+            int order2 = getOrder(o2);
+            return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
+        }));
+    }
     /**
      * Sort the given array
      *
@@ -86,7 +99,7 @@ public class OrderUtil {
      *
      * @param objects The array to sort
      */
-    public static void sort(Object...objects) {
+    public static void sort(Object[] objects) {
         Arrays.sort(objects,(o1, o2) -> {
             int order1 = getOrder(o1);
             int order2 = getOrder(o2);

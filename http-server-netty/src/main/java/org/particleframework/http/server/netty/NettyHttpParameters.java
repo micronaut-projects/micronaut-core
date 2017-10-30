@@ -67,6 +67,11 @@ public class NettyHttpParameters implements HttpParameters {
     }
 
     @Override
+    public Collection<List<String>> values() {
+        return Collections.unmodifiableCollection(parameters.values());
+    }
+
+    @Override
     public List<String> getAll(CharSequence name) {
         String key = name.toString();
         return parameters.computeIfAbsent(key, s -> Collections.emptyList());

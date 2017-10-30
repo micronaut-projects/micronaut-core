@@ -36,6 +36,11 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
     Set<String> getNames();
 
     /**
+     * @return The values
+     */
+    Collection<V> values();
+
+    /**
      * @return The concrete type of the value
      */
     default Class<V> getValueType() {

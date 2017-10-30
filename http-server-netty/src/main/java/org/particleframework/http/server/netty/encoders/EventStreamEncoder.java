@@ -25,7 +25,7 @@ import io.netty.util.AsciiString;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.server.netty.NettyHttpRequest;
-import org.particleframework.http.server.netty.handler.ChannelHandlerFactory;
+import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.particleframework.http.sse.Event;
 import org.particleframework.http.sse.EventStream;
 import org.reactivestreams.Subscription;
@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
@@ -43,6 +44,7 @@ import java.time.Duration;
  * @since 1.0
  */
 @ChannelHandler.Sharable
+@Singleton
 public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(EventStreamEncoder.class);
 
@@ -52,11 +54,6 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
     public static final AsciiString RETRY_PREFIX = new AsciiString("retry: ", StandardCharsets.UTF_8);
     public static final AsciiString COMMENT_PREFIX = new AsciiString(": ", StandardCharsets.UTF_8);
     public static final AsciiString NEWLINE = new AsciiString("\n", StandardCharsets.UTF_8);
-    private final ChannelHandlerFactory.NettyHttpRequestProvider requestProvider;
-
-    public EventStreamEncoder(ChannelHandlerFactory.NettyHttpRequestProvider requestProvider) {
-        this.requestProvider = requestProvider;
-    }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -76,7 +73,7 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
                                             @Override
                                             protected void complete() {
                                                 channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT).addListener(future -> {
-                                                            NettyHttpRequest request = requestProvider.get();
+                                                            NettyHttpRequest request = NettyHttpRequest.get(ctx);
                                                             if (request == null || !request.getHeaders().isKeepAlive()) {
                                                                 channel.pipeline()
                                                                         .writeAndFlush(org.particleframework.http.HttpResponse.noContent())
@@ -118,12 +115,14 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
             Event event = (Event) msg;
             Object data = event.getData();
             if(data instanceof CharSequence) {
-                data = Unpooled.copiedBuffer((CharSequence)data, requestProvider.get().getCharacterEncoding());
+                NettyHttpRequest request = NettyHttpRequest.get(ctx);
+                Charset charset = request == null ? StandardCharsets.UTF_8 : request.getCharacterEncoding();
+                data = Unpooled.copiedBuffer((CharSequence)data, charset);
             }
 
             if (data instanceof ByteBuf) {
                 ByteBuf body = (ByteBuf) data;
-                ByteBuf eventData = Unpooled.buffer(body.readableBytes() + 10);
+                ByteBuf eventData = ctx.alloc().buffer(body.readableBytes() + 10);
 
                 writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
                 writeAttribute(eventData, ID_PREFIX, event.getId());
@@ -160,11 +159,4 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
         }
     }
 
-    @Singleton
-    public static class Factory implements ChannelHandlerFactory {
-        @Override
-        public ChannelHandler build(NettyHttpRequestProvider requestProvider) {
-            return new EventStreamEncoder(requestProvider);
-        }
-    }
 }
