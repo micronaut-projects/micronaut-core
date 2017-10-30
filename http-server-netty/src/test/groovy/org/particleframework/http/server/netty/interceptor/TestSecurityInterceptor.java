@@ -43,7 +43,7 @@ public class TestSecurityInterceptor implements HttpRequestInterceptor {
     }
 
     @Override
-    public void intercept(HttpRequest<?> request, RequestContext context) {
+    public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
 
         Assert.that(request.get("first").isPresent());
         Assert.that(!request.get("second").isPresent());

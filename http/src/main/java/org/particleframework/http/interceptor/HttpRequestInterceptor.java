@@ -17,18 +17,16 @@ package org.particleframework.http.interceptor;
 
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpRequest;
-import org.reactivestreams.Publisher;
-
 import java.util.concurrent.CompletableFuture;
 
 /**
  * <p>A interface for classes that can intercept an {@link org.particleframework.http.HttpRequest} and can either proceed with the request or return a modified result</p>
  *
- * <p>Note that implementation should call at least one of either {@link RequestContext#proceed(HttpRequest)} or {@link RequestContext#write(Object)} in order to proceed request processing.</p>
+ * <p>Note that implementation should call at least one of either {@link RequestInterceptionContext#proceed(HttpRequest)} or {@link RequestInterceptionContext#write(Object)} in order to proceed request processing.</p>
  *
- * <p>When {@link RequestContext#proceed(HttpRequest)} is called the interceptor will proceed to the next interceptor in the chain. The interceptors themselves can be ordered via the {@link Ordered} interface.</p>
+ * <p>When {@link RequestInterceptionContext#proceed(HttpRequest)} is called the interceptor will proceed to the next interceptor in the chain. The interceptors themselves can be ordered via the {@link Ordered} interface.</p>
  *
- * <p>When {@link RequestContext#write(Object)} is called then the next interceptor in the chain will not be invoked and instead the passed value will be encoded as the response.</p>
+ * <p>When {@link RequestInterceptionContext#write(Object)} is called then the next interceptor in the chain will not be invoked and instead the passed value will be encoded as the response.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -48,9 +46,9 @@ public interface HttpRequestInterceptor extends Ordered {
      * Intercepts a {@link HttpRequest}
      *
      * @param request The {@link HttpRequest} instance
-     * @param context The {@link RequestContext} instance
+     * @param context The {@link RequestInterceptionContext} instance
      */
-    void intercept(HttpRequest<?> request, RequestContext context);
+    void intercept(HttpRequest<?> request, RequestInterceptionContext context);
 
 
     /**
@@ -58,7 +56,7 @@ public interface HttpRequestInterceptor extends Ordered {
      *
      * <p>The context instance itself can be passed to other threads as necessary if blocking operations are required to implement the {@link HttpRequestInterceptor}</p>
      */
-    interface RequestContext {
+    interface RequestInterceptionContext {
         /**
          * Proceed to the next interceptor or final request invocation
          *
@@ -70,7 +68,7 @@ public interface HttpRequestInterceptor extends Ordered {
          * Write an alternative response
          *
          * @param response The response to write
-         * @return A {@link Publisher} with the response that fires once written successfully
+         * @return A {@link CompletableFuture} with the response that fires once written successfully
          */
         <T> CompletableFuture<T> write(T response);
     }

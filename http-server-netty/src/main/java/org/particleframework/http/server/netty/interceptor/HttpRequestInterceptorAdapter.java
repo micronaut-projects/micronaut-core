@@ -20,7 +20,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.interceptor.HttpRequestInterceptor;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
@@ -48,7 +47,7 @@ public class HttpRequestInterceptorAdapter extends SimpleChannelInboundHandler<H
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> msg) throws Exception {
         if (adapted.matches(msg)) {
             try {
-                adapted.intercept(msg, new HttpRequestInterceptor.RequestContext() {
+                adapted.intercept(msg, new HttpRequestInterceptor.RequestInterceptionContext() {
                     @Override
                     public void proceed(HttpRequest<?> request) {
                         ctx.fireChannelRead(request);
