@@ -13,29 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.converters;
-
-import io.netty.buffer.ByteBuf;
-import org.particleframework.http.MediaType;
-
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.Optional;
 
 /**
- * Represents a mapping between a Java type and a {@link MediaType}
+ * <p>Classes to support exposing {@link org.particleframework.function.Function} instances over the web</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MediaTypeReader<T> {
-    /**
-     * @return The media type
-     */
-    MediaType getMediaType();
-
-    /**
-     * @return The Java type
-     */
-    T read(Class<T> type, ByteBuf byteBuf, Charset charset) throws IOException;
-}
+package org.particleframework.function.web;

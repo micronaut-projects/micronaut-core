@@ -49,7 +49,7 @@ import java.lang.annotation.Annotation;
  *
  * @param <A> The annotation type, which should be a stereotype of {@link Executable}
  */
-public interface ExecutableMethodProcessor<A extends Annotation> extends AnnotationProcessor<A, ExecutableMethod<Object,Object>> {
+public interface ExecutableMethodProcessor<A extends Annotation> extends AnnotationProcessor<A, ExecutableMethod<?,?>> {
 
     /**
      * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
@@ -57,5 +57,5 @@ public interface ExecutableMethodProcessor<A extends Annotation> extends Annotat
      * @param method The executable method
      */
     @Override
-    void process(ExecutableMethod<Object,Object> method);
+    void process(ExecutableMethod<?,?> method);
 }

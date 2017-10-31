@@ -1,0 +1,133 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package org.particleframework.function.web;
+
+import org.particleframework.context.BeanLocator;
+import org.particleframework.context.ExecutionHandleLocator;
+import org.particleframework.context.annotation.Replaces;
+import org.particleframework.context.processor.ExecutableMethodProcessor;
+import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.util.StringUtils;
+import org.particleframework.function.DefaultFunctionRegistry;
+import org.particleframework.function.Function;
+import org.particleframework.function.FunctionRegistry;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Consumes;
+import org.particleframework.http.annotation.Produces;
+import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.web.router.DefaultRouteBuilder;
+
+import javax.inject.Singleton;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+/**
+ * Process methods for {@link Function} instances
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Singleton
+@Replaces(DefaultFunctionRegistry.class)
+public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Function>, FunctionRegistry {
+
+
+    private final DefaultFunctionRegistry functionRegistry;
+
+    public AnnotatedFunctionRouteBuilder(
+            ExecutionHandleLocator executionHandleLocator,
+            UriNamingStrategy uriNamingStrategy,
+            ConversionService<?> conversionService) {
+        super(executionHandleLocator, uriNamingStrategy, conversionService);
+        this.functionRegistry = new DefaultFunctionRegistry();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void process(ExecutableMethod<?, ?> method) {
+        Function annotation = method.getAnnotation(Function.class);
+        String[] consumes = method.findAnnotation(Consumes.class).map(Consumes::value).orElse(annotation.consumes());
+
+        // TODO: properly implement suppport for produces
+        String[] produces = method.findAnnotation(Produces.class).map(Produces::value).orElse(annotation.produces());
+
+        String functionPath = annotation.value();
+        Class<?> declaringType = method.getDeclaringType();
+        if(StringUtils.isEmpty(functionPath)) {
+            String typeName = declaringType.getSimpleName();
+            if(typeName.contains("$")) {
+                // generated lambda
+                functionPath = "/" + NameUtils.hyphenate(method.getMethodName());
+            }
+            else {
+                functionPath = "/" + NameUtils.hyphenate(typeName);
+            }
+        }
+        else {
+            functionPath = "/" + functionPath;
+        }
+
+        if(java.util.function.Function.class.isAssignableFrom(declaringType)) {
+            POST(functionPath, method)
+                .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
+            functionRegistry.process(method);
+        }
+        else if(Consumer.class.isAssignableFrom(declaringType)) {
+            POST(functionPath, method)
+                    .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
+            functionRegistry.process(method);
+        }
+        else if(BiFunction.class.isAssignableFrom(declaringType)) {
+            POST(functionPath, method)
+                    .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
+            functionRegistry.process(method);
+        }
+        else if(Supplier.class.isAssignableFrom(declaringType)) {
+            GET(functionPath, method)
+                .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
+            functionRegistry.process(method);
+        }
+    }
+
+
+    @Override
+    public Optional<? extends ExecutableMethod<?, ?>> findFirst() {
+        return functionRegistry.findFirst();
+    }
+
+    @Override
+    public <T> Optional<ExecutableMethod<Supplier<T>, T>> findSupplier(String name) {
+        return functionRegistry.findSupplier(name);
+    }
+
+    @Override
+    public <T> Optional<ExecutableMethod<Consumer<T>, Void>> findConsumer(String name) {
+        return functionRegistry.findConsumer(name);
+    }
+
+    @Override
+    public <T, R> Optional<ExecutableMethod<java.util.function.Function<T, R>, R>> findFunction(String name) {
+        return functionRegistry.findFunction(name);
+    }
+
+    @Override
+    public <T, U, R> Optional<ExecutableMethod<BiFunction<T, U, R>, R>> findBiFunction(String name) {
+        return functionRegistry.findBiFunction(name);
+    }
+}

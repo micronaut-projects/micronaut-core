@@ -82,7 +82,7 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
         endpointIds.clear();
     }
 
-    protected UriTemplate buildUriTemplate(ExecutableMethod<Object, Object> method, String id) {
+    protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
         UriTemplate template = new UriTemplate(uriNamingStrategy.resolveUri(id));
         for (Argument argument : method.getArguments()) {
             if(isPathParameter(argument)) {

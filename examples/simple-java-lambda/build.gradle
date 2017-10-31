@@ -1,0 +1,59 @@
+import jp.classmethod.aws.gradle.lambda.AWSLambdaMigrateFunctionTask
+import com.amazonaws.services.lambda.model.Runtime
+
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+        mavenLocal()
+
+    }
+    dependencies {
+        classpath "jp.classmethod.aws:gradle-aws-plugin:0.22"
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id "de.sebastianboegl.shadow.transformer.log4j" version "2.1.1"
+    id 'java'
+    id "application"
+}
+
+apply plugin: 'jp.classmethod.aws.lambda'
+
+mainClassName = "example.Application"
+applicationDefaultJvmArgs = [""]
+jar {
+    manifest {
+        attributes 'Main-Class': "example.Application"
+    }
+}
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+dependencies {
+    compileOnly "org.particleframework:inject-java:${projectVersion}"
+    compile "org.particleframework:function-aws:${projectVersion}"
+    runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
+    runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
+
+
+    testCompile "org.particleframework:http-server-netty:${projectVersion}"
+    testCompile 'junit:junit:4.12'
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+}
+shadowJar {
+    mergeServiceFiles()
+}
+
+task deploy(type: AWSLambdaMigrateFunctionTask) {
+    functionName = "particle-function"
+    handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    runtime = Runtime.Java8
+    zipFile = shadowJar.archivePath
+    memorySize = 512
+    timeout = 60
+}

@@ -44,7 +44,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder impl
     }
 
     @Override
-    public void process(ExecutableMethod<Object, Object> method) {
+    public void process(ExecutableMethod<?, ?> method) {
         Class<?> declaringType = method.getDeclaringType();
         Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
 
@@ -52,9 +52,10 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder impl
             Write annotation = method.getAnnotation(Write.class);
             UriTemplate template = buildUriTemplate(method, config.getId());
             POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-                .accept(MediaType.of(annotation.consumes()));
+                    .accept(MediaType.of(annotation.consumes()));
         });
     }
+
 
     @Override
     protected boolean isPathParameter(Argument argument) {

@@ -48,6 +48,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -82,6 +83,7 @@ public class DefaultBeanContext implements BeanContext {
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class
@@ -101,28 +103,36 @@ public class DefaultBeanContext implements BeanContext {
         this.beanConfigurationIterator = resolveBeanConfigurarions().iterator();
     }
 
+    @Override
+    public boolean isRunning() {
+        return running.get();
+    }
+
     /**
      * The start method will read all bean definition classes found on the classpath and initialize any pre-required state
      */
     @Override
     public BeanContext start() {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Starting BeanContext");
-        }
-        readAllBeanConfigurations();
-        readAllBeanDefinitionClasses();
-        if (LOG.isDebugEnabled()) {
-            String activeConfigurations = beanConfigurations.values()
-                    .stream()
-                    .filter(config -> config.isEnabled(this))
-                    .map(BeanConfiguration::getName)
-                    .collect(Collectors.joining(","));
-            if (StringUtils.isNotEmpty(activeConfigurations)) {
-                LOG.debug("Loaded active configurations: {}", activeConfigurations);
+        if(running.compareAndSet(false, true)) {
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Starting BeanContext");
             }
-        }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("BeanContext Started.");
+            readAllBeanConfigurations();
+            readAllBeanDefinitionClasses();
+            if (LOG.isDebugEnabled()) {
+                String activeConfigurations = beanConfigurations.values()
+                        .stream()
+                        .filter(config -> config.isEnabled(this))
+                        .map(BeanConfiguration::getName)
+                        .collect(Collectors.joining(","));
+                if (StringUtils.isNotEmpty(activeConfigurations)) {
+                    LOG.debug("Loaded active configurations: {}", activeConfigurations);
+                }
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("BeanContext Started.");
+            }
         }
         return this;
     }
@@ -132,34 +142,35 @@ public class DefaultBeanContext implements BeanContext {
      */
     @Override
     public BeanContext stop() {
-        // need to sort registered singletons so that beans with that require other beans appear first
-        ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
-        objects.sort((o1, o2) -> {
-                    BeanDefinition bd1 = o1.beanDefinition;
-                    BeanDefinition bd2 = o2.beanDefinition;
+        if(running.compareAndSet(true, false)) {
+            // need to sort registered singletons so that beans with that require other beans appear first
+            ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
+            objects.sort((o1, o2) -> {
+                        BeanDefinition bd1 = o1.beanDefinition;
+                        BeanDefinition bd2 = o2.beanDefinition;
 
-                    Collection requiredComponents1 = bd1.getRequiredComponents();
-                    Collection requiredComponents2 = bd2.getRequiredComponents();
-                    Integer requiredComponentCount1 = requiredComponents1.size();
-                    Integer requiredComponentCount2 = requiredComponents2.size();
-                    return requiredComponentCount1.compareTo(requiredComponentCount2);
+                        Collection requiredComponents1 = bd1.getRequiredComponents();
+                        Collection requiredComponents2 = bd2.getRequiredComponents();
+                        Integer requiredComponentCount1 = requiredComponents1.size();
+                        Integer requiredComponentCount2 = requiredComponents2.size();
+                        return requiredComponentCount1.compareTo(requiredComponentCount2);
+                    }
+            );
+
+            objects.forEach(beanRegistration -> {
+                BeanDefinition def = beanRegistration.beanDefinition;
+                Object bean = beanRegistration.bean;
+                if (def instanceof DisposableBeanDefinition) {
+                    try {
+                        ((DisposableBeanDefinition) def).dispose(this, bean);
+                    } catch (Throwable e) {
+                        LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
+                    }
+                } else if (bean instanceof LifeCycle) {
+                    ((LifeCycle) bean).stop();
                 }
-        );
-
-        objects.forEach(beanRegistration -> {
-            BeanDefinition def = beanRegistration.beanDefinition;
-            Object bean = beanRegistration.bean;
-            if (def instanceof DisposableBeanDefinition) {
-                try {
-                    ((DisposableBeanDefinition) def).dispose(this, bean);
-                } catch (Throwable e) {
-                    LOG.error("Error disposing of bean registration [" + def.getName() + "]: " + e.getMessage(), e);
-                }
-            } else if (bean instanceof LifeCycle) {
-                ((LifeCycle) bean).stop();
-            }
-        });
-
+            });
+        }
         return this;
     }
 

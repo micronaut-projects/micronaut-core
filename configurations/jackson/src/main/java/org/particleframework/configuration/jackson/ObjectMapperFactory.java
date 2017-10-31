@@ -86,9 +86,7 @@ public class ObjectMapperFactory {
             }
             else {
                 Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
-                if(targetType.isPresent()) {
-                    module.addDeserializer(targetType.get(), deserializer);
-                }
+                targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
         }
         objectMapper.registerModule(module);

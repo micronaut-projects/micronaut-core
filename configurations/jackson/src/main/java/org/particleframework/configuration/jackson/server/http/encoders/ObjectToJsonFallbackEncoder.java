@@ -20,7 +20,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
@@ -29,7 +28,6 @@ import org.particleframework.http.annotation.Produces;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.encoders.ObjectToStringFallbackEncoder;
-import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.particleframework.http.sse.Event;
 
 import javax.inject.Singleton;

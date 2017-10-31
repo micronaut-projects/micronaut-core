@@ -28,7 +28,7 @@ import java.util.Arrays;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodReference extends AnnotationSource {
+public interface MethodReference<T,R> extends AnnotationSource {
 
     /**
      * The required argument types
@@ -43,12 +43,12 @@ public interface MethodReference extends AnnotationSource {
     /**
      * @return Return the return type
      */
-    ReturnType getReturnType();
+    ReturnType<R> getReturnType();
 
     /**
      * @return The bean that declares this injection point
      */
-    Class<?> getDeclaringType();
+    Class<T> getDeclaringType();
 
     /**
      * @return The name of the method

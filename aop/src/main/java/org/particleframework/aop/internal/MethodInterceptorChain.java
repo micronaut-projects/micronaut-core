@@ -24,6 +24,7 @@ import org.particleframework.core.type.ReturnType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Set;
 
 /**
@@ -53,12 +54,12 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
 
     @Override
     public Class[] getArgumentTypes() {
-        return new Class[0];
+        return executionHandle.getArgumentTypes();
     }
 
     @Override
-    public Set<? extends Annotation> getExecutableAnnotations() {
-        return null;
+    public Collection<? extends Annotation> getExecutableAnnotations() {
+        return executionHandle.getExecutableAnnotations();
     }
 
     @Override
@@ -72,8 +73,8 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
     }
 
     @Override
-    public Class<?> getDeclaringType() {
-        return null;
+    public Class<T> getDeclaringType() {
+        return executionHandle.getDeclaringType();
     }
 
 }

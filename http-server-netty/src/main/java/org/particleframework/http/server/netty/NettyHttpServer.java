@@ -22,7 +22,9 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
@@ -75,14 +77,14 @@ public class NettyHttpServer implements EmbeddedServer {
     private final Optional<Router> router;
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
+    private final int serverPort;
 
     @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
-            Environment environment,
+            ApplicationContext applicationContext,
             Optional<Router> router,
             RequestBinderRegistry binderRegistry,
-            BeanLocator beanLocator,
             @Named(IOExecutorService.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             HttpRequestInterceptor[] interceptors,
@@ -92,11 +94,13 @@ public class NettyHttpServer implements EmbeddedServer {
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
-        this.beanLocator = beanLocator;
-        this.environment = environment;
+        this.beanLocator = applicationContext;
+        this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
         this.router = router;
         this.ioExecutor = ioExecutor;
+        int port = serverConfiguration.getPort();
+        this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
@@ -106,73 +110,86 @@ public class NettyHttpServer implements EmbeddedServer {
     }
 
     @Override
+    public boolean isRunning() {
+        return !SocketUtils.isTcpPortAvailable(serverPort);
+    }
+
+    @Override
     public EmbeddedServer start() {
-        NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
-        NioEventLoopGroup parentGroup = createParentEventLoopGroup();
-        ServerBootstrap serverBootstrap = createServerBootstrap();
+        if(!isRunning()) {
 
-        processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
-        processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
+            NioEventLoopGroup parentGroup = createParentEventLoopGroup();
+            ServerBootstrap serverBootstrap = createServerBootstrap();
+
+            processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
+            processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
 
 
-        int port = serverConfiguration.getPort();
-        serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer() {
-                    @Override
-                    protected void initChannel(Channel ch) throws Exception {
-                        ChannelPipeline pipeline = ch.pipeline();
+            serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer() {
+                        @Override
+                        protected void initChannel(Channel ch) throws Exception {
+                            ChannelPipeline pipeline = ch.pipeline();
 
-                        RequestBinderRegistry binderRegistry = NettyHttpServer.this.binderRegistry;
+                            RequestBinderRegistry binderRegistry = NettyHttpServer.this.binderRegistry;
 
-                        pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
-                        pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-                        pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(environment, serverConfiguration));
-                        for (HttpRequestInterceptor interceptor : interceptors) {
-                            pipeline.addLast("particle-interceptor-" + NameUtils.hyphenate(interceptor.getClass().getSimpleName()), new HttpRequestInterceptorAdapter(interceptor));
+                            pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
+                            pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
+                            pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(environment, serverConfiguration));
+                            for (HttpRequestInterceptor interceptor : interceptors) {
+                                pipeline.addLast("particle-interceptor-" + NameUtils.hyphenate(interceptor.getClass().getSimpleName()), new HttpRequestInterceptorAdapter(interceptor));
+                            }
+                            pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(
+                                    beanLocator,
+                                    NettyHttpServer.this.router,
+                                    serverConfiguration,
+                                    binderRegistry,
+                                    executorSelector,
+                                    ioExecutor
+                            ));
+                            registerParticleChannelHandlers(pipeline);
                         }
-                        pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(
-                                beanLocator,
-                                NettyHttpServer.this.router,
-                                serverConfiguration,
-                                binderRegistry,
-                                executorSelector,
-                                ioExecutor
-                        ));
-                        registerParticleChannelHandlers(pipeline);
-                    }
-                });
+                    });
 
-        Optional<String> host = serverConfiguration.getHost();
+            Optional<String> host = serverConfiguration.getHost();
 
-        ChannelFuture future;
+            ChannelFuture future;
 
-        if(host.isPresent()) {
-            future = serverBootstrap.bind(host.get(), port == -1 ? SocketUtils.findAvailableTcpPort() : port);
-        }
-        else {
-            future = serverBootstrap.bind(port == -1 ? SocketUtils.findAvailableTcpPort() : port);
-        }
-
-        future.addListener(op -> {
-            if (future.isSuccess()) {
-                serverChannel = future.channel();
-            } else {
-                Throwable cause = op.cause();
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
-                }
+            if(host.isPresent()) {
+                future = serverBootstrap.bind(host.get(), serverPort);
             }
-        });
+            else {
+                future = serverBootstrap.bind(serverPort);
+            }
+
+            future.addListener(op -> {
+                if (future.isSuccess()) {
+                    serverChannel = future.channel();
+                } else {
+                    Throwable cause = op.cause();
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
+                    }
+                }
+            });
+        }
         return this;
     }
 
 
     @Override
     public EmbeddedServer stop() {
-        if (this.serverChannel != null) {
+        if (isRunning() && this.serverChannel != null) {
             try {
                 serverChannel.close().sync();
+                if(beanLocator instanceof LifeCycle) {
+                    LifeCycle lifeCycle = (LifeCycle) beanLocator;
+                    if(lifeCycle.isRunning()) {
+                        lifeCycle.stop();
+                    }
+                }
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error stopping Particle server: " + e.getMessage(), e);
@@ -184,7 +201,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public int getPort() {
-        return serverConfiguration.getPort();
+        return serverPort;
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {

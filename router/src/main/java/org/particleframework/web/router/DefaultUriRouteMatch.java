@@ -56,12 +56,12 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
     @Override
     public UriRouteMatch<T> decorate(Function<RouteMatch<T>, T> executor) {
         Map<String, Object> variables = getVariables();
-        Collection<Argument> arguments = getRequiredArguments();
+        List<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
         return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
             @Override
-            public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(arguments);
+            public List<Argument> getRequiredArguments() {
+                return Collections.unmodifiableList(arguments);
             }
 
             @Override
@@ -90,8 +90,8 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
     protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
             @Override
-            public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(requiredArguments);
+            public List<Argument> getRequiredArguments() {
+                return Collections.unmodifiableList(requiredArguments);
             }
 
             @Override

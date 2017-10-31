@@ -66,7 +66,10 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         if(!result.isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
-                return doBind(context, body.get(), parameterName, locale, characterEncoding);
+                result = doBind(context, body.get(), parameterName, locale, characterEncoding);
+                if(!result.isPresent()) {
+                    return source.getBody(argument.getType());
+                }
             }
         }
         return result;

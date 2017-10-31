@@ -17,6 +17,7 @@ import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -41,7 +42,7 @@ public class DefaultEnvironment implements Environment {
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
-
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     public DefaultEnvironment(String name, ClassLoader classLoader) {
         this(name,classLoader, ConversionService.SHARED);
@@ -172,11 +173,24 @@ public class DefaultEnvironment implements Environment {
 
     @Override
     public Environment start() {
-        ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
-        OrderUtil.sort(propertySources);
-        for (PropertySource propertySource : propertySources) {
-            processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
+        if(running.compareAndSet(false, true)) {
+            ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
+            OrderUtil.sort(propertySources);
+            for (PropertySource propertySource : propertySources) {
+                processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
+            }
         }
+        return this;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running.get();
+    }
+
+    @Override
+    public Environment stop() {
+        running.set(false);
         return this;
     }
 
@@ -194,11 +208,6 @@ public class DefaultEnvironment implements Environment {
     @Override
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
-    }
-
-    @Override
-    public Environment stop() {
         return this;
     }
 

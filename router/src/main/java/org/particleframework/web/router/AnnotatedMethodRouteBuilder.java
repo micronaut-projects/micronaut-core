@@ -190,7 +190,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         );
     }
 
-    private MediaType[] resolveConsumes(ExecutableMethod method, String... consumes) {
+    private MediaType[] resolveConsumes(ExecutableMethod<?,?> method, String... consumes) {
         if (consumes.length > 0) {
             return Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new);
         } else {
@@ -213,7 +213,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @Override
-    public void process(ExecutableMethod<Object, Object> method) {
+    public void process(ExecutableMethod<?, ?> method) {
         Optional<Annotation> actionAnn = method.findAnnotationWithStereoType(Action.class);
         actionAnn.ifPresent(annotation -> {
                     Class<? extends Annotation> annotationClass = annotation.annotationType();

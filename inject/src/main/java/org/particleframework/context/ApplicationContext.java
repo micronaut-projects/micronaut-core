@@ -70,6 +70,26 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     }
 
     /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
+     * if the {@link ApplicationContext} requires graceful shutdown
+     *
+     * @param type The environment to use
+     * @return The running {@link BeanContext}
+     */
+    static <T> T run(Class<T> type) {
+        T bean = build(Environment.DEVELOPMENT)
+                .start()
+                .getBean(type);
+        if(bean instanceof LifeCycle) {
+            LifeCycle lifeCycle = (LifeCycle) bean;
+            if(!lifeCycle.isRunning()) {
+                lifeCycle.start();
+            }
+        }
+        return bean;
+    }
+
+    /**
      * Build a {@link ApplicationContext}
      *
      * @param environment The environment to use

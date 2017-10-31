@@ -22,6 +22,7 @@ import org.particleframework.core.type.Argument;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,7 +40,7 @@ public interface UriRouteMatch<R> extends UriMatchInfo, RouteMatch<R> {
      *
      * @return The required arguments in order to invoke this route
      */
-    default Collection<Argument> getRequiredArguments() {
+    default List<Argument> getRequiredArguments() {
         Map<String, Object> matchVariables = getVariables();
         return Arrays.stream(getArguments())
                 .filter((arg) -> !matchVariables.containsKey(arg.getName()))

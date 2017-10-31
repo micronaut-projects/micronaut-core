@@ -64,6 +64,9 @@ public abstract class AbstractAnnotatedArgumentBinder <A extends Annotation, T, 
             annotationValue = argument.getName();
         }
         Object value = values.get(annotationValue, Object.class).orElse(null);
+        if(value == null) {
+            return value;
+        }
         boolean isConvertibleValues = values instanceof ConvertibleMultiValues;
         if(isConvertibleValues && isManyObjects(argument)) {
             ConvertibleMultiValues<?> multiValues = (ConvertibleMultiValues<?>) values;

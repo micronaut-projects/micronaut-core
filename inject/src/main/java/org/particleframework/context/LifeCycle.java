@@ -12,15 +12,24 @@ import java.io.IOException;
  * @since 1.0
  */
 public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable  {
+
+    /**
+     * @return Whether the component is running
+     */
+    boolean isRunning();
     /**
      * Starts the lifecyle component
      */
-    T start();
+    default T start() {
+        return (T) this;
+    }
 
     /**
      * Stops the life cycle component
      */
-    T stop();
+    default T stop() {
+        return (T) this;
+    }
 
     /**
      * Delegates to {@link #stop()}

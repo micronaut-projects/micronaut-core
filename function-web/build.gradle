@@ -1,0 +1,12 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":function")
+    compile project(":http-server")
+
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
+
+    testRuntime project(":configurations/jackson")
+
+}

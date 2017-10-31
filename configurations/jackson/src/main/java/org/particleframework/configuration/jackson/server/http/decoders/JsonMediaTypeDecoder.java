@@ -13,32 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.jackson.server.http.converters;
+package org.particleframework.configuration.jackson.server.http.decoders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.server.netty.converters.MediaTypeReader;
+import org.particleframework.http.decoder.DecodingException;
+import org.particleframework.http.decoder.MediaTypeDecoder;
 
 import javax.inject.Singleton;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
-import java.util.Optional;
+import java.io.InputStream;
 
 /**
- * A {@link MediaTypeReader} for JSON
+ * A {@link MediaTypeDecoder} for JSON and Jackson
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class JsonMediaTypeReader<T> implements MediaTypeReader<T> {
-
+public class JsonMediaTypeDecoder implements MediaTypeDecoder {
     private final ObjectMapper objectMapper;
 
-    JsonMediaTypeReader(ObjectMapper objectMapper) {
+    public JsonMediaTypeDecoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -48,8 +44,11 @@ public class JsonMediaTypeReader<T> implements MediaTypeReader<T> {
     }
 
     @Override
-    public T read(Class<T> type, ByteBuf byteBuf, Charset charset) throws IOException {
-        InputStreamReader reader = new InputStreamReader(new ByteBufInputStream(byteBuf), charset);
-        return objectMapper.readValue(reader, type);
+    public <T> T decode(Class<T> type, InputStream inputStream) throws DecodingException {
+        try {
+            return objectMapper.readValue(inputStream, type);
+        } catch (IOException e) {
+            throw new DecodingException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+        }
     }
 }

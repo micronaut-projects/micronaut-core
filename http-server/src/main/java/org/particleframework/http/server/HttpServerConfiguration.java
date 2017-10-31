@@ -34,7 +34,7 @@ import java.util.*;
 @ConfigurationProperties(value = "particle.server", cliPrefix = "")
 public class HttpServerConfiguration {
 
-    protected int port = 8080;
+    protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
     protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;

@@ -34,7 +34,7 @@ import java.util.Set;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  */
-public interface ExecutableMethod<T, R> extends Executable<T,R>, MethodReference {
+public interface ExecutableMethod<T, R> extends Executable<T,R>, MethodReference<T,R> {
 
     /**
      * @return One or many {@link org.particleframework.context.annotation.Executable} annotations for this method

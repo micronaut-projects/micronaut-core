@@ -21,7 +21,9 @@ import org.particleframework.core.naming.conventions.TypeConvention;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.stereotype.Controller;
+import org.particleframework.web.router.annotation.Get;
 
 import java.util.List;
 
@@ -261,6 +263,19 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute GET(String uri, ExecutableMethod<?, ?> method) {
+        return GET(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
      * @param target The target
      * @param method The method
      * @return The route
@@ -332,7 +347,18 @@ public interface RouteBuilder {
     default UriRoute POST(Class type, PropertyConvention id) {
         return POST(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.methodName());
     }
-
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute POST(String uri, ExecutableMethod<?, ?> method) {
+        return POST(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
     /**
      * <p>Route the specified URI template to the specified target.</p>
      *
@@ -409,6 +435,19 @@ public interface RouteBuilder {
      */
     default UriRoute PUT(Class type, PropertyConvention id) {
         return PUT(getUriNamingStrategy().resolveUri(type, id), type, UPDATE.methodName());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute PUT(String uri, ExecutableMethod<?, ?> method) {
+        return PUT(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
     }
 
     /**
@@ -495,6 +534,18 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute PATCH(String uri, ExecutableMethod<?, ?> method) {
+        return PATCH(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
      * @param target The target
      * @param method The method
      * @return The route
@@ -565,6 +616,19 @@ public interface RouteBuilder {
      */
     default UriRoute DELETE(Class type, PropertyConvention id) {
         return DELETE(getUriNamingStrategy().resolveUri(type, id), type, DELETE.methodName());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute DELETE(String uri, ExecutableMethod<?, ?> method) {
+        return DELETE(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
     }
 
     /**
@@ -644,7 +708,18 @@ public interface RouteBuilder {
     default UriRoute OPTIONS(Class type, PropertyConvention id) {
         return OPTIONS(getUriNamingStrategy().resolveUri(type, id), type, OPTIONS.methodName());
     }
-
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute OPTIONS(String uri, ExecutableMethod<?, ?> method) {
+        return OPTIONS(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
     /**
      * <p>Route the specified URI template to the specified target.</p>
      *
@@ -729,6 +804,18 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute HEAD(String uri, ExecutableMethod<?, ?> method) {
+        return HEAD(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
      * @param target The target
      * @param method The method
      * @return The route
@@ -802,6 +889,18 @@ public interface RouteBuilder {
         return HEAD(getUriNamingStrategy().resolveUri(type, id), type, TRACE.methodName());
     }
 
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute TRACE(String uri, ExecutableMethod<?, ?> method) {
+        return TRACE(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
     /**
      * <p>Route the specified URI template to the specified target.</p>
      *

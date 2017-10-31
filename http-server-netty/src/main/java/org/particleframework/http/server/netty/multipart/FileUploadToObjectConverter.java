@@ -16,18 +16,16 @@
 package org.particleframework.http.server.netty.multipart;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.server.netty.converters.MediaTypeReader;
+import org.particleframework.http.decoder.MediaTypeDecoder;
+import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
 
 import javax.inject.Singleton;
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -39,15 +37,12 @@ import java.util.Optional;
 @Singleton
 public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Object> {
 
-    private final Map<String, MediaTypeReader> javaTypeMappings;
     private final ConversionService conversionService;
+    private final MediaTypeDecoderRegistry decoderRegistry;
 
-    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeReader... mediaTypeMappings) {
-        this.javaTypeMappings = new LinkedHashMap<>();
-        for (MediaTypeReader mediaTypeMapping : mediaTypeMappings) {
-            javaTypeMappings.put(mediaTypeMapping.getMediaType().getExtension(), mediaTypeMapping);
-        }
+    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeDecoderRegistry decoderRegistry) {
         this.conversionService = conversionService;
+        this.decoderRegistry = decoderRegistry;
     }
 
     @Override
@@ -59,22 +54,23 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
 
             String contentType = object.getContentType();
             ByteBuf byteBuf = object.getByteBuf();
-            if (contentType != null) {
-                MediaType mediaType = new MediaType(contentType);
-                Charset charset = object.getCharset();
-                if (charset == null) {
-                    charset = context.getCharset();
+            try {
+                if (contentType != null) {
+                    MediaType mediaType = new MediaType(contentType);
+                    Optional<MediaTypeDecoder> registered = decoderRegistry.findDecoder(mediaType);
+                    if(registered.isPresent()) {
+                        MediaTypeDecoder decoder = registered.get();
+                        Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
+                        return Optional.of(val);
+                    }
+                    else {
+                        return conversionService.convert(byteBuf, targetType, context);
+                    }
                 }
-                MediaTypeReader reader = javaTypeMappings.get(mediaType.getExtension());
-                if(reader != null) {
-                    Object val = reader.read(targetType, byteBuf, charset);
-                    return Optional.of(val);
-                }
-                else {
-                    return conversionService.convert(byteBuf, targetType, context);
-                }
+                return conversionService.convert(byteBuf, targetType, context);
+            } finally {
+                byteBuf.release();
             }
-            return conversionService.convert(byteBuf, targetType, context);
         } catch (Exception e) {
             context.reject(e);
             return Optional.empty();

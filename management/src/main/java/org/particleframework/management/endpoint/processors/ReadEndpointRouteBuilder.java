@@ -41,7 +41,7 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder imple
     }
 
     @Override
-    public void process(ExecutableMethod<Object, Object> method) {
+    public void process(ExecutableMethod<?, ?> method) {
         Class<?> declaringType = method.getDeclaringType();
         Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
 

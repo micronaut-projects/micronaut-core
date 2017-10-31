@@ -61,6 +61,11 @@ class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycle<Thre
     }
 
     @Override
+    public boolean isRunning() {
+        return true;
+    }
+
+    @Override
     public ThreadLocalCustomScope start() {
         return this;
     }
