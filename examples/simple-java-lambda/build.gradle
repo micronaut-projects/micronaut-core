@@ -22,11 +22,11 @@ plugins {
 
 apply plugin: 'jp.classmethod.aws.lambda'
 
-mainClassName = "example.Application"
+mainClassName = "org.particleframework.function.executor.FunctionApplication"
 applicationDefaultJvmArgs = [""]
 jar {
     manifest {
-        attributes 'Main-Class': "example.Application"
+        attributes 'Main-Class': "org.particleframework.function.executor.FunctionApplication"
     }
 }
 repositories {
