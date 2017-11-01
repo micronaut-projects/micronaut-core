@@ -54,23 +54,19 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
 
             String contentType = object.getContentType();
             ByteBuf byteBuf = object.getByteBuf();
-            try {
-                if (contentType != null) {
-                    MediaType mediaType = new MediaType(contentType);
-                    Optional<MediaTypeDecoder> registered = decoderRegistry.findDecoder(mediaType);
-                    if(registered.isPresent()) {
-                        MediaTypeDecoder decoder = registered.get();
-                        Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
-                        return Optional.of(val);
-                    }
-                    else {
-                        return conversionService.convert(byteBuf, targetType, context);
-                    }
+            if (contentType != null) {
+                MediaType mediaType = new MediaType(contentType);
+                Optional<MediaTypeDecoder> registered = decoderRegistry.findDecoder(mediaType);
+                if(registered.isPresent()) {
+                    MediaTypeDecoder decoder = registered.get();
+                    Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
+                    return Optional.of(val);
                 }
-                return conversionService.convert(byteBuf, targetType, context);
-            } finally {
-                byteBuf.release();
+                else {
+                    return conversionService.convert(byteBuf, targetType, context);
+                }
             }
+            return conversionService.convert(byteBuf, targetType, context);
         } catch (Exception e) {
             context.reject(e);
             return Optional.empty();

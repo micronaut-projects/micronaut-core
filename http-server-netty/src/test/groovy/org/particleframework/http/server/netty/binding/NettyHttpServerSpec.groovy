@@ -24,6 +24,7 @@ import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
 import org.particleframework.runtime.ParticleApplication
+import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.stereotype.Controller
 import org.particleframework.web.router.annotation.Get
 import org.particleframework.web.router.annotation.Put
@@ -39,9 +40,9 @@ class NettyHttpServerSpec extends Specification {
     void "test Particle server running"() {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
-
+        int port = applicationContext.getBean(EmbeddedServer).getPort()
         then:
-        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+        new URL("http://localhost:$port/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -50,9 +51,10 @@ class NettyHttpServerSpec extends Specification {
     void "test Particle server running again"() {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
+        int port = applicationContext.getBean(EmbeddedServer).getPort()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+        new URL("http://localhost:$port/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()

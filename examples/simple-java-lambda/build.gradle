@@ -54,6 +54,6 @@ task deploy(type: AWSLambdaMigrateFunctionTask) {
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
-    memorySize = 512
+    memorySize = 96
     timeout = 60
 }
