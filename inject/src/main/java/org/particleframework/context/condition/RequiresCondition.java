@@ -112,7 +112,7 @@ public class RequiresCondition implements Condition<ConditionContext> {
             if(beanContext instanceof ApplicationContext) {
                 ApplicationContext applicationContext = (ApplicationContext) beanContext;
                 Environment environment = applicationContext.getEnvironment();
-                return Arrays.stream(env).anyMatch(name -> name.equalsIgnoreCase(environment.getName()));
+                return Arrays.stream(env).anyMatch(name -> environment.getActiveNames().contains(name));
             }
         }
         return true;

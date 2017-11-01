@@ -34,22 +34,22 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Construct a new ApplicationContext for the given environment name
      *
-     * @param environmentName The environment name
+     * @param environmentNames The environment names
      */
-    public DefaultApplicationContext(String environmentName) {
-        this(environmentName, DefaultBeanContext.class.getClassLoader());
+    public DefaultApplicationContext(String... environmentNames) {
+        this(DefaultBeanContext.class.getClassLoader(), environmentNames);
     }
 
     /**
      * Construct a new ApplicationContext for the given environment name and classloader
      *
-     * @param environmentName The environment name
+     * @param environmentNames The environment names
      * @param classLoader     The class loader
      */
-    public DefaultApplicationContext(String environmentName, ClassLoader classLoader) {
+    public DefaultApplicationContext(ClassLoader classLoader, String... environmentNames) {
         super(classLoader);
         this.conversionService = createConversionService();
-        this.environment = createEnvironment(environmentName);
+        this.environment = createEnvironment(environmentNames);
     }
 
     @Override
@@ -78,11 +78,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Creates the default environment for the given environment name
      *
-     * @param environmentName The environment name
+     * @param environmentNames The environment name
      * @return The environment instance
      */
-    protected Environment createEnvironment(String environmentName) {
-        return new DefaultEnvironment(environmentName, getClassLoader(), conversionService);
+    protected Environment createEnvironment(String... environmentNames) {
+        return new DefaultEnvironment(getClassLoader(), conversionService, environmentNames);
     }
 
     @Override

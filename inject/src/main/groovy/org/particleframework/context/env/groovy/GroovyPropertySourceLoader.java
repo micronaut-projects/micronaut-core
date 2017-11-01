@@ -12,6 +12,7 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -26,7 +27,10 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
     public Optional<PropertySource> load(String name, Environment environment) {
         Map<String,Object> finalMap = new LinkedHashMap<>();
         loadProperties(environment, name + ".groovy", finalMap);
-        loadProperties(environment, name + "-"+environment.getName()+".groovy", finalMap);
+        Set<String> activeNames = environment.getActiveNames();
+        for (String activeName : activeNames) {
+            loadProperties(environment, name + "-"+ activeName +".groovy", finalMap);
+        }
         if(!finalMap.isEmpty()) {
             MapPropertySource newPropertySource = new MapPropertySource(finalMap);
             return Optional.of(newPropertySource);

@@ -30,7 +30,7 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment implements Environment {
 
-    private final String name;
+    private final Set<String> names;
     private final ConversionService conversionService;
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
@@ -44,16 +44,16 @@ public class DefaultEnvironment implements Environment {
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public DefaultEnvironment(String name, ClassLoader classLoader) {
-        this(name,classLoader, ConversionService.SHARED);
+    public DefaultEnvironment(ClassLoader classLoader, String... names) {
+        this(classLoader, ConversionService.SHARED, names);
     }
 
-    public DefaultEnvironment(String name) {
-        this(name,DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED);
+    public DefaultEnvironment(String... names) {
+        this(DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED, names);
     }
 
-    public DefaultEnvironment(String name, ClassLoader classLoader, ConversionService conversionService) {
-        this.name = name == null ? "default" : name;
+    public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
+        this.names = names == null ? Collections.emptySet() : Collections.unmodifiableSet(new HashSet<>(Arrays.asList(names)));
         this.conversionService = conversionService;
         this.classLoader = classLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -127,8 +127,8 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public String getName() {
-        return this.name;
+    public Set<String> getActiveNames() {
+        return this.names;
     }
 
     @Override

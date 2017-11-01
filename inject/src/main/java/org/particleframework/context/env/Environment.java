@@ -16,6 +16,7 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -37,9 +38,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String DEVELOPMENT = "dev";
 
     /**
-     * @return The name of the environment
+     * @return The active environment names
      */
-    String getName();
+    Set<String> getActiveNames();
 
     /**
      * Adds a property source to this environment

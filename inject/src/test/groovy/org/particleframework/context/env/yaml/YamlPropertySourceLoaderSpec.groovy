@@ -13,7 +13,7 @@ class YamlPropertySourceLoaderSpec extends Specification {
         given:
         Environment env = Mock(Environment)
         env.isPresent(_) >> true
-        env.getName() >> "test"
+        env.getActiveNames() >> (["test"] as Set)
         env.getResourceAsStream("application.yml") >> {
             Optional.of(new ByteArrayInputStream('''\
 hibernate:

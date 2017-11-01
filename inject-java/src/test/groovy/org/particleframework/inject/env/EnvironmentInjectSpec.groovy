@@ -16,8 +16,8 @@ class EnvironmentInjectSpec extends Specification {
 
         then:
         a.environment != null
-        a.environment.name == "foo"
+        a.environment.activeNames == ["foo"] as Set
         a.defaultEnvironment != null
-        a.defaultEnvironment.name == "foo"
+        a.defaultEnvironment.activeNames == ["foo"] as Set
     }
 }

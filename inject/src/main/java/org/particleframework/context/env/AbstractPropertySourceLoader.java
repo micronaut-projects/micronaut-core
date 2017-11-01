@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * @author Graeme Rocher
@@ -35,7 +36,10 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
             Map<String,Object> finalMap = new LinkedHashMap<>();
             String ext = getFileExtension();
             loadProperties(environment, name + "." + ext, finalMap);
-            loadProperties(environment, name + "-"+environment.getName()+"." + ext, finalMap);
+            Set<String> activeNames = environment.getActiveNames();
+            for (String activeName : activeNames) {
+                loadProperties(environment, name + "-"+ activeName +"." + ext, finalMap);
+            }
             if(!finalMap.isEmpty()) {
                 MapPropertySource newPropertySource = new MapPropertySource(finalMap);
                 return Optional.of(newPropertySource);

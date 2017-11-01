@@ -62,11 +62,11 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     /**
      * Run the {@link ApplicationContext}. This method will instantiate a new {@link ApplicationContext} and call {@link #start()}
      *
-     * @param environment The environment to use
+     * @param environments The environments to use
      * @return The running {@link BeanContext}
      */
-    static ApplicationContext run(String environment) {
-        return build(environment).start();
+    static ApplicationContext run(String... environments) {
+        return build(environments).start();
     }
 
     /**
@@ -92,32 +92,32 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     /**
      * Build a {@link ApplicationContext}
      *
-     * @param environment The environment to use
+     * @param environments The environments to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build(String environment) {
-        return new DefaultApplicationContext(environment);
+    static ApplicationContext build(String... environments) {
+        return new DefaultApplicationContext(environments);
     }
 
     /**
      * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
      *
-     * @param environment The environment to use
      * @param classLoader The classloader to use
+     * @param environments The environments to use
      * @return The running {@link ApplicationContext}
      */
-    static ApplicationContext run(String environment, ClassLoader classLoader) {
-        return build(environment, classLoader).start();
+    static ApplicationContext run(ClassLoader classLoader,String... environments) {
+        return build(classLoader, environments).start();
     }
 
     /**
      * Build a {@link ApplicationContext}
      *
-     * @param environment The environment to use
      * @param classLoader The classloader to use
+     * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static ApplicationContext build(String environment, ClassLoader classLoader) {
-        return new DefaultApplicationContext(environment, classLoader);
+    static ApplicationContext build(ClassLoader classLoader, String... environments) {
+        return new DefaultApplicationContext(classLoader, environments);
     }
 }
