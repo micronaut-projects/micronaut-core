@@ -17,6 +17,7 @@ package org.particleframework.function.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.env.Environment
 import org.particleframework.function.Function
 import spock.lang.Specification
 
@@ -31,7 +32,7 @@ class ParticleRequestStreamHandlerSpec extends Specification{
         given:
         ParticleRequestStreamHandler requestStreamHandler = new ParticleRequestStreamHandler() {
             @Override
-            protected String resolveFunctionName(ApplicationContext environment) {
+            protected String resolveFunctionName(Environment environment) {
                 return "book"
             }
         }

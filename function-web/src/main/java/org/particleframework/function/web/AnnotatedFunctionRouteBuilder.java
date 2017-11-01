@@ -48,7 +48,7 @@ import java.util.function.Supplier;
 public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Function>, FunctionRegistry {
 
 
-    private final DefaultFunctionRegistry functionRegistry;
+    private final FunctionRegistry functionRegistry;
 
     public AnnotatedFunctionRouteBuilder(
             ExecutionHandleLocator executionHandleLocator,
@@ -86,29 +86,34 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
         if(java.util.function.Function.class.isAssignableFrom(declaringType)) {
             POST(functionPath, method)
                 .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            functionRegistry.process(method);
+            ((ExecutableMethodProcessor)functionRegistry).process(method);
         }
         else if(Consumer.class.isAssignableFrom(declaringType)) {
             POST(functionPath, method)
                     .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            functionRegistry.process(method);
+            ((ExecutableMethodProcessor)functionRegistry).process(method);
         }
         else if(BiFunction.class.isAssignableFrom(declaringType)) {
             POST(functionPath, method)
                     .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            functionRegistry.process(method);
+            ((ExecutableMethodProcessor)functionRegistry).process(method);
         }
         else if(Supplier.class.isAssignableFrom(declaringType)) {
             GET(functionPath, method)
                 .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            functionRegistry.process(method);
+            ((ExecutableMethodProcessor)functionRegistry).process(method);
         }
     }
 
 
     @Override
-    public Optional<? extends ExecutableMethod<?, ?>> findFirst() {
+    public <T, R> Optional<? extends ExecutableMethod<T, R>> findFirst() {
         return functionRegistry.findFirst();
+    }
+
+    @Override
+    public <T, R> Optional<? extends ExecutableMethod<T, R>> find(String name) {
+        return functionRegistry.find(name);
     }
 
     @Override

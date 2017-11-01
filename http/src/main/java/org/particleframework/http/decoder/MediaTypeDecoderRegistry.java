@@ -34,4 +34,14 @@ public interface MediaTypeDecoderRegistry {
      * @return The decoder
      */
     Optional<MediaTypeDecoder> findDecoder(MediaType mediaType);
+
+    /**
+     * Create a new registry from the given decoders
+     *
+     * @param decoders The decoders
+     * @return The registry
+     */
+    static MediaTypeDecoderRegistry of(MediaTypeDecoder...decoders) {
+        return new DefaultMediaTypeDecoderRegistry(decoders);
+    }
 }

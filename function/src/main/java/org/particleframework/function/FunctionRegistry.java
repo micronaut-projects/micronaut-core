@@ -38,7 +38,14 @@ public interface FunctionRegistry {
      * Find the first available registered function
      * @return The {@link ExecutableMethod} method representing the function
      */
-    Optional<? extends ExecutableMethod<?, ?>> findFirst();
+    <T,R> Optional<? extends ExecutableMethod<T, R>> findFirst();
+
+    /**
+     * Find the first available registered function
+     * @return The {@link ExecutableMethod} method representing the function
+     */
+    <T, R> Optional<? extends ExecutableMethod<T, R>> find(String name);
+
     /**
      * Find a {@link Supplier} for the given name
      *

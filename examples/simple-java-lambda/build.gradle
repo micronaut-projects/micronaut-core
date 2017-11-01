@@ -40,7 +40,8 @@ dependencies {
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
 
 
-    testCompile "org.particleframework:http-server-netty:${projectVersion}"
+    testRuntime "org.particleframework:http-server-netty:${projectVersion}"
+    testRuntime "org.particleframework:function-web:${projectVersion}"
     testCompile 'junit:junit:4.12'
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }
@@ -48,12 +49,12 @@ shadowJar {
     mergeServiceFiles()
 }
 
-task deploy(type: AWSLambdaMigrateFunctionTask) {
+task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "particle-function"
     handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
-    memorySize = 96
+    memorySize = 512
     timeout = 60
 }

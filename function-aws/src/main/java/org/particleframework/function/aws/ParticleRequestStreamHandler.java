@@ -20,22 +20,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
-import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.Writable;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.util.StringUtils;
 import org.particleframework.function.FunctionRegistry;
-import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.decoder.DecodingException;
 import org.particleframework.http.decoder.MediaTypeDecoder;
 import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.web.router.Router;
-import org.particleframework.web.router.UriRouteMatch;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,68 +45,59 @@ import java.util.*;
  * @since 1.0
  */
 public class ParticleRequestStreamHandler implements RequestStreamHandler {
-    private static final Logger LOG = LoggerFactory.getLogger(ParticleRequestStreamHandler.class);
-
     @Override
     public void handleRequest(InputStream input, OutputStream output, Context context) throws IOException {
         ApplicationContext applicationContext = buildApplicationContext();
         registerContextBeans(context, applicationContext);
         applicationContext.start();
 
-        Environment environment = applicationContext.getEnvironment();
-
-        Router router = applicationContext.getBean(Router.class);
+        Environment env = applicationContext.getEnvironment();
+        FunctionRegistry functionRegistry = applicationContext.getBean(FunctionRegistry.class);
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class);
-        String functionName = resolveFunctionName(applicationContext);
+        String functionName = resolveFunctionName(env);
+        Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
         if(functionName == null) {
-            throw new IllegalStateException("No function functions found");
+            registeredMethod = functionRegistry.findFirst();
         }
-
-        Optional<UriRouteMatch<Object>> potentialRoute = router.find(HttpMethod.POST, "/" + functionName).findFirst();
-        if(!potentialRoute.isPresent()) {
-            potentialRoute = router.find(HttpMethod.GET, "/" + functionName).findFirst();
+        else {
+            registeredMethod = functionRegistry.find(functionName);
         }
-        UriRouteMatch<Object> match = potentialRoute.orElseThrow(() -> new IllegalStateException("No function found for name: " + functionName));
+        ExecutableMethod<Object, Object> method = registeredMethod
+                .orElseThrow(() -> new IllegalStateException("No function found for name: " + functionName));
 
-        List<Argument> requiredArguments = match.getRequiredArguments();
-        int argCount = requiredArguments.size();
+        Argument[] requiredArguments = method.getArguments();
+        int argCount = requiredArguments.length;
         Object result;
+        Object bean = applicationContext.getBean(method.getDeclaringType());
+
         switch (argCount) {
             case 0:
-                result = match.execute();
+                result = method.invoke(bean);
             break;
             case 1:
-                Argument arg = requiredArguments.get(0);
-                match = decodeArgument(applicationContext, match, arg, input);
-                if(match.isExecutable()) {
-                    result = match.execute();
-                }
-                else {
-                    throw new InvocationException("Function ["+functionName+"] cannot be made executable");
-                }
+
+                Argument arg = requiredArguments[0];
+                Object value = decodeArgument(env, functionRegistry, arg, input);
+                result = method.invoke(bean, value);
             break;
             case 2:
-                Argument firstArgument = requiredArguments.get(0);
-                Argument secondArgument = requiredArguments.get(1);
-                match = match.fulfill(Collections.singletonMap(
-                        secondArgument.getName(),
-                        context
-                ));
-                match = decodeArgument(applicationContext, match, firstArgument, input);
-                if(match.isExecutable()) {
-                    result = match.execute();
-                }
-                else {
-                    throw new InvocationException("Function ["+functionName+"] cannot be made executable");
-                }
+                Argument firstArgument = requiredArguments[0];
+                Argument secondArgument = requiredArguments[1];
+                Object first = decodeArgument(env, functionRegistry, firstArgument, input);
+                Object second = decodeContext(env, secondArgument, context);
+                result = method.invoke(bean, first, second);
             break;
             default:
                 throw new InvocationException("Function ["+functionName+"] cannot be made executable.");
         }
         if(result != null) {
-            encode(environment, objectMapper, result, output);
+            encode(env, objectMapper, result, output);
         }
 
+    }
+
+    protected String resolveFunctionName(Environment env) {
+        return env.getProperty(FunctionRegistry.FUNCTION_NAME, String.class, (String)null);
     }
 
     /**
@@ -120,33 +107,6 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
         return ApplicationContext.build(Environment.DEVELOPMENT);
     }
 
-    /**
-     * Resolves the function name to execute
-     * @param environment The environment
-     * @return The function name or null if it cannot be determined
-     */
-    protected String resolveFunctionName(ApplicationContext environment) {
-        String name = environment.getProperty(FunctionRegistry.FUNCTION_NAME, String.class, (String) null);
-        if(name == null) {
-            Optional<? extends ExecutableMethod<?, ?>> method = environment.getBean(FunctionRegistry.class).findFirst();
-            if(method.isPresent()) {
-                ExecutableMethod<?, ?> m = method.get();
-                name = m.findAnnotation(org.particleframework.function.Function.class)
-                        .map(org.particleframework.function.Function::value)
-                        .orElse(m.getMethodName());
-                if(StringUtils.isEmpty(name)) {
-                    name = m.getMethodName();
-                }
-            }
-            else if(LOG.isDebugEnabled()) {
-                LOG.debug("No function definitions found");
-            }
-        }
-        if(LOG.isDebugEnabled() && name != null) {
-            LOG.debug("Resolved function name: {}", name);
-        }
-        return name;
-    }
 
     private void encode(Environment environment, ObjectMapper objectMapper, Object result, OutputStream output) throws IOException {
         Optional<JsonNode> converted = environment.convert(result, JsonNode.class);
@@ -167,45 +127,40 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
         }
     }
 
-    private UriRouteMatch<Object> decodeArgument(ApplicationContext applicationContext, UriRouteMatch<Object> match, Argument arg, InputStream input) {
+    private Object decodeArgument(
+            ConversionService<?> conversionService,
+            FunctionRegistry functionRegistry,
+            Argument<?> arg,
+            InputStream input) {
         if(ClassUtils.isJavaLangType(arg.getType())) {
-            match = match.fulfill(
-                    Collections.singletonMap(
-                            arg.getName(),
-                            input
-                    )
-            );
+            Optional<?> convert = conversionService.convert(input, ConversionContext.of(arg));
+            if(convert.isPresent()) {
+                return convert.get();
+            }
         } else {
-            Optional<MediaTypeDecoder> registered = applicationContext.getBean(MediaTypeDecoderRegistry.class)
-                    .findDecoder(MediaType.APPLICATION_JSON_TYPE);
-            if(registered.isPresent()) {
-                MediaTypeDecoder decoder = registered.get();
-                Object decoded = decoder.decode(arg.getType(), input);
-                match = match.fulfill(
-                        Collections.singletonMap(
-                                arg.getName(),
-                                decoded
-                        )
-                );
 
-                if(!match.isExecutable()) {
-                    Optional<ConvertibleValues> convertedValues = applicationContext.getEnvironment().convert(decoded, ConvertibleValues.class);
-                    if(convertedValues.isPresent()) {
-                        ConvertibleValues values = convertedValues.get();
-                        Optional converted = values.get(arg.getName(), arg);
-                        if(converted.isPresent()) {
-                            match = match.fulfill(
-                                    Collections.singletonMap(
-                                            arg.getName(),
-                                            converted.get()
-                                    )
-                            );
-                        }
-                    }
+            if(functionRegistry instanceof MediaTypeDecoderRegistry) {
+                Optional<MediaTypeDecoder> registeredDecoder = ((MediaTypeDecoderRegistry) functionRegistry).findDecoder(MediaType.APPLICATION_JSON_TYPE);
+                if(registeredDecoder.isPresent()) {
+                    MediaTypeDecoder decoder = registeredDecoder.get();
+                    return decoder.decode(arg.getType(), input);
                 }
             }
         }
-        return match;
+        throw new DecodingException("Unable to decode argument from stream: " + arg);
+    }
+
+    private Object decodeContext(
+            ConversionService<?> conversionService,
+            Argument<?> arg,
+            Context context) {
+        if(ClassUtils.isJavaLangType(arg.getType())) {
+            Optional<?> convert = conversionService.convert(context, ConversionContext.of(arg));
+            if(convert.isPresent()) {
+                return convert.get();
+            }
+        }
+        throw new DecodingException("Unable to decode argument from stream: " + arg);
     }
 
     private void registerContextBeans(Context context, ApplicationContext applicationContext) {

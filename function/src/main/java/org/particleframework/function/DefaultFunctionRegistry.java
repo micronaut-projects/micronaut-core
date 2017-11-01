@@ -18,6 +18,9 @@ package org.particleframework.function;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.decoder.MediaTypeDecoder;
+import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
 import org.particleframework.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
@@ -37,12 +40,18 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.particleframework.function.Function>, FunctionRegistry {
+public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.particleframework.function.Function>, FunctionRegistry, MediaTypeDecoderRegistry {
     private final Map<String, ExecutableMethod<?,?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> biFunctions= new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> suppliers = new LinkedHashMap<>(1);
+    private final MediaTypeDecoderRegistry decoderRegistry;
 
+    public DefaultFunctionRegistry(MediaTypeDecoder...decoders) {
+        this.decoderRegistry = MediaTypeDecoderRegistry.of(decoders);
+    }
+
+    @SuppressWarnings("unchecked")
     @Override
     public Optional<? extends ExecutableMethod<?, ?>> findFirst() {
         return Stream.of(functions, suppliers, consumers, biFunctions)
@@ -51,6 +60,20 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.pa
                     return values.stream().findFirst();
                 }).filter(Optional::isPresent)
                 .map(Optional::get)
+                .findFirst();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Optional<? extends ExecutableMethod<?, ?>> find(String name) {
+        return Stream.of(functions, suppliers, consumers, biFunctions)
+                .flatMap(map -> {
+                    ExecutableMethod<?, ?> method = map.get(name);
+                    if(method == null) {
+                        return Stream.empty();
+                    }
+                    return Stream.of(method);
+                })
                 .findFirst();
     }
 
@@ -138,5 +161,10 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.pa
 
     private void registerFunction(ExecutableMethod<?, ?> method, String functionId) {
         functions.put(functionId, method);
+    }
+
+    @Override
+    public Optional<MediaTypeDecoder> findDecoder(MediaType mediaType) {
+        return decoderRegistry.findDecoder(mediaType);
     }
 }

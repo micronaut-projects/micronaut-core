@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.decoder;
+package org.particleframework.http.decoder;
 
 import org.particleframework.http.MediaType;
-import org.particleframework.http.decoder.MediaTypeDecoder;
-import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
 
-import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -30,7 +27,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
 public class DefaultMediaTypeDecoderRegistry implements MediaTypeDecoderRegistry{
 
     Map<String, MediaTypeDecoder> decodersByExtension = new LinkedHashMap<>(3);

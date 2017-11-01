@@ -1,5 +1,5 @@
 dependencies {
-    compile project(":function-web")
+    compile project(":function")
     runtime project(":configurations/jackson")
     compile 'com.amazonaws:aws-lambda-java-core:1.1.0'
     compile 'com.amazonaws:aws-lambda-java-events:1.1.0'

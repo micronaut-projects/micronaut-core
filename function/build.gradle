@@ -1,3 +1,5 @@
 dependencies {
-    compile project(":router")
+    compile project(":inject")
+    compileOnly project(":inject-java")
+    compile project(":http")
 }
