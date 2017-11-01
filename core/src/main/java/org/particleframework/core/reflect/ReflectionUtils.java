@@ -33,6 +33,19 @@ public class ReflectionUtils {
         }
     });
 
+    private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES
+            = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
+        {
+            put(Byte.class, Byte.BYTES);
+            put(Character.class, Character.BYTES);
+            put(Double.class, Double.BYTES);
+            put(Float.class, Float.BYTES);
+            put(Integer.class, Integer.BYTES);
+            put(Long.class, Long.BYTES);
+            put(Short.class, Short.BYTES);
+        }
+    });
+
     /**
      * Obtain the wrapper type for the given primitive type
      *

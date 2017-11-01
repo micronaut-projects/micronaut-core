@@ -33,12 +33,12 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
+class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
 
     final HttpStatus httpStatus;
 
-    public StatusRouteMatch(HttpStatus httpStatus, MethodExecutionHandle executableMethod, List<Predicate<HttpRequest>> conditions, ConversionService<?> conversionService) {
-        super(conditions, executableMethod, conversionService);
+    StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+        super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;
     }
 
@@ -49,7 +49,7 @@ public class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
 
     @Override
     protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new StatusRouteMatch<T>(httpStatus, executableMethod, conditions, conversionService) {
+        return new StatusRouteMatch<T>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(requiredArguments);
@@ -67,7 +67,7 @@ public class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
         Map<String, Object> variables = getVariables();
         Collection<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new StatusRouteMatch<T>(httpStatus, executableMethod, conditions, conversionService) {
+        return new StatusRouteMatch<T>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(arguments);

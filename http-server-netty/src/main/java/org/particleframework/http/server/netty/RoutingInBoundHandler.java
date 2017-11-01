@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty;
 import com.typesafe.netty.http.StreamedHttpRequest;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.*;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import org.particleframework.context.BeanLocator;
@@ -445,6 +446,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     }
                     else {
                         request.addContent((ByteBufHolder) message);
+                        if(!routeMatch.isExecutable() && message instanceof LastHttpContent) {
+                            Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument();
+                            if(bodyArgument.isPresent()) {
+                                Argument<?> argument = bodyArgument.get();
+                                String bodyArgumentName = argument.getName();
+                                if(routeMatch.isRequiredInput(bodyArgumentName)) {
+                                    routeMatch = routeMatch.fulfill(
+                                            Collections.singletonMap(
+                                                    bodyArgumentName,
+                                                    request.getBody()
+                                            )
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
                 else {
@@ -453,7 +469,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
 
                 if(!executed) {
-                    if(routeMatch.isExecutable()) {
+                    if(routeMatch.isExecutable() || message instanceof LastHttpContent) {
                         // we have enough data to satisfy the route, continue
                         doOnComplete();
                     }

@@ -15,18 +15,16 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
-import org.particleframework.inject.MethodExecutionHandle;
 
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs
@@ -34,23 +32,23 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteMatch<T> {
+@Internal
+class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteMatch<T> {
 
     private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
     private final Set<MediaType> acceptedMediaTypes;
+    private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
 
-    protected DefaultUriRouteMatch(HttpMethod httpMethod,
-                                   UriMatchInfo matchInfo,
-                                   MethodExecutionHandle executableMethod,
-                                   List<Predicate<HttpRequest>> conditions,
-                                   Set<MediaType> acceptedMediaTypes,
-                                   ConversionService<?> conversionService
+    DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                         DefaultRouteBuilder.DefaultUriRoute uriRoute,
+                         ConversionService<?> conversionService
     ) {
-        super(conditions, executableMethod, conversionService);
+        super(uriRoute, conversionService);
+        this.uriRoute = uriRoute;
         this.matchInfo = matchInfo;
-        this.httpMethod = httpMethod;
-        this.acceptedMediaTypes = acceptedMediaTypes;
+        this.httpMethod = uriRoute.httpMethod;
+        this.acceptedMediaTypes = uriRoute.acceptedMediaTypes;
     }
 
     @Override
@@ -58,7 +56,7 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
         Map<String, Object> variables = getVariables();
         List<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
+        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
                 return Collections.unmodifiableList(arguments);
@@ -78,7 +76,7 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
 
     @Override
     public boolean accept(MediaType contentType) {
-        return contentType == null || acceptedMediaTypes.contains(contentType);
+        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(contentType);
     }
 
     @Override
@@ -88,7 +86,7 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
 
     @Override
     protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new DefaultUriRouteMatch<T>(httpMethod, matchInfo, executableMethod, conditions, acceptedMediaTypes, conversionService) {
+        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
                 return Collections.unmodifiableList(requiredArguments);
@@ -97,6 +95,11 @@ public class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements Ur
             @Override
             public Map<String, Object> getVariables() {
                 return newVariables;
+            }
+
+            @Override
+            public Optional<Argument<?>> getRequiredInput(String name) {
+                return super.getRequiredInput(name);
             }
         };
     }

@@ -6,12 +6,14 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.format.Format;
 import org.particleframework.core.convert.format.FormattingTypeConverter;
 import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
+import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.io.IOUtils;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 
-import java.io.File;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
@@ -20,6 +22,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
@@ -101,6 +104,47 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     protected void registerDefaultConverters() {
+
+        // InputStream -> String
+        addConverter(InputStream.class, String.class, (object, targetType, context) -> {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(object));
+            try {
+                return Optional.of(IOUtils.readText(reader));
+            } catch (IOException e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        });
+
+        // String -> byte[]
+        addConverter(CharSequence.class, byte[].class, (object, targetType, context) -> Optional.of(object.toString().getBytes(context.getCharset())));
+        addConverter(Integer.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Integer.BYTES).putInt(object).array()));
+        addConverter(Character.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Integer.BYTES).putChar(object).array()));
+        addConverter(Long.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Long.BYTES).putLong(object).array()));
+        addConverter(Short.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Short.BYTES).putShort(object).array()));
+        addConverter(Double.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Double.BYTES).putDouble(object).array()));
+        addConverter(Float.class, byte[].class, (object, targetType, context) -> Optional.of(ByteBuffer.allocate(Float.BYTES).putFloat(object).array()));
+
+
+        // InputStream -> Number
+        addConverter(InputStream.class, Number.class, (object, targetType, context) -> {
+            Optional<String> convert = DefaultConversionService.this.convert(object, String.class, context);
+            if(convert.isPresent()) {
+                return convert.flatMap(val -> DefaultConversionService.this.convert(val, targetType, context));
+            }
+            return Optional.empty();
+        });
+
+        // Reader -> String
+        addConverter(Reader.class, String.class, (object, targetType, context) -> {
+            BufferedReader reader = object instanceof BufferedReader ? (BufferedReader)object : new BufferedReader(object);
+            try {
+                return Optional.of(IOUtils.readText(reader));
+            } catch (IOException e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        });
 
         // String -> File
         addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
@@ -437,6 +481,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
+            if(ConvertibleValues.class.isAssignableFrom(targetType)) {
+                if(object instanceof ConvertibleValues) {
+                    return Optional.of(object);
+                }
+                else {
+                    return Optional.empty();
+                }
+            }
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());

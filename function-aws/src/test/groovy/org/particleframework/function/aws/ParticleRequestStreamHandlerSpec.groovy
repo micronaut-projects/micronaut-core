@@ -28,7 +28,7 @@ import spock.lang.Specification
  */
 class ParticleRequestStreamHandlerSpec extends Specification{
 
-    void "test particle stream handler"() {
+    void "test particle stream handler with POJO"() {
         given:
         ParticleRequestStreamHandler requestStreamHandler = new ParticleRequestStreamHandler() {
             @Override
@@ -40,6 +40,8 @@ class ParticleRequestStreamHandlerSpec extends Specification{
 
         when:
         def body = '{"title":"The Stand"}'
+        def input = new ByteArrayInputStream()
+        input.text
         def output = new ByteArrayOutputStream()
         requestStreamHandler.handleRequest(
                 new ByteArrayInputStream(body.bytes),
@@ -51,6 +53,30 @@ class ParticleRequestStreamHandlerSpec extends Specification{
         output.toString() == '{"title":"THE STAND"}'
     }
 
+    void "test particle stream handler with integer"() {
+        given:
+        ParticleRequestStreamHandler requestStreamHandler = new ParticleRequestStreamHandler() {
+            @Override
+            protected String resolveFunctionName(Environment environment) {
+                return "multiply-by-two"
+            }
+        }
+
+
+        when:
+        def body = '10'
+        def input = new ByteArrayInputStream()
+        input.text
+        def output = new ByteArrayOutputStream()
+        requestStreamHandler.handleRequest(
+                new ByteArrayInputStream(body.bytes),
+                output,
+                Mock(Context)
+        )
+
+        then:
+        output.toString() == 'value 20'
+    }
 
     static class Book {
         String title
@@ -63,6 +89,15 @@ class ParticleRequestStreamHandlerSpec extends Specification{
         Book apply(Book book) {
             book.title = book.title.toUpperCase()
             return book
+        }
+    }
+
+    @Function('multiply-by-two')
+    static class IntegerFunction implements java.util.function.Function<Integer, String> {
+
+        @Override
+        String apply(Integer i) {
+            return "value " + (i * 2);
         }
     }
 }

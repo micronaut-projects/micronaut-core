@@ -17,24 +17,25 @@ package org.particleframework.configuration.jackson.server.http.decoders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.decoder.DecodingException;
-import org.particleframework.http.decoder.MediaTypeDecoder;
+import org.particleframework.http.codec.CodecException;
+import org.particleframework.http.codec.MediaTypeCodec;
 
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
- * A {@link MediaTypeDecoder} for JSON and Jackson
+ * A {@link MediaTypeCodec} for JSON and Jackson
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class JsonMediaTypeDecoder implements MediaTypeDecoder {
+public class JsonMediaTypeCodec implements MediaTypeCodec {
     private final ObjectMapper objectMapper;
 
-    public JsonMediaTypeDecoder(ObjectMapper objectMapper) {
+    public JsonMediaTypeCodec(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -44,11 +45,20 @@ public class JsonMediaTypeDecoder implements MediaTypeDecoder {
     }
 
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws DecodingException {
+    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
         try {
             return objectMapper.readValue(inputStream, type);
         } catch (IOException e) {
-            throw new DecodingException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+        }
+    }
+
+    @Override
+    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
+        try {
+            objectMapper.writeValue(outputStream, object);
+        } catch (IOException e) {
+            throw new CodecException("Error encoding object ["+object+"] to JSON: " + e.getMessage());
         }
     }
 }

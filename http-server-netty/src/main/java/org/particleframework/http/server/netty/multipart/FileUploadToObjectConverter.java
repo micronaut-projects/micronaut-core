@@ -22,8 +22,8 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.decoder.MediaTypeDecoder;
-import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -38,9 +38,9 @@ import java.util.Optional;
 public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Object> {
 
     private final ConversionService conversionService;
-    private final MediaTypeDecoderRegistry decoderRegistry;
+    private final MediaTypeCodecRegistry decoderRegistry;
 
-    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeDecoderRegistry decoderRegistry) {
+    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeCodecRegistry decoderRegistry) {
         this.conversionService = conversionService;
         this.decoderRegistry = decoderRegistry;
     }
@@ -56,9 +56,9 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
             ByteBuf byteBuf = object.getByteBuf();
             if (contentType != null) {
                 MediaType mediaType = new MediaType(contentType);
-                Optional<MediaTypeDecoder> registered = decoderRegistry.findDecoder(mediaType);
+                Optional<MediaTypeCodec> registered = decoderRegistry.findCodec(mediaType);
                 if(registered.isPresent()) {
-                    MediaTypeDecoder decoder = registered.get();
+                    MediaTypeCodec decoder = registered.get();
                     Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
                     return Optional.of(val);
                 }

@@ -19,8 +19,8 @@ import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.decoder.MediaTypeDecoder;
-import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
@@ -40,15 +40,15 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.particleframework.function.Function>, FunctionRegistry, MediaTypeDecoderRegistry {
+public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.particleframework.function.Function>, FunctionRegistry, MediaTypeCodecRegistry {
     private final Map<String, ExecutableMethod<?,?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> biFunctions= new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> suppliers = new LinkedHashMap<>(1);
-    private final MediaTypeDecoderRegistry decoderRegistry;
+    private final MediaTypeCodecRegistry decoderRegistry;
 
-    public DefaultFunctionRegistry(MediaTypeDecoder...decoders) {
-        this.decoderRegistry = MediaTypeDecoderRegistry.of(decoders);
+    public DefaultFunctionRegistry(MediaTypeCodec...decoders) {
+        this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
     }
 
     @SuppressWarnings("unchecked")
@@ -164,7 +164,7 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.pa
     }
 
     @Override
-    public Optional<MediaTypeDecoder> findDecoder(MediaType mediaType) {
-        return decoderRegistry.findDecoder(mediaType);
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+        return decoderRegistry.findCodec(mediaType);
     }
 }

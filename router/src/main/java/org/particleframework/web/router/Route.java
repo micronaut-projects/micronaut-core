@@ -40,6 +40,12 @@ public interface Route {
     Route accept(MediaType... mediaType);
 
     /**
+     * Accept all {@link MediaType} references
+     *
+     * @return A new route with the media type applied
+     */
+    Route acceptAll();
+    /**
      * Defines routes nested within this route
      *
      * @param nested The nested routes
@@ -55,4 +61,10 @@ public interface Route {
      */
     Route where(Predicate<HttpRequest> condition);
 
+    /**
+     * The name of the argument to the route that is the request body
+     * @param argument The argument
+     * @return This route
+     */
+    Route body(String argument);
 }

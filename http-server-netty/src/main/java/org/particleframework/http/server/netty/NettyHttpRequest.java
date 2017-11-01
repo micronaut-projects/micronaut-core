@@ -18,28 +18,23 @@ package org.particleframework.http.server.netty;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.multipart.*;
-import io.netty.util.*;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.AttributeKey;
+import io.netty.util.DefaultAttributeMap;
+import io.netty.util.ReferenceCounted;
 import org.particleframework.core.annotation.Internal;
-import org.particleframework.core.convert.*;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
-import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.*;
-import org.particleframework.http.HttpHeaders;
-import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpRequest;
 import org.particleframework.http.cookie.Cookies;
-import org.particleframework.http.exceptions.ConnectionClosedException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -275,8 +270,11 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     protected void releaseIfNecessary(Object value) {
         if (value instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) value;
-            if (referenceCounted.refCnt() != 0) {
-                referenceCounted.release();
+            if((!(value instanceof CompositeByteBuf))) {
+                int i = referenceCounted.refCnt();
+                if (i != 0) {
+                    referenceCounted.release();
+                }
             }
         }
     }

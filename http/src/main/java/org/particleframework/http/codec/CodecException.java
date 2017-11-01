@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.decoder;
+package org.particleframework.http.codec;
 
 import org.particleframework.http.exceptions.HttpException;
 
@@ -23,12 +23,12 @@ import org.particleframework.http.exceptions.HttpException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DecodingException extends HttpException {
-    public DecodingException(String message) {
+public class CodecException extends HttpException {
+    public CodecException(String message) {
         super(message);
     }
 
-    public DecodingException(String message, Throwable cause) {
+    public CodecException(String message, Throwable cause) {
         super(message, cause);
     }
 }

@@ -21,6 +21,7 @@ import org.particleframework.context.annotation.Replaces;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.function.DefaultFunctionRegistry;
 import org.particleframework.function.Function;
@@ -30,6 +31,7 @@ import org.particleframework.http.annotation.Consumes;
 import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.web.router.DefaultRouteBuilder;
+import org.particleframework.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -62,11 +64,6 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
     @Override
     public void process(ExecutableMethod<?, ?> method) {
         Function annotation = method.getAnnotation(Function.class);
-        String[] consumes = method.findAnnotation(Consumes.class).map(Consumes::value).orElse(annotation.consumes());
-
-        // TODO: properly implement suppport for produces
-        String[] produces = method.findAnnotation(Produces.class).map(Produces::value).orElse(annotation.produces());
-
         String functionPath = annotation.value();
         Class<?> declaringType = method.getDeclaringType();
         if(StringUtils.isEmpty(functionPath)) {
@@ -83,24 +80,32 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
             functionPath = "/" + functionPath;
         }
 
+        UriRoute route = null;
         if(java.util.function.Function.class.isAssignableFrom(declaringType)) {
-            POST(functionPath, method)
-                .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            ((ExecutableMethodProcessor)functionRegistry).process(method);
+            route = POST(functionPath, method);
+
         }
         else if(Consumer.class.isAssignableFrom(declaringType)) {
-            POST(functionPath, method)
-                    .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            ((ExecutableMethodProcessor)functionRegistry).process(method);
+            route = POST(functionPath, method);
         }
         else if(BiFunction.class.isAssignableFrom(declaringType)) {
-            POST(functionPath, method)
-                    .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
-            ((ExecutableMethodProcessor)functionRegistry).process(method);
+            route = POST(functionPath, method);
         }
         else if(Supplier.class.isAssignableFrom(declaringType)) {
-            GET(functionPath, method)
-                .accept(Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new));
+            route = GET(functionPath, method);
+        }
+
+        if(route != null) {
+            Class[] argumentTypes = method.getArgumentTypes();
+            if(argumentTypes.length > 0) {
+               if(!ClassUtils.isJavaLangType(argumentTypes[0])) {
+                   route.accept(MediaType.APPLICATION_JSON_TYPE);
+               }
+               else {
+                   route.body(method.getArgumentNames()[0])
+                        .acceptAll();
+               }
+            }
             ((ExecutableMethodProcessor)functionRegistry).process(method);
         }
     }

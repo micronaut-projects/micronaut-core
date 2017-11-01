@@ -16,21 +16,23 @@
 package org.particleframework.function.aws;
 
 import com.amazonaws.services.lambda.runtime.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.exceptions.ConversionErrorException;
 import org.particleframework.core.io.Writable;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.function.FunctionRegistry;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.decoder.DecodingException;
-import org.particleframework.http.decoder.MediaTypeDecoder;
-import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
+import org.particleframework.http.codec.CodecException;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.inject.ExecutableMethod;
 
 import java.io.IOException;
@@ -53,7 +55,6 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
 
         Environment env = applicationContext.getEnvironment();
         FunctionRegistry functionRegistry = applicationContext.getBean(FunctionRegistry.class);
-        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class);
         String functionName = resolveFunctionName(env);
         Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
         if(functionName == null) {
@@ -91,7 +92,7 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
                 throw new InvocationException("Function ["+functionName+"] cannot be made executable.");
         }
         if(result != null) {
-            encode(env, objectMapper, result, output);
+            encode(env, functionRegistry, method.getReturnType(), result, output);
         }
 
     }
@@ -108,21 +109,42 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
     }
 
 
-    private void encode(Environment environment, ObjectMapper objectMapper, Object result, OutputStream output) throws IOException {
-        Optional<JsonNode> converted = environment.convert(result, JsonNode.class);
-        if(converted.isPresent()) {
-            objectMapper.writeValue(output, converted.get());
-        }
-        else {
-            Optional<Writable> writable = environment.convert(result, Writable.class);
-            if(writable.isPresent()) {
-                writable.get().writeTo(output);
+    private void encode(Environment environment, FunctionRegistry registry, ReturnType<Object> returnType, Object result, OutputStream output) throws IOException {
+        if(ClassUtils.isJavaLangType(returnType.getType())) {
+            if(result instanceof Byte) {
+                output.write((Byte) result);
+            }
+            else if(result instanceof Boolean) {
+                output.write(((Boolean) result) ? 1 : 0);
+            }
+            else if(result instanceof byte[]) {
+                output.write((byte[]) result);
             }
             else {
                 byte[] bytes = environment
                         .convert(result, byte[].class)
                         .orElseThrow(() -> new InvocationException("Unable to convert result [" + result + "] for output stream"));
                 output.write(bytes);
+            }
+        }
+        else {
+            Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
+
+
+            if(codec.isPresent()) {
+                codec.get().encode(result, output);
+            }
+            else {
+                Optional<Writable> writable = environment.convert(result, Writable.class);
+                if(writable.isPresent()) {
+                    writable.get().writeTo(output);
+                }
+                else {
+                    byte[] bytes = environment
+                            .convert(result, byte[].class)
+                            .orElseThrow(() -> new InvocationException("Unable to convert result [" + result + "] for output stream"));
+                    output.write(bytes);
+                }
             }
         }
     }
@@ -133,21 +155,19 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
             Argument<?> arg,
             InputStream input) {
         if(ClassUtils.isJavaLangType(arg.getType())) {
-            Optional<?> convert = conversionService.convert(input, ConversionContext.of(arg));
-            if(convert.isPresent()) {
-                return convert.get();
-            }
+            Object converted = doConvertInput(conversionService, arg, input);
+            if (converted != null) return converted;
         } else {
 
-            if(functionRegistry instanceof MediaTypeDecoderRegistry) {
-                Optional<MediaTypeDecoder> registeredDecoder = ((MediaTypeDecoderRegistry) functionRegistry).findDecoder(MediaType.APPLICATION_JSON_TYPE);
+            if(functionRegistry instanceof MediaTypeCodecRegistry) {
+                Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) functionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
                 if(registeredDecoder.isPresent()) {
-                    MediaTypeDecoder decoder = registeredDecoder.get();
+                    MediaTypeCodec decoder = registeredDecoder.get();
                     return decoder.decode(arg.getType(), input);
                 }
             }
         }
-        throw new DecodingException("Unable to decode argument from stream: " + arg);
+        throw new CodecException("Unable to decode argument from stream: " + arg);
     }
 
     private Object decodeContext(
@@ -155,12 +175,25 @@ public class ParticleRequestStreamHandler implements RequestStreamHandler {
             Argument<?> arg,
             Context context) {
         if(ClassUtils.isJavaLangType(arg.getType())) {
-            Optional<?> convert = conversionService.convert(context, ConversionContext.of(arg));
-            if(convert.isPresent()) {
-                return convert.get();
+            Object convert = doConvertInput(conversionService, arg, context);
+            if (convert != null) return convert;
+        }
+        throw new CodecException("Unable to decode argument from stream: " + arg);
+    }
+
+    private Object doConvertInput(ConversionService<?> conversionService, Argument<?> arg, Object object) {
+        ArgumentConversionContext conversionContext = ConversionContext.of(arg);
+        Optional<?> convert = conversionService.convert(object, conversionContext);
+        if(convert.isPresent()) {
+            return convert.get();
+        }
+        else {
+            Optional<ConversionError> lastError = conversionContext.getLastError();
+            if(lastError.isPresent()) {
+                throw new ConversionErrorException(arg, lastError.get());
             }
         }
-        throw new DecodingException("Unable to decode argument from stream: " + arg);
+        return null;
     }
 
     private void registerContextBeans(Context context, ApplicationContext applicationContext) {

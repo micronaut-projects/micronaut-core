@@ -16,6 +16,7 @@
 package org.particleframework.function;
 
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.http.MediaType;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
@@ -43,13 +44,4 @@ public @interface Function {
      */
     String value() default "";
 
-    /**
-     * @return The produced MediaType values. Defaults to application/json
-     */
-    String[] produces() default {"application/json"};
-
-    /**
-     * @return The consumed MediaType for request bodies Defaults to application/json
-     */
-    String[] consumes() default {"application/json"};
 }

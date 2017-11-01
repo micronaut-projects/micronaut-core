@@ -55,6 +55,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 
 /**
+ * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}
+ *
+ * @see RoutingInBoundHandler
  * @author Graeme Rocher
  * @since 1.0
  */

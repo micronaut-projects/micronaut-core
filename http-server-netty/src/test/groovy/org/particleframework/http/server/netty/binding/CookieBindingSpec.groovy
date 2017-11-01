@@ -32,11 +32,12 @@ class CookieBindingSpec extends AbstractParticleSpec {
 
         where:
         uri                | result              | headers
+        '/cookie/all'      | "Cookie Value: bar" | ['Cookie': 'myVar=bar']
         '/cookie/simple'   | "Cookie Value: bar" | ['Cookie': 'myVar=bar']
         '/cookie/optional' | "Cookie Value: 10"  | ['Cookie': 'myVar=10']
         '/cookie/optional' | "Cookie Value: -1"  | ['Cookie': 'myVar=foo']
         '/cookie/optional' | "Cookie Value: -1"  | [:]
-        '/cookie/all'      | "Cookie Value: bar" | ['Cookie': 'myVar=bar']
+
     }
 
     @Controller

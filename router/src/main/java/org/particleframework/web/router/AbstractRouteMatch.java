@@ -44,13 +44,13 @@ import java.util.stream.Collectors;
 abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
 
     protected final MethodExecutionHandle<R> executableMethod;
-    protected final List<Predicate<HttpRequest>> conditions;
     protected final ConversionService<?> conversionService;
     protected final Map<String, Argument> requiredInputs;
+    protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
 
-    protected AbstractRouteMatch(List<Predicate<HttpRequest>> conditions, MethodExecutionHandle<R> executableMethod, ConversionService<?> conversionService) {
-        this.conditions = conditions;
-        this.executableMethod = executableMethod;
+    protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+        this.abstractRoute = abstractRoute;
+        this.executableMethod = abstractRoute.targetMethod;
         this.conversionService = conversionService;
         Argument[] requiredArguments = executableMethod.getArguments();
         this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
@@ -65,6 +65,13 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
             }
         }
 
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Optional<Argument<?>> getBodyArgument() {
+        String bodyArgument = abstractRoute.bodyArgument;
+        return Optional.ofNullable(requiredInputs.get(bodyArgument));
     }
 
     @Override
@@ -111,7 +118,7 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
 
     @Override
     public boolean test(HttpRequest request) {
-        for (Predicate<HttpRequest> condition : conditions) {
+        for (Predicate<HttpRequest> condition : abstractRoute.conditions) {
             if (!condition.test(request)) {
                 return false;
             }

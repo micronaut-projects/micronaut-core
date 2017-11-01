@@ -15,6 +15,7 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
@@ -31,12 +32,13 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ErrorRouteMatch<T> extends StatusRouteMatch<T> {
+@Internal
+class ErrorRouteMatch<T> extends StatusRouteMatch<T> {
     private final Throwable error;
     private final Map<String, Object> variables;
 
-    public ErrorRouteMatch(Throwable error, MethodExecutionHandle executableMethod, List<Predicate<HttpRequest>> conditions, ConversionService<?> conversionService) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, executableMethod, conditions, conversionService);
+    ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+        super(HttpStatus.INTERNAL_SERVER_ERROR, abstractRoute, conversionService);
         this.error = error;
         this.variables = new LinkedHashMap<>();
         for (Argument argument : getArguments()) {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.decoder;
+package org.particleframework.http.codec;
 
 import org.particleframework.http.MediaType;
 
@@ -25,15 +25,15 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MediaTypeDecoderRegistry {
+public interface MediaTypeCodecRegistry {
 
     /**
-     * Find a decoder for the given media type
+     * Find a codec for the given media type
      *
      * @param mediaType The {@link MediaType}
-     * @return The decoder
+     * @return The codec
      */
-    Optional<MediaTypeDecoder> findDecoder(MediaType mediaType);
+    Optional<MediaTypeCodec> findCodec(MediaType mediaType);
 
     /**
      * Create a new registry from the given decoders
@@ -41,7 +41,7 @@ public interface MediaTypeDecoderRegistry {
      * @param decoders The decoders
      * @return The registry
      */
-    static MediaTypeDecoderRegistry of(MediaTypeDecoder...decoders) {
-        return new DefaultMediaTypeDecoderRegistry(decoders);
+    static MediaTypeCodecRegistry of(MediaTypeCodec...decoders) {
+        return new DefaultMediaTypeCodecRegistry(decoders);
     }
 }

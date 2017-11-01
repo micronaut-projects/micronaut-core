@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.decoder;
+package org.particleframework.http.codec;
 
 import org.particleframework.http.MediaType;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
- * Represents a decoder for a particular media type. For example JSON.
+ * Represents a codec for a particular media type. For example JSON.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MediaTypeDecoder {
+public interface MediaTypeCodec {
 
     /**
-     * @return The media type of the decoder
+     * @return The media type of the codec
      */
     MediaType getMediaType();
 
@@ -40,10 +41,20 @@ public interface MediaTypeDecoder {
      * @param inputStream The input stream
      * @param <T> The generic type
      * @return The decoded result
-     * @throws DecodingException When the result cannot be decoded
+     * @throws CodecException When the result cannot be decoded
      */
-    <T> T decode(Class<T> type, InputStream inputStream) throws DecodingException;
+    <T> T decode(Class<T> type, InputStream inputStream) throws CodecException;
 
+    /**
+     * Encode the given type from the given {@link InputStream}
+     *
+     * @param object The object to encode
+     * @param outputStream The input stream
+     * @param <T> The generic type
+     * @return The decoded result
+     * @throws CodecException When the result cannot be decoded
+     */
+    <T> void encode(T object, OutputStream outputStream) throws CodecException;
     /**
      * Decode the given type from the given bytes
      *
@@ -52,9 +63,9 @@ public interface MediaTypeDecoder {
      * @param <T> The decoded type
      * @return The decoded result
      *
-     * @throws DecodingException When the result cannot be decoded
+     * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Class<T> type, byte[] bytes) throws DecodingException {
+    default <T> T decode(Class<T> type, byte[] bytes) throws CodecException {
         return decode(type, new ByteArrayInputStream(bytes));
     }
 }

@@ -24,10 +24,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ParticleRequestHandler<E> implements RequestHandler<E, Object> {
+public abstract class ParticleRequestHandler<I,O> implements RequestHandler<I, O> {
     @Override
-    public Object handleRequest(E input, Context context) {
-        // TODO...
-        return null;
-    }
+    public abstract O handleRequest(I input, Context context);
 }

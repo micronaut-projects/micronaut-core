@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.decoder;
+package org.particleframework.http.codec;
 
 import org.particleframework.http.MediaType;
 
@@ -22,19 +22,19 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Registry of {@link MediaTypeDecoder} instances
+ * Registry of {@link MediaTypeCodec} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultMediaTypeDecoderRegistry implements MediaTypeDecoderRegistry{
+public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
-    Map<String, MediaTypeDecoder> decodersByExtension = new LinkedHashMap<>(3);
-    Map<MediaType, MediaTypeDecoder> decodersByType = new LinkedHashMap<>(3);
+    Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
+    Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
 
-    DefaultMediaTypeDecoderRegistry(MediaTypeDecoder...decoders) {
+    DefaultMediaTypeCodecRegistry(MediaTypeCodec...decoders) {
         if(decoders != null) {
-            for (MediaTypeDecoder decoder : decoders) {
+            for (MediaTypeCodec decoder : decoders) {
                 MediaType mediaType = decoder.getMediaType();
                 if(mediaType != null) {
                     decodersByExtension.put(mediaType.getExtension(), decoder);
@@ -45,11 +45,11 @@ public class DefaultMediaTypeDecoderRegistry implements MediaTypeDecoderRegistry
     }
 
     @Override
-    public Optional<MediaTypeDecoder> findDecoder(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
         if(mediaType == null) {
             return Optional.empty();
         }
-        MediaTypeDecoder decoder = decodersByType.get(mediaType);
+        MediaTypeCodec decoder = decodersByType.get(mediaType);
         if(decoder == null) {
             decoder = decodersByType.get(mediaType.getExtension());
         }

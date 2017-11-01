@@ -32,6 +32,7 @@ import org.particleframework.http.uri.UriMatchTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -268,23 +269,60 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return route;
     }
 
-    class DefaultErrorRoute implements ErrorRoute, Comparable<ErrorRoute> {
+    abstract class AbstractRoute implements Route {
 
-        private final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
+        protected final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
+        protected final MethodExecutionHandle targetMethod;
+        protected final ConversionService<?> conversionService;
+        protected Set<MediaType> acceptedMediaTypes;
+        protected String bodyArgument;
+
+        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, Set<MediaType> mediaTypes) {
+            this.targetMethod = targetMethod;
+            this.conversionService = conversionService;
+            this.acceptedMediaTypes = mediaTypes;
+        }
+
+        @Override
+        public Route accept(MediaType... mediaTypes) {
+            this.acceptedMediaTypes = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(mediaTypes)));
+            return this;
+        }
+
+        @Override
+        public Route acceptAll() {
+            this.acceptedMediaTypes = Collections.emptySet();
+            return this;
+        }
+
+        @Override
+        public Route where(Predicate<HttpRequest> condition) {
+            if (condition != null) {
+                conditions.add(condition);
+            }
+            return this;
+        }
+
+        @Override
+        public Route body(String argument) {
+            this.bodyArgument = argument;
+            return this;
+        }
+    }
+
+    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute, Comparable<ErrorRoute> {
+
         private final Class<? extends Throwable> error;
         private final Class originatingClass;
-        private final MethodExecutionHandle targetMethod;
-        private final ConversionService<?> conversionService;
 
         public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
             this(null, error, targetMethod, conversionService);
         }
 
         public DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            super(targetMethod, conversionService, Collections.emptySet());
             this.originatingClass = originatingClass;
             this.error = error;
-            this.targetMethod = targetMethod;
-            this.conversionService = conversionService;
         }
 
         @Override
@@ -308,7 +346,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public <T> Optional<RouteMatch<T>> match(Throwable exception) {
             if (error.isInstance(exception)) {
-                return Optional.of(new ErrorRouteMatch(exception, targetMethod, conditions, conversionService));
+                return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
             }
             return Optional.empty();
         }
@@ -319,16 +357,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public Route acceptAll() {
+            return this;
+        }
+
+        @Override
         public ErrorRoute nest(Runnable nested) {
             return this;
         }
 
         @Override
         public ErrorRoute where(Predicate<HttpRequest> condition) {
-            if (condition != null) {
-                conditions.add(condition);
-            }
-            return this;
+            return (ErrorRoute) super.where(condition);
         }
 
         @Override
@@ -371,17 +411,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link HttpStatus} code
      */
-    class DefaultStatusRoute implements StatusRoute {
+    class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
-        private final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
         private final HttpStatus status;
-        private final MethodExecutionHandle targetMethod;
-        private final ConversionService<?> conversionService;
 
         public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            super(targetMethod, conversionService, Collections.emptySet());
             this.status = status;
-            this.targetMethod = targetMethod;
-            this.conversionService = conversionService;
         }
 
         @Override
@@ -392,7 +428,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
             if (this.status == status) {
-                return Optional.of(new StatusRouteMatch(status, targetMethod, conditions, conversionService));
+                return Optional.of(new StatusRouteMatch(status, this, conversionService));
             }
             return Optional.empty();
         }
@@ -404,16 +440,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public Route acceptAll() {
+            return this;
+        }
+
+        @Override
         public StatusRoute nest(Runnable nested) {
             return this;
         }
 
         @Override
         public StatusRoute where(Predicate<HttpRequest> condition) {
-            if (condition != null) {
-                conditions.add(condition);
-            }
-            return this;
+            return (StatusRoute) super.where(condition);
         }
 
         public HttpStatus getStatus() {
@@ -439,14 +477,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * The default route impl
      */
-    class DefaultUriRoute implements UriRoute {
+    class DefaultUriRoute extends AbstractRoute implements UriRoute {
 
-        private final HttpMethod httpMethod;
-        private final Set<MediaType> acceptedMediaTypes;
-        private final UriMatchTemplate uriMatchTemplate;
-        private final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
-        private final MethodExecutionHandle targetMethod;
-        private final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
+        final HttpMethod httpMethod;
+        final UriMatchTemplate uriMatchTemplate;
+        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
 
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
             this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
@@ -461,10 +496,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, Set<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
+            super(targetMethod, ConversionService.SHARED, mediaTypes);
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
-            this.acceptedMediaTypes = mediaTypes;
-            this.targetMethod = targetMethod;
         }
 
 
@@ -489,17 +523,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return httpMethod;
         }
 
-
         @Override
-        public Route accept(MediaType... mediaTypes) {
-            DefaultRouteBuilder.this.uriRoutes.remove(this);
-            DefaultUriRoute newRoute = new DefaultUriRoute(httpMethod, uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), targetMethod);
-            DefaultRouteBuilder.this.uriRoutes.add(newRoute);
-            return newRoute;
+        public UriRoute body(String argument) {
+            return (UriRoute) super.body(argument);
         }
 
         @Override
-        public Route nest(Runnable nested) {
+        public UriRoute accept(MediaType... mediaTypes) {
+            return (UriRoute) super.accept(mediaTypes);
+        }
+
+        @Override
+        public UriRoute acceptAll() {
+            return (UriRoute) super.acceptAll();
+        }
+
+        @Override
+        public UriRoute nest(Runnable nested) {
             DefaultUriRoute previous = DefaultRouteBuilder.this.currentParentRoute;
             DefaultRouteBuilder.this.currentParentRoute = this;
             try {
@@ -511,15 +551,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route where(Predicate<HttpRequest> condition) {
-            conditions.add(condition);
-            return this;
+        public UriRoute where(Predicate<HttpRequest> condition) {
+            return (UriRoute) super.where(condition);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public Optional<UriRouteMatch> match(String uri) {
             Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map((info) -> new DefaultUriRouteMatch(httpMethod, info, targetMethod, conditions, acceptedMediaTypes, conversionService));
+            return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, conversionService));
         }
 
 
@@ -591,7 +631,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public ResourceRoute accept(MediaType... mediaTypes) {
             DefaultRouteBuilder.this.uriRoutes.remove(getRoute);
-            DefaultUriRoute getRoute = new DefaultUriRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), this.getRoute.targetMethod);
+            Set<MediaType> newMediaTypes = new HashSet<>(Arrays.asList(mediaTypes));
+            return accept(newMediaTypes);
+        }
+
+        protected ResourceRoute accept(Set<MediaType> newMediaTypes) {
+            DefaultUriRoute getRoute = new DefaultUriRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, newMediaTypes, this.getRoute.targetMethod);
             DefaultRouteBuilder.this.uriRoutes.add(getRoute);
 
             Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
@@ -599,12 +644,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 if (value != this.getRoute) {
                     DefaultUriRoute defaultRoute = (DefaultUriRoute) value;
                     DefaultRouteBuilder.this.uriRoutes.remove(defaultRoute);
-                    DefaultUriRoute newRoute = new DefaultUriRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, new HashSet<>(Arrays.asList(mediaTypes)), this.getRoute.targetMethod);
+                    DefaultUriRoute newRoute = new DefaultUriRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, newMediaTypes, this.getRoute.targetMethod);
                     newMap.put(key, newRoute);
                     DefaultRouteBuilder.this.uriRoutes.add(defaultRoute);
                 }
             });
             return newResourceRoute(newMap, getRoute);
+        }
+
+        @Override
+        public Route acceptAll() {
+            return accept(Collections.emptySet());
         }
 
         @Override
@@ -624,6 +674,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             for (Route route : resourceRoutes.values()) {
                 route.where(condition);
             }
+            return this;
+        }
+
+        @Override
+        public ResourceRoute body(String argument) {
             return this;
         }
 

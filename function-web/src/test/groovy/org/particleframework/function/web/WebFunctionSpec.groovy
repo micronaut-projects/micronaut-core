@@ -91,7 +91,7 @@ class WebFunctionSpec extends Specification {
     }
 
 
-    void "test string consumer"() {
+    void "test string consumer with JSON"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
         String server = "http://localhost:$embeddedServer.port"
@@ -100,6 +100,27 @@ class WebFunctionSpec extends Specification {
         def request = new Request.Builder()
                 .url("$server/consumer/string")
                 .post(RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), data))
+
+        when:
+        def response = client.newCall(request.build()).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        StringConsumer.LAST_VALUE == "The Stand"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test string consumer with text plain"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        String server = "http://localhost:$embeddedServer.port"
+        OkHttpClient client = new OkHttpClient()
+        def data = 'The Stand'
+        def request = new Request.Builder()
+                .url("$server/consumer/string")
+                .post(RequestBody.create( MediaType.parse("text/plain"), data))
 
         when:
         def response = client.newCall(request.build()).execute()

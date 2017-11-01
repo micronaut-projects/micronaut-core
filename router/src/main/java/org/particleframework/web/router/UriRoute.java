@@ -16,12 +16,17 @@
 package org.particleframework.web.router;
 
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpRequest;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatcher;
 
 import java.net.URI;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
+ * Represents a {@link Route} that matches a {@link URI}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -33,7 +38,7 @@ public interface UriRoute extends Route, UriMatcher {
      * @param nested The nested routes
      * @return This route
      */
-    Route nest(Runnable nested);
+    UriRoute nest(Runnable nested);
 
     /**
      * @return The HTTP method for this route
@@ -58,4 +63,16 @@ public interface UriRoute extends Route, UriMatcher {
      */
     @Override
     Optional<UriRouteMatch> match(String uri);
+
+    @Override
+    UriRoute accept(MediaType... mediaType);
+
+    @Override
+    UriRoute acceptAll();
+
+    @Override
+    UriRoute where(Predicate<HttpRequest> condition);
+
+    @Override
+    UriRoute body(String argument);
 }

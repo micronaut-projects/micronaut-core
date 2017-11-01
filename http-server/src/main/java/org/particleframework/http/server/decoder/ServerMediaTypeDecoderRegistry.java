@@ -18,13 +18,13 @@ package org.particleframework.http.server.decoder;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
-import org.particleframework.http.decoder.MediaTypeDecoder;
-import org.particleframework.http.decoder.MediaTypeDecoderRegistry;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 
 import javax.inject.Singleton;
 
 /**
- * A bean for the default {@link MediaTypeDecoderRegistry} used by the server
+ * A bean for the default {@link MediaTypeCodecRegistry} used by the server
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,7 +35,7 @@ public class ServerMediaTypeDecoderRegistry {
     @Singleton
     @Primary
     @Bean
-    MediaTypeDecoderRegistry serverMediaTypeDecoderRegistry(MediaTypeDecoder...decoders) {
-        return MediaTypeDecoderRegistry.of(decoders);
+    MediaTypeCodecRegistry serverMediaTypeDecoderRegistry(MediaTypeCodec...decoders) {
+        return MediaTypeCodecRegistry.of(decoders);
     }
 }

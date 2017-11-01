@@ -114,4 +114,9 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
      * @return True if it is
      */
     Optional<Argument<?>> getRequiredInput(String name);
+
+    /**
+     * @return The argument that represents the body
+     */
+    Optional<Argument<?>> getBodyArgument();
 }
