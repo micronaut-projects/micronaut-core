@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import static org.particleframework.function.aws.ParticleRequestHandler.registerContextBeans;
+
 /**
  * <p>An implementation of the {@link RequestStreamHandler} for Particle</p>
  *
@@ -38,24 +40,10 @@ public class ParticleRequestStreamHandler extends StreamFunctionExecutor<Context
     @Override
     protected ApplicationContext buildApplicationContext(Context context) {
         ApplicationContext applicationContext = super.buildApplicationContext(context);
-        registerContextBeans(context, applicationContext);
+        if(context != null) {
+            registerContextBeans(context, applicationContext);
+        }
         return applicationContext;
-    }
-
-    private void registerContextBeans(Context context, ApplicationContext applicationContext) {
-        applicationContext.registerSingleton(context);
-        LambdaLogger logger = context.getLogger();
-        if(logger != null) {
-            applicationContext.registerSingleton(logger);
-        }
-        ClientContext clientContext = context.getClientContext();
-        if(clientContext != null) {
-            applicationContext.registerSingleton(clientContext);
-        }
-        CognitoIdentity identity = context.getIdentity();
-        if(identity != null) {
-            applicationContext.registerSingleton(identity);
-        }
     }
 
 }

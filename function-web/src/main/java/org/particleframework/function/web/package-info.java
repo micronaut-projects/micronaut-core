@@ -15,7 +15,7 @@
  */
 
 /**
- * <p>Classes to support exposing {@link org.particleframework.function.Function} instances over the web</p>
+ * <p>Classes to support exposing {@link org.particleframework.function.FunctionBean} instances over the web</p>
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -40,7 +40,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.particleframework.function.Function>, FunctionRegistry, MediaTypeCodecRegistry {
+public class DefaultFunctionRegistry implements ExecutableMethodProcessor<FunctionBean>, FunctionRegistry, MediaTypeCodecRegistry {
     private final Map<String, ExecutableMethod<?,?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> biFunctions= new LinkedHashMap<>(1);
@@ -119,7 +119,7 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<org.pa
 
     @Override
     public void process(ExecutableMethod<?, ?> method) {
-        org.particleframework.function.Function annotation = method.getAnnotation(org.particleframework.function.Function.class);
+        FunctionBean annotation = method.getAnnotation(FunctionBean.class);
         String functionId = annotation.value();
         Class<?> declaringType = method.getDeclaringType();
         if(StringUtils.isEmpty(functionId)) {

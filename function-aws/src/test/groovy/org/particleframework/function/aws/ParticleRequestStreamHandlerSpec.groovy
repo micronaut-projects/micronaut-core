@@ -16,10 +16,11 @@
 package org.particleframework.function.aws
 
 import com.amazonaws.services.lambda.runtime.Context
-import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.Environment
-import org.particleframework.function.Function
+import org.particleframework.function.FunctionBean
 import spock.lang.Specification
+
+import java.util.function.Function
 
 
 /**
@@ -82,8 +83,8 @@ class ParticleRequestStreamHandlerSpec extends Specification{
         String title
     }
 
-    @Function('book')
-    static class BookFunction implements java.util.function.Function<Book, Book> {
+    @FunctionBean('book')
+    static class BookFunction implements Function<Book, Book> {
 
         @Override
         Book apply(Book book) {
@@ -92,8 +93,8 @@ class ParticleRequestStreamHandlerSpec extends Specification{
         }
     }
 
-    @Function('multiply-by-two')
-    static class IntegerFunction implements java.util.function.Function<Integer, String> {
+    @FunctionBean('multiply-by-two')
+    static class IntegerFunction implements Function<Integer, String> {
 
         @Override
         String apply(Integer i) {

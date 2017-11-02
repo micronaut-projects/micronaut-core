@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A registry of defined {@link Function} instances
+ * A registry of defined {@link FunctionBean} instances
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,7 +33,10 @@ public interface FunctionRegistry {
      * The name of the default function name
      */
     String FUNCTION_NAME = "particle.function.name";
-
+    /**
+     * The name of the default function name
+     */
+    String FUNCTION_CHARSET = "particle.function.charset";
     /**
      * Find the first available registered function
      * @return The {@link ExecutableMethod} method representing the function

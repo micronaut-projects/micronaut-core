@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>An annotation applied to classes that should be exposed as functions. The class itself must implement a {@link FunctionalInterface} to be exposed as a function.</p>
+ * <p>An annotation applied to classes that should be exposed as functions. The class itself must implement an interface from <tt>java.util.function</tt> such as {@link java.util.function.Consumer} to be exposed as a function.</p>
  *
  *
  * @author Graeme Rocher
@@ -38,7 +38,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Singleton
 @Executable
-public @interface Function {
+public @interface FunctionBean {
     /**
      * @return An optional ID of the function which may or may not be used depending on the target platform
      */

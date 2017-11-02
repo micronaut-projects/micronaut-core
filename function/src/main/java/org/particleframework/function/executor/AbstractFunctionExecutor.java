@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package example;
-
-import org.particleframework.function.executor.FunctionInitializer;
-
-import javax.inject.Inject;
+package org.particleframework.function.executor;
 
 /**
+ * A class that executes the configured {@link org.particleframework.function.FunctionRegistry#FUNCTION_NAME} for the given inputs and outputs
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class UpperCaseTitleFunction extends FunctionInitializer {
+public abstract class AbstractFunctionExecutor<I,O,C> extends AbstractExecutor<C> implements FunctionExecutor<I,O> {
 
-    @Inject UpperCaseTitleService upperCaseTitleService;
-
-    public Book toUpperCase(Book book) {
-        return upperCaseTitleService.toUpperCase(book);
-    }
 }

@@ -727,7 +727,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 if (isValue) {
                     writer.visitFieldValue(
-                        declaringClass.getQualifiedName().toString(),
+                        modelUtils.resolveTypeReference(declaringClass),
                         qualifierRef,
                         requiresReflection,
                         fieldType,
@@ -736,7 +736,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     );
                 } else {
                     writer.visitFieldInjectionPoint(
-                        declaringClass.getQualifiedName().toString(),
+                        modelUtils.resolveTypeReference(declaringClass),
                         qualifierRef,
                         requiresReflection,
                         fieldType,
@@ -897,7 +897,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     packageName,
                     shortClassName,
                     factoryMethodBeanDefinitionName,
-                    producedElement.getQualifiedName().toString(),
+                    modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
                     beanScope,
                     singletonAnn.isPresent());

@@ -14,7 +14,7 @@
  * limitations under the License. 
  */
 /**
- * Support classes for binding to {@link org.particleframework.function.Function} parameters from AWS Lambda requests
+ * Support classes for binding to {@link org.particleframework.function.FunctionBean} parameters from AWS Lambda requests
  *
  * @author Graeme Rocher
  * @since 1.0

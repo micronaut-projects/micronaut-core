@@ -15,7 +15,7 @@
  */
 
 /**
- * <p>Classes to support exposing {@link org.particleframework.function.Function} instances for AWS lambda</p>
+ * <p>Classes to support exposing {@link org.particleframework.function.FunctionBean} instances for AWS lambda</p>
  *
  * @author Graeme Rocher
  * @since 1.0

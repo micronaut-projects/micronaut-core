@@ -15,19 +15,20 @@
  */
 package example;
 
-import org.particleframework.function.executor.FunctionInitializer;
-
-import javax.inject.Inject;
+import javax.inject.Singleton;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-public class UpperCaseTitleFunction extends FunctionInitializer {
-
-    @Inject UpperCaseTitleService upperCaseTitleService;
+@Singleton
+public class UpperCaseTitleService {
 
     public Book toUpperCase(Book book) {
-        return upperCaseTitleService.toUpperCase(book);
+        String title = book.getTitle();
+        if(title != null) {
+            book.setTitle(title.toUpperCase());
+        }
+        return book;
     }
 }

@@ -15,19 +15,25 @@
  */
 package example;
 
-import org.particleframework.function.executor.FunctionInitializer;
 
-import javax.inject.Inject;
+import org.particleframework.function.FunctionBean;
+
+import java.util.function.Function;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-public class UpperCaseTitleFunction extends FunctionInitializer {
+@FunctionBean("uppercase")
+public class UpperCaseTitleFunctionBean implements Function<Book, Book> {
+    UpperCaseTitleService upperCaseTitleService;
 
-    @Inject UpperCaseTitleService upperCaseTitleService;
+    public UpperCaseTitleFunctionBean(UpperCaseTitleService upperCaseTitleService) {
+        this.upperCaseTitleService = upperCaseTitleService;
+    }
 
-    public Book toUpperCase(Book book) {
+    @Override
+    public Book apply(Book book) {
         return upperCaseTitleService.toUpperCase(book);
     }
 }

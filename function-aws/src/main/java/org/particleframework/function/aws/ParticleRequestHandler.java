@@ -15,16 +15,47 @@
  */
 package org.particleframework.function.aws;
 
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.*;
+import org.particleframework.context.ApplicationContext;
+import org.particleframework.function.FunctionBean;
+import org.particleframework.function.executor.AbstractFunctionExecutor;
 
 /**
- * <p>An Amazon Lambda {@link RequestHandler} implementation for Particle {@link org.particleframework.function.Function}</p>
+ * <p>An Amazon Lambda {@link RequestHandler} implementation for Particle {@link FunctionBean}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class ParticleRequestHandler<I,O> implements RequestHandler<I, O> {
+public abstract class ParticleRequestHandler<I,O> extends AbstractFunctionExecutor<I,O, Context> implements RequestHandler<I, O> {
     @Override
-    public abstract O handleRequest(I input, Context context);
+    public final O handleRequest(I input, Context context) {
+        ApplicationContext applicationContext = buildApplicationContext(context);
+        startEnvironment(applicationContext);
+        return applicationContext.inject(this).execute(input);
+    }
+
+    @Override
+    protected ApplicationContext buildApplicationContext(Context context) {
+        ApplicationContext applicationContext = super.buildApplicationContext(context);
+        if(context != null) {
+            registerContextBeans(context, applicationContext);
+        }
+        return applicationContext;
+    }
+
+    static void registerContextBeans(Context context, ApplicationContext applicationContext) {
+        applicationContext.registerSingleton(context);
+        LambdaLogger logger = context.getLogger();
+        if(logger != null) {
+            applicationContext.registerSingleton(logger);
+        }
+        ClientContext clientContext = context.getClientContext();
+        if(clientContext != null) {
+            applicationContext.registerSingleton(clientContext);
+        }
+        CognitoIdentity identity = context.getIdentity();
+        if(identity != null) {
+            applicationContext.registerSingleton(identity);
+        }
+    }
 }

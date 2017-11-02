@@ -1205,12 +1205,12 @@ public class DefaultBeanContext implements BeanContext {
                     if (!beansOfTypeList.contains(instance)) {
                         if (!hasQualifier) {
 
-                            if (LOG.isDebugEnabled()) {
+                            if (LOG.isTraceEnabled()) {
                                 Qualifier registeredQualifier = entry.getKey().qualifier;
                                 if (registeredQualifier != null) {
-                                    LOG.debug("Found existing bean for type {} {}: {} ", beanType.getName(), instance);
+                                    LOG.trace("Found existing bean for type {} {}: {} ", beanType.getName(), instance);
                                 } else {
-                                    LOG.debug("Found existing bean for type {}: {} ", beanType.getName(), instance);
+                                    LOG.trace("Found existing bean for type {}: {} ", beanType.getName(), instance);
                                 }
                             }
 
@@ -1221,8 +1221,8 @@ public class DefaultBeanContext implements BeanContext {
                             if(registeredQualifer == null) {
                                 Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
                                 if(result.isPresent()) {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
+                                    if (LOG.isTraceEnabled()) {
+                                        LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
                                     }
 
                                     beansOfTypeList.add((T) instance);
@@ -1230,8 +1230,8 @@ public class DefaultBeanContext implements BeanContext {
                                 }
                             }
                             else if (registeredQualifer != null && qualifier.equals(registeredQualifer)) {
-                                if (LOG.isDebugEnabled()) {
-                                    LOG.debug("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
+                                if (LOG.isTraceEnabled()) {
+                                    LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
                                 }
 
                                 beansOfTypeList.add((T) instance);

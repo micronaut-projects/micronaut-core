@@ -37,6 +37,8 @@ import org.particleframework.inject.ExecutableMethod;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -46,7 +48,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class StreamFunctionExecutor<C> {
+public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     /**
      * Execute the function for the given input and output
      * @param input The input
@@ -57,25 +59,24 @@ public class StreamFunctionExecutor<C> {
         execute(input, output, null);
     }
 
+    /**
+     * Execute the function with given context object
+     *
+     * @param input The {@link InputStream}
+     * @param output THe {@link OutputStream}
+     * @param context The context object
+     * @throws IOException If an error occurs
+     */
     protected void execute(InputStream input, OutputStream output, C context) throws IOException {
         ApplicationContext applicationContext = buildApplicationContext(context);
         if(context == null) {
             context = (C) applicationContext;
         }
-        applicationContext.start();
-
-        Environment env = applicationContext.getEnvironment();
-        FunctionRegistry functionRegistry = applicationContext.getBean(FunctionRegistry.class);
+        Environment env = startEnvironment(applicationContext);
         String functionName = resolveFunctionName(env);
-        Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
-        if(functionName == null) {
-            registeredMethod = functionRegistry.findFirst();
-        }
-        else {
-            registeredMethod = functionRegistry.find(functionName);
-        }
-        ExecutableMethod<Object, Object> method = registeredMethod
-                .orElseThrow(() -> new IllegalStateException("No function found for name: " + functionName));
+
+        FunctionRegistry functionRegistry = applicationContext.getBean(FunctionRegistry.class);
+        ExecutableMethod<Object, Object> method = resolveFunction(functionRegistry, functionName);
 
         Argument[] requiredArguments = method.getArguments();
         int argCount = requiredArguments.length;
@@ -107,18 +108,6 @@ public class StreamFunctionExecutor<C> {
         }
     }
 
-    protected String resolveFunctionName(Environment env) {
-        return env.getProperty(FunctionRegistry.FUNCTION_NAME, String.class, (String)null);
-    }
-
-    /**
-     * @return Build the {@link ApplicationContext} to use
-     * @param context A platform specific context object
-     */
-    protected ApplicationContext buildApplicationContext(C context) {
-        return ApplicationContext.build();
-    }
-
 
     private void encode(Environment environment, FunctionRegistry registry, ReturnType<Object> returnType, Object result, OutputStream output) throws IOException {
         if(ClassUtils.isJavaLangType(returnType.getType())) {
@@ -139,16 +128,16 @@ public class StreamFunctionExecutor<C> {
             }
         }
         else {
-            Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
-
-
-            if(codec.isPresent()) {
-                codec.get().encode(result, output);
+            if(result instanceof Writable) {
+                Writable writable = (Writable) result;
+                writable.writeTo(output, environment.getProperty(FunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
             }
             else {
-                Optional<Writable> writable = environment.convert(result, Writable.class);
-                if(writable.isPresent()) {
-                    writable.get().writeTo(output);
+                Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
+
+
+                if(codec.isPresent()) {
+                    codec.get().encode(result, output);
                 }
                 else {
                     byte[] bytes = environment
@@ -165,16 +154,21 @@ public class StreamFunctionExecutor<C> {
             FunctionRegistry functionRegistry,
             Argument<?> arg,
             InputStream input) {
-        if(ClassUtils.isJavaLangType(arg.getType())) {
+        Class<?> argType = arg.getType();
+        if(ClassUtils.isJavaLangType(argType)) {
             Object converted = doConvertInput(conversionService, arg, input);
             if (converted != null) return converted;
-        } else {
+        }
+        else if(argType.isInstance(input)) {
+            return input;
+        }
+        else {
 
             if(functionRegistry instanceof MediaTypeCodecRegistry) {
                 Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) functionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
                 if(registeredDecoder.isPresent()) {
                     MediaTypeCodec decoder = registeredDecoder.get();
-                    return decoder.decode(arg.getType(), input);
+                    return decoder.decode(argType, input);
                 }
             }
         }

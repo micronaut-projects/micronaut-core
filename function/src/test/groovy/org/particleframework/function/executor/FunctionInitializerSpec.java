@@ -13,21 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package example;
+package org.particleframework.function.executor;
 
-import org.particleframework.function.executor.FunctionInitializer;
+import org.junit.Assert;
+import org.junit.Test;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-public class UpperCaseTitleFunction extends FunctionInitializer {
+public class FunctionInitializerSpec   {
 
-    @Inject UpperCaseTitleService upperCaseTitleService;
+    @Test
+    public void testFunctionInitializer() {
+        Assert.assertEquals(new MathFunction().round(1.6f) , 2);
+    }
 
-    public Book toUpperCase(Book book) {
-        return upperCaseTitleService.toUpperCase(book);
+    @Singleton
+    public static class MathService {
+        int round(float input) {
+            return Math.round(input);
+        }
+    }
+
+    public static class MathFunction extends FunctionInitializer {
+        @Inject
+        MathService mathService;
+
+        int round(float input) {
+            return mathService.round(input);
+        }
     }
 }

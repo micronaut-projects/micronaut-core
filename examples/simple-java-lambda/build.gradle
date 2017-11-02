@@ -51,7 +51,8 @@ shadowJar {
 
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "particle-function"
-    handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+//    handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+    handler = "example.UpperCaseTitleFunction::toUpperCase"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath

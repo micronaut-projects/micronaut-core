@@ -21,7 +21,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
-import org.particleframework.function.Function
+import org.particleframework.function.FunctionBean
 import org.particleframework.function.FunctionRegistry
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
@@ -152,7 +152,7 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
-    @Function("supplier/string")
+    @FunctionBean("supplier/string")
     static class StringSupplier implements Supplier<String> {
 
         @Override
@@ -161,7 +161,7 @@ class WebFunctionSpec extends Specification {
         }
     }
 
-    @Function("supplier/pojo")
+    @FunctionBean("supplier/pojo")
     static class PojoSupplier implements Supplier<Book> {
 
         @Override
@@ -171,7 +171,7 @@ class WebFunctionSpec extends Specification {
     }
 
 
-    @Function("consumer/string")
+    @FunctionBean("consumer/string")
     static class StringConsumer implements Consumer<String> {
 
         static String LAST_VALUE
@@ -181,7 +181,7 @@ class WebFunctionSpec extends Specification {
         }
     }
 
-    @Function("consumer/pojo")
+    @FunctionBean("consumer/pojo")
     static class PojoConsumer implements Consumer<Book> {
 
         static Book LAST_VALUE

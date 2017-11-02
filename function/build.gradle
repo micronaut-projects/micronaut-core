@@ -2,4 +2,6 @@ dependencies {
     compile project(":inject")
     compileOnly project(":inject-java")
     compile project(":http")
+
+    testCompile project(":inject-java")
 }

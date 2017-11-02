@@ -15,7 +15,6 @@
  */
 package org.particleframework.function.web;
 
-import org.particleframework.context.BeanLocator;
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.annotation.Replaces;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
@@ -24,11 +23,9 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.function.DefaultFunctionRegistry;
-import org.particleframework.function.Function;
+import org.particleframework.function.FunctionBean;
 import org.particleframework.function.FunctionRegistry;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.annotation.Consumes;
-import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.web.router.DefaultRouteBuilder;
 import org.particleframework.web.router.UriRoute;
@@ -40,14 +37,14 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Process methods for {@link Function} instances
+ * Process methods for {@link FunctionBean} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
 @Replaces(DefaultFunctionRegistry.class)
-public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Function>, FunctionRegistry {
+public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<FunctionBean>, FunctionRegistry {
 
 
     private final FunctionRegistry functionRegistry;
@@ -63,7 +60,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
     @SuppressWarnings("unchecked")
     @Override
     public void process(ExecutableMethod<?, ?> method) {
-        Function annotation = method.getAnnotation(Function.class);
+        FunctionBean annotation = method.getAnnotation(FunctionBean.class);
         String functionPath = annotation.value();
         Class<?> declaringType = method.getDeclaringType();
         if(StringUtils.isEmpty(functionPath)) {
