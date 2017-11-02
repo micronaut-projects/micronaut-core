@@ -17,7 +17,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     /**
      * @return The default conversion service
      */
-    ConversionService getConversionService();
+    ConversionService<?> getConversionService();
 
     /**
      * @return The application environment

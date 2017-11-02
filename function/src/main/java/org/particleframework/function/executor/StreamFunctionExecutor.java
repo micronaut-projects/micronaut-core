@@ -104,13 +104,13 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 throw new InvocationException("Function ["+functionName+"] cannot be made executable.");
         }
         if(result != null) {
-            encode(env, functionRegistry, method.getReturnType(), result, output);
+            encode(env, functionRegistry, method.getReturnType().getType(), result, output);
         }
     }
 
 
-    private void encode(Environment environment, FunctionRegistry registry, ReturnType<Object> returnType, Object result, OutputStream output) throws IOException {
-        if(ClassUtils.isJavaLangType(returnType.getType())) {
+    static void encode(Environment environment, FunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
+        if(ClassUtils.isJavaLangType(returnType)) {
             if(result instanceof Byte) {
                 output.write((Byte) result);
             }

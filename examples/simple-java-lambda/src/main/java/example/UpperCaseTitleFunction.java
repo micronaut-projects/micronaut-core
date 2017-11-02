@@ -18,6 +18,7 @@ package example;
 import org.particleframework.function.executor.FunctionInitializer;
 
 import javax.inject.Inject;
+import java.io.IOException;
 
 /**
  * @author Graeme Rocher
@@ -29,5 +30,10 @@ public class UpperCaseTitleFunction extends FunctionInitializer {
 
     public Book toUpperCase(Book book) {
         return upperCaseTitleService.toUpperCase(book);
+    }
+
+    public static void main(String...args) throws IOException {
+        UpperCaseTitleFunction function = new UpperCaseTitleFunction();
+        function.run(args, (context)-> function.toUpperCase(context.get(Book.class)));
     }
 }

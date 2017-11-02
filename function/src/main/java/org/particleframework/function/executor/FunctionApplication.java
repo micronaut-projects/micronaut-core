@@ -19,6 +19,8 @@ import org.particleframework.core.cli.CommandLine;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Allows executing functions from the CLI
@@ -28,29 +30,63 @@ import java.nio.charset.StandardCharsets;
  */
 public class FunctionApplication extends StreamFunctionExecutor {
 
+    public static final String DATA_OPTION = "d";
+    public static final String DEBUG_OPTIONS = "x";
+
+    /**
+     * The main method which is the entry point
+     * @param args The arguments
+     */
     public static void main(String...args) {
-        CommandLine commandLine = CommandLine.build()
-                .addOption("d", "For passing the data")
-                .addOption("x", "For passing the data")
-                .parse(args);
+        FunctionApplication functionApplication = new FunctionApplication();
+        run(functionApplication, args);
+    }
 
+    /**
+     * Run the given {@link StreamFunctionExecutor} for the given arguments
+     *
+     * @param functionExecutor The function executor
+     * @param args The arguments
+     */
+    public static void run(StreamFunctionExecutor functionExecutor, String... args) {
+        parseData(args, (data, isDebug) -> {
+            ByteArrayInputStream input = new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8));
+            try {
+                functionExecutor.execute(input, System.out);
+            } catch (Exception e) {
+                exitWithError(isDebug, e);
+            }
+        });
+    }
 
+    static void exitWithError(Boolean isDebug, Exception e) {
+        System.err.println("Error executing function. Use -x for more information: " + e.getMessage());
+        if(isDebug) {
+            e.printStackTrace(System.err);
+        }
+        System.exit(1);
+    }
+
+    static void parseData(String[] args, BiConsumer<String, Boolean> data) {
+        CommandLine commandLine = parseCommandLine(args);
         Object value = commandLine.optionValue("d");
         if(value != null) {
-            ByteArrayInputStream input = new ByteArrayInputStream(value.toString().getBytes(StandardCharsets.UTF_8));
-            try {
-                new FunctionApplication().execute(input, System.out);
-            } catch (Exception e) {
-                System.err.println("Error executing function. Use -x for more information: " + e.getMessage());
-                if(commandLine.hasOption("x")) {
-                    e.printStackTrace(System.err);
-                }
-                System.exit(1);
-            }
+            data.accept(value.toString(), commandLine.hasOption("x"));
         }
         else {
-            System.err.println("No data specified. Use -d to specify the data");
-            System.exit(1);
+            exitWithNoData();
         }
+    }
+
+    static void exitWithNoData() {
+        System.err.println("No data specified. Use -d to specify the data");
+        System.exit(1);
+    }
+
+    static CommandLine parseCommandLine(String[] args) {
+        return CommandLine.build()
+                    .addOption(DATA_OPTION, "For passing the data")
+                    .addOption(DEBUG_OPTIONS, "For outputting debug information")
+                    .parse(args);
     }
 }

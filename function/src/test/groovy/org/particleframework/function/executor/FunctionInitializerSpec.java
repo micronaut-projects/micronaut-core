@@ -20,6 +20,7 @@ import org.junit.Test;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.IOException;
 
 /**
  * @author Graeme Rocher
@@ -45,6 +46,11 @@ public class FunctionInitializerSpec   {
 
         int round(float input) {
             return mathService.round(input);
+        }
+
+        public static void main(String...args) throws IOException {
+            MathFunction mathFunction = new MathFunction();
+            mathFunction.run(args, (context)-> mathFunction.round(context.get(float.class)));
         }
     }
 }

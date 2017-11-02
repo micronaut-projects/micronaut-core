@@ -54,6 +54,15 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
+    public <T> T decode(Class<T> type, String data) throws CodecException {
+        try {
+            return objectMapper.readValue(data, type);
+        } catch (IOException e) {
+            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+        }
+    }
+
+    @Override
     public <T> void encode(T object, OutputStream outputStream) throws CodecException {
         try {
             objectMapper.writeValue(outputStream, object);

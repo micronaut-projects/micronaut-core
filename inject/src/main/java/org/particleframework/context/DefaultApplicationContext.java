@@ -104,7 +104,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public ConversionService getConversionService() {
+    public ConversionService<?> getConversionService() {
         return conversionService;
     }
 

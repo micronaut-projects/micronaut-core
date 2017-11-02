@@ -20,6 +20,7 @@ import org.particleframework.http.MediaType;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Represents a codec for a particular media type. For example JSON.
@@ -67,5 +68,19 @@ public interface MediaTypeCodec {
      */
     default <T> T decode(Class<T> type, byte[] bytes) throws CodecException {
         return decode(type, new ByteArrayInputStream(bytes));
+    }
+
+    /**
+     * Decode the given type from the given bytes
+     *
+     * @param type The type
+     * @param data The data as a string
+     * @param <T> The decoded type
+     * @return The decoded result
+     *
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Class<T> type, String data) throws CodecException {
+        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
     }
 }
