@@ -1,0 +1,5 @@
+dependencies {
+    compile project(":inject-groovy")
+    compile project(":function")
+    runtime project(":configurations/jackson")
+}

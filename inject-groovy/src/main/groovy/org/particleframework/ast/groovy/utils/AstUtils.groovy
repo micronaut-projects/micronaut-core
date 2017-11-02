@@ -16,6 +16,8 @@ import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecR
  */
 @CompileStatic
 class AstUtils {
+    public static final Parameter[] ZERO_PARAMETERS = new Parameter[0]
+    public static final ClassNode[] EMPTY_CLASS_ARRAY = new ClassNode[0]
 
 
     static Parameter[] copyParameters(Parameter[] parameterTypes) {

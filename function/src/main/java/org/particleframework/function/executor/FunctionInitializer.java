@@ -38,9 +38,10 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
 
     @SuppressWarnings("unchecked")
     public FunctionInitializer() {
-        this.applicationContext = buildApplicationContext(null);
-        startEnvironment(applicationContext);
-        applicationContext.inject(this);
+        ApplicationContext applicationContext = buildApplicationContext(null);
+        this.applicationContext = applicationContext;
+        startEnvironment(this.applicationContext);
+        injectThis(applicationContext);
     }
 
     @Override
@@ -58,6 +59,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
      * @throws IOException If an error occurs
      */
     protected void run(String[] args, Function<ParseContext, ?> supplier) throws IOException {
+        ApplicationContext applicationContext = this.applicationContext;
         ParseContext context = new ParseContext(args);
         try {
             Object result = supplier.apply(context);
@@ -69,6 +71,15 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
         } catch (Exception e) {
             FunctionApplication.exitWithError(context.debug, e);
         }
+    }
+
+    /**
+     * Injects this instance
+     * @param applicationContext The {@link ApplicationContext}
+     * @return This injected instance
+     */
+    protected void injectThis(ApplicationContext applicationContext) {
+        applicationContext.inject(this);
     }
 
 

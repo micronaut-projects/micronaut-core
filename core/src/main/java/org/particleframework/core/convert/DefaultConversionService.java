@@ -237,10 +237,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
-        // String -> Number
-        addConverter(CharSequence.class, Number.class, (CharSequence object, Class<Number> targetType, ConversionContext context) -> {
+        // String -> Float
+        addConverter(CharSequence.class, Float.class, (CharSequence object, Class<Float> targetType, ConversionContext context) -> {
             try {
-                Integer converted = Integer.valueOf(object.toString());
+                Float converted = Float.valueOf(object.toString());
+                return Optional.of(converted);
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        });
+
+        // String -> Double
+        addConverter(CharSequence.class, Double.class, (CharSequence object, Class<Double> targetType, ConversionContext context) -> {
+            try {
+                Double converted = Double.valueOf(object.toString());
                 return Optional.of(converted);
             } catch (NumberFormatException e) {
                 context.reject(object, e);
@@ -280,6 +291,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.empty();
             }
         });
+
 
         // String -> Boolean
         addConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, ConversionContext context) -> {
