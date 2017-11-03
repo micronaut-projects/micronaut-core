@@ -21,6 +21,7 @@ import org.particleframework.aop.Introduction;
 import org.particleframework.aop.writer.AopProxyWriter;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.value.OptionalValues;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
@@ -388,8 +389,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             boolean isPublicMethod = method.getModifiers().contains(PUBLIC);
-            boolean isExecutableMethod = annotationUtils.hasStereotype(method, Executable.class);
-            if (isExecutableMethod || (isExecutableType && isPublicMethod)) {
+            boolean isExecutableMethod = annotationUtils.hasStereotype(method, Executable.class) ;
+            if ((isExecutableMethod || (isExecutableType && isPublicMethod)) && !annotationUtils.hasStereotype(method, Internal.class)) {
                 visitExecutableMethod(method);
                 return null;
             }

@@ -17,6 +17,7 @@ package org.particleframework.function.executor;
 
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertySource;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.function.FunctionRegistry;
 import org.particleframework.inject.ExecutableMethod;
@@ -66,6 +67,10 @@ class AbstractExecutor<C> {
     }
 
     protected Environment startEnvironment(ApplicationContext applicationContext) {
+        if(this instanceof PropertySource) {
+            applicationContext.getEnvironment().addPropertySource((PropertySource) this);
+        }
+
         return applicationContext
                 .start()
                 .getEnvironment();

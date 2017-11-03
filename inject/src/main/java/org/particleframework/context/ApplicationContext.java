@@ -100,6 +100,14 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     }
 
     /**
+     * Build a {@link ApplicationContext}
+     *
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static ApplicationContext build() {
+        return new DefaultApplicationContext();
+    }
+    /**
      * Run the {@link BeanContext}. This method will instantiate a new {@link BeanContext} and call {@link #start()}
      *
      * @param classLoader The classloader to use

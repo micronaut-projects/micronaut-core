@@ -15,8 +15,6 @@
  */
 package org.particleframework.function.groovy
 
-import org.particleframework.context.annotation.Value
-
 import javax.inject.Singleton
 
 /**
@@ -24,19 +22,10 @@ import javax.inject.Singleton
  * @since 1.0
  */
 @Singleton
-class MathService {
-    @Value('math.multiplier')
-    Integer multiplier = 1
+class MessageService {
 
-    int round(float value) {
-        Math.round(value) * multiplier
-    }
-
-    long sum(Sum sum) {
-        sum.a + sum.b
-    }
-
-    Integer max() {
-        Integer.MAX_VALUE
+    List<Message> messages = []
+    void send(Message message) {
+        messages.add(message)
     }
 }

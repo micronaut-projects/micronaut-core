@@ -1,9 +1,12 @@
 package org.particleframework.ast.groovy.annotation
 
+import groovy.transform.Canonical
 import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
 import groovy.transform.Memoized
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
+import org.codehaus.groovy.runtime.memoize.LRUCache
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.core.value.OptionalValues
 
@@ -24,6 +27,8 @@ import java.lang.annotation.Target
 @CompileStatic
 class AnnotationStereoTypeFinder {
     private static final List<String> EXCLUDED_ANNOTATIONS = [Retention.name, Documented.name, Target.name, Inject.name, Qualifier.name, Scope.name]
+    private static final Object NO_RESULT = new Object()
+    private final LRUCache cache = new LRUCache(100)
 
     boolean hasStereoType(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
         return hasStereoType(annotatedNode, stereotype.name)
@@ -46,8 +51,28 @@ class AnnotationStereoTypeFinder {
         return findAnnotationWithStereoType(annotatedNode, stereotype.name)
     }
 
-    @Memoized
     AnnotationNode findAnnotationWithStereoType(AnnotatedNode annotatedNode, String stereotype) {
+        def key = new Key(annotatedNode, stereotype)
+        def result = cache.get(key)
+        if(result == NO_RESULT) {
+            return null
+        }
+        else if(result != null) {
+            return (AnnotationNode)result
+        }
+        else {
+            AnnotationNode node = findAnnotationWithStereoTypeNoCache(annotatedNode, stereotype)
+            if(node != null) {
+                cache.put(key, node)
+            }
+            if(node == null) {
+                cache.put(key, NO_RESULT)
+            }
+            return node
+        }
+    }
+
+    private AnnotationNode findAnnotationWithStereoTypeNoCache(AnnotatedNode annotatedNode, String stereotype) {
         List<AnnotationNode> annotations = annotatedNode.getAnnotations()
         for(AnnotationNode ann in annotations) {
             ClassNode annotationClassNode = ann.classNode
@@ -77,7 +102,6 @@ class AnnotationStereoTypeFinder {
         }
         return null
     }
-
     /**
      * Find all the annotations for the given stereotype
      *
@@ -177,6 +201,16 @@ class AnnotationStereoTypeFinder {
             return OptionalValues.of(type, values)
         }
         return OptionalValues.empty()
+    }
+
+    @EqualsAndHashCode
+    private static class Key {
+        AnnotatedNode annotatedNode; String stereotype
+
+        Key(AnnotatedNode annotatedNode, String stereotype) {
+            this.annotatedNode = annotatedNode
+            this.stereotype = stereotype
+        }
     }
 
 }

@@ -5,6 +5,9 @@ import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.Parameter
+import org.particleframework.core.annotation.Internal
+
+import javax.inject.Inject
 
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse
 
@@ -18,6 +21,8 @@ import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecR
 class AstUtils {
     public static final Parameter[] ZERO_PARAMETERS = new Parameter[0]
     public static final ClassNode[] EMPTY_CLASS_ARRAY = new ClassNode[0]
+    public static final ClassNode INTERNAL_ANNOTATION = ClassHelper.make(Internal)
+    public static final ClassNode INJECT_ANNOTATION = ClassHelper.make(Inject)
 
 
     static Parameter[] copyParameters(Parameter[] parameterTypes) {

@@ -16,6 +16,7 @@
 package org.particleframework.function.executor;
 
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.function.FunctionRegistry;
@@ -35,21 +36,44 @@ import java.util.function.Function;
 public class FunctionInitializer extends AbstractExecutor implements Closeable, AutoCloseable {
 
     protected final ApplicationContext applicationContext;
-
+    protected final boolean closeContext;
     @SuppressWarnings("unchecked")
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
         this.applicationContext = applicationContext;
-        startEnvironment(this.applicationContext);
+        startThis(applicationContext);
         injectThis(applicationContext);
+        this.closeContext = true;
+    }
+
+    /**
+     * Start a function for an existing {@link ApplicationContext}
+     * @param applicationContext The application context
+     */
+    protected FunctionInitializer(ApplicationContext applicationContext) {
+        this(applicationContext, true);
+    }
+
+    /**
+     * Start a function for an existing {@link ApplicationContext}
+     * @param applicationContext The application context
+     */
+    protected FunctionInitializer(ApplicationContext applicationContext, boolean inject) {
+        this.applicationContext = applicationContext;
+        this.closeContext = false;
+        if(inject) {
+            injectThis(applicationContext);
+        }
     }
 
     @Override
+    @Internal
     public void close() throws IOException {
-        if (applicationContext != null) {
+        if (closeContext && applicationContext != null) {
             applicationContext.close();
         }
     }
+
 
     /**
      * This method is designed to be called when using the {@link FunctionInitializer} from a static Application main method
@@ -74,19 +98,30 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
     }
 
     /**
+     * Start this environment
+     *
+     * @param applicationContext
+     */
+    protected void startThis(ApplicationContext applicationContext) {
+        startEnvironment(applicationContext);
+    }
+
+    /**
      * Injects this instance
      * @param applicationContext The {@link ApplicationContext}
      * @return This injected instance
      */
     protected void injectThis(ApplicationContext applicationContext) {
-        applicationContext.inject(this);
+        if(applicationContext != null) {
+            applicationContext.inject(this);
+        }
     }
 
 
     /**
      * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type
      */
-    protected class ParseContext {
+    public class ParseContext {
         private final String data;
         private final boolean debug;
 

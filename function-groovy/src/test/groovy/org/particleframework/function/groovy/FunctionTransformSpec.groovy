@@ -15,9 +15,15 @@
  */
 package org.particleframework.function.groovy
 
+import okhttp3.MediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import org.particleframework.context.ApplicationContext
+import org.particleframework.context.env.MapPropertySource
+import org.particleframework.http.HttpStatus
+import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
-
-import java.nio.charset.StandardCharsets
 
 /**
  * @author Graeme Rocher
@@ -27,8 +33,150 @@ class FunctionTransformSpec extends Specification{
 
     void "run function"() {
         expect:
-        new RoundFunction().round(1.6f) == 2
-
+        new RoundFunction().round(1.6f) == 4
+        new SumFunction().sum(new Sum(a: 10,b: 20)) == 30
+        new MaxFunction().max() == Integer.MAX_VALUE.toLong()
     }
 
+    void "run consumer"() {
+        given:
+        NotifyFunction function = new NotifyFunction()
+
+        def message = new Message(title: "Hello", body: "World")
+        when:
+        function.send(message)
+
+        then:
+        function.messageService.messages.contains(message)
+    }
+
+    void "run bi-consumer"() {
+        given:
+        NotifyWithArgsFunction function = new NotifyWithArgsFunction()
+
+        def message = new Message(title: "Hello", body: "World")
+        when:
+        function.send("Hello", "World")
+
+        then:
+        function.messageService.messages.contains(message)
+    }
+
+    void "test run JSON bi-consumer as REST service"() {
+
+        given:
+        def applicationContext = ApplicationContext.build()
+                .environment({ env ->
+            env.addPropertySource(MapPropertySource.of(
+                    'math.multiplier': '2'
+            ))
+
+        })
+        EmbeddedServer server = applicationContext.start().getBean(EmbeddedServer).start()
+        def message = new Message(title: "Hello", body: "World")
+        String url = "http://localhost:$server.port"
+        OkHttpClient client = new OkHttpClient()
+        def data = '{"title":"Hello", "body":"World"}'
+
+        def request = new Request.Builder()
+                .url("$url/notify-with-args")
+                .post(RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), data))
+
+        when:
+        def response = client.newCall(request.build()).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        applicationContext.getBean(MessageService).messages.contains(message)
+
+        cleanup:
+        if(server != null)
+            server.stop()
+    }
+
+    void "test run JSON function as REST service"() {
+        given:
+        EmbeddedServer server = ApplicationContext.build()
+                .environment({ env ->
+            env.addPropertySource(MapPropertySource.of(
+                    'math.multiplier':'2'
+            ))
+
+        }).start().getBean(EmbeddedServer).start()
+
+        String url = "http://localhost:$server.port"
+        OkHttpClient client = new OkHttpClient()
+        def data = '{"a":10, "b":5}'
+        def request = new Request.Builder()
+                .url("$url/sum")
+                .post(RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), data))
+
+        when:
+        def response = client.newCall(request.build()).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == '15'
+
+        cleanup:
+        if(server != null)
+            server.stop()
+    }
+
+    void "test run function as REST service"() {
+        given:
+        EmbeddedServer server = ApplicationContext.build()
+                                                  .environment({ env ->
+            env.addPropertySource(MapPropertySource.of(
+                    'math.multiplier':'2'
+            ))
+
+        }).start().getBean(EmbeddedServer).start()
+
+        String url = "http://localhost:$server.port"
+        OkHttpClient client = new OkHttpClient()
+        def data = '1.6'
+        def request = new Request.Builder()
+                .url("$url/round")
+                .post(RequestBody.create( MediaType.parse("text/plain"), data))
+
+        when:
+        def response = client.newCall(request.build()).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == '4'
+
+        cleanup:
+        if(server != null)
+            server.stop()
+    }
+
+    void "test run supplier as REST service"() {
+        given:
+        EmbeddedServer server = ApplicationContext.build()
+                .environment({ env ->
+            env.addPropertySource(MapPropertySource.of(
+                    'math.multiplier':'2'
+            ))
+
+        }).start().getBean(EmbeddedServer).start()
+
+        String url = "http://localhost:$server.port"
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("$url/max")
+
+
+        when:
+        def response = client.newCall(request.build()).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == String.valueOf(Integer.MAX_VALUE)
+
+        cleanup:
+        if(server != null)
+            server.stop()
+    }
 }

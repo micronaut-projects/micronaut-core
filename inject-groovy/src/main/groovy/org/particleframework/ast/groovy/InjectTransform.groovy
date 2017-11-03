@@ -22,6 +22,7 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.*
+import org.particleframework.core.annotation.Internal
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
@@ -508,7 +509,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             else if(!isConstructor) {
                 boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
-                if((isExecutableType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                boolean isExecutable = (isExecutableType && isPublic && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)
+                isExecutable = isExecutable && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)
+                if(isExecutable && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)) {
                     if(declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
