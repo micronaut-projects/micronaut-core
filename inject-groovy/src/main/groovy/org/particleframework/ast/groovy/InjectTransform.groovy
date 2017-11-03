@@ -22,6 +22,7 @@ import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.*
+import org.particleframework.core.annotation.Internal
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
@@ -508,7 +509,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             else if(!isConstructor) {
                 boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
-                if((isExecutableType && isPublic) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)) {
+                boolean isExecutable = (isExecutableType && isPublic && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)) || stereoTypeFinder.hasStereoType(methodNode, Executable.name)
+                isExecutable = isExecutable && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)
+                if(isExecutable && !AstAnnotationUtils.hasAnnotation(methodNode, Internal)) {
                     if(declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
@@ -633,6 +636,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitField(FieldNode fieldNode) {
             if(fieldNode.name == 'metaClass') return
+            int modifiers = fieldNode.modifiers
+            if(Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) || fieldNode.isSynthetic()) {
+                return
+            }
             ClassNode declaringClass = fieldNode.declaringClass
             boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
             boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
@@ -643,8 +650,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Object qualifierRef = resolveQualifier(fieldNode)
 
 
-                    boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
-                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
+                    boolean isPrivate = Modifier.isPrivate(modifiers)
+                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
                     if(!beanWriter.isValidated()) {
                         if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
                             beanWriter.setValidated(true)

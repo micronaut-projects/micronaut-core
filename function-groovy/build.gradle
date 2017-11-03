@@ -2,4 +2,9 @@ dependencies {
     compile project(":inject-groovy")
     compile project(":function")
     runtime project(":configurations/jackson")
+
+    testCompile project(":function-web")
+    testRuntime project(":http-server-netty")
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

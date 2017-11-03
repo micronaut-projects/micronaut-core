@@ -60,8 +60,11 @@ public class FunctionApplication extends StreamFunctionExecutor {
     }
 
     static void exitWithError(Boolean isDebug, Exception e) {
-        System.err.println("Error executing function. Use -x for more information: " + e.getMessage());
+        System.err.println("Error executing function (Use -x for more information): " + e.getMessage());
         if(isDebug) {
+            System.err.println();
+            System.err.println("Error Detail");
+            System.err.println("------------");
             e.printStackTrace(System.err);
         }
         System.exit(1);

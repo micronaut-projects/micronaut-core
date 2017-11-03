@@ -16,23 +16,30 @@
 package org.particleframework.http.server.netty.converters;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 
 import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a {@link ByteBuf} to a byte array
+ * A byte buf to object converter
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class ByteBufToArrayConverter implements TypeConverter<ByteBuf, byte[]> {
+public class ByteBufToObjectConverter implements TypeConverter<ByteBuf, Object> {
+    private final ConversionService<?> conversionService;
+
+    public ByteBufToObjectConverter(ConversionService<?> conversionService) {
+        this.conversionService = conversionService;
+    }
+
     @Override
-    public Optional<byte[]> convert(ByteBuf object, Class<byte[]> targetType, ConversionContext context) {
-        return Optional.of(ByteBufUtil.getBytes(object));
+    public Optional<Object> convert(ByteBuf object, Class<Object> targetType, ConversionContext context) {
+        return conversionService.convert(object, String.class, context)
+                .flatMap(val -> conversionService.convert(val, targetType, context));
     }
 }

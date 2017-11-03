@@ -49,8 +49,8 @@ class ConfigurationEvaluator {
     Map<String, Object> evaluate(Reader reader) {
         CompilerConfiguration configuration = new CompilerConfiguration()
         configuration.addCompilationCustomizers(
-            new ASTTransformationCustomizer(CompileStatic.class),
-            new ASTTransformationCustomizer(new ConfigTransform())
+                new ASTTransformationCustomizer(CompileStatic.class),
+                new ASTTransformationCustomizer(new ConfigTransform())
         )
 
         GroovyShell shell = new GroovyShell(configuration)
@@ -65,95 +65,12 @@ class ConfigurationEvaluator {
         void visit(ASTNode[] nodes, SourceUnit source) {
             List<ClassNode> classNodes = source.getAST().classes
             ClassNode scriptClassNode = classNodes.find { it.script }
-            if(scriptClassNode != null) {
+            if (scriptClassNode != null) {
                 MethodNode runMethod = scriptClassNode.getMethod('run', [] as Parameter[])
-                if(runMethod != null) {
+                if (runMethod != null) {
                     new SetPropertyTransformer(source).visitMethod(runMethod)
                 }
             }
-        }
-    }
-
-    private static class SetPropertyTransformer extends ClassCodeExpressionTransformer {
-        final SourceUnit sourceUnit
-
-        String nestedPath = ""
-
-        SetPropertyTransformer(SourceUnit sourceUnit) {
-            this.sourceUnit = sourceUnit
-        }
-
-        @Override
-        Expression transform(Expression exp) {
-            if(exp instanceof BinaryExpression) {
-                BinaryExpression be = (BinaryExpression)exp
-                if(be.operation.type == ASSIGN.type) {
-                    Expression left = be.leftExpression
-                    Expression right = be.rightExpression
-                    if(left instanceof VariableExpression) {
-                        def varX = (VariableExpression) left
-                        if(varX.accessedVariable.isDynamicTyped()) {
-                            String path = "${nestedPath}${varX.name}"
-                            return callThisX("setProperty", args(constX(path), right))
-                        }
-                    }
-                    else if(left instanceof PropertyExpression) {
-                        PropertyExpression propX = (PropertyExpression)left
-                        String path = buildPath(propX)
-                        if(path != null) {
-                            return callThisX("setProperty", args(constX(path), right))
-                        }
-
-                    }
-                }
-            }
-            else if(exp instanceof MethodCallExpression) {
-                MethodCallExpression methodX = (MethodCallExpression)exp
-                Expression argsX = methodX.arguments
-                ClosureExpression closureX = findSingleClosure(argsX)
-                if(closureX != null) {
-                    String currentNestedPath = nestedPath
-                    try {
-                        nestedPath = "${nestedPath ? nestedPath : ''}${methodX.methodAsString}."
-                        visitClosureExpression(closureX)
-                    } finally {
-                        nestedPath = currentNestedPath
-                    }
-                    return callThisX("with", args(closureX))
-                }
-            }
-            return super.transform(exp)
-        }
-
-        private ClosureExpression findSingleClosure(Expression argsX) {
-            if (argsX instanceof ClosureExpression) {
-                return (ClosureExpression) argsX
-            } else if (argsX instanceof ArgumentListExpression) {
-                ArgumentListExpression listX = (ArgumentListExpression) argsX
-                if (listX.expressions.size() == 1 && listX.getExpression(0) instanceof ClosureExpression) {
-                    return (ClosureExpression)listX.getExpression(0)
-                }
-            }
-            return null
-        }
-
-        private String buildPath(PropertyExpression propX) {
-            String path = propX.propertyAsString
-            Expression objX = propX.objectExpression
-            while(objX instanceof PropertyExpression) {
-                propX = ((PropertyExpression)objX)
-                objX = propX.objectExpression
-                path = "${propX.propertyAsString}.${path}"
-            }
-            if(objX instanceof VariableExpression) {
-                VariableExpression varX = (VariableExpression)objX
-                if(varX.accessedVariable.isDynamicTyped()) {
-                    path = "${varX.name}.${path}"
-                    path = "${nestedPath}${path}"
-                    return path
-                }
-            }
-            return null
         }
     }
 }

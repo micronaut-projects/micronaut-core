@@ -49,7 +49,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             return objectMapper.readValue(inputStream, type);
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
         }
     }
 
@@ -58,7 +58,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             return objectMapper.readValue(data, type);
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: ");
+            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
         }
     }
 

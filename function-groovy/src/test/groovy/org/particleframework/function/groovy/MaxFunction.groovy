@@ -15,28 +15,12 @@
  */
 package org.particleframework.function.groovy
 
-import org.particleframework.context.annotation.Value
+import groovy.transform.Field
 
-import javax.inject.Singleton
+math.multiplier = 2
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-@Singleton
-class MathService {
-    @Value('math.multiplier')
-    Integer multiplier = 1
+@Field MathService mathService
 
-    int round(float value) {
-        Math.round(value) * multiplier
-    }
-
-    long sum(Sum sum) {
-        sum.a + sum.b
-    }
-
-    Integer max() {
-        Integer.MAX_VALUE
-    }
+Long max() {
+    mathService.max()
 }

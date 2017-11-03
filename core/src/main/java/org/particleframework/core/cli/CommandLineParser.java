@@ -16,6 +16,7 @@
 package org.particleframework.core.cli;
 
 import org.particleframework.core.cli.exceptions.ParseException;
+import org.particleframework.core.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,22 +79,27 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
 
     private void parseInternal(DefaultCommandLine cl, String[] args, boolean firstArgumentIsCommand) {
         cl.setRawArguments(args);
-        String lastWasOption = null;
+        String lastOptionName = null;
         for (String arg : args) {
             if (arg == null) continue;
             String trimmed = arg.trim();
-            if (trimmed != null && trimmed.length()>0) {
+            if (StringUtils.isNotEmpty(trimmed)) {
                 if (trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {
                     trimmed = trimmed.substring(1, trimmed.length() - 1);
                 }
                 if (trimmed.charAt(0) == '-') {
-                    lastWasOption = processOption(cl, trimmed);
+                    lastOptionName = processOption(cl, trimmed);
                 }
                 else {
-                    if(lastWasOption != null) {
-                        cl.addUndeclaredOption(lastWasOption, trimmed);
-                        lastWasOption = null;
-                        continue;
+                    if(lastOptionName != null) {
+                        Option opt = declaredOptions.get(lastOptionName);
+                        if(opt != null) {
+                            cl.addDeclaredOption(opt, trimmed);
+                        }
+                        else {
+                            cl.addUndeclaredOption(lastOptionName, trimmed);
+                        }
+                        lastOptionName = null;
                     }
                     else {
                         cl.addRemainingArg(trimmed);

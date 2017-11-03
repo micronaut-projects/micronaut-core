@@ -15,10 +15,13 @@
  */
 package example
 
+import groovy.transform.EqualsAndHashCode
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@EqualsAndHashCode
 class Book {
     String title
 }

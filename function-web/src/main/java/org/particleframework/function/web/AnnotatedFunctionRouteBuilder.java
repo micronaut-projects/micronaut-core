@@ -32,9 +32,11 @@ import org.particleframework.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Process methods for {@link FunctionBean} instances
@@ -78,15 +80,9 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
         }
 
         UriRoute route = null;
-        if(java.util.function.Function.class.isAssignableFrom(declaringType)) {
+        if(Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
             route = POST(functionPath, method);
 
-        }
-        else if(Consumer.class.isAssignableFrom(declaringType)) {
-            route = POST(functionPath, method);
-        }
-        else if(BiFunction.class.isAssignableFrom(declaringType)) {
-            route = POST(functionPath, method);
         }
         else if(Supplier.class.isAssignableFrom(declaringType)) {
             route = GET(functionPath, method);
@@ -94,8 +90,9 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
 
         if(route != null) {
             Class[] argumentTypes = method.getArgumentTypes();
-            if(argumentTypes.length > 0) {
-               if(!ClassUtils.isJavaLangType(argumentTypes[0])) {
+            int argCount = argumentTypes.length;
+            if(argCount > 0) {
+               if(argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0])) {
                    route.accept(MediaType.APPLICATION_JSON_TYPE);
                }
                else {

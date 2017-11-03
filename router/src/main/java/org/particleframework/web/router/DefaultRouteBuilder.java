@@ -32,7 +32,6 @@ import org.particleframework.http.uri.UriMatchTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -343,6 +342,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return Optional.empty();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<RouteMatch<T>> match(Throwable exception) {
             if (error.isInstance(exception)) {
@@ -425,6 +425,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return status;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
             if (this.status == status) {

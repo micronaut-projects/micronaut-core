@@ -1,5 +1,6 @@
 package org.particleframework.core.annotation;
 
+import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
@@ -9,7 +10,8 @@ import java.lang.annotation.RetentionPolicy;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface Internal {
 
 }

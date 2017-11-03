@@ -67,17 +67,14 @@ class MessageUtils {
         builder.append(argument.getName()).append("] of method [")
                 .append(methodInjectionPoint.getName())
                 .append("] of class: ")
-                .append(resolutionContext.getPath().peek().getDeclaringType().getName())
+                .append(methodInjectionPoint.getDeclaringBean().getName())
                 .append(ls)
                 .append(ls);
 
         if(message != null) {
             builder.append("Message: ").append(message).append(ls);
         }
-        String pathString =  circular ? resolutionContext.getPath().toCircularString() : resolutionContext.getPath().toString();
-        builder.append("Path Taken: ");
-        if(circular) builder.append(ls);
-        builder.append(pathString);
+        appendPath(resolutionContext, circular, builder, ls);
         return builder.toString();
     }
 
@@ -95,17 +92,14 @@ class MessageUtils {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
         String ls = System.getProperty("line.separator");
         builder.append(fieldInjectionPoint.getName()).append("] of class: ")
-                .append(resolutionContext.getPath().peek().getDeclaringType().getName())
+                .append(fieldInjectionPoint.getDeclaringBean().getName())
                 .append(ls)
                 .append(ls);
 
         if(message != null) {
             builder.append("Message: ").append(message).append(ls);
         }
-        String pathString =  circular ? resolutionContext.getPath().toCircularString() : resolutionContext.getPath().toString();
-        builder.append("Path Taken: ");
-        if(circular) builder.append(ls);
-        builder.append(pathString);
+        appendPath(resolutionContext, circular, builder, ls);
         return builder.toString();
     }
 
@@ -130,5 +124,16 @@ class MessageUtils {
         }
         builder.append("Path Taken: ").append(resolutionContext.getPath().toString());
         return builder.toString();
+    }
+
+    private static void appendPath(BeanResolutionContext resolutionContext, boolean circular, StringBuilder builder, String ls) {
+        BeanResolutionContext.Path path = resolutionContext.getPath();
+        if(!path.isEmpty()) {
+
+            String pathString =  circular ? path.toCircularString() : path.toString();
+            builder.append("Path Taken: ");
+            if(circular) builder.append(ls);
+            builder.append(pathString);
+        }
     }
 }
