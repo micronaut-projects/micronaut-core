@@ -2,47 +2,60 @@
 
 ## Minimum Feature Set
 
-The following features are considered bar minimum for launching Particle.
+The following features are a TODO list of things to do on Particle before launching
 
 ### Core Features
 
-#### AOP API
+#### Annotation Abstraction
 
-We need a compile time equivalent for AOP such that one can define an annotation (for example `@Secured`) that when applied to method is intercepted and allows decorative behaviour.
+We need to produce compile time annotation metadata and get rid of `AnnotationUtils` which is a performance problem. At compile time we should produce an `AnnotationMetadata` interface that has the same features as the current `AnnotationSource` API but without the costly reflection based lookups. We should also support the equivalent of `AliasFor` in Spring.
 
-Proposed API:
+#### Generic Type Abstraction for Factory Beans
 
-[source,java]
-----
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.METHOD})
-@Around(SecuredImplementer)
-public @interface Secured {
-}
+This is currently not possible due to type erasure:
 
-public class SecuredImplementer implements AroundAdvice {
+```
+@Factory
+class TypeConverterFactory {
 
-    @Override
-    Object around(Invocation invocation) {
-        return invocation.proceed()
+    TypeConverter<String, Integer> typeConverter() {
+        (string, integer, context) -> {
+           // do conversion
+        }
     }
 }
-----
+```
 
-Other than the above two classes there should be no other configuration required with all necessary code generated at compile time both for setting up the advice and when `@Secured` is used on a method in an application class.
+At compile time we know the types but at runtime the lambda loses type information. We need to add an API to obtain type information for a bean from the factory.
 
-Possible limitations to consider will be that the AOP advice will need to be compiled before application code.
+#### AOP API
+
+We need to allow `Introduction` advise to specify additional interfaces that should be be implemented by the interceptor.
 
 #### Configuration Sharing
 
 Need a mechanism for configuration discovery and sharing across the federation
 
+### Management Features
+
+#### Endpoints
+
+We need endpoints for managing and/or exposing information about:
+
+- logging
+- beans
+- routes
+- health checks
+- refresh
+- server stop/start
+
+These should be built on the `Endpoint` API
+
 ### HTTP Server
 
-#### Interceptor / HandlerChain Concept
+#### Session Support
 
-The HTTP server must have a way to intercept HTTP request and apply logic before controller action execution
+We need to support customizable, non-blocking HTTP sessions.
 
 #### HTTPS Support
 
@@ -55,11 +68,6 @@ Content negotiation must be supported
 #### Compile Time Data Binding
 
 Data binding classes should be generated at compile time to avoid reflection when performing data binding
-
-
-#### Multi Part Support
-
-Multi Part requests and file uploads must be supported
 
 #### WebSocket Support
 
@@ -83,5 +91,17 @@ In the case where multiple services of the same name exist client side load bala
 
 Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.)
 
+
+### HTTP Gateway
+
+An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client. The gateway need to be responsible for:
+
+- JWT Token based authentication
+- Load Balancing
+- Starting Distributed Tracing
+- Retry
+- Rate limiting
+- Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
+- Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
 
 
