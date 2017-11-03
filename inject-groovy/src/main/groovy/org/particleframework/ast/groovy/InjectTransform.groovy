@@ -636,6 +636,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitField(FieldNode fieldNode) {
             if(fieldNode.name == 'metaClass') return
+            int modifiers = fieldNode.modifiers
+            if(Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) || fieldNode.isSynthetic()) {
+                return
+            }
             ClassNode declaringClass = fieldNode.declaringClass
             boolean isInject = stereoTypeFinder.hasStereoType(fieldNode, Inject)
             boolean isValue = !isInject && (stereoTypeFinder.hasStereoType(fieldNode, Value) || isConfigurationProperties)
@@ -646,8 +650,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Object qualifierRef = resolveQualifier(fieldNode)
 
 
-                    boolean isPrivate = Modifier.isPrivate(fieldNode.getModifiers())
-                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, fieldNode.modifiers)
+                    boolean isPrivate = Modifier.isPrivate(modifiers)
+                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
                     if(!beanWriter.isValidated()) {
                         if(stereoTypeFinder.hasStereoType(fieldNode, "javax.validation.Constraint")) {
                             beanWriter.setValidated(true)

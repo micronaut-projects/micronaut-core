@@ -696,7 +696,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         @Override
         public Object visitVariable(VariableElement variable, Object o) {
-            if (modelUtils.isStatic(variable)) {
+            if (modelUtils.isStatic(variable) || modelUtils.isFinal(variable)) {
                 return null;
             }
 

@@ -148,6 +148,12 @@ class SimpleEndpointSpec extends Specification {
 @Endpoint('simple')
 class Simple implements Toggleable {
 
+    private final ApplicationContext applicationContext
+
+    Simple(ApplicationContext applicationContext) {
+        assert  applicationContext != null
+        this.applicationContext = applicationContext
+    }
     boolean enabled = true
     String myValue
 

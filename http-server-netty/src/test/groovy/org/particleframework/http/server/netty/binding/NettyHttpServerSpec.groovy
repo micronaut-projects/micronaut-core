@@ -41,8 +41,14 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
         int port = applicationContext.getBean(EmbeddedServer).getPort()
+
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("http://localhost:$port/person/Fred")
+
+        def response = client.newCall(request.build()).execute()
         then:
-        new URL("http://localhost:$port/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+        response.body().string() == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -52,9 +58,14 @@ class NettyHttpServerSpec extends Specification {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
         int port = applicationContext.getBean(EmbeddedServer).getPort()
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("http://localhost:$port/person/Fred")
+
+        def response = client.newCall(request.build()).execute()
 
         then:
-        new URL("http://localhost:$port/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+        response.body().string() == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -65,8 +76,14 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
 
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("http://localhost:$newPort/person/Fred")
+
+        def response = client.newCall(request.build()).execute()
+
         then:
-        new URL("http://localhost:$newPort/person/Fred").getText(readTimeout:3000) == "Person Named Fred"
+        response.body().string() == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
@@ -77,8 +94,14 @@ class NettyHttpServerSpec extends Specification {
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
 
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("http://localhost:$newPort/person/another/job?id=10")
+
+        def response = client.newCall(request.build()).execute()
+
         then:
-        new URL("http://localhost:$newPort/person/another/job?id=10").getText(readTimeout:3000) == "JOB ID 10"
+        response.body().string() == "JOB ID 10"
 
         cleanup:
         applicationContext?.stop()
@@ -88,11 +111,16 @@ class NettyHttpServerSpec extends Specification {
         when:"A required request parameter is missing"
         int newPort = SocketUtils.findAvailableTcpPort()
         ApplicationContext applicationContext = ParticleApplication.run('-port',newPort.toString())
-        new URL("http://localhost:$newPort/person/another/job").getText(readTimeout:10000)
+
+        OkHttpClient client = new OkHttpClient()
+        def request = new Request.Builder()
+                .url("http://localhost:$newPort/person/another/job")
+
+        def response = client.newCall(request.build()).execute()
+
 
         then:"A 400 is returned"
-        def e = thrown(IOException)
-        e.message.contains('400')
+        response.code() == HttpStatus.BAD_REQUEST.code
 
         cleanup:
         applicationContext?.stop()

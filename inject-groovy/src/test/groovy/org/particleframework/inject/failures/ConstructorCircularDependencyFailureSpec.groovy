@@ -24,7 +24,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
         e.message == '''\
-Failed to inject value for field [a] of class: org.particleframework.inject.failures.ConstructorCircularDependencyFailureSpec$C
+Failed to inject value for field [a] of class: org.particleframework.inject.failures.ConstructorCircularDependencyFailureSpec$B
 
 Message: Circular dependency detected
 Path Taken: 
