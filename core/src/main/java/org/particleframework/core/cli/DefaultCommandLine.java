@@ -59,13 +59,14 @@ class DefaultCommandLine implements CommandLine {
 
     @Override
     public boolean hasOption(String name) {
-        return declaredOptions.containsKey(name) || undeclaredOptions.containsKey(name);
+        return declaredOptions.containsKey(new Option(name, null)) || undeclaredOptions.containsKey(name);
     }
 
     @Override
     public Object optionValue(String name) {
-        if (declaredOptions.containsKey(name)) {
-            return declaredOptions.get(name);
+        Option opt = new Option(name, null);
+        if (declaredOptions.containsKey(opt)) {
+            return declaredOptions.get(opt);
         }
         if (undeclaredOptions.containsKey(name)) {
             return undeclaredOptions.get(name);

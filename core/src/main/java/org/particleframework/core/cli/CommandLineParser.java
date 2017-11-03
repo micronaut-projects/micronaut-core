@@ -91,7 +91,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
                 }
                 else {
                     if(lastWasOption != null) {
-                        cl.addUndeclaredOption(lastWasOption, trimmed);
+                        cl.addDeclaredOption(declaredOptions.get(lastWasOption), trimmed);
                         lastWasOption = null;
                         continue;
                     }
