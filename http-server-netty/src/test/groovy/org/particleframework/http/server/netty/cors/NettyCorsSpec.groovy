@@ -50,6 +50,24 @@ class NettyCorsSpec extends AbstractParticleSpec {
         headerNames.empty
     }
 
+    void "test cors request with a controller that returns map"() {
+        given:
+        def request = new Request.Builder()
+                .url("$server/test/arbitrary")
+                .header(ORIGIN, 'fooBar.com')
+
+        when:
+        def response = client.newCall(
+                request.build()
+        ).execute()
+        Set<String> headerNames = response.headers().names()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'fooBar.com'
+        headerNames.empty
+    }
+
     void "test cors request with controlled method"() {
         given:
         def request = new Request.Builder()
@@ -234,6 +252,11 @@ class NettyCorsSpec extends AbstractParticleSpec {
 
         HttpResponse index() {
             HttpResponse.noContent()
+        }
+
+        @Get
+        Map arbitrary() {
+            [some: 'data']
         }
     }
 }
