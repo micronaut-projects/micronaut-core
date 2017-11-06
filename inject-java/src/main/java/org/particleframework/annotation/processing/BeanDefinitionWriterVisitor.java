@@ -7,6 +7,7 @@ import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Optional;
 
 public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
 
@@ -25,7 +26,7 @@ public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
     }
 
     @Override
-    public File visitServiceDescriptor(String classname) throws IOException {
-        return targetDirectory;
+    public Optional<File> visitServiceDescriptor(String classname) throws IOException {
+        return Optional.ofNullable(targetDirectory);
     }
 }

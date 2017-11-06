@@ -1,0 +1,68 @@
+import jp.classmethod.aws.gradle.lambda.AWSLambdaMigrateFunctionTask
+import com.amazonaws.services.lambda.model.Runtime
+
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+        mavenLocal()
+
+    }
+    dependencies {
+        classpath "jp.classmethod.aws:gradle-aws-plugin:0.22"
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id "de.sebastianboegl.shadow.transformer.log4j" version "2.1.1"
+    id 'groovy'
+    id "application"
+}
+
+apply plugin: 'jp.classmethod.aws.lambda'
+
+mainClassName = "example.UpperCaseTitleFunction"
+applicationDefaultJvmArgs = [""]
+jar {
+    manifest {
+        attributes 'Main-Class': "example.UpperCaseTitleFunction"
+    }
+}
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+dependencies {
+    compileOnly "org.particleframework:inject-java:${projectVersion}"
+//    compile "org.particleframework:function-aws:${projectVersion}"
+    compile "org.particleframework:function-groovy:${projectVersion}"
+    runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
+    runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
+
+
+    testRuntime "org.particleframework:http-server-netty:${projectVersion}"
+    testRuntime "org.particleframework:function-web:${projectVersion}"
+    testCompile 'junit:junit:4.12'
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+
+    testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
+        exclude module:'groovy-all'
+    }
+
+}
+shadowJar {
+    mergeServiceFiles()
+}
+
+task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "particle-function"
+//  To deploy ParticleRequestStreamHandler uncomment function-aws dependency
+//  handler = "org.particleframework.function.aws.ParticleRequestStreamHandler"
+    handler = "example.UpperCaseTitleFunction::toUpperCase"
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    runtime = Runtime.Java8
+    zipFile = shadowJar.archivePath
+    memorySize = 512
+    timeout = 60
+}

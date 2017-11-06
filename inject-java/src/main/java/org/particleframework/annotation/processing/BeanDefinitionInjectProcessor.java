@@ -46,6 +46,7 @@ import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import javax.tools.JavaFileObject;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -84,7 +85,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         super.init(processingEnv);
         this.serviceDescriptorGenerator = new ServiceDescriptorGenerator();
         this.beanDefinitionWriters = new LinkedHashMap<>();
-        this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, targetDirectory);
+        this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
 
     @Override
@@ -178,14 +179,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
                 beanDefinitionClassWriter.writeTo(out);
             }
-            serviceDescriptorGenerator.generate(
-                targetDirectory,
-                beanDefinitionClassWriter.getBeanDefinitionClassName(),
-                BeanDefinitionClass.class);
+            Optional<File> targetDirectory = getTargetDirectory();
+            if(targetDirectory.isPresent()) {
+
+                serviceDescriptorGenerator.generate(
+                        targetDirectory.get(),
+                        beanDefinitionClassWriter.getBeanDefinitionClassName(),
+                        BeanDefinitionClass.class);
+            }
         } catch (IOException e) {
             // raise a compile error
             error("Unexpected error: %s", e.getMessage());
-            e.printStackTrace();
         }
     }
 

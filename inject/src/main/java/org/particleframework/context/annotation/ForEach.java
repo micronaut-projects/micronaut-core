@@ -29,7 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>For example:</p>
  *
  * <pre><code>
- *  {@literal @}ForEach("foo.bar")
+ *  {@literal @}ForEach(property="foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>

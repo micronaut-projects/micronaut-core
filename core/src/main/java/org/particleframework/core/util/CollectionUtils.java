@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.util;
 
+import org.particleframework.core.annotation.Nullable;
+
 import java.lang.reflect.Constructor;
 import java.util.*;
 
@@ -25,6 +27,46 @@ import java.util.*;
  * @since 1.0
  */
 public class CollectionUtils {
+    /**
+     * Null safe empty check
+     *
+     * @param map The map
+     * @return True if it is empty or null
+     */
+    public static boolean isEmpty(@Nullable Map map) {
+        return map == null || map.isEmpty();
+    }
+
+    /**
+     * Null safe not empty check
+     *
+     * @param map The ,ap
+     * @return True if it is not null and not empty
+     */
+    public static boolean isNotEmpty(@Nullable Map map) {
+        return map != null && !map.isEmpty();
+    }
+
+    /**
+     * Null safe empty check
+     *
+     * @param collection The collection
+     * @return True if it is empty or null
+     */
+    public static boolean isEmpty(@Nullable Collection collection) {
+        return collection == null || collection.isEmpty();
+    }
+
+    /**
+     * Null safe not empty check
+     *
+     * @param collection The collection
+     * @return True if it is not null and not empty
+     */
+    public static boolean isNotEmpty(@Nullable Collection collection) {
+        return collection != null && !collection.isEmpty();
+    }
+
     /**
      * <p>Attempts to convert a collection to the given iterabable type</p>
      *

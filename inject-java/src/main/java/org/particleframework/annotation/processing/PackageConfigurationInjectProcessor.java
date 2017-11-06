@@ -16,8 +16,10 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.SimpleElementVisitor8;
 import javax.tools.JavaFileObject;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Optional;
 import java.util.Set;
 
 @SupportedAnnotationTypes({
@@ -58,12 +60,13 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
                         writer.writeTo(out);
                     }
                     if (configurationClassName != null) {
-                        serviceDescriptorGenerator.generate(targetDirectory, configurationClassName, BeanConfiguration.class);
+                        Optional<File> targetDirectory = getTargetDirectory();
+                        if(targetDirectory.isPresent()) {
+                            serviceDescriptorGenerator.generate(targetDirectory.get(), configurationClassName, BeanConfiguration.class);
+                        }
                     }
                 } catch (IOException e) {
                     error("Unexpected error: %s", e.getMessage());
-                    // FIXME something is wrong, probably want to fail fast
-                    e.printStackTrace();
                 }
             }
             return aPackage;

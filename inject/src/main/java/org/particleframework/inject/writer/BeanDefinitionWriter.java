@@ -517,10 +517,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         try (OutputStream outputStream = visitor.visitClass(className)) {
                             outputStream.write(classWriter.toByteArray());
                         }
-                        serviceDescriptorGenerator.generate(
-                                visitor.visitServiceDescriptor(className),
-                                className,
-                                ExecutableMethod.class);
+                        Optional<File> file = visitor.visitServiceDescriptor(className);
+                        if(file.isPresent()) {
+                            serviceDescriptorGenerator.generate(
+                                    file.get(),
+                                    className,
+                                    ExecutableMethod.class);
+                        }
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }

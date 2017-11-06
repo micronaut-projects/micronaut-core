@@ -418,8 +418,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             }
 
             @Override
-            public File visitServiceDescriptor(String classname) {
-                return compilationDir;
+            public Optional<File> visitServiceDescriptor(String classname) {
+                return Optional.ofNullable(compilationDir);
             }
         };
     }

@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
  */
 public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
+    private static final ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
+
     protected final Map<CharSequence, V> map;
     private final ConversionService<?> conversionService;
 
@@ -48,6 +50,9 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        if(name == null || requiredType == null) {
+            return Optional.empty();
+        }
         V value = map.get(name);
         if(value != null) {
             return conversionService.convert(value, requiredType);
@@ -57,6 +62,10 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
     @Override
     public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        if(name == null || requiredType == null) {
+            return Optional.empty();
+        }
+
         V value = map.get(name);
         if(value != null) {
             return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
@@ -72,5 +81,15 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     @Override
     public Collection<V> values() {
         return Collections.unmodifiableCollection(map.values());
+    }
+
+    /**
+     * An empty {@link ConvertibleValuesMap}
+     * @param <V> The generic type
+     * @return The empty {@link ConvertibleValuesMap}
+     */
+    @SuppressWarnings("unchecked")
+    public static <V> ConvertibleValues<V> empty() {
+        return (ConvertibleValues<V>) EMPTY;
     }
 }

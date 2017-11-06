@@ -129,4 +129,20 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
             }
         };
     }
+
+    /**
+     * Creates a new {@link ConvertibleValues} for the values
+     *
+     * @param values A map of values
+     * @param <T> The target generic type
+     * @return The values
+     */
+    static <T> ConvertibleValues<T> of(Map<CharSequence, T> values ) {
+        if(values == null) {
+            return ConvertibleValuesMap.empty();
+        }
+        else {
+            return new ConvertibleValuesMap<>( values);
+        }
+    }
 }

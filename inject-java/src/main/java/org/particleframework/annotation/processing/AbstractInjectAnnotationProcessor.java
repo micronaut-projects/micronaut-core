@@ -16,6 +16,7 @@ import javax.tools.StandardLocation;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Optional;
 
 abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
@@ -26,7 +27,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected AnnotationUtils annotationUtils;
     protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
-    protected File targetDirectory;
+    private File targetDirectory;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -39,7 +40,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.annotationUtils = new AnnotationUtils(elementUtils);
         this.genericUtils = new GenericUtils(elementUtils,typeUtils, modelUtils);
 
-        Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
+
         URI baseDir = null;
         try {
             baseDir = filer.getResource(StandardLocation.CLASS_OUTPUT, "", "").toUri();
@@ -53,17 +54,18 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 // ignore
             }
         }
-        else {
-
+        if(targetDirectory == null) {
+            Options javacOptions = Options.instance(((JavacProcessingEnvironment)processingEnv).getContext());
             String javacDirectoryOption = javacOptions.get(Option.D);
             if(javacDirectoryOption != null) {
 
                 this.targetDirectory = new File(javacDirectoryOption);
             }
         }
-        if(this.targetDirectory == null) {
-            messager.printMessage(Diagnostic.Kind.ERROR, "Compilation target directory cannot be established");
-        }
+    }
+
+    public Optional<File> getTargetDirectory() {
+        return Optional.ofNullable(targetDirectory);
     }
 
     // error will produce a "compile error"
