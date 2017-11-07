@@ -50,7 +50,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_METHOD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(
+            ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
                     Method.class,
@@ -62,7 +62,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     );
 
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_FIELD = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(
+            ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
                     Field.class,
@@ -73,7 +73,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     );
 
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_CONSTRUCTOR = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(
+            ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
                     Constructor.class,
@@ -84,7 +84,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             )
     );
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_SIMPLE = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(
+            ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
                     Class.class,
@@ -93,7 +93,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     );
 
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_WITH_GENERICS = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredMethod(
+            ReflectionUtils.getRequiredInternalMethod(
                     Argument.class,
                     "of",
                     Class.class,
@@ -517,10 +517,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         try (OutputStream outputStream = visitor.visitClass(className)) {
                             outputStream.write(classWriter.toByteArray());
                         }
-                        serviceDescriptorGenerator.generate(
-                                visitor.visitServiceDescriptor(className),
-                                className,
-                                ExecutableMethod.class);
+                        Optional<File> file = visitor.visitServiceDescriptor(className);
+                        if(file.isPresent()) {
+                            serviceDescriptorGenerator.generate(
+                                    file.get(),
+                                    className,
+                                    ExecutableMethod.class);
+                        }
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -1817,43 +1820,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 Type.getType(getConstructorMethod).getDescriptor(),
                 false);
     }
-
-    static void pushStoreTypeInArray(GeneratorAdapter methodVisitor, int index, int size, Object type) {
-        // the array index position
-        methodVisitor.push(index);
-        // the type reference
-        if (type instanceof Class) {
-            Class typeClass = (Class) type;
-            if (typeClass.isPrimitive()) {
-                Type wrapperType = Type.getType(ReflectionUtils.getWrapperType(typeClass));
-
-                methodVisitor.visitFieldInsn(GETSTATIC, wrapperType.getInternalName(), "TYPE", Type.getDescriptor(Class.class));
-            } else {
-                methodVisitor.push(Type.getType(typeClass));
-            }
-        } else {
-            methodVisitor.push(getObjectType(type.toString()));
-        }
-        // store the type reference
-        methodVisitor.arrayStore(TYPE_CLASS);
-        // if we are not at the end of the array duplicate array onto the stack
-        if (index < (size - 1)) {
-            methodVisitor.dup();
-        }
-    }
-
-
-    static void pushNewArray(GeneratorAdapter methodVisitor, Class arrayType, int size) {
-        // the size of the array
-        methodVisitor.push(size);
-        // define the array
-        methodVisitor.visitTypeInsn(ANEWARRAY, Type.getInternalName(arrayType));
-        // add a reference to the array on the stack
-        if (size > 0) {
-            methodVisitor.visitInsn(DUP);
-        }
-    }
-
 
 
     /**

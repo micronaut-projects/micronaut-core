@@ -1,12 +1,14 @@
 package org.particleframework.ast.groovy.utils
 
 import groovy.transform.CompileStatic
+import groovy.transform.Memoized
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
-import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
+import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
+import org.particleframework.core.annotation.AnnotationMetadata
 
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
@@ -21,6 +23,35 @@ import java.lang.annotation.Target
  */
 @CompileStatic
 class AstAnnotationUtils {
+
+    /**
+     * Get the {@link AnnotationMetadata} for the given annotated node
+     * @param annotatedNode The node
+     * @return The metadata
+     */
+    @Memoized(maxCacheSize = 100)
+    static AnnotationMetadata getAnnotationMetadata(AnnotatedNode annotatedNode) {
+        return new GroovyAnnotationMetadataBuilder().build(annotatedNode)
+    }
+
+    /**
+     * Return whether the given annotated node has the given stereotype
+     * @param annotatedNode The annotated node
+     * @param stereotype The stereotype
+     * @return True if it does
+     */
+    static boolean hasStereotype(AnnotatedNode annotatedNode, String stereotype) {
+        return getAnnotationMetadata(annotatedNode).hasStereotype(stereotype)
+    }
+    /**
+     * Return whether the given annotated node has the given stereotype
+     * @param annotatedNode The annotated node
+     * @param stereotype The stereotype
+     * @return True if it does
+     */
+    static boolean hasStereotype(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
+        return hasStereotype(annotatedNode, stereotype.getName())
+    }
 
     /**
      * Finds an annotation for the given annotated node and type

@@ -17,10 +17,7 @@ package org.particleframework.core.io;
 
 import org.particleframework.core.annotation.Nullable;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -50,6 +47,16 @@ public interface Writable {
     }
 
     /**
+     * Write this {@link Writable} to the given {@link File}
+     * @param file The file
+     * @throws IOException if an error occurred while outputting data to the writer
+     */
+    default void writeTo(File file) throws IOException {
+        try(FileOutputStream outputStream = new FileOutputStream(file)) {
+            writeTo(outputStream);
+        }
+    }
+     /**
      * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
      *
      * @param outputStream The output stream

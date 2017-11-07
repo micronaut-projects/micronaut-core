@@ -1,5 +1,6 @@
 package org.particleframework.core.reflect;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.exception.InvocationException;
 
 import java.lang.reflect.Constructor;
@@ -33,6 +34,21 @@ public class ReflectionUtils {
         }
     });
 
+    private static final Map<Class<?>, Class<?>> WRAPPER_TO_PRIMITIVE
+            = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
+        {
+            put(Boolean.class, boolean.class);
+            put(Byte.class, byte.class);
+            put(Character.class, char.class);
+            put(Double.class, double.class);
+            put(Float.class, float.class);
+            put(Integer.class, int.class);
+            put(Long.class, long.class);
+            put(Short.class, short.class);
+            put(Void.class, void.class);
+        }
+    });
+
     private static final Map<Class<?>, Integer> PRIMITIVE_BYTE_SIZES
             = Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Integer>() {
         {
@@ -60,6 +76,20 @@ public class ReflectionUtils {
         }
     }
 
+    /**
+     * Obtain the wrapper type for the given primitive type
+     *
+     * @param wrapperType The primitive type
+     * @return The wrapper type
+     */
+    public static Class getPrimitiveType(Class wrapperType) {
+        Class<?> wrapper = PRIMITIVES_TO_WRAPPERS.get(wrapperType);
+        if (wrapper != null) {
+            return wrapper;
+        } else {
+            return wrapperType;
+        }
+    }
     /**
      * Obtains a declared method
      *
@@ -152,7 +182,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds a method on the given type for the given name
+     * Finds an internal method defined by the Particle API and throws a {@link NoSuchMethodError} if it doesn't exist
      *
      * @param type The type
      * @param name The name
@@ -160,12 +190,31 @@ public class ReflectionUtils {
      * @return An {@link Optional} contains the method or empty
      * @throws NoSuchMethodError If the method doesn't exist
      */
+    @Internal
     public static Method getRequiredInternalMethod(Class type, String name, Class... argumentTypes) {
         try {
             return type.getDeclaredMethod(name, argumentTypes);
         } catch (NoSuchMethodException e) {
             return findMethod(type, name, argumentTypes)
                     .orElseThrow(()-> newNoSuchMethodInternalError(type, name, argumentTypes));
+        }
+    }
+
+
+    /**
+     * Finds an internal constructor defined by the Particle API and throws a {@link NoSuchMethodError} if it doesn't exist
+     *
+     * @param type The type
+     * @param argumentTypes The argument types
+     * @return An {@link Optional} contains the method or empty
+     * @throws NoSuchMethodError If the method doesn't exist
+     */
+    @Internal
+    public static <T> Constructor<T> getRequiredInternalConstructor(Class<T> type, Class... argumentTypes) {
+        try {
+            return type.getDeclaredConstructor(argumentTypes);
+        } catch (NoSuchMethodException e) {
+            throw newNoSuchConstructorInternalError(type, argumentTypes);
         }
     }
     /**
@@ -261,10 +310,18 @@ public class ReflectionUtils {
         return new NoSuchMethodError("Required method "+name+"("+argsAsText+") not found for class: " + declaringType.getName() + ". This could indicate a classpath issue, or out-of-date class metadata. Check your classpath and recompile classes as necessary.");
     }
 
-    public static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {
+    private static NoSuchMethodError newNoSuchMethodInternalError(Class declaringType, String name, Class[] argumentTypes) {
         Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
         String argsAsText = stringStream.collect(Collectors.joining(","));
 
         return new NoSuchMethodError("Particle method "+ declaringType.getName() +"."+name+"("+argsAsText+") not found. Most likely reason for this issue is that you are running a newer version of Particle with code compiled against an older version. Please recompile the offending classes");
+    }
+
+
+    private static NoSuchMethodError newNoSuchConstructorInternalError(Class declaringType, Class[] argumentTypes) {
+        Stream<String> stringStream = Arrays.stream(argumentTypes).map(Class::getSimpleName);
+        String argsAsText = stringStream.collect(Collectors.joining(","));
+
+        return new NoSuchMethodError("Particle constructor "+ declaringType.getName() +"("+argsAsText+") not found. Most likely reason for this issue is that you are running a newer version of Particle with code compiled against an older version. Please recompile the offending classes");
     }
 }

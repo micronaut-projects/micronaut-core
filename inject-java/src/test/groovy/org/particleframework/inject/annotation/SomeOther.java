@@ -13,22 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context;
+package org.particleframework.inject.annotation;
 
-import javax.inject.Qualifier;
+import org.particleframework.aop.Around;
+
+import javax.inject.Scope;
 import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>A qualifier for a proxy target. This qualifier is used internally the resolve the target class of a proxy.</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Qualifier
+@Around(proxyTarget = true, lazy = true)
+@Scope
 @Documented
 @Retention(RUNTIME)
-@interface ProxyTarget {
+@Target({ElementType.ANNOTATION_TYPE})
+public @interface SomeOther {
 }

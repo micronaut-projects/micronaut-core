@@ -35,7 +35,6 @@ class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo
     private Set<String> annotations = new HashSet<>();
     private String className;
     private boolean isAbstract;
-    private boolean isFinal;
 
     public AnnotatedTypeInfoVisitor() {
         super(Opcodes.ASM5);
@@ -47,7 +46,6 @@ class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo
         boolean isInterface = ((access & Opcodes.ACC_INTERFACE) != 0);
         boolean isAnnotation = ((access & Opcodes.ACC_ANNOTATION) != 0);
         this.isAbstract = isInterface || isAnnotation || ((access & Opcodes.ACC_ABSTRACT) != 0);
-        this.isFinal = ((access & Opcodes.ACC_FINAL) != 0);
     }
 
 

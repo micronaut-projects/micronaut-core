@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.value;
 
+import org.particleframework.core.annotation.Nullable;
+
 import java.util.*;
 import java.util.function.BiConsumer;
 
@@ -88,7 +90,10 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
      * @param <T> The target generic type
      * @return The values
      */
-    static <T> OptionalValues<T> of(Class<T> type, Map<CharSequence, ?> values ) {
+    static <T> OptionalValues<T> of(Class<T> type, @Nullable Map<CharSequence, ?> values ) {
+        if(values == null) {
+            return empty();
+        }
         return new MapOptionalValues<>(type, values);
     }
 

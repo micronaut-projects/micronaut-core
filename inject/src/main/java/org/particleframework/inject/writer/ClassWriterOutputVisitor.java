@@ -3,6 +3,7 @@ package org.particleframework.inject.writer;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Optional;
 
 public interface ClassWriterOutputVisitor {
     /**
@@ -19,5 +20,5 @@ public interface ClassWriterOutputVisitor {
      * @return the output directory
      * @throws IOException
      */
-    File visitServiceDescriptor(String classname) throws IOException;
+    Optional<File> visitServiceDescriptor(String classname) throws IOException;
 }
