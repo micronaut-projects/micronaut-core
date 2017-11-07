@@ -19,13 +19,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.HttpMessage;
 import org.particleframework.http.server.netty.NettyHttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
-import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.particleframework.http.sse.Event;
 
 import javax.inject.Singleton;
@@ -42,7 +41,8 @@ import java.util.List;
 @Singleton
 public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Object> implements Ordered {
 
-    public static final int ORDER = Ordered.LOWEST_PRECEDENCE;
+    public static final int ORDER = HttpResponseEncoder.ORDER - 1000;
+    public static final int OBJECT_FALLBACK_ORDER_START = ORDER - 1000;
 
     @Override
     public int getOrder() {
@@ -51,7 +51,7 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
 
     @Override
     public boolean acceptOutboundMessage(Object msg) throws Exception {
-        return  !(msg instanceof HttpContent) && !(msg instanceof ByteBuf) && !(msg instanceof Event) && !(msg instanceof HttpObject);
+        return !(msg instanceof HttpMessage) && !(msg instanceof HttpContent) && !(msg instanceof ByteBuf) && !(msg instanceof Event) && !(msg instanceof HttpObject);
     }
 
     @Override
@@ -69,11 +69,9 @@ public class ObjectToStringFallbackEncoder extends MessageToMessageEncoder<Objec
             res = res.replace(content);
             FullHttpResponse httpResponse = res.getNativeResponse();
             if(!HttpUtil.isTransferEncodingChunked(httpResponse)) {
-                httpResponse
-                        .headers()
-                        .add(HttpHeaderNames.CONTENT_LENGTH, string.length());
+                res.getHeaders().add(HttpHeaderNames.CONTENT_LENGTH, string.length());
             }
-            out.add(httpResponse);
+            out.add(res);
         }
     }
 }

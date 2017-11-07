@@ -36,9 +36,11 @@ import java.util.function.BiConsumer;
 public class CompletableFutureEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(CompletableFutureEncoder.class);
 
+    public static final int ORDER = ObjectToStringFallbackEncoder.OBJECT_FALLBACK_ORDER_START - 1000;
+
     @Override
     public int getOrder() {
-        return ObjectToStringFallbackEncoder.ORDER - 100;
+        return ORDER;
     }
 
     @Override

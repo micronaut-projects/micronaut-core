@@ -54,18 +54,22 @@ class NettyCorsSpec extends AbstractParticleSpec {
         given:
         def request = new Request.Builder()
                 .url("$server/test/arbitrary")
-                .header(ORIGIN, 'fooBar.com')
+                .header(ORIGIN, 'foo.com')
 
         when:
         def response = client.newCall(
                 request.build()
         ).execute()
-        Set<String> headerNames = response.headers().names()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'fooBar.com'
-        headerNames.empty
+        response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
+        response.header(VARY) == ORIGIN
+        !response.headers().names().contains(ACCESS_CONTROL_MAX_AGE)
+        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_HEADERS)
+        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_METHODS)
+        !response.headers().names().contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
     void "test cors request with controlled method"() {

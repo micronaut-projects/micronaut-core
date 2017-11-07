@@ -55,6 +55,13 @@ public class EventStreamEncoder extends ChannelOutboundHandlerAdapter implements
     public static final AsciiString COMMENT_PREFIX = new AsciiString(": ", StandardCharsets.UTF_8);
     public static final AsciiString NEWLINE = new AsciiString("\n", StandardCharsets.UTF_8);
 
+    public static final int ORDER = ObjectToStringFallbackEncoder.OBJECT_FALLBACK_ORDER_START - 1000;
+
+    @Override
+    public int getOrder() {
+        return ORDER;
+    }
+
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 

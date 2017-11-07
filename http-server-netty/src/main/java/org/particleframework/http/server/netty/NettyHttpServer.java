@@ -28,6 +28,7 @@ import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -45,7 +46,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
@@ -88,7 +88,7 @@ public class NettyHttpServer implements EmbeddedServer {
             ApplicationContext applicationContext,
             Optional<Router> router,
             RequestBinderRegistry binderRegistry,
-            @Named(IOExecutorService.NAME) ExecutorService ioExecutor,
+            @javax.inject.Named(IOExecutorService.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             HttpRequestInterceptor[] interceptors,
             ChannelOutboundHandler... outboundHandlers
@@ -234,7 +234,12 @@ public class NettyHttpServer implements EmbeddedServer {
     private void registerParticleChannelHandlers(ChannelPipeline pipeline) {
         int i = 0;
         for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
-            String name = NettyHttpServer.PARTICLE_HANDLER + NettyHttpServer.OUTBOUND_KEY + ++i;
+            String name;
+            if (outboundHandlerAdapter instanceof Named) {
+                name = ((Named) outboundHandlerAdapter).getName();
+            } else {
+                name = NettyHttpServer.PARTICLE_HANDLER + NettyHttpServer.OUTBOUND_KEY + ++i;
+            }
             pipeline.addAfter(NettyHttpServer.HTTP_CODEC, name, outboundHandlerAdapter);
         }
     }

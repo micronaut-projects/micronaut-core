@@ -42,6 +42,7 @@ import org.particleframework.http.server.cors.CorsHandler;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
+import org.particleframework.http.server.netty.encoders.HttpResponseEncoder;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.web.router.RouteMatch;
@@ -130,7 +131,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
                 return;
             } else {
-                pipeline.addBefore(NettyHttpServer.HTTP_STREAMS_CODEC, NettyHttpServer.CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
+                pipeline.addAfter(HttpResponseEncoder.NAME, NettyHttpServer.CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
                     @Override
                     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                         if (msg instanceof MutableHttpResponse) {

@@ -34,9 +34,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ChannelHandler.Sharable
 @Singleton
 public class PublisherEncoder extends ChannelOutboundHandlerAdapter implements Ordered {
+
+    public static final int ORDER = ObjectToStringFallbackEncoder.OBJECT_FALLBACK_ORDER_START - 1000;
+
     @Override
     public int getOrder() {
-        return ObjectToStringFallbackEncoder.ORDER - 100;
+        return ORDER;
     }
 
     @Override

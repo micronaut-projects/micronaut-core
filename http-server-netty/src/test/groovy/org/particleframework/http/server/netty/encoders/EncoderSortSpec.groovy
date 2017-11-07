@@ -26,23 +26,17 @@ class EncoderSortSpec extends Specification {
 
     void "test sort order"() {
         given:
-        def one = new ObjectToStringFallbackEncoder()
-        def two = new CompletableFutureEncoder()
-        def three = new HttpResponseEncoder()
+        def toString = new ObjectToStringFallbackEncoder()
+        def future = new CompletableFutureEncoder()
+        def response = new HttpResponseEncoder()
+        def body = new HttpBodyEncoder()
 
 
         when:
-        def list = [one, two, three]
+        def list = [toString, future, response, body]
         OrderUtil.sort(list)
 
         then:
-        list == [three, two, one]
-
-        when:
-        list = [three, two, one]
-        OrderUtil.sort(list)
-
-        then:
-        list == [three, two, one]
+        list == [body, future, toString, response]
     }
 }
