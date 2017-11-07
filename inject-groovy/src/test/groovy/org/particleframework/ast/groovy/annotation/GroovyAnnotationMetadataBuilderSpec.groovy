@@ -91,7 +91,7 @@ class Test {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -128,8 +128,9 @@ interface ITest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
+        !metadata.hasDeclaredStereotype(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
         metadata.hasStereotype(Scope)
@@ -166,8 +167,9 @@ class SuperTest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.SuperTest'
         metadata.getValue(Trace, "types").get() == ['test.SuperTest'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
+        !metadata.hasDeclaredStereotype(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
         metadata.hasStereotype(Scope)
@@ -204,7 +206,8 @@ class SuperTest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
+        metadata.hasDeclaredStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -243,7 +246,8 @@ interface ITest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
+        !metadata.hasDeclaredStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -326,6 +330,9 @@ interface ITest {
         !metadata.hasDeclaredAnnotation(Singleton)
         metadata.hasAnnotation(Primary)
         metadata.hasStereotype(Qualifier)
+        metadata.hasStereotype(Primary)
+        !metadata.hasDeclaredStereotype(Primary)
+        !metadata.hasDeclaredStereotype(Qualifier)
         !metadata.hasStereotype(Singleton)
     }
 

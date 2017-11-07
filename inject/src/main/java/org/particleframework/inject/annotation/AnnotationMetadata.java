@@ -340,6 +340,20 @@ public interface AnnotationMetadata {
     }
 
     /**
+     * Check whether any of the given stereotypes is present
+     * @param annotations The annotations
+     * @return True if any of the given stereotypes are present
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasStereotype(Class<? extends Annotation>... annotations) {
+        for (Class<? extends Annotation> annotation : annotations) {
+            if(hasStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
      * Checks whether this object has the given annotation directly declared on the object
      *
      * @param annotation The annotation

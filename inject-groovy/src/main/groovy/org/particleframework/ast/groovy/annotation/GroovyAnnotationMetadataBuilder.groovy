@@ -31,6 +31,9 @@ import org.particleframework.inject.annotation.AbstractAnnotationMetadataBuilder
  */
 @CompileStatic
 class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<AnnotatedNode, AnnotationNode>{
+
+    public static final ClassNode ANN_OVERRIDE = ClassHelper.make(Override.class)
+
     @Override
     protected AnnotatedNode getTypeForAnnotation(AnnotationNode annotationMirror) {
         return annotationMirror.classNode
@@ -58,11 +61,8 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         else if(element instanceof MethodNode) {
             MethodNode mn = (MethodNode)element
             List<AnnotatedNode> hierarchy = buildHierarchy(mn.getDeclaringClass())
-            if (!mn.getAnnotations(ClassHelper.make(Override.class)).isEmpty()) {
-                MethodNode overridden = findOverriddenMethod(mn)
-                if (overridden != null) {
-                    hierarchy.add(overridden)
-                }
+            if (!mn.getAnnotations(ANN_OVERRIDE).isEmpty()) {
+                hierarchy.addAll(findOverriddenMethods(mn))
             }
             hierarchy.add(mn)
             return hierarchy
@@ -149,7 +149,8 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         }
     }
 
-    private MethodNode findOverriddenMethod(MethodNode methodNode) {
+    private List<MethodNode> findOverriddenMethods(MethodNode methodNode) {
+        List<MethodNode> overriddenMethods = []
         ClassNode classNode = methodNode.getDeclaringClass()
 
         String methodName = methodNode.name
@@ -160,19 +161,23 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             for(i in classNode.getAllInterfaces()) {
                 MethodNode parent = i.getDeclaredMethod(methodName, methodParameters)
                 if(parent != null) {
-                    return parent
+                    overriddenMethods.add(parent)
                 }
             }
             classNode = classNode.superClass
             if(classNode != null && classNode.name != Object.name) {
                 MethodNode parent = classNode.getDeclaredMethod(methodName, methodParameters)
                 if(parent != null) {
-                    return parent
+                    if(!parent.isPrivate()) {
+                        overriddenMethods.add(parent)
+                    }
+                    if(parent.getAnnotations(ANN_OVERRIDE).isEmpty()) {
+                        break
+                    }
                 }
             }
         }
-
-        return null
+        return overriddenMethods
     }
 
 }
