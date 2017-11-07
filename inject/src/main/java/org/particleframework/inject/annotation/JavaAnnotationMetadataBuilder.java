@@ -16,6 +16,7 @@
 package org.particleframework.inject.annotation;
 
 
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.value.OptionalValues;
 
 import javax.lang.model.element.*;

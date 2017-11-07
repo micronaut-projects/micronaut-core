@@ -16,6 +16,7 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 

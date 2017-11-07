@@ -20,6 +20,7 @@ import com.sun.tools.javac.util.Context
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.support.Parser
 import spock.lang.Specification
 
@@ -28,7 +29,6 @@ import javax.inject.Scope
 import javax.inject.Singleton
 import javax.lang.model.element.Element
 import javax.lang.model.element.TypeElement
-import javax.lang.model.type.DeclaredType
 
 /**
  * @author Graeme Rocher
@@ -361,7 +361,7 @@ interface ITest {
         !metadata.hasStereotype(Singleton)
     }
 
-    private AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
+    static AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
         List<Element> elements = Parser.parseLines( "",
                 cls
         ).toList()
@@ -372,7 +372,7 @@ interface ITest {
         return metadata
     }
 
-    private AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
+    static AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
         List<Element> elements = Parser.parseLines( "",
                 cls
         ).toList()

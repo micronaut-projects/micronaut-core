@@ -26,7 +26,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Executable;
-import org.particleframework.inject.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.writer.*;
 
 import javax.annotation.PostConstruct;

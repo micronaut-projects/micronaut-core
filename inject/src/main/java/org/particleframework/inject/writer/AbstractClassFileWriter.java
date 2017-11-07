@@ -177,14 +177,75 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
         int argTypeCount = argumentTypes.size();
         if (!argumentTypes.isEmpty()) {
-            BeanDefinitionWriter.pushNewArray(methodVisitor, Class.class, argTypeCount);
+            pushNewArray(methodVisitor, Class.class, argTypeCount);
             Iterator<Object> argIterator = argumentTypes.iterator();
             for (int i = 0; i < argTypeCount; i++) {
-                BeanDefinitionWriter.pushStoreTypeInArray(methodVisitor, i, argTypeCount, argIterator.next());
+                pushStoreTypeInArray(methodVisitor, i, argTypeCount, argIterator.next());
             }
         } else {
             // no arguments
-            BeanDefinitionWriter.pushNewArray(methodVisitor, Class.class, 0);
+            pushNewArray(methodVisitor, Class.class, 0);
+        }
+    }
+
+    protected static void pushNewArray(GeneratorAdapter methodVisitor, Class arrayType, int size) {
+        // the size of the array
+        methodVisitor.push(size);
+        // define the array
+        methodVisitor.visitTypeInsn(ANEWARRAY, Type.getInternalName(arrayType));
+        // add a reference to the array on the stack
+        if (size > 0) {
+            methodVisitor.visitInsn(DUP);
+        }
+    }
+
+    protected static void pushStoreStringInArray(GeneratorAdapter methodVisitor, int index, int size, String string) {
+        // the array index position
+        methodVisitor.push(index);
+        // load the constant string
+        methodVisitor.push(string);
+        // store the string in the position
+        methodVisitor.visitInsn(AASTORE);
+        if (index != (size - 1)) {
+            // if we are not at the end of the array duplicate array onto the stack
+            methodVisitor.dup();
+        }
+    }
+
+    protected static void pushStoreInArray(GeneratorAdapter methodVisitor, int index, int size, Runnable runnable) {
+        // the array index position
+        methodVisitor.push(index);
+        // load the constant string
+        runnable.run();
+        // store the string in the position
+        methodVisitor.visitInsn(AASTORE);
+        if (index != (size - 1)) {
+            // if we are not at the end of the array duplicate array onto the stack
+            methodVisitor.dup();
+        }
+    }
+
+    protected static void pushStoreTypeInArray(GeneratorAdapter methodVisitor, int index, int size, Object type) {
+        // the array index position
+        methodVisitor.push(index);
+        // the type reference
+        if (type instanceof Class) {
+            Class typeClass = (Class) type;
+            if (typeClass.isPrimitive()) {
+                Type wrapperType = Type.getType(ReflectionUtils.getWrapperType(typeClass));
+
+                methodVisitor.visitFieldInsn(GETSTATIC, wrapperType.getInternalName(), "TYPE", Type.getDescriptor(Class.class));
+            } else {
+                methodVisitor.push(Type.getType(typeClass));
+            }
+        } else {
+            methodVisitor.push(getObjectType(type.toString()));
+        }
+        // store the type reference
+        methodVisitor.arrayStore(TYPE_CLASS);
+        // if we are not at the end of the array duplicate array onto the stack
+        if (index < (size - 1)) {
+            methodVisitor.dup();
         }
     }
 
@@ -327,14 +388,15 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         out.write(bytes);
     }
 
-    protected MethodVisitor startConstructor(ClassVisitor classWriter) {
-        return classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
+    protected GeneratorAdapter startConstructor(ClassVisitor classWriter) {
+        MethodVisitor defaultConstructor = classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR, null, null);
+        return new GeneratorAdapter(defaultConstructor, ACC_PUBLIC, CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
     }
 
-    protected MethodVisitor startConstructor(ClassVisitor classWriter, Object...argumentTypes
+    protected GeneratorAdapter startConstructor(ClassVisitor classWriter, Object...argumentTypes
     ) {
         String descriptor = getConstructorDescriptor(argumentTypes);
-        return classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null);
+        return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor, null, null), ACC_PUBLIC, CONSTRUCTOR_NAME, descriptor);
     }
 
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
@@ -475,7 +537,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
         // 2nd arg: the additional elements
         int len = annotationSourceList.size();
-        BeanDefinitionWriter.pushNewArray(generator, AnnotatedElement.class, len); // arg 2: the additional elements
+        AbstractClassFileWriter.pushNewArray(generator, AnnotatedElement.class, len); // arg 2: the additional elements
         for (int i = 0; i < len; i++) {
 
             generator.push(i);

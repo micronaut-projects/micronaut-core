@@ -5,7 +5,7 @@ import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.Internal;
 
 /**
- * <p>A component definition class provides a reference to a {@link BeanDefinition} thus
+ * <p>A bean definition class provides a reference to a {@link BeanDefinition} thus
  * allowing for soft loading of component definitions for purposes of type inspection.</p>
  *
  * <p>The class can also decided whether to abort loading the definition by returning null</p>

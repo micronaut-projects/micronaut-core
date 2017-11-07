@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  */
 public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
-    private static final ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
+    static final ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
 
     protected final Map<CharSequence, V> map;
     private final ConversionService<?> conversionService;

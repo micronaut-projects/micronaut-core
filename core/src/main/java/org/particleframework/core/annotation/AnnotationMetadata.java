@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject.annotation;
+package org.particleframework.core.annotation;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.value.OptionalValues;
 
@@ -30,12 +29,17 @@ import java.util.*;
  *
  * <p>Users of Particle should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement} interface and use this interface instead to obtain maximum efficiency</p>
  *
- * <p>Core framework types such as {@link org.particleframework.inject.BeanDefinition} and {@link org.particleframework.inject.ExecutableMethod} implement this interface</p>
+ * <p>Core framework types such as <tt>org.particleframework.inject.BeanDefinition</tt> and <tt>org.particleframework.inject.ExecutableMethod</tt> implement this interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface AnnotationMetadata {
+    /**
+     * A constant for representing empty metadata
+     */
+    AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
+
     /**
      * The default <tt>value()</tt> member
      */
@@ -92,15 +96,15 @@ public interface AnnotationMetadata {
      * Get all of the values for the given annotation
      *
      * @param annotation The annotation name
-     * @return The {@link ConvertibleValues}
+     * @return A {@link ConvertibleValues} instance
      */
     ConvertibleValues<Object> getValues(String annotation);
 
     /**
-     * Get all of the values for the given annotation
+     * Get all of the values for the given annotation and type of the underlying values
      *
      * @param annotation The annotation name
-     * @return The {@link ConvertibleValues}
+     * @return The {@link OptionalValues}
      */
     <T> OptionalValues<T> getValues(String annotation, Class<T> valueType);
 
@@ -119,7 +123,7 @@ public interface AnnotationMetadata {
      * @return The annotation name
      */
     default Optional<String> getAnnotationByStereotype(Class<? extends Annotation> stereotype) {
-        return getAnnotationsByStereotype(stereotype).stream().findFirst();
+        return getAnnotationByStereotype(stereotype.getName());
     }
     /**
      * Get all of the values for the given annotation

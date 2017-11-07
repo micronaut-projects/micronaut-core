@@ -8,7 +8,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
 import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import org.particleframework.inject.annotation.AnnotationMetadata
+import org.particleframework.core.annotation.AnnotationMetadata
 
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented

@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject.annotation;
 
+import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.ConvertibleValuesMap;
 import org.particleframework.core.util.CollectionUtils;
@@ -29,13 +31,40 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-class DefaultAnnotationMetadata implements AnnotationMetadata {
+public class DefaultAnnotationMetadata implements AnnotationMetadata {
 
-    private Set<String> declaredAnnotations = null;
-    private Set<String> declaredStereotypes = null;
-    private Map<String, Map<CharSequence, Object>> allStereotypes = null;
-    private Map<String, Map<CharSequence, Object>> allAnnotations = null;
-    private Map<String, Set<String>> annotationsByStereotype = null;
+    Set<String> declaredAnnotations;
+    Set<String> declaredStereotypes;
+    Map<String, Map<CharSequence, Object>> allStereotypes;
+    Map<String, Map<CharSequence, Object>> allAnnotations;
+    Map<String, Set<String>> annotationsByStereotype;
+
+    @Internal
+    protected DefaultAnnotationMetadata() {
+    }
+
+    /**
+     * This constructor is designed to be used by compile time produced subclasses
+     *
+     * @param declaredAnnotations The directly declared annotations
+     * @param declaredStereotypes The directly declared stereotypes
+     * @param allStereotypes All of the stereotypes
+     * @param allAnnotations All of the annotations
+     * @param annotationsByStereotype The annotations by stereotype
+     */
+    @Internal
+    protected DefaultAnnotationMetadata(
+            Set<String> declaredAnnotations,
+            Set<String> declaredStereotypes,
+            Map<String, Map<CharSequence, Object>> allStereotypes,
+            Map<String, Map<CharSequence, Object>> allAnnotations,
+            Map<String, Set<String>> annotationsByStereotype) {
+        this.declaredAnnotations = declaredAnnotations;
+        this.declaredStereotypes = declaredStereotypes;
+        this.allStereotypes = allStereotypes;
+        this.allAnnotations = allAnnotations;
+        this.annotationsByStereotype = annotationsByStereotype;
+    }
 
     @Override
     public boolean hasDeclaredAnnotation(String annotation) {
@@ -161,6 +190,7 @@ class DefaultAnnotationMetadata implements AnnotationMetadata {
         }
         return this;
     }
+
 
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,

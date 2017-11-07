@@ -145,4 +145,14 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
             return new ConvertibleValuesMap<>( values);
         }
     }
+
+    /**
+     * An empty {@link ConvertibleValues}
+     * @param <V> The generic type
+     * @return The empty {@link ConvertibleValues}
+     */
+    @SuppressWarnings("unchecked")
+    static <V> ConvertibleValues<V> empty() {
+        return ConvertibleValuesMap.EMPTY;
+    }
 }

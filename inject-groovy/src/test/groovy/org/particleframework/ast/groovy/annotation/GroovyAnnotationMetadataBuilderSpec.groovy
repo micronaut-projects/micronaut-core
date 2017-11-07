@@ -22,7 +22,7 @@ import org.codehaus.groovy.ast.builder.AstBuilder
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
-import org.particleframework.inject.annotation.AnnotationMetadata
+import org.particleframework.core.annotation.AnnotationMetadata
 import spock.lang.Specification
 
 import javax.inject.Qualifier

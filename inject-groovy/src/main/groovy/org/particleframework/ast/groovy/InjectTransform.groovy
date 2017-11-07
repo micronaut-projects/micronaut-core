@@ -25,7 +25,7 @@ import org.particleframework.core.util.ArrayUtils
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinitionClass
-import org.particleframework.inject.annotation.AnnotationMetadata
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.writer.*
 
 import javax.annotation.PostConstruct

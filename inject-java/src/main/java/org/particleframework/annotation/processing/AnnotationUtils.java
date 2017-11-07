@@ -17,7 +17,7 @@ package org.particleframework.annotation.processing;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.particleframework.inject.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 
 import javax.inject.Qualifier;

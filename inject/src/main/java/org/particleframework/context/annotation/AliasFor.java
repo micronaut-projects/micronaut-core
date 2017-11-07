@@ -15,12 +15,14 @@
  */
 package org.particleframework.context.annotation;
 
+import org.particleframework.core.annotation.AnnotationMetadata;
+
 import java.lang.annotation.*;
 
 /**
  * <p>Allows specifying an annotation member alias. That is a member of an annotation can be used to represent the value of annotation</p>
  *
- * <p>The representation is constructed via the {@link org.particleframework.inject.annotation.AnnotationMetadata} interface</p>
+ * <p>The representation is constructed via the {@link AnnotationMetadata} interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
