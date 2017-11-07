@@ -53,6 +53,9 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         expect:
         eventHandler.events.size() == 4
         eventHandler.events.first().data.data == '{"name":"Foo 1","age":11}'
+
+        cleanup:
+        eventSource.close()
     }
 
     void "test consume event stream string"() {
@@ -71,6 +74,9 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         expect:
         eventHandler.events.size() == 4
         eventHandler.events.first().data.data == 'Foo 1'
+
+        cleanup:
+        eventSource.close()
     }
 
     void "test consume rich event stream object"() {
@@ -97,6 +103,8 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         then:
         event.name == 'foo'
 
+        cleanup:
+        eventSource.close()
     }
 
     void "test receive error from supplier"() {
@@ -117,7 +125,8 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         eventHandler.events.size() == 0
         eventHandler.comments.size() == 0
 
-
+        cleanup:
+        eventSource.close()
     }
 
     void "test receive error from onError"() {
@@ -138,6 +147,8 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         eventHandler.events.size() == 0
         eventHandler.comments.size() == 0
 
+        cleanup:
+        eventSource.close()
     }
 
     @Controller
