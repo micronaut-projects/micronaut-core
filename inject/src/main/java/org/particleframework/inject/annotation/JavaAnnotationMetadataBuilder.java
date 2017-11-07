@@ -23,6 +23,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -72,9 +73,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             ExecutableElement executableElement = (ExecutableElement) element;
             // the starting hierarchy is the type and super types of this method
             List<Element> hierarchy = buildHierarchy(executableElement.getEnclosingElement());
-            ExecutableElement parentMethod = findOverriddenMethod(executableElement);
-            if(parentMethod != null) {
-                hierarchy.add(parentMethod);
+            if( hasAnnotation(executableElement, Override.class)) {
+                hierarchy.addAll( findOverriddenMethods(executableElement) );
             }
             hierarchy.add(element);
             return hierarchy;
@@ -150,30 +150,57 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
 
-    private ExecutableElement findOverriddenMethod(ExecutableElement executableElement) {
-        ExecutableElement overridden = null;
+    private List<ExecutableElement> findOverriddenMethods(ExecutableElement executableElement) {
+        List<ExecutableElement> overridden = new ArrayList<>();
         Element enclosingElement = executableElement.getEnclosingElement();
         if (enclosingElement instanceof TypeElement) {
-            TypeElement thisType = (TypeElement) enclosingElement;
-            TypeMirror superMirror = thisType.getSuperclass();
-            TypeElement supertype = superMirror instanceof TypeElement ? (TypeElement) superMirror : null;
+            TypeElement supertype = (TypeElement) enclosingElement;
             while (supertype != null && !supertype.toString().equals(Object.class.getName())) {
                 Optional<ExecutableElement> result = findOverridden(executableElement, supertype);
                 if (result.isPresent()) {
-                    overridden = result.get();
-                    break;
+                    ExecutableElement overriddenMethod = result.get();
+                    overridden.add(overriddenMethod);
+                    if(!hasAnnotation(overriddenMethod, Override.class)) {
+                        findOverriddenInterfaceMethod(executableElement, overridden, supertype);
+                        break;
+                    }
                 }
                 else {
-                    overridden = findOverriddenInterfaceMethod(executableElement, supertype);
+                    findOverriddenInterfaceMethod(executableElement, overridden, supertype);
 
                 }
-                supertype = (TypeElement) supertype.getSuperclass();
-            }
-            if (overridden == null) {
-                overridden = findOverriddenInterfaceMethod(executableElement, thisType);
+                supertype = (TypeElement) ((DeclaredType) supertype.getSuperclass()).asElement();
             }
         }
         return overridden;
+    }
+
+    private boolean hasAnnotation(ExecutableElement overriddenMethod, Class<? extends Annotation> ann) {
+        List<? extends AnnotationMirror> annotationMirrors = overriddenMethod.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            if(annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void findOverriddenInterfaceMethod(ExecutableElement executableElement, List<ExecutableElement> overridden, TypeElement supertype) {
+        Optional<ExecutableElement> result;
+        List<? extends TypeMirror> interfaces = supertype.getInterfaces();
+
+        for (TypeMirror anInterface : interfaces) {
+            if (anInterface instanceof DeclaredType) {
+                DeclaredType iElement = (DeclaredType) anInterface;
+                TypeElement interfaceElement = (TypeElement) iElement.asElement();
+                result = findOverridden(executableElement, interfaceElement);
+                if (result.isPresent()) {
+                    overridden.add( result.get() );
+                } else {
+                    findOverriddenInterfaceMethod(executableElement, overridden, interfaceElement);
+                }
+            }
+        }
     }
 
     private Optional<ExecutableElement> findOverridden(ExecutableElement executableElement, TypeElement supertype) {
@@ -184,35 +211,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 .findFirst();
     }
 
-    private ExecutableElement findOverriddenInterfaceMethod(ExecutableElement executableElement, TypeElement thisType) {
-
-        ExecutableElement overridden = null;
-        TypeElement supertype = thisType;
-        while (supertype != null && !supertype.toString().equals(Object.class.getName())) {
-            List<? extends TypeMirror> interfaces = supertype.getInterfaces();
-
-            for (TypeMirror anInterface : interfaces) {
-                if (anInterface instanceof DeclaredType) {
-                    DeclaredType iElement = (DeclaredType) anInterface;
-                    Optional<ExecutableElement> result = findOverridden(executableElement, (TypeElement) iElement.asElement());
-                    if (result.isPresent()) {
-                        overridden = result.get();
-                        break;
-                    } else {
-                        overridden = findOverriddenInterfaceMethod(executableElement, (TypeElement) iElement.asElement());
-                        if (overridden != null) break;
-                    }
-                }
-            }
-            TypeMirror superMirror = supertype.getSuperclass();
-            if (superMirror instanceof DeclaredType) {
-                supertype = (TypeElement) ((DeclaredType) superMirror).asElement();
-            } else {
-                break;
-            }
-        }
-        return overridden;
-    }
 
     private static class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
         private final Map<CharSequence, Object> annotationValues;

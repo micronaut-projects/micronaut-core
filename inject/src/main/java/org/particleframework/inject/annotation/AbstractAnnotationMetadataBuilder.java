@@ -49,35 +49,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
             if(annotationHierarchy.isEmpty()) continue;
 
-            List<? extends A> stereotypeHierarchy = buildStereotypeHierarchy(currentElement);
             Map<String, Map<CharSequence, Object>> annotationValues = new LinkedHashMap<>();
-            Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
 
-            populateAnnotationDataForHierarchy(currentElement, annotationHierarchy, annotationValues, stereotypes);
-            populateAnnotationDataForHierarchy(currentElement, stereotypeHierarchy, stereotypes, stereotypes);
+            for (A a : annotationHierarchy) {
+                Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
+                List<A> stereotypeHierarchy = new ArrayList<>();
+                buildStereotypeHierarchy(getTypeForAnnotation(a), stereotypeHierarchy);
+                Collections.reverse(stereotypeHierarchy);
+                for (A stereotype : stereotypeHierarchy) {
+                    populateAnnotationData(stereotype, stereotypes, stereotypes);
+                }
 
-            if(!annotationValues.isEmpty()) {
-                for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationValues.entrySet()) {
-                    String annotationName = entry.getKey();
-                    if(currentElement == element) {
-                        annotationMetadata.addDeclaredAnnotation(annotationName, entry.getValue());
-                        if(!stereotypes.isEmpty()) {
-                            for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                                annotationMetadata.addStereotype(stereotype.getKey(), stereotype.getValue());
-                            }
+                String annotationName = getAnnotationTypeName(a);
+                Map<CharSequence, Object> values = populateAnnotationData(a, annotationValues, stereotypes);
+
+                if(currentElement == element) {
+                    annotationMetadata.addDeclaredAnnotation(annotationName, values);
+                    if(!stereotypes.isEmpty()) {
+                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
+                            annotationMetadata.addDeclaredStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
                         }
                     }
-                    else {
-                        annotationMetadata.addAnnotation(annotationName, entry.getValue());
-                        if(!stereotypes.isEmpty()) {
-                            for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                                annotationMetadata.addStereotype(stereotype.getKey(), stereotype.getValue());
-                            }
+                }
+                else {
+                    annotationMetadata.addAnnotation(annotationName, values);
+                    if(!stereotypes.isEmpty()) {
+                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
+                            annotationMetadata.addStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
                         }
                     }
-
                 }
             }
+
         }
         return annotationMetadata;
     }
@@ -143,29 +146,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The name
      */
     protected abstract String getAnnotationMemberName(T member);
-    /**
-     * Build the stereotype hierarchy for the given element
-     *
-     * @param element The element
-     * @return A list of annotations
-     */
-    protected List<A> buildStereotypeHierarchy(T element) {
-        List<A> hierarchy = new ArrayList<>();
-        List<? extends A> annotationMirrors = getAnnotationsForType(element);
-        for (A annotationMirror : annotationMirrors) {
-            buildStereotypeHierarchy(getTypeForAnnotation(annotationMirror), hierarchy);
-        }
-        Collections.reverse(hierarchy);
-        return hierarchy;
-    }
 
     /**
      * Populate the annotation data for the given annotation
-     * @param element
      * @param annotationMirror The annotation
      * @param annotationData The annotation data
      */
-    protected void populateAnnotationData(T element, A annotationMirror, Map<String, Map<CharSequence, Object>> annotationData, Map<String, Map<CharSequence, Object>> stereotypes) {
+    protected Map<CharSequence, Object> populateAnnotationData(A annotationMirror, Map<String, Map<CharSequence, Object>> annotationData, Map<String, Map<CharSequence, Object>> stereotypes) {
         String annotationName = getAnnotationTypeName(annotationMirror);
         Map<? extends T, ?> elementValues = readAnnotationValues(annotationMirror);
         if(CollectionUtils.isEmpty(elementValues)) {
@@ -196,7 +183,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
                 readAnnotationValues(getAnnotationMemberName(member), annotationValue, annotationValues);
             }
+            return annotationValues;
         }
+        return Collections.emptyMap();
     }
 
 
@@ -204,14 +193,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationData.computeIfAbsent(annotationName, s -> new LinkedHashMap<>(elementValues.size()));
     }
 
-
-    private void populateAnnotationDataForHierarchy(T element, List<? extends A> hierarchy, Map<String, Map<CharSequence, Object>> annotations, Map<String, Map<CharSequence, Object>> stereotypes) {
-        if(CollectionUtils.isNotEmpty(hierarchy)) {
-            for (A annotationMirror : hierarchy) {
-                populateAnnotationData(element, annotationMirror, annotations, stereotypes);
-            }
-        }
-    }
 
     private void buildStereotypeHierarchy(T element, List<A> hierarchy) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);

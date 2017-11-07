@@ -56,6 +56,33 @@ class Test {
         !metadata.hasStereotype(Singleton)
     }
 
+    void "test parse first level stereotype data singleton"() {
+
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+@javax.inject.Singleton
+class AImpl implements A {
+
+}
+
+interface A {
+
+}
+
+
+''')
+
+        expect:
+        metadata != null
+        !metadata.hasDeclaredAnnotation(Scope)
+        metadata.hasDeclaredAnnotation(Singleton)
+        metadata.hasStereotype(Singleton)
+        metadata.hasStereotype(Scope)
+        metadata.getAnnotationByStereotype(Singleton).get() == 'javax.inject.Singleton'
+    }
+
     void "test parse inherited stereotype data"() {
 
         given:
@@ -93,7 +120,7 @@ class Test {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -130,7 +157,7 @@ interface ITest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -168,7 +195,7 @@ class SuperTest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.SuperTest'
         metadata.getValue(Trace, "types").get() == ['test.SuperTest'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -206,7 +233,7 @@ class SuperTest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -245,7 +272,7 @@ interface ITest {
         metadata.getValue(Trace, "type").isPresent()
         metadata.getValue(Trace, "type").get() == 'test.Test'
         metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
-        !metadata.hasStereotype(Trace)
+        metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
         metadata.hasStereotype(SomeOther)
@@ -258,6 +285,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
+        metadata.getAnnotationsByStereotype(Around.name) == [Trace.name] as Set
     }
 
 
