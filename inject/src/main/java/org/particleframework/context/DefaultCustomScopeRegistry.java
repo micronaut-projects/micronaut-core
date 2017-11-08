@@ -39,7 +39,7 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     }
 
     @Override
-    public Optional<CustomScope> findScope(Annotation scopeAnnotation) {
-        return scopes.computeIfAbsent(scopeAnnotation.annotationType(), type -> beanLocator.findBean(CustomScope.class, Qualifiers.byTypeArguments(type)));
+    public Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
+        return scopes.computeIfAbsent(scopeAnnotation, type -> beanLocator.findBean(CustomScope.class, Qualifiers.byTypeArguments(type)));
     }
 }

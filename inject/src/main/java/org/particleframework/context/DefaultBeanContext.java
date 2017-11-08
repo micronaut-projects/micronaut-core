@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
 import javax.inject.Scope;
+import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
@@ -839,17 +840,19 @@ public class DefaultBeanContext implements BeanContext {
     }
 
 
+    @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
-        Annotation scope = definition.getScope();
+        boolean isProxy = definition instanceof ProxyBeanDefinition;
+        Class<? extends Annotation> scope =  isProxy ? null : definition.getScope();
         Optional<CustomScope> registeredScope = scope != null ? customScopeRegistry.findScope(scope) : Optional.empty();
         if (registeredScope.isPresent()) {
             CustomScope customScope = registeredScope.get();
-            if (definition instanceof ProxyBeanDefinition) {
+            if (isProxy) {
                 definition = getProxiedBeanDefinition(beanType, qualifier);
             }
             BeanDefinition<T> finalDefinition = definition;
             return (T) customScope.get(
-                    scope,
+                    finalDefinition,
                     new BeanKey(beanType, qualifier),
                     () -> {
                         T createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, null);
@@ -1483,8 +1486,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public Annotation getScope() {
-            return AnnotationUtil.findAnnotationWithStereoType(singletonClass, Scope.class).orElse(null);
+        public Class<? extends Annotation> getScope() {
+            return Singleton.class;
         }
 
         @Override

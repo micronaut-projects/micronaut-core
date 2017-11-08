@@ -27,6 +27,7 @@ import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.inject.BeanDefinitionClass;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
 import javax.annotation.PostConstruct;
@@ -423,7 +424,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     beanMethodParameters
             );
 
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod);
+            AnnotationMetadata methodAnnotationMetadata = new JavaAnnotationMetadataBuilder(elementUtils).buildForMethod(beanMethod);
             if(methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
                 Object[] interceptorTypes = methodAnnotationMetadata
                         .getAnnotationNamesByStereotype(AROUND_TYPE)

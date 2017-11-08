@@ -32,5 +32,5 @@ public interface CustomScopeRegistry {
      * @param scopeAnnotation The scope annotation
      * @return The custom scope
      */
-    Optional<CustomScope> findScope(Annotation scopeAnnotation);
+    Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation);
 }

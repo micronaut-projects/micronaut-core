@@ -13,6 +13,7 @@ import org.particleframework.aop.Around
 import org.particleframework.aop.Interceptor
 import org.particleframework.aop.Introduction
 import org.particleframework.aop.writer.AopProxyWriter
+import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
@@ -315,9 +316,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
             if( isFactoryClass && !isConstructor && methodAnnotationMetadata.hasStereotype(Bean)) {
+                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
                 String scopeAnn = methodAnnotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null)
-                String beanDefinitionPackage = concreteClass.packageName;
+                String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
                 String factoryMethodBeanDefinitionName =
                         beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + "Definition"

@@ -44,58 +44,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     );
 
     /**
-     * Build the meta data for the given element
+     * Build the meta data for the given element. If the element is a method the class metadata will be included
      *
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata build(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        List<T> hierarchy = buildHierarchy(element);
-        for (T currentElement : hierarchy) {
-            List<? extends A> annotationHierarchy =
-                    getAnnotationsForType(currentElement);
-
-            if(annotationHierarchy.isEmpty()) continue;
-
-            Map<String, Map<CharSequence, Object>> annotationValues = new LinkedHashMap<>();
-
-            for (A a : annotationHierarchy) {
-                String annotationName = getAnnotationTypeName(a);
-                if(INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
-
-                Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
-                List<A> stereotypeHierarchy = new ArrayList<>();
-                buildStereotypeHierarchy(getTypeForAnnotation(a), stereotypeHierarchy);
-                Collections.reverse(stereotypeHierarchy);
-                for (A stereotype : stereotypeHierarchy) {
-                    populateAnnotationData(stereotype, stereotypes, stereotypes);
-                }
-
-                Map<CharSequence, Object> values = populateAnnotationData(a, annotationValues, stereotypes);
-
-                if(currentElement == element) {
-                    annotationMetadata.addDeclaredAnnotation(annotationName, values);
-                    if(!stereotypes.isEmpty()) {
-                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                            annotationMetadata.addDeclaredStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
-                        }
-                    }
-                }
-                else {
-                    annotationMetadata.addAnnotation(annotationName, values);
-                    if(!stereotypes.isEmpty()) {
-                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                            annotationMetadata.addStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
-                        }
-                    }
-                }
-            }
-
-        }
-        return annotationMetadata;
+        return buildInternal(element, annotationMetadata, true);
     }
 
+    /**
+     * Build the meta data for the given method element excluding any class metadata
+     *
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForMethod(T element) {
+        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        return buildInternal(element, annotationMetadata, false);
+    }
 
     /**
      * Get the type of the given annotation
@@ -103,6 +71,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The type
      */
     protected abstract T getTypeForAnnotation(A annotationMirror);
+
 
     /**
      * Get the given type of the annotation
@@ -119,14 +88,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract List<? extends A> getAnnotationsForType(T element);
 
-
     /**
      * Build the type hierarchy for the given element
      *
      * @param element The element
+     * @param inheritTypeAnnotations
      * @return The type hierarchy
      */
-    protected abstract List<T> buildHierarchy(T element);
+    protected abstract List<T> buildHierarchy(T element, boolean inheritTypeAnnotations);
+
 
     /**
      * Read the given member and value, applying conversions if necessary, and place the data in the given map
@@ -198,6 +168,52 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return annotationValues;
         }
         return Collections.emptyMap();
+    }
+
+    private AnnotationMetadata buildInternal(T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
+        List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations);
+        for (T currentElement : hierarchy) {
+            List<? extends A> annotationHierarchy =
+                    getAnnotationsForType(currentElement);
+
+            if(annotationHierarchy.isEmpty()) continue;
+
+            Map<String, Map<CharSequence, Object>> annotationValues = new LinkedHashMap<>();
+
+            for (A a : annotationHierarchy) {
+                String annotationName = getAnnotationTypeName(a);
+                if(INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
+
+                Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
+                List<A> stereotypeHierarchy = new ArrayList<>();
+                buildStereotypeHierarchy(getTypeForAnnotation(a), stereotypeHierarchy);
+                Collections.reverse(stereotypeHierarchy);
+                for (A stereotype : stereotypeHierarchy) {
+                    populateAnnotationData(stereotype, stereotypes, stereotypes);
+                }
+
+                Map<CharSequence, Object> values = populateAnnotationData(a, annotationValues, stereotypes);
+
+                if(currentElement == element) {
+                    annotationMetadata.addDeclaredAnnotation(annotationName, values);
+                    if(!stereotypes.isEmpty()) {
+                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
+                            annotationMetadata.addDeclaredStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
+                        }
+                    }
+                }
+                else {
+                    annotationMetadata.addAnnotation(annotationName, values);
+                    if(!stereotypes.isEmpty()) {
+                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
+                            annotationMetadata.addStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
+                        }
+                    }
+                }
+            }
+
+        }
+        return annotationMetadata;
     }
 
     private Map<CharSequence, Object> resolveAnnotationData(Map<String, Map<CharSequence, Object>> annotationData, String annotationName, Map<? extends T, ?> elementValues) {

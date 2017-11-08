@@ -50,7 +50,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected List<AnnotatedNode> buildHierarchy(AnnotatedNode element) {
+    protected List<AnnotatedNode> buildHierarchy(AnnotatedNode element, boolean inheritTypeAnnotations) {
         if(element instanceof ClassNode) {
             List<AnnotatedNode> hierarchy = new ArrayList<>()
             ClassNode cn = (ClassNode) element
@@ -60,7 +60,13 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
         }
         else if(element instanceof MethodNode) {
             MethodNode mn = (MethodNode)element
-            List<AnnotatedNode> hierarchy = buildHierarchy(mn.getDeclaringClass())
+            List<AnnotatedNode> hierarchy
+            if(inheritTypeAnnotations) {
+                hierarchy = buildHierarchy(mn.getDeclaringClass(), false)
+            }
+            else {
+                hierarchy = []
+            }
             if (!mn.getAnnotations(ANN_OVERRIDE).isEmpty()) {
                 hierarchy.addAll(findOverriddenMethods(mn))
             }

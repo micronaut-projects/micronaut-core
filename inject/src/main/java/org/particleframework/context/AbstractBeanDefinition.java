@@ -53,8 +53,6 @@ import java.util.stream.Stream;
 @Internal
 public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
-    private final Annotation scope;
-    private final boolean singleton;
     private final Class<T> type;
     private final Class<?> declaringType;
     private boolean hasPreDestroyMethods = false;
@@ -81,8 +79,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Internal
     protected AbstractBeanDefinition(Method method,
                                      Argument... arguments) {
-        this.scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, method.getAnnotations()).orElse(null);
-        this.singleton = AnnotationUtil.findAnnotationWithStereoType(Singleton.class, method.getAnnotations()).isPresent();
         this.type = (Class<T>) method.getReturnType();
         this.declaringType = method.getDeclaringClass();
         this.constructor = new MethodConstructorInjectionPoint(
@@ -98,8 +94,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                                      Class<T> type,
                                      Constructor<T> constructor,
                                      Argument... arguments) {
-        this.scope = scope;
-        this.singleton = singleton;
         this.type = type;
         this.declaringType = type;
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
@@ -209,12 +203,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public boolean isSingleton() {
-        return singleton;
+        return hasDeclaredStereotype(Singleton.class);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Annotation getScope() {
-        return this.scope;
+    public Class<? extends Annotation> getScope() {
+        return getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class).orElse(null);
     }
 
     @Override

@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.scope;
 
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanIdentifier;
 
 import javax.inject.Provider;
@@ -40,13 +41,13 @@ public interface CustomScope<A extends Annotation> {
     /**
      * Resolve an object from the given scope
      *
-     * @param scopeAnnotation The scope annotation
+     * @param beanDefinition The bean definition
      * @param identifier The {@link BeanIdentifier}
      * @param provider The provider that will build the bean definition
      * @param <T> The bean generic type
      * @return The bean instance
      */
-    <T> T get(A scopeAnnotation, BeanIdentifier identifier, Provider<T> provider);
+    <T> T get(BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider);
 
     /**
      * Remove a bean definition from the scope

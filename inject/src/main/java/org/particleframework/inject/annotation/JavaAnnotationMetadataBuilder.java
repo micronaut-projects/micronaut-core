@@ -59,7 +59,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected List<Element> buildHierarchy(Element element) {
+    protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations) {
         if(element instanceof TypeElement) {
             List<Element> hierarchy = new ArrayList<>();
             hierarchy.add(element);
@@ -73,7 +73,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             // with type level data
             ExecutableElement executableElement = (ExecutableElement) element;
             // the starting hierarchy is the type and super types of this method
-            List<Element> hierarchy = buildHierarchy(executableElement.getEnclosingElement());
+            List<Element> hierarchy;
+            if(inheritTypeAnnotations) {
+                hierarchy = buildHierarchy(executableElement.getEnclosingElement(), false);
+            }
+            else {
+                hierarchy = new ArrayList<>();
+            }
             if( hasAnnotation(executableElement, Override.class)) {
                 hierarchy.addAll( findOverriddenMethods(executableElement) );
             }
