@@ -498,8 +498,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
             else if(!isConstructor) {
-                boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
-                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !methodAnnotationMetadata.hasAnnotation(Internal) && !methodNode.isSynthetic() && !methodNode.isStatic() && !methodNode.isAbstract() && !methodNode.isPrivate()
+                boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
+                boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
+                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !hasInvalidModifiers
                 if(isExecutable) {
                     if(declaringClass != ClassHelper.OBJECT_TYPE) {
 

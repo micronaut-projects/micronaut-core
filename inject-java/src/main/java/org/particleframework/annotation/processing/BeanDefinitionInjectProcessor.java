@@ -364,8 +364,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
             // handle @Bean annotation for @Factory class
-            if (isFactoryType && annotationUtils.hasStereotype(method, Bean.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
+            if (isFactoryType && methodAnnotationMetadata.hasStereotype(Bean.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
                 visitBeanFactoryMethod(method);
                 return null;
             }
@@ -374,9 +375,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            boolean injected = annotationUtils.hasStereotype(method, Inject.class);
-            boolean postConstruct = annotationUtils.hasStereotype(method, PostConstruct.class);
-            boolean preDestroy = annotationUtils.hasStereotype(method, PreDestroy.class);
+            boolean injected = methodAnnotationMetadata.hasStereotype(Inject.class);
+            boolean postConstruct = methodAnnotationMetadata.hasStereotype(PostConstruct.class);
+            boolean preDestroy = methodAnnotationMetadata.hasStereotype(PreDestroy.class);
             if (injected || postConstruct || preDestroy) {
 
                 visitAnnotatedMethod(method, o);
@@ -388,9 +389,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            boolean isPublicMethod = method.getModifiers().contains(PUBLIC);
-            boolean isExecutableMethod = annotationUtils.hasStereotype(method, Executable.class) ;
-            if ((isExecutableMethod || (isExecutableType && isPublicMethod)) && !annotationUtils.hasStereotype(method, Internal.class)) {
+            Set<Modifier> modifiers = method.getModifiers();
+            boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
+            boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
+            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable.class)) && !hasInvalidModifiers;
+            if (isExecutable) {
                 visitExecutableMethod(method);
                 return null;
             }
