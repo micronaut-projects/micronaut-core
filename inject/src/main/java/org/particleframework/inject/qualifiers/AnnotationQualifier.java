@@ -37,21 +37,19 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
 
         return candidates.filter(candidate -> {
                     String candidateName;
-                    if(candidate instanceof NameResolver) {
+                    if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getType().getSimpleName());
-                    }
-                    else {
-                        Optional<Named> annotation = candidate.findAnnotation(Named.class);
-                        candidateName = annotation.map(Named::value).orElse( candidate.getType().getSimpleName() );
+                    } else {
+                        Named named = candidate.getType().getAnnotation(Named.class);
+                        candidateName = named != null ? named.value() : candidate.getType().getSimpleName();
                     }
 
-                    if(candidateName.equalsIgnoreCase(name)) {
+                    if (candidateName.equalsIgnoreCase(name)) {
                         return true;
-                    }
-                    else {
+                    } else {
 
                         String qualified = name + beanType.getSimpleName();
-                        if(qualified.equals(candidateName)) {
+                        if (qualified.equals(candidateName)) {
                             return true;
                         }
                     }

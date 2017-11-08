@@ -36,10 +36,12 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
+import org.particleframework.annotation.processing.BeanDefinitionInjectProcessor;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import javax.lang.model.element.Element;
@@ -57,6 +59,14 @@ public final class Parser {
      */
     public static Iterable<? extends Element> parseLines(String className, String... lines) {
         return parse(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
+    }
+
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     */
+    public static Iterable<? extends JavaFileObject> generate(String className, String... lines) {
+        return generate(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
     }
     /**
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
@@ -93,6 +103,46 @@ public final class Parser {
         }
     }
 
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     */
+    public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
+        InMemoryJavaFileManager fileManager =
+                new InMemoryJavaFileManager(
+                        compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
+        Context context = new Context();
+        JavacTask task =
+                ((JavacTool) compiler)
+                        .getTask(
+                                null, // explicitly use the default because old javac logs some output on stderr
+                                fileManager,
+                                diagnosticCollector,
+                                ImmutableSet.of(),
+                                ImmutableSet.of(),
+                                Arrays.asList(sources),
+                                context);
+        try {
+            task.setProcessors(Collections.singletonList(new BeanDefinitionInjectProcessor()));
+            task.generate();
+
+            List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();
+            StringBuilder error = new StringBuilder();
+            for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
+                if( diagnostic.getKind() == Diagnostic.Kind.ERROR ) {
+                    error.append(diagnostic);
+                }
+            }
+            if(error.length() > 0) {
+                throw new RuntimeException(error.toString());
+            }
+            return fileManager.getOutputFiles();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
     /**
      * Returns {@code true} if errors were found while parsing source files.
      *

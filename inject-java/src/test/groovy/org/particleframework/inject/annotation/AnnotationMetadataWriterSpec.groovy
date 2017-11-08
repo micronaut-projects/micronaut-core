@@ -18,22 +18,23 @@ package org.particleframework.inject.annotation
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Primary
 import org.particleframework.core.annotation.AnnotationMetadata
-import spock.lang.Specification
 
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class AnnotationMetadataWriterSpec extends Specification {
+class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
     void "test write first level stereotype data"() {
 
         given:
-        AnnotationMetadata toWrite = JavaAnnotationMetadataBuilderSpec.buildTypeAnnotationMetadata('''\
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
 package test;
 
 @org.particleframework.context.annotation.Primary
@@ -44,13 +45,15 @@ class Test {
 
         when:
         def className = "test"
-        AnnotationMetadata metadata = writeAndLoad(className, toWrite)
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
 
         then:
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
         !metadata.hasDeclaredAnnotation(Singleton)
         metadata.hasAnnotation(Primary)
+        !metadata.hasStereotype(Documented) // ignore internal annotations
+        !metadata.hasStereotype(Retention) // ignore internal annotations
         metadata.hasStereotype(Qualifier)
         !metadata.hasStereotype(Singleton)
     }
@@ -58,7 +61,7 @@ class Test {
     void "test write inherited stereotype data attributes"() {
 
         given:
-        AnnotationMetadata toWrite = JavaAnnotationMetadataBuilderSpec.buildTypeAnnotationMetadata('''\
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
 package test;
 
 @org.particleframework.inject.annotation.Trace(type = Test.class, types = {Test.class}, something = true)
@@ -68,7 +71,7 @@ class Test {
 
         when:
         def className = "test"
-        AnnotationMetadata metadata = writeAndLoad(className, toWrite)
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
 
         then:
         metadata != null
@@ -94,7 +97,7 @@ class Test {
     void "test write super class inherited interface stereotype data attributes"() {
 
         given:
-        AnnotationMetadata toWrite = JavaAnnotationMetadataBuilderSpec.buildTypeAnnotationMetadata('''\
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
 package test;
 
 
@@ -111,7 +114,7 @@ interface ITest {
 
         when:
         def className = "test"
-        AnnotationMetadata metadata = writeAndLoad(className, toWrite)
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
 
         then:
         metadata != null
@@ -132,26 +135,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationsByStereotype(Around.name) == [Trace.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name] as Set
     }
 
-    protected AnnotationMetadata writeAndLoad(String className, AnnotationMetadata toWrite) {
-        def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite)
-                .writeTo(stream)
-        className = className + AnnotationMetadataWriter.CLASS_NAME_SUFFIX
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                if (name == className) {
-                    def bytes = stream.toByteArray()
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
-
-        AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
-        return metadata
-    }
 }

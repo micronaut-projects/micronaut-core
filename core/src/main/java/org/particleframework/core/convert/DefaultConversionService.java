@@ -397,6 +397,18 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((Object[]) newArray);
         });
 
+        // Object[] -> String[]
+        addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
+            String[] strings = new String[object.length];
+            for (int i = 0; i < object.length; i++) {
+                Object o = object[i];
+                if(o != null) {
+                    strings[i] = o.toString();
+                }
+            }
+            return Optional.of(strings);
+        });
+
         // String -> Enum
         addConverter(CharSequence.class, Enum.class, (CharSequence object, Class<Enum> targetType, ConversionContext context) -> {
             String stringValue = object.toString();

@@ -32,7 +32,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 boolean requiresReflection,
                                 Argument...arguments) {
         this.method = method;
-        this.annotationElements = new AnnotatedElement[] { method, declaringBean};
+        this.annotationElements = new AnnotatedElement[] { method, declaringBean.getType()};
         this.requiresReflection = requiresReflection;
         if (requiresReflection) {
             this.method.setAccessible(true);
@@ -47,7 +47,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                                 boolean requiresReflection,
                                 Argument...arguments) {
         this.method = method;
-        this.annotationElements = new AnnotatedElement[] { field, method, declaringComponent};
+        this.annotationElements = new AnnotatedElement[] { field, method, declaringComponent.getType()};
         this.requiresReflection = requiresReflection;
         if(requiresReflection) {
             this.method.setAccessible(true);

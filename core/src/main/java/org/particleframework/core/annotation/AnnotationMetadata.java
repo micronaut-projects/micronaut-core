@@ -16,6 +16,7 @@
 package org.particleframework.core.annotation;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -91,7 +92,7 @@ public interface AnnotationMetadata {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    Set<String> getAnnotationsByStereotype(String stereotype);
+    Set<String> getAnnotationNamesByStereotype(String stereotype);
     /**
      * Get all of the values for the given annotation
      *
@@ -113,8 +114,8 @@ public interface AnnotationMetadata {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<String> getAnnotationByStereotype(String stereotype) {
-        return getAnnotationsByStereotype(stereotype).stream().findFirst();
+    default Optional<String> getAnnotationNameByStereotype(String stereotype) {
+        return getAnnotationNamesByStereotype(stereotype).stream().findFirst();
     }
 
     /**
@@ -122,8 +123,26 @@ public interface AnnotationMetadata {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<String> getAnnotationByStereotype(Class<? extends Annotation> stereotype) {
-        return getAnnotationByStereotype(stereotype.getName());
+    default Optional<Class> getAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
+        return getAnnotationTypeByStereotype(stereotype.getName());
+    }
+
+    /**
+     * Find the first annotation name for the given stereotype
+     * @param stereotype The stereotype
+     * @return The annotation name
+     */
+    default Optional<Class> getAnnotationTypeByStereotype(String stereotype) {
+        return getAnnotationNameByStereotype(stereotype).flatMap(name -> ClassUtils.forName(name, getClass().getClassLoader()));
+    }
+
+    /**
+     * Find the first annotation name for the given stereotype
+     * @param stereotype The stereotype
+     * @return The annotation name
+     */
+    default Optional<String> getAnnotationNameByStereotype(Class<? extends Annotation> stereotype) {
+        return getAnnotationNameByStereotype(stereotype.getName());
     }
     /**
      * Get all of the values for the given annotation
@@ -140,8 +159,8 @@ public interface AnnotationMetadata {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default Set<String> getAnnotationsByStereotype(Class<? extends Annotation> stereotype) {
-        return getAnnotationsByStereotype(stereotype.getName());
+    default Set<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
+        return getAnnotationNamesByStereotype(stereotype.getName());
     }
     /**
      * Get all of the values for the given annotation
@@ -175,6 +194,44 @@ public interface AnnotationMetadata {
     default OptionalLong longValue(String annotation, String member) {
         Optional<Long> result = getValues(annotation).get(member, Long.class);
         return result.map(OptionalLong::of).orElseGet(OptionalLong::empty);
+    }
+
+    /**
+     * The value of the annotation as a Class
+     * @param annotation The annotation
+     * @return An {@link Optional} class
+     */
+    default Optional<Class> classValue(String annotation) {
+        return classValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value of the annotation as a Class
+     * @param annotation The annotation
+     * @param member The annotation member
+     * @return An {@link Optional} class
+     */
+    default Optional<Class> classValue(String annotation, String member) {
+        return getValues(annotation).get(member, Class.class);
+    }
+
+    /**
+     * The value of the annotation as a Class
+     * @param annotation The annotation
+     * @return An {@link Optional} class
+     */
+    default Optional<Class> classValue(Class<? extends Annotation> annotation) {
+        return classValue(annotation.getName());
+    }
+
+    /**
+     * The value of the annotation as a Class
+     * @param annotation The annotation
+     * @param member The annotation member
+     * @return An {@link Optional} class
+     */
+    default Optional<Class> classValue(Class<? extends Annotation> annotation, String member) {
+        return classValue(annotation.getName(), member);
     }
 
     /**
@@ -378,4 +435,6 @@ public interface AnnotationMetadata {
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         return stereotype != null && hasDeclaredStereotype(stereotype.getName());
     }
+
+
 }

@@ -1,5 +1,7 @@
 package org.particleframework.context.env;
 
+import org.particleframework.context.converters.StringArrayToClassArrayConverter;
+import org.particleframework.context.converters.StringToClassConverter;
 import org.particleframework.core.value.MapPropertyResolver;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.annotation.Nullable;
@@ -55,6 +57,12 @@ public class DefaultEnvironment implements Environment {
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
         this.names = names == null ? Collections.emptySet() : Collections.unmodifiableSet(new HashSet<>(Arrays.asList(names)));
         this.conversionService = conversionService;
+        conversionService.addConverter(
+                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+        );
+        conversionService.addConverter(
+                Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
+        );
         this.classLoader = classLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
 

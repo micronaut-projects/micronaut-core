@@ -49,7 +49,7 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Set<String> getAnnotationsByStereotype(String stereotype) {
+    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
         return Collections.emptySet();
     }
 

@@ -29,12 +29,14 @@ import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.value.OptionalValues;
 import org.particleframework.inject.*;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
@@ -49,7 +51,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -447,6 +448,7 @@ public class DefaultBeanContext implements BeanContext {
         return getBeanProvider(resolutionContext, beanType, null);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier) {
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
@@ -635,9 +637,6 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        for (BeanDefinition<T> candidate : candidates) {
-            beanDefinitions.put(candidate.getType(), candidate);
-        }
 
         if (candidates.isEmpty()) {
             if (LOG.isDebugEnabled()) {
@@ -647,6 +646,9 @@ public class DefaultBeanContext implements BeanContext {
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Resolved bean candidates {} for type: {}", candidates, beanType);
+            }
+            for (BeanDefinition<T> candidate : candidates) {
+                beanDefinitions.put(candidate.getType(), candidate);
             }
             return candidates;
         }
@@ -1043,8 +1045,8 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
             if (qualifier == null) {
-                Optional<javax.inject.Named> optional = beanDefinition.findAnnotation(javax.inject.Named.class);
-                qualifier = (Qualifier<T>) optional.map(Qualifiers::byAnnotation).orElse(null);
+                Optional<String> optional = beanDefinition.getValue(javax.inject.Named.class, String.class);
+                qualifier = (Qualifier<T>) optional.map(name -> Qualifiers.byAnnotation(beanDefinition, name)).orElse(null);
 
             }
         }
@@ -1064,24 +1066,24 @@ public class DefaultBeanContext implements BeanContext {
 
         Class<?> createdType = createdBean.getClass();
         BeanKey createdBeanKey = new BeanKey(createdType, qualifier);
-        Optional<Annotation> qualifierAnn = beanDefinition.findAnnotationWithStereoType(javax.inject.Qualifier.class);
+        Optional<Class> qualifierAnn = beanDefinition.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
         if(qualifierAnn.isPresent()) {
 
-            Annotation annotation = qualifierAnn.get();
-            if(annotation.annotationType() == Primary.class) {
+            Class annotation = qualifierAnn.get();
+            if(Primary.class == annotation) {
                 BeanKey primaryBeanKey = new BeanKey(beanType, null);
                 singletonObjects.put(primaryBeanKey, registration);
             }
             else {
 
-                BeanKey qualifierKey = new BeanKey(createdType, Qualifiers.byAnnotation(annotation));
+                BeanKey qualifierKey = new BeanKey(createdType, Qualifiers.byAnnotation(beanDefinition, annotation.getName()));
                 if(!qualifierKey.equals(createdBeanKey)) {
                     singletonObjects.put(qualifierKey, registration);
                 }
             }
         }
         else {
-            if(!beanDefinition.findAnnotation(ForEach.class).isPresent()) {
+            if(!beanDefinition.hasDeclaredAnnotation(ForEach.class)) {
                 BeanKey primaryBeanKey = new BeanKey(createdType, null);
                 singletonObjects.put(primaryBeanKey, registration);
             }
@@ -1584,8 +1586,38 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public AnnotatedElement[] getAnnotatedElements() {
-            return new AnnotatedElement[]{singletonClass};
+        public boolean hasDeclaredAnnotation(String annotation) {
+            return false;
+        }
+
+        @Override
+        public boolean hasAnnotation(String annotation) {
+            return false;
+        }
+
+        @Override
+        public boolean hasStereotype(String annotation) {
+            return false;
+        }
+
+        @Override
+        public boolean hasDeclaredStereotype(String annotation) {
+            return false;
+        }
+
+        @Override
+        public Set<String> getAnnotationNamesByStereotype(String stereotype) {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public ConvertibleValues<Object> getValues(String annotation) {
+            return ConvertibleValues.empty();
+        }
+
+        @Override
+        public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
+            return OptionalValues.empty();
         }
     }
 

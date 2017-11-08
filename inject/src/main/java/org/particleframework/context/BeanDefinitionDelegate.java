@@ -18,7 +18,9 @@ package org.particleframework.context;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.value.OptionalValues;
 import org.particleframework.core.value.ValueResolver;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.core.naming.Named;
@@ -155,11 +157,6 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return definition.getAnnotatedElements();
-    }
-
-    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -209,6 +206,41 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     public void put(String name, Object value) {
         this.attributes.put(name, value);
+    }
+
+    @Override
+    public boolean hasDeclaredAnnotation(String annotation) {
+        return getTarget().hasDeclaredAnnotation(annotation);
+    }
+
+    @Override
+    public boolean hasAnnotation(String annotation) {
+        return getTarget().hasAnnotation(annotation);
+    }
+
+    @Override
+    public boolean hasStereotype(String annotation) {
+        return getTarget().hasStereotype(annotation);
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(String annotation) {
+        return getTarget().hasDeclaredStereotype(annotation);
+    }
+
+    @Override
+    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
+        return getTarget().getAnnotationNamesByStereotype(stereotype);
+    }
+
+    @Override
+    public ConvertibleValues<Object> getValues(String annotation) {
+        return getTarget().getValues(annotation);
+    }
+
+    @Override
+    public <T1> OptionalValues<T1> getValues(String annotation, Class<T1> valueType) {
+        return getTarget().getValues(annotation, valueType);
     }
 
     interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {

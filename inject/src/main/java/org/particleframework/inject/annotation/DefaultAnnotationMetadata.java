@@ -87,7 +87,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Set<String> getAnnotationsByStereotype(String stereotype) {
+    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
         if(annotationsByStereotype != null) {
             Set<String> annotations = annotationsByStereotype.get(stereotype);
             if(annotations != null) {

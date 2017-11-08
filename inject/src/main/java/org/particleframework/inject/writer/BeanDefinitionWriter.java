@@ -9,11 +9,13 @@ import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
 import org.particleframework.context.annotation.Value;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +24,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -219,6 +222,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
     private List<TypeAnnotationSource> annotationSourceList = new ArrayList<>();
+    private AnnotationMetadataWriter annotationMetadataWriter;
 
     /**
      * Creates a bean definition writer
@@ -463,6 +467,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             finalizeInjectMethod();
             finalizeBuildMethod();
+            if(annotationMetadataWriter != null) {
+                String fieldName = "$annotationMetadata";
+                Type annotationMetadata = Type.getType(AnnotationMetadata.class);
+
+                // add the field
+                classWriter.visitField(ACC_PRIVATE | ACC_FINAL, fieldName, annotationMetadata.getDescriptor(), null, null);
+                // assign the field in the constructor
+                Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
+                constructorVisitor.loadThis();
+                constructorVisitor.newInstance(concreteMetadataType);
+                constructorVisitor.dup();
+                constructorVisitor.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
+                constructorVisitor.putField(beanDefinitionType, fieldName, annotationMetadata);
+
+                GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
+                annotationMetadataMethod.loadThis();
+                annotationMetadataMethod.getField(beanDefinitionType, fieldName, annotationMetadata);
+                annotationMetadataMethod.returnValue();
+                annotationMetadataMethod.visitMaxs(1,1);
+                annotationMetadataMethod.visitEnd();
+            }
             constructorVisitor.visitInsn(RETURN);
             constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
             if (buildMethodVisitor != null) {
@@ -482,6 +507,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 preDestroyMethodVisitor.visitInsn(ARETURN);
                 preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
             }
+
             if(!annotationSourceList.isEmpty()) {
                 GeneratorAdapter annotatedElementMethod = writeGetAnnotatedElementsMethod(classWriter, TYPE_ABSTRACT_BEAN_DEFINITION, annotationSourceList);
                 annotatedElementMethod.visitMaxs(1,1);
@@ -499,7 +525,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!beanFinalized) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
-        return ((ClassWriter) classWriter).toByteArray();
+        return classWriter.toByteArray();
     }
 
     @Override
@@ -511,6 +537,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             try {
+                if(annotationMetadataWriter != null) {
+                    try(OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
+                        annotationMetadataWriter.writeTo(outputStream);
+                    }
+                }
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
                 methodExecutors.forEach((className, classWriter) -> {
                     try {
@@ -823,6 +854,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
         visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD, isOptional);
+    }
+
+    @Override
+    public void visitAnnotationMetadata(AnnotationMetadata metadata) {
+        this.annotationMetadataWriter = new AnnotationMetadataWriter(beanDefinitionName, metadata);
     }
 
 

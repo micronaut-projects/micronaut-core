@@ -22,6 +22,7 @@ class PrimarySpec extends Specification {
         B b = context.getBean(B)
 
         then:"The impl marked with @Primary is selected"
+        context.getBeanDefinition(A2).isPrimary()
         b.all.size() == 2
         b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }

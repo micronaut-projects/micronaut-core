@@ -15,26 +15,20 @@
  */
 package org.particleframework.inject.annotation
 
-import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.util.Context
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
 import org.particleframework.core.annotation.AnnotationMetadata
-import org.particleframework.support.Parser
-import spock.lang.Specification
 
 import javax.inject.Qualifier
 import javax.inject.Scope
 import javax.inject.Singleton
-import javax.lang.model.element.Element
-import javax.lang.model.element.TypeElement
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class JavaAnnotationMetadataBuilderSpec extends Specification {
+class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
 
     void "test parse first level stereotype data"() {
 
@@ -80,7 +74,7 @@ interface A {
         metadata.hasDeclaredAnnotation(Singleton)
         metadata.hasStereotype(Singleton)
         metadata.hasStereotype(Scope)
-        metadata.getAnnotationByStereotype(Singleton).get() == 'javax.inject.Singleton'
+        metadata.getAnnotationNameByStereotype(Singleton).get() == 'javax.inject.Singleton'
     }
 
     void "test parse inherited stereotype data"() {
@@ -285,7 +279,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationsByStereotype(Around.name) == [Trace.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name] as Set
     }
 
 
@@ -361,26 +355,5 @@ interface ITest {
         !metadata.hasStereotype(Singleton)
     }
 
-    static AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
-        List<Element> elements = Parser.parseLines( "",
-                cls
-        ).toList()
 
-        Element element = elements ? elements[0] : null
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
-        return metadata
-    }
-
-    static AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
-        List<Element> elements = Parser.parseLines( "",
-                cls
-        ).toList()
-
-        TypeElement element = elements ? elements[0] : null
-        Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
-        return metadata
-    }
 }

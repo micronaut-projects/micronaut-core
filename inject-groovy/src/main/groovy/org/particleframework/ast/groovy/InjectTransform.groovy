@@ -213,15 +213,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitClass(ClassNode node) {
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node)
             if(annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
-                String scopeType = annotationMetadata.getAnnotationByStereotype(Scope).orElse(null)
+                String scopeType = annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null)
                 String packageName= node.packageName
                 String beanClassName = node.nameWithoutPackage
 
                 Object[] aroundInterceptors = annotationMetadata
-                        .getAnnotationsByStereotype(AROUND_TYPE)
+                        .getAnnotationNamesByStereotype(AROUND_TYPE)
                         .toArray()
                 Object[] introductionInterceptors = annotationMetadata
-                        .getAnnotationsByStereotype(Introduction.class)
+                        .getAnnotationNamesByStereotype(Introduction.class)
                         .toArray()
 
 
@@ -236,6 +236,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         isInterface,
                         isSingleton,
                         interceptorTypes)
+                aopProxyWriter.visitAnnotationMetadata(annotationMetadata)
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
@@ -315,7 +316,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
             if( isFactoryClass && !isConstructor && methodAnnotationMetadata.hasStereotype(Bean)) {
                 ClassNode producedType = methodNode.returnType
-                String scopeAnn = methodAnnotationMetadata.getAnnotationByStereotype(Scope).orElse(null)
+                String scopeAnn = methodAnnotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null)
                 String beanDefinitionPackage = concreteClass.packageName;
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
                 String factoryMethodBeanDefinitionName =
@@ -329,6 +330,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         producedType.isInterface(),
                         scopeAnn,
                         methodAnnotationMetadata.hasDeclaredStereotype(Singleton))
+                beanMethodWriter.visitAnnotationMetadata(methodAnnotationMetadata)
 
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> qualifierTypes = [:]
@@ -344,7 +346,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 if(methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
-                    Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationsByStereotype(Around).toArray()
+                    Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues( AROUND_TYPE, Boolean )
                     Map<CharSequence, Object> finalSettings = [:]
                     for(key in aopSettings) {
@@ -362,6 +364,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     else {
                         populateProxyWriterConstructor(producedType, proxyWriter)
                     }
+                    proxyWriter.visitAnnotationMetadata(methodAnnotationMetadata)
                     proxyWriter.visitMethodAnnotationSource(
                             beanMethodDeclaringType,
                             methodName,
@@ -524,7 +527,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         if((isAopProxyType && isPublic) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
 
-                            Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationsByStereotype(Around).toArray()
+                            Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                             OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                             AopProxyWriter proxyWriter = resolveProxyWriter(
                                     aopSettings,
@@ -669,7 +672,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         Object resolveQualifier(AnnotatedNode annotatedNode) {
-            return AstAnnotationUtils.getAnnotationMetadata(annotatedNode).getAnnotationByStereotype(Qualifier).orElse(null)
+            return AstAnnotationUtils.getAnnotationMetadata(annotatedNode).getAnnotationNameByStereotype(Qualifier).orElse(null)
         }
 
         @Override
@@ -768,16 +771,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             classNode.isInterface(),
-                            annotationMetadata.getAnnotationByStereotype(Scope).orElse(null),
+                            annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null),
                             annotationMetadata.hasDeclaredStereotype(Singleton))
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
-                            annotationMetadata.getAnnotationByStereotype(Scope).orElse(null),
+                            annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null),
                             annotationMetadata.hasDeclaredStereotype(Singleton))
                 }
+                beanWriter.visitAnnotationMetadata(annotationMetadata)
                 beanDefinitionWriters.put(classNode, beanWriter)
 
 
@@ -818,7 +822,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                 if(isAopProxyType) {
-                    Object[] interceptorTypeReferences = annotationMetadata.getAnnotationsByStereotype(Around).toArray()
+                    Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                     resolveProxyWriter(aopSettings, false, interceptorTypeReferences)
                 }
 

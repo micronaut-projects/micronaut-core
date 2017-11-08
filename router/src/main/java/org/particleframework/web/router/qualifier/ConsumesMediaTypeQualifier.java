@@ -22,6 +22,7 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.http.annotation.Consumes;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,9 +44,9 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
     @Override
     public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
         return candidates.filter(candidate -> {
-                    Consumes consumes = candidate.getAnnotation(Consumes.class);
-                    if (consumes != null) {
-                        Set<String> consumedTypes = Arrays.stream(consumes.value()).map(MediaType::new).map(MediaType::getExtension).collect(Collectors.toSet());
+                    Optional<String[]> consumes = candidate.getValue(Consumes.class, String[].class);
+                    if (consumes.isPresent()) {
+                        Set<String> consumedTypes = Arrays.stream(consumes.get()).map(MediaType::new).map(MediaType::getExtension).collect(Collectors.toSet());
                         return consumedTypes.contains(contentType.getExtension());
                     }
                     return false;

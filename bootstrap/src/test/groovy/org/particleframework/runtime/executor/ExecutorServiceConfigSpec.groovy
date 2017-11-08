@@ -52,6 +52,11 @@ class ExecutorServiceConfigSpec extends Specification {
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+
+        then:
+        executorServices.size() == 3
+
+        when:
         ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
         ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
 
@@ -86,7 +91,7 @@ class ExecutorServiceConfigSpec extends Specification {
         where:
         invalidateCache | environment
         true            | "test"
-        false           | "test"
+//        false           | "test"
     }
 
 

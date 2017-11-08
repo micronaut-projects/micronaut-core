@@ -104,7 +104,7 @@ class AnnotationUtils {
      * @return The Qualifier or null
      */
     String resolveQualifier(Element element) {
-        return getAnnotationMetadata(element).getAnnotationByStereotype(Qualifier.class).orElse(null);
+        return getAnnotationMetadata(element).getAnnotationNameByStereotype(Qualifier.class).orElse(null);
     }
 
 

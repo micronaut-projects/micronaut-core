@@ -90,6 +90,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
+     * @return The class name that this metadata will generate
+     */
+    public String getClassName() {
+        return className;
+    }
+
+    /**
      * Write the class to the target directory
      *
      * @param targetDir The target directory

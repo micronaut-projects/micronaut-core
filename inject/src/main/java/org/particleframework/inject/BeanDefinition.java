@@ -2,6 +2,7 @@ package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -17,7 +18,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotationSource, Named {
+public interface BeanDefinition<T> extends AnnotationMetadata, Named {
 
     /**
      * @return The scope of the component

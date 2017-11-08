@@ -55,10 +55,10 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
         return endpointIds.computeIfAbsent(declaringType, aClass -> {
             Optional<? extends BeanDefinition<?>> opt = beanContext.findBeanDefinition(declaringType);
             if (opt.isPresent()) {
-                Endpoint endpoint = opt.get().getAnnotation(Endpoint.class);
-                if (endpoint != null) {
-                    String id = endpoint.value();
-                    if (!ENDPOINT_ID_PATTERN.matcher(id).matches()) {
+                BeanDefinition<?> beanDefinition = opt.get();
+                if (beanDefinition.hasStereotype(Endpoint.class)) {
+                    String id = beanDefinition.getValue(Endpoint.class, String.class).orElse(null);
+                    if (id == null || !ENDPOINT_ID_PATTERN.matcher(id).matches()) {
                         throw new BeanContextException("Invalid @Endpoint ID - Should only contain letters: " + id);
                     }
 

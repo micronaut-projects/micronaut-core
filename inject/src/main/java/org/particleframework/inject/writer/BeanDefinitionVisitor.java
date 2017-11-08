@@ -16,6 +16,7 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.Type;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.BeanDefinition;
 
 import java.io.File;
@@ -286,6 +287,11 @@ public interface BeanDefinitionVisitor {
                          String fieldName,
                          boolean isOptional);
 
+    /**
+     * Visit the annotation metadata for this bean
+     * @param metadata The annotation metadata
+     */
+    void visitAnnotationMetadata(AnnotationMetadata metadata);
     /**
      * Adds a method as a source of annotations
      *

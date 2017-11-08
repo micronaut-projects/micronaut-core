@@ -21,6 +21,7 @@ import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 
 import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.*;
@@ -35,7 +36,12 @@ import java.util.*;
  * @since 1.0
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
-    private static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(Retention.class.getName(), Documented.class.getName(), Target.class.getName());
+    private static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
+            Retention.class.getName(),
+            Repeatable.class.getName(),
+            Documented.class.getName(),
+            Target.class.getName()
+    );
 
     /**
      * Build the meta data for the given element
@@ -47,12 +53,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
         List<T> hierarchy = buildHierarchy(element);
         for (T currentElement : hierarchy) {
-            List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
+            List<? extends A> annotationHierarchy =
+                    getAnnotationsForType(currentElement);
+
             if(annotationHierarchy.isEmpty()) continue;
 
             Map<String, Map<CharSequence, Object>> annotationValues = new LinkedHashMap<>();
 
             for (A a : annotationHierarchy) {
+                String annotationName = getAnnotationTypeName(a);
+                if(INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
+
                 Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
                 List<A> stereotypeHierarchy = new ArrayList<>();
                 buildStereotypeHierarchy(getTypeForAnnotation(a), stereotypeHierarchy);
@@ -61,7 +72,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     populateAnnotationData(stereotype, stereotypes, stereotypes);
                 }
 
-                String annotationName = getAnnotationTypeName(a);
                 Map<CharSequence, Object> values = populateAnnotationData(a, annotationValues, stereotypes);
 
                 if(currentElement == element) {
@@ -85,6 +95,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         return annotationMetadata;
     }
+
 
     /**
      * Get the type of the given annotation
@@ -189,7 +200,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return Collections.emptyMap();
     }
 
-
     private Map<CharSequence, Object> resolveAnnotationData(Map<String, Map<CharSequence, Object>> annotationData, String annotationName, Map<? extends T, ?> elementValues) {
         return annotationData.computeIfAbsent(annotationName, s -> new LinkedHashMap<>(elementValues.size()));
     }
@@ -199,9 +209,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
         for (A annotationMirror : annotationMirrors) {
 
-            T annotationType = getTypeForAnnotation(annotationMirror);
-            String stereotypeName = annotationType.toString();
-            if(!INTERNAL_ANNOTATION_NAMES.contains(stereotypeName)) {
+            String annotationName = getAnnotationTypeName(annotationMirror);
+            if(!INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                T annotationType = getTypeForAnnotation(annotationMirror);
                 hierarchy.add(annotationMirror);
                 buildStereotypeHierarchy(annotationType, hierarchy);
             }

@@ -52,7 +52,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
-import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.type.TypeKind.ARRAY;
 
 @SupportedAnnotationTypes("*")
@@ -314,7 +313,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if(isAopProxyType) {
                             Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(concreteClass)
-                                                                       .getAnnotationsByStereotype(AROUND_TYPE)
+                                                                       .getAnnotationNamesByStereotype(AROUND_TYPE)
                                                                        .toArray();
                             resolveAopProxyWriter(
                                     beanDefinitionWriter,
@@ -424,14 +423,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     beanMethodParameters
             );
 
-            if(annotationUtils.hasStereotype(beanMethod,AROUND_TYPE)) {
-                Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(beanMethod)
-                        .getAnnotationsByStereotype(AROUND_TYPE)
+            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod);
+            if(methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
+                Object[] interceptorTypes = methodAnnotationMetadata
+                        .getAnnotationNamesByStereotype(AROUND_TYPE)
                         .toArray();
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
                 ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
-                OptionalValues<Boolean> aopSettings = annotationUtils.getAnnotationMetadata(beanMethod).getValues(AROUND_TYPE, Boolean.class);
+                OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
                 for (CharSequence setting : aopSettings) {
                     Optional<Boolean> entry = aopSettings.get(setting);
@@ -447,6 +447,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         constructorData,
                         interceptorTypes);
 
+                proxyWriter.visitAnnotationMetadata(methodAnnotationMetadata);
                 proxyWriter.visitMethodAnnotationSource(
                         beanMethodDeclaringType,
                         beanMethodName,
@@ -497,8 +498,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }, proxyWriter);
             }
 
-            Optional<String> preDestroyMethod = annotationUtils
-                                                    .getAnnotationMetadata(beanMethod)
+            Optional<String> preDestroyMethod = methodAnnotationMetadata
                                                     .getValue(Bean.class, "preDestroy", String.class);
             preDestroyMethod
                 .ifPresent(destroyMethodName -> {
@@ -539,7 +539,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(method)
-                        .getAnnotationsByStereotype(AROUND_TYPE)
+                        .getAnnotationNamesByStereotype(AROUND_TYPE)
                         .toArray();
 
                 OptionalValues<Boolean> settings = annotationUtils.getAnnotationMetadata( method ).getValues(AROUND_TYPE, Boolean.class);
@@ -829,55 +829,59 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 genericUtils.interfaceGenericTypeFor(typeElement, Provider.class);
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
             Optional<String> scopeAnn =
-                annotationMetadata.getAnnotationByStereotype(Scope.class);
+                annotationMetadata.getAnnotationNameByStereotype(Scope.class);
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
 
             boolean isSingleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
             boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
-            return new BeanDefinitionWriter(
-                packageElement.getQualifiedName().toString(),
-                beanClassName,
-                providerTypeParam == null
-                    ? elementUtils.getBinaryName(typeElement).toString()
-                    : providerTypeParam.toString(),
+            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
+                    packageElement.getQualifiedName().toString(),
+                    beanClassName,
+                    providerTypeParam == null
+                            ? elementUtils.getBinaryName(typeElement).toString()
+                            : providerTypeParam.toString(),
                     isInterface,
                     scopeAnn.orElse(null),
                     isSingleton);
+            beanDefinitionWriter.visitAnnotationMetadata(annotationMetadata);
+            return beanDefinitionWriter;
         }
 
         private AopProxyWriter createAopWriterFor(TypeElement typeElement) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
             Optional<String> scopeAnn =
-                    annotationMetadata.getAnnotationByStereotype(Scope.class);
+                    annotationMetadata.getAnnotationNameByStereotype(Scope.class);
 
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
             Object[] aroundInterceptors = annotationUtils.getAnnotationMetadata(typeElement)
-                    .getAnnotationsByStereotype(AROUND_TYPE)
+                    .getAnnotationNamesByStereotype(AROUND_TYPE)
                     .toArray();
             Object[] introductionInterceptors = annotationUtils.getAnnotationMetadata(typeElement)
-                    .getAnnotationsByStereotype(Introduction.class)
+                    .getAnnotationNamesByStereotype(Introduction.class)
                     .toArray();
 
             Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
             boolean isSingleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
             boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
-            return new AopProxyWriter(
+            AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
                     scopeAnn.orElse(null),
                     isInterface,
                     isSingleton,
                     interceptorTypes);
+            aopProxyWriter.visitAnnotationMetadata(annotationMetadata);
+            return aopProxyWriter;
         }
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
             Optional<String> scopeAnn =
-                    annotationMetadata.getAnnotationByStereotype(Scope.class);
+                    annotationMetadata.getAnnotationNameByStereotype(Scope.class);
 
             Element element = typeUtils.asElement(producedType);
             TypeElement producedElement = modelUtils.classElementFor(element);
@@ -892,7 +896,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String beanScope = scopeAnn.orElse(null);
             String upperCaseMethodName = NameUtils.capitalize(method.getSimpleName().toString());
             String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + "Definition";
-            return new BeanDefinitionWriter(
+            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
                     packageName,
                     shortClassName,
                     factoryMethodBeanDefinitionName,
@@ -900,6 +904,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     isInterface,
                     beanScope,
                     annotationMetadata.hasDeclaredStereotype(Singleton.class));
+            beanDefinitionWriter.visitAnnotationMetadata(annotationMetadata);
+            return beanDefinitionWriter;
         }
 
 

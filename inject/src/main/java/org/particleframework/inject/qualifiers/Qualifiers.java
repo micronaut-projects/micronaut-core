@@ -2,9 +2,11 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.Type;
+import org.particleframework.core.annotation.AnnotationMetadata;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * Factory for {@link org.particleframework.context.annotation.Bean} qualifiers
@@ -56,6 +58,41 @@ public class Qualifiers {
         }
     }
 
+    /**
+     * Build a qualifier for the given annotation
+     *
+     * @param metadata The metadata
+     * @param type The annotation type
+     * @param <T> The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, Class<? extends Annotation> type) {
+        return byAnnotation(metadata, type.getName());
+    }
+
+    /**
+     * Build a qualifier for the given annotation
+     *
+     * @param metadata The metadata
+     * @param type The annotation type
+     * @param <T> The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, String type) {
+        if(Type.class.getName().equals(type)) {
+            Optional<Class> aClass = metadata.classValue(type);
+            if(aClass.isPresent()) {
+                return byType(aClass.get());
+            }
+        }
+        else if(Named.class.getName().equals(type)) {
+            Optional<String> value = metadata.getValue(type, String.class);
+            if(value.isPresent()) {
+                return byName(value.get());
+            }
+        }
+        return new AnnotationMetadataQualifier<>(metadata, type);
+    }
     /**
      * Build a qualifier for the given generic type arguments
      *

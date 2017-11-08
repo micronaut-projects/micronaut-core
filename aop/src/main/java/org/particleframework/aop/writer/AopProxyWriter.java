@@ -25,6 +25,7 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.Qualifier;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.value.OptionalValues;
@@ -902,6 +903,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
         proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional);
+    }
+
+    @Override
+    public void visitAnnotationMetadata(AnnotationMetadata metadata) {
+        if(parentWriter != null) {
+            parentWriter.visitAnnotationMetadata(metadata);
+        }
+        proxyBeanDefinitionWriter.visitAnnotationMetadata(metadata);
     }
 
     @Override

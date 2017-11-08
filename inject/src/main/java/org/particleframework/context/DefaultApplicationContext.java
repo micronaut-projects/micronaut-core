@@ -8,7 +8,9 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.naming.Named;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
@@ -174,10 +176,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
             List<BeanDefinition> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
-                ForEach forEach = candidate.getAnnotation(ForEach.class);
-                if (forEach != null) {
+                if (candidate.hasStereotype(ForEach.class)) {
 
-                    String property = forEach.property();
+                    String property = candidate.getValue(ForEach.class, "property", String.class).orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
@@ -189,7 +190,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
                         }
                     } else {
-                        Class[] value = forEach.value();
+                        Optional<Class[]> opt = candidate.getValue(ForEach.class, Class[].class);
+                        Class[] value = opt.orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
                         if (value.length == 1) {
                             Class<?> dependentType = value[0];
                             Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
@@ -202,8 +204,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                         BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                         optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
                                     } else {
-                                        Optional<Annotation> candidateQualifier = dependentCandidate.findAnnotationWithStereoType(javax.inject.Qualifier.class);
-                                        optional = candidateQualifier.map(Qualifiers::byAnnotation);
+                                        Optional<String> qualiferName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
+                                        optional = qualiferName.map( name -> Qualifiers.byAnnotation(dependentCandidate, name));
                                     }
 
 

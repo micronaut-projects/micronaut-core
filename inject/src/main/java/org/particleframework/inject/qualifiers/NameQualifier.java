@@ -36,8 +36,8 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
         }
         return candidates.filter(candidate -> {
                     String typeName;
-                    Optional<Named> beanQualifier = candidate.findAnnotation(Named.class);
-                    typeName = beanQualifier.map(Named::value).orElseGet(() -> {
+                    Optional<String> beanQualifier = candidate.getValue(Named.class, String.class);
+                    typeName = beanQualifier.orElseGet(() -> {
                         if(candidate instanceof NameResolver) {
                             Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
                             return resolvedName.orElse(candidate.getType().getSimpleName());
@@ -52,7 +52,7 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (o == null || !NameQualifier.class.isAssignableFrom(o.getClass())) return false;
 
         NameQualifier<?> that = (NameQualifier<?>) o;
 
