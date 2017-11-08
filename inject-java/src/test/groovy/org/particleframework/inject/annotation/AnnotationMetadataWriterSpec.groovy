@@ -137,10 +137,9 @@ interface ITest {
 
     protected AnnotationMetadata writeAndLoad(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-
         new AnnotationMetadataWriter(className, toWrite)
                 .writeTo(stream)
-
+        className = className + AnnotationMetadataWriter.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {

@@ -1,7 +1,8 @@
 package org.particleframework.ast.groovy.utils
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import groovy.transform.CompileStatic
-import groovy.transform.Memoized
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
@@ -9,6 +10,7 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
 import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import org.particleframework.core.annotation.AnnotationMetadata
+import org.particleframework.core.annotation.Internal
 
 import java.lang.annotation.Annotation
 import java.lang.annotation.Documented
@@ -24,14 +26,25 @@ import java.lang.annotation.Target
 @CompileStatic
 class AstAnnotationUtils {
 
+    private static final Cache<AnnotatedNode, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(100).build();
+
     /**
      * Get the {@link AnnotationMetadata} for the given annotated node
      * @param annotatedNode The node
      * @return The metadata
      */
-    @Memoized(maxCacheSize = 100)
     static AnnotationMetadata getAnnotationMetadata(AnnotatedNode annotatedNode) {
-        return new GroovyAnnotationMetadataBuilder().build(annotatedNode)
+        return annotationMetadataCache.get(annotatedNode, { AnnotatedNode annotatedNode1 ->
+            new GroovyAnnotationMetadataBuilder().build(annotatedNode1)
+        })
+    }
+
+    /**
+     * Invalidates any cached metadata
+     */
+    @Internal
+    static void invalidateCache() {
+        annotationMetadataCache.invalidateAll()
     }
 
     /**

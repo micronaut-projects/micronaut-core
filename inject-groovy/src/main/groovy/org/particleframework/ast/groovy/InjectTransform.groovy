@@ -250,7 +250,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 superClasses = superClasses.reverse()
                 for (classNode in superClasses) {
-                    if(classNode.name != ClassHelper.OBJECT_TYPE.name) {
+                    if(classNode.name != ClassHelper.OBJECT_TYPE.name && classNode.name != GroovyObjectSupport.name && classNode.name != Script.name) {
                         classNode.visitContents(this)
                     }
                 }
@@ -499,8 +499,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             else if(!isConstructor) {
                 boolean isPublic = methodNode.isPublic() && !methodNode.isStatic() && !methodNode.isAbstract()
-                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !methodAnnotationMetadata.hasAnnotation(Internal) && !methodNode.isSynthetic()
-                if(isExecutable && !methodNode.isPrivate()) {
+                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !methodAnnotationMetadata.hasAnnotation(Internal) && !methodNode.isSynthetic() && !methodNode.isStatic() && !methodNode.isAbstract() && !methodNode.isPrivate()
+                if(isExecutable) {
                     if(declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)

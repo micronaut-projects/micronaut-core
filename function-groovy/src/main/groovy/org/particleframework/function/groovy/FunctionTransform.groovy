@@ -33,6 +33,7 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.FieldASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.particleframework.ast.groovy.InjectTransform
+import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.AstUtils
 import org.particleframework.context.ApplicationContext
@@ -220,6 +221,7 @@ class FunctionTransform implements ASTTransformation{
 
                         }
                     }
+                    AstAnnotationUtils.invalidateCache()
                     new InjectTransform().visit(nodes, source)
                 }
 
