@@ -17,6 +17,8 @@ package org.particleframework.core.util;
 
 import org.particleframework.core.annotation.Nullable;
 
+import java.util.*;
+
 /**
  * Utility methods for Strings
  *
@@ -44,5 +46,44 @@ public class StringUtils {
      */
     public static boolean isNotEmpty(@Nullable  CharSequence str) {
         return !isEmpty(str);
+    }
+
+    /**
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     *
+     * @param objects The objects
+     * @return An set of strings
+     */
+    public static Set<String> internSetOf(Object...objects) {
+        if(objects == null || objects.length == 0) {
+            return Collections.emptySet();
+        }
+        Set<String> strings = new HashSet<>(objects.length);
+        for (Object object : objects) {
+            strings.add(object.toString().intern());
+        }
+        return strings;
+    }
+
+    /**
+     * Converts the given objects into a set of interned strings. See {@link String#intern()}
+     *
+     * @param values The objects
+     * @return An unmodifiable set of strings
+     * @see CollectionUtils#mapOf(Object...)
+     */
+    public static Map<String, Object> internMapOf(Object...values) {
+        if(values == null) {
+            return Collections.emptyMap();
+        }
+        int len = values.length;
+        if(len % 2 != 0) throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+
+        Map<String,Object> answer = new HashMap<>(len / 2);
+        int i = 0;
+        while (i < values.length - 1) {
+            answer.put(values[i++].toString().intern(), values[i++]);
+        }
+        return answer;
     }
 }

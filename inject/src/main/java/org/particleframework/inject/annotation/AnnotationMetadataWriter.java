@@ -20,7 +20,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.writer.AbstractClassFileWriter;
 import org.particleframework.inject.writer.ClassGenerationException;
 
@@ -40,8 +40,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
-                    CollectionUtils.class,
-                    "mapOf",
+                    StringUtils.class,
+                    "internMapOf",
                     Object[].class
             )
     );
@@ -54,8 +54,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     );
     private static final org.objectweb.asm.commons.Method METHOD_SET_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
-                    CollectionUtils.class,
-                    "setOf",
+                    StringUtils.class,
+                    "internSetOf",
                     Object[].class
             )
     );
@@ -180,7 +180,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 // use the property type as the value
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_SET_OF);
+            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_SET_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -203,7 +203,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -233,7 +233,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 }
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -255,7 +255,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             );
         }
         // invoke the AbstractBeanDefinition.createMap method
-        methodVisitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+        methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
 
     }
 
