@@ -53,6 +53,8 @@ import java.util.stream.Stream;
 public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private final Class<T> type;
+    private final boolean singleton;
+    private final boolean isProvided;
     private final Class<?> declaringType;
     private boolean hasPreDestroyMethods = false;
     private boolean hasPostConstructMethods = false;
@@ -75,9 +77,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      * @param method    The method to call
      * @param arguments The arguments
      */
+    @SuppressWarnings("unchecked")
     @Internal
     protected AbstractBeanDefinition(Method method,
                                      Argument... arguments) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
+        this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
         this.type = (Class<T>) method.getReturnType();
         this.declaringType = method.getDeclaringClass();
         this.constructor = new MethodConstructorInjectionPoint(
@@ -93,7 +99,10 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                                      Class<T> type,
                                      Constructor<T> constructor,
                                      Argument... arguments) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         this.type = type;
+        this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
+        this.singleton = singleton;
         this.declaringType = type;
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
     }
@@ -221,12 +230,12 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public boolean isProvided() {
-        return hasStereotype(Provided.class);
+        return isProvided;
     }
 
     @Override
     public boolean isSingleton() {
-        return hasDeclaredStereotype(Singleton.class);
+        return singleton;
     }
 
     @SuppressWarnings("unchecked")

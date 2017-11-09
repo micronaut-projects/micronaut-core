@@ -175,6 +175,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
+    private static final String FIELD_ANNOTATION_METADATA = "$annotationMetadata";
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -467,27 +468,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             finalizeInjectMethod();
             finalizeBuildMethod();
-            if(annotationMetadataWriter != null) {
-                String fieldName = "$annotationMetadata";
-                Type annotationMetadata = Type.getType(AnnotationMetadata.class);
-
-                // add the field
-                classWriter.visitField(ACC_PRIVATE | ACC_FINAL, fieldName, annotationMetadata.getDescriptor(), null, null);
-                // assign the field in the constructor
-                Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-                constructorVisitor.loadThis();
-                constructorVisitor.newInstance(concreteMetadataType);
-                constructorVisitor.dup();
-                constructorVisitor.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
-                constructorVisitor.putField(beanDefinitionType, fieldName, annotationMetadata);
-
-                GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
-                annotationMetadataMethod.loadThis();
-                annotationMetadataMethod.getField(beanDefinitionType, fieldName, annotationMetadata);
-                annotationMetadataMethod.returnValue();
-                annotationMetadataMethod.visitMaxs(1,1);
-                annotationMetadataMethod.visitEnd();
-            }
+            finalizeAnnotationMetadata();
             constructorVisitor.visitInsn(RETURN);
             constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
             if (buildMethodVisitor != null) {
@@ -516,6 +497,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             classWriter.visitEnd();
         }
         this.beanFinalized = true;
+    }
+
+    protected void finalizeAnnotationMetadata() {
+        if(annotationMetadataWriter != null) {
+
+            GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
+            annotationMetadataMethod.loadThis();
+            annotationMetadataMethod.getStatic(beanDefinitionType, FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.returnValue();
+            annotationMetadataMethod.visitMaxs(1,1);
+            annotationMetadataMethod.visitEnd();
+        }
     }
 
     /**
@@ -858,6 +851,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitAnnotationMetadata(AnnotationMetadata metadata) {
+        Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
         this.annotationMetadataWriter = new AnnotationMetadataWriter(beanDefinitionName, metadata);
     }
 
@@ -870,6 +864,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Map<String, Map<String, Object>> genericTypes) {
         Type factoryTypeRef = getTypeReference(factoryClass);
         this.constructorVisitor = buildProtectedConstructor(BEAN_DEFINITION_METHOD_CONSTRUCTOR);
+
+        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
+        initializeAnnotationMetadata(staticInit);
+        staticInit.visitInsn(RETURN);
+        staticInit.visitMaxs(1,1);
+        staticInit.visitEnd();
+
         GeneratorAdapter defaultConstructor = new GeneratorAdapter(
                 startConstructor(classWriter),
                 ACC_PUBLIC,
@@ -1607,6 +1608,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_CONSTRUCTOR, TYPE_CONSTRUCTOR.getDescriptor(), null, null);
 
+
+
             Collection<Object> argumentClassNames = argumentTypes.values();
 
             pushGetConstructorForType(staticInit, this.beanType, argumentClassNames);
@@ -1616,6 +1619,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     FIELD_CONSTRUCTOR,
                     TYPE_CONSTRUCTOR
             );
+            initializeAnnotationMetadata(staticInit);
+
             staticInit.visitInsn(RETURN);
             staticInit.visitMaxs(1,1);
             staticInit.visitEnd();
@@ -1736,6 +1741,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
 
+    }
+
+    private void initializeAnnotationMetadata(GeneratorAdapter staticInit) {
+        if( annotationMetadataWriter != null) {
+            Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
+            classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
+            Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
+            staticInit.newInstance(concreteMetadataType);
+            staticInit.dup();
+            staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
+            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_METADATA, annotationMetadataType);
+        }
     }
 
     static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {

@@ -147,7 +147,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         startClass(classWriter, getInternalName(className), superType);
 
         GeneratorAdapter constructor = startConstructor(classWriter);
-
         constructor.loadThis();
         // 1st argument: the declared annotations
         pushCreateSetCall(constructor, annotationMetadata.declaredAnnotations);
