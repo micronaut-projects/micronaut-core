@@ -35,4 +35,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
 public @interface SomeOther {
+
+    String testDefault() default "foo";
 }

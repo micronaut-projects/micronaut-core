@@ -74,6 +74,26 @@ class Test {
         metadata.hasStereotype(org.particleframework.context.annotation.Context)
     }
 
+    void "test parse inherited stereotype data attributes default values"() {
+
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+@org.particleframework.ast.groovy.annotation.Trace(type = Test.class, types = [Test.class])
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.hasAnnotation(Trace)
+        metadata.isFalse(Around, 'hotswap')
+        metadata.isFalse(Trace, 'something')
+        !metadata.isPresent(Around, 'hotswap')
+        !metadata.isPresent(Trace, 'something')
+    }
+
     void "test parse inherited stereotype data attributes"() {
 
         given:

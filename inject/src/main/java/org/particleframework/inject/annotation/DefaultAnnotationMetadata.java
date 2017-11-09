@@ -16,14 +16,20 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.ConvertibleValuesMap;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalValues;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of {@link AnnotationMetadata}
@@ -31,13 +37,17 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultAnnotationMetadata implements AnnotationMetadata {
+public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement {
 
     Set<String> declaredAnnotations;
     Set<String> declaredStereotypes;
     Map<String, Map<CharSequence, Object>> allStereotypes;
     Map<String, Map<CharSequence, Object>> allAnnotations;
     Map<String, Set<String>> annotationsByStereotype;
+
+    private Annotation[] allAnnotationArray;
+    private Annotation[] declaredAnnotationArray;
+    private final Map<String, Annotation> annotationMap = new ConcurrentHashMap<>(2);
 
     @Internal
     protected DefaultAnnotationMetadata() {
@@ -64,6 +74,24 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata {
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+        Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
+        if(defaultValues.containsKey(member)) {
+            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+        Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
+        if(defaultValues.containsKey(member)) {
+            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -184,7 +212,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata {
      */
     DefaultAnnotationMetadata addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
         if(annotation != null) {
-            Set<String> declaredAnnotations = getDeclaredAnnotations();
+            Set<String> declaredAnnotations = getDeclaredAnnotationNames();
             Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
             addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true);
         }
@@ -249,7 +277,67 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata {
         return annotations;
     }
 
-    private Set<String> getDeclaredAnnotations() {
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        if(annotationClass == null) return null;
+        String annotationName = annotationClass.getName();
+        if( hasAnnotation(annotationName)) {
+            return (T) annotationMap.computeIfAbsent(annotationName, s -> {
+                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
+                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
+
+            });
+        }
+        return null;
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        Annotation[] annotations = this.allAnnotationArray;
+        if (annotations == null) {
+            synchronized (this) { // double check
+                annotations = this.allAnnotationArray;
+                if (annotations == null) {
+                    this.allAnnotationArray = annotations = initializeAnnotations(allAnnotations.keySet());
+                }
+            }
+        }
+        return annotations;
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        Annotation[] annotations = this.declaredAnnotationArray;
+        if (annotations == null) {
+            synchronized (this) { // double check
+                annotations = this.declaredAnnotationArray;
+                if (annotations == null) {
+                    this.declaredAnnotationArray = annotations = initializeAnnotations(declaredAnnotations);
+                }
+            }
+        }
+        return annotations;
+    }
+
+    private Annotation[] initializeAnnotations(Set<String> names) {
+        if(CollectionUtils.isNotEmpty(names)) {
+            List<Annotation> annotations = new ArrayList<>();
+            for (String name : names) {
+                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
+                loaded.ifPresent(aClass -> {
+                    Annotation ann = getAnnotation(aClass);
+                    if(ann != null)
+                        annotations.add(ann);
+                });
+            }
+            return annotations.toArray(new Annotation[annotations.size()]);
+        }
+
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    private Set<String> getDeclaredAnnotationNames() {
         Set<String> annotations = this.declaredAnnotations;
         if (annotations == null) {
             this.declaredAnnotations = annotations = new HashSet<>(3);

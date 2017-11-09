@@ -28,6 +28,10 @@ public class DependencyInjectionException extends BeanContextException {
         super(MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, message, false));
     }
 
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, FieldInjectionPoint fieldInjectionPoint, String message, Throwable cause) {
+        super(MessageUtils.buildMessage(resolutionContext, fieldInjectionPoint, message, false), cause);
+    }
+
     public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, Throwable cause) {
         super(MessageUtils.buildMessage(resolutionContext, methodInjectionPoint, argument, null, false), cause);
     }

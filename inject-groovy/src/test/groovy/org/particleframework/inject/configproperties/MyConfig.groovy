@@ -27,6 +27,7 @@ class MyConfig {
         return defaultPort
     }
 
+    @ConfigurationProperties('inner')
     static class Inner {
         boolean enabled
     }

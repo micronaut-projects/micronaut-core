@@ -16,6 +16,7 @@
 package org.particleframework.management.endpoint;
 
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.ConfigurationReader;
 import org.particleframework.context.annotation.Executable;
 
@@ -44,10 +45,12 @@ public @interface Endpoint {
     /**
      * @return The ID of the endpoint
      */
+    @AliasFor(annotation = ConfigurationReader.class, member = "value")
     String value();
 
     /**
      * @return The default prefix to use
      */
+    @AliasFor(annotation = ConfigurationReader.class, member = "prefix")
     String prefix() default "endpoints";
 }

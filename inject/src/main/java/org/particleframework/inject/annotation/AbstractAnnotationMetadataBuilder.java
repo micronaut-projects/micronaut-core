@@ -217,7 +217,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private Map<CharSequence, Object> resolveAnnotationData(Map<String, Map<CharSequence, Object>> annotationData, String annotationName, Map<? extends T, ?> elementValues) {
-        return annotationData.computeIfAbsent(annotationName, s -> new LinkedHashMap<>(elementValues.size()));
+        int size = elementValues.size();
+        Map<CharSequence, Object> resolved = annotationData.computeIfAbsent(annotationName, s -> new LinkedHashMap<>(size));
+        if(resolved.isEmpty() && size > 0) {
+            resolved = new LinkedHashMap<>(size);
+            annotationData.put(annotationName, resolved);
+        }
+        return resolved;
     }
 
 

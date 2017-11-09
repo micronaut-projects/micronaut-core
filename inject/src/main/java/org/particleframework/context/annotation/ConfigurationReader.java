@@ -34,4 +34,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
 public @interface ConfigurationReader {
+    /**
+     * @return The configuration entry to read
+     */
+    String value() default "";
+
+    /**
+     * @return The prefix to use
+     */
+    String prefix() default "";
 }

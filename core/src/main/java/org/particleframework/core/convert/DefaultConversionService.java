@@ -36,6 +36,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * The default conversion service. Handles basic type conversion operations.
@@ -395,6 +396,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
             }
             return Optional.of((Object[]) newArray);
+        });
+
+        addConverter(Object[].class, String.class, (Object[] object, Class<String> targetType, ConversionContext context) -> {
+            if(object.length == 0) {
+                return Optional.empty();
+            }
+            else {
+                return Optional.of( Arrays.stream(object).map(Object::toString).collect(Collectors.joining("")));
+            }
         });
 
         // Object[] -> String[]

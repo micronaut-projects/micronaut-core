@@ -69,7 +69,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     Map.class
             )
     );
-    static final String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
@@ -81,7 +80,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param annotationMetadata The annotation metadata
      */
     public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
-        this.className = className + CLASS_NAME_SUFFIX;
+        this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.annotationMetadata = (DefaultAnnotationMetadata) annotationMetadata;
         } else {

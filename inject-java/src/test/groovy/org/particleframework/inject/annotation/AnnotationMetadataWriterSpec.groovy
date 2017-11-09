@@ -48,6 +48,8 @@ class Test {
         AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
 
         then:
+        metadata.getAnnotation(Primary) instanceof Primary
+        metadata.declaredAnnotations.size() == 1
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
         !metadata.hasDeclaredAnnotation(Singleton)
@@ -56,6 +58,30 @@ class Test {
         !metadata.hasStereotype(Retention) // ignore internal annotations
         metadata.hasStereotype(Qualifier)
         !metadata.hasStereotype(Singleton)
+    }
+
+    void "test write annotation metadata default values"() {
+
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+@org.particleframework.inject.annotation.Trace(type = Test.class, types = {Test.class})
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasAnnotation(Trace)
+        metadata.isFalse(Around, 'hotswap')
+        metadata.isFalse(Trace, 'something')
+        metadata.getValue(SomeOther, "testDefault", String).get() == 'foo'
+        !metadata.isPresent(SomeOther, "testDefault")
     }
 
     void "test write inherited stereotype data attributes"() {

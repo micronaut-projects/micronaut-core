@@ -20,6 +20,7 @@ import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 
 /**
@@ -35,7 +36,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotationMetadata {
+public interface AnnotationMetadata extends AnnotatedElement {
     /**
      * A constant for representing empty metadata
      */
@@ -45,6 +46,10 @@ public interface AnnotationMetadata {
      * The default <tt>value()</tt> member
      */
     String VALUE_MEMBER = "value";
+    /**
+     * The suffix used when saving compiled metadata to classes
+     */
+    String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
      * Checks whether this object has the given annotation directly declared on the object
@@ -108,6 +113,48 @@ public interface AnnotationMetadata {
      * @return The {@link OptionalValues}
      */
     <T> OptionalValues<T> getValues(String annotation, Class<T> valueType);
+
+    /**
+     * Return the default value for the given annotation member
+     *
+     * @param annotation The annotation
+     * @param member The member
+     * @param requiredType The required type
+     * @param <T> The required generic type
+     * @return An optional value
+     */
+    <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType);
+
+    /**
+     * Return the default value for the given annotation member
+     *
+     * @param annotation The annotation
+     * @param member The member
+     * @param requiredType The required type
+     * @param <T> The required generic type
+     * @return An optional value
+     */
+    default <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+        return getDefaultValue(annotation.getName(), member, requiredType);
+    }
+    /**
+     * Get the value of the given annotation member
+     *
+     * @param annotation The annotation class
+     * @param member The annotation member
+     * @param requiredType The required type
+     * @param <T> The value
+     * @return An {@link Optional} of the value
+     */
+    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+        Optional<T> value = getValues(annotation).get(member, requiredType);
+        if(!value.isPresent()) {
+            if(hasStereotype(annotation)) {
+                return getDefaultValue(annotation, member, requiredType);
+            }
+        }
+        return value;
+    }
 
     /**
      * Find the first annotation name for the given stereotype
@@ -182,7 +229,13 @@ public interface AnnotationMetadata {
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(String annotation, String member, Class<T> requiredType) {
-        return getValues(annotation).get(member, requiredType);
+        Optional<T> value = getValues(annotation).get(member, requiredType);
+        if(!value.isPresent()) {
+            if(hasStereotype(annotation)) {
+                return getDefaultValue(annotation, member, requiredType);
+            }
+        }
+        return value;
     }
 
     /**
@@ -192,7 +245,7 @@ public interface AnnotationMetadata {
      * @return THe {@link OptionalLong} value
      */
     default OptionalLong longValue(String annotation, String member) {
-        Optional<Long> result = getValues(annotation).get(member, Long.class);
+        Optional<Long> result = getValue(annotation, member, Long.class);
         return result.map(OptionalLong::of).orElseGet(OptionalLong::empty);
     }
 
@@ -212,7 +265,7 @@ public interface AnnotationMetadata {
      * @return An {@link Optional} class
      */
     default Optional<Class> classValue(String annotation, String member) {
-        return getValues(annotation).get(member, Class.class);
+        return getValue(annotation, member, Class.class);
     }
 
     /**
@@ -241,7 +294,7 @@ public interface AnnotationMetadata {
      * @return THe {@link OptionalInt} value
      */
     default OptionalInt intValue(String annotation, String member) {
-        Optional<Integer> result = getValues(annotation).get(member, Integer.class);
+        Optional<Integer> result = getValue(annotation,member, Integer.class);
         return result.map(OptionalInt::of).orElseGet(OptionalInt::empty);
     }
 
@@ -252,7 +305,7 @@ public interface AnnotationMetadata {
      * @return THe {@link OptionalDouble} value
      */
     default OptionalDouble doubleValue(String annotation, String member) {
-        Optional<Double> result = getValues(annotation).get(member, Double.class);
+        Optional<Double> result = getValue(annotation,member, Double.class);
         return result.map(OptionalDouble::of).orElseGet(OptionalDouble::empty);
     }
     /**
@@ -312,6 +365,28 @@ public interface AnnotationMetadata {
         return getValue(annotation.getName(), member, Boolean.class).orElse(false);
     }
 
+
+    /**
+     * Returns whether the value of the given member is present
+     *
+     * @param annotation The annotation class
+     * @param member The annotation member
+     * @return True if the value is true
+     */
+    default boolean isPresent(String annotation, String member) {
+        return getValues(annotation).contains(member);
+    }
+
+    /**
+     * Returns whether the value of the given member is <em>true</em>
+     *
+     * @param annotation The annotation class
+     * @param member The annotation member
+     * @return True if the value is true
+     */
+    default boolean isPresent(Class<? extends Annotation> annotation, String member) {
+        return isPresent(annotation.getName(), member);
+    }
     /**
      * Returns whether the value of the given member is <em>true</em>
      *
@@ -363,18 +438,6 @@ public interface AnnotationMetadata {
         return getValue(annotation.getName(), requiredType);
     }
 
-    /**
-     * Get the value of the given annotation member
-     *
-     * @param annotation The annotation class
-     * @param member The annotation member
-     * @param requiredType The required type
-     * @param <T> The value
-     * @return An {@link Optional} of the value
-     */
-    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        return getValue(annotation.getName(), member, requiredType);
-    }
 
     /**
      * Checks whether this object has the given annotation on the object itself or inherited from a parent
@@ -435,6 +498,4 @@ public interface AnnotationMetadata {
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         return stereotype != null && hasDeclaredStereotype(stereotype.getName());
     }
-
-
 }

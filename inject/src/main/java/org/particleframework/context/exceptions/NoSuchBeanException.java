@@ -9,13 +9,6 @@ import org.particleframework.context.Qualifier;
  * @since 1.0
  */
 public class NoSuchBeanException extends BeanContextException {
-    public NoSuchBeanException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public NoSuchBeanException(String message) {
-        super(message);
-    }
 
     public NoSuchBeanException(Class beanType) {
         super("No bean of type [" + beanType.getName() + "] exists");
@@ -23,5 +16,9 @@ public class NoSuchBeanException extends BeanContextException {
 
     public <T> NoSuchBeanException(Class<T> beanType, Qualifier<T> qualifier) {
         super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : ""));
+    }
+
+    protected NoSuchBeanException(String message) {
+        super(message);
     }
 }

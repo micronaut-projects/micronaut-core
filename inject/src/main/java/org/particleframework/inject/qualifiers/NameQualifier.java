@@ -36,7 +36,7 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
         }
         return candidates.filter(candidate -> {
                     String typeName;
-                    Optional<String> beanQualifier = candidate.getValue(Named.class, String.class);
+                    Optional<String> beanQualifier = candidate.hasStereotype(Named.class) ? candidate.getValue(Named.class, String.class) : Optional.empty();
                     typeName = beanQualifier.orElseGet(() -> {
                         if(candidate instanceof NameResolver) {
                             Optional<String> resolvedName = ((NameResolver) candidate).resolveName();

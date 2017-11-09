@@ -17,6 +17,7 @@ package org.particleframework.inject.foreach
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
+import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
@@ -282,6 +283,7 @@ class MyConfiguration {
         return defaultPort
     }
 
+    @ConfigurationProperties("inner")
     static class Inner {
         String enabled
     }
@@ -321,6 +323,7 @@ class MyConfigurationWithPrimary {
         return defaultPort
     }
 
+    @ConfigurationProperties("inner")
     static class Inner {
         String enabled
     }

@@ -19,7 +19,10 @@ import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
+import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
+import org.codehaus.groovy.ast.stmt.ReturnStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.annotation.AbstractAnnotationMetadataBuilder
 
@@ -103,10 +106,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected Map<? extends AnnotatedNode, ?> readAnnotationValues(AnnotationNode annotationMirror) {
-        def members = annotationMirror.getMembers()
+        Map<String, Expression> members = annotationMirror.getMembers()
         Map<? extends AnnotatedNode, Object> values = [:]
+        ClassNode annotationClassNode = annotationMirror.classNode
         for(m in members) {
-            values.put(annotationMirror.classNode.getMethods(m.key)[0], m.value)
+            values.put(annotationClassNode.getMethods(m.key)[0], m.value)
         }
         return values
     }

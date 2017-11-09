@@ -193,10 +193,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         BeanDefinitionVisitor aopProxyWriter
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
-            this(sourceUnit, targetClassNode, InjectVisitor.isConfigurationProperties(targetClassNode))
+            this(sourceUnit, targetClassNode, null)
         }
 
-        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, boolean isConfigurationProperties) {
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, Boolean configurationProperties) {
             this.sourceUnit = sourceUnit
             this.concreteClass = targetClassNode
             this.annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(targetClassNode)
@@ -204,7 +204,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE)
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean>empty()
             this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
-            this.isConfigurationProperties = isConfigurationProperties
+            this.isConfigurationProperties = configurationProperties != null ? configurationProperties : isConfigurationProperties(annotationMetadata)
             if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Scope) || annotationMetadata.hasStereotype(Bean)) {
                 defineBeanDefinition(concreteClass)
             }
@@ -260,16 +260,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        static boolean isConfigurationProperties(ClassNode targetClassNode) {
-            if( AstAnnotationUtils.hasStereotype(targetClassNode, ConfigurationReader) ) {
-                return true
+        boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
+            if( annotationMetadata.hasStereotype(ConfigurationReader) ) {
+                if(annotationMetadata.hasStereotype(ForEach)) {
+                    return annotationMetadata
+                            .getValue(ForEach, "property", String)
+                            .isPresent()
+                }
+                else {
+                    return true
+                }
             }
-            else {
-                return AstAnnotationUtils
-                        .getAnnotationMetadata(targetClassNode)
-                        .getValue(ForEach, "property", String)
-                        .isPresent()
-            }
+            return false
         }
 
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
@@ -681,6 +683,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitProperty(PropertyNode propertyNode) {
             FieldNode fieldNode = propertyNode.field
             if(fieldNode.name == 'metaClass') return
+            def modifiers = propertyNode.getModifiers()
+            if(Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers) ) {
+                return
+            }
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
             boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && fieldNode != null && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
@@ -806,22 +812,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         addError("Class must have at least one public constructor in order to be a candidate for dependency injection", classNode)
                     }
                 }
-
-                if(isConfigurationProperties) {
-                    SourceUnit su = sourceUnit
-                    classNode.getInnerClasses().each { InnerClassNode inner->
-                        if(Modifier.isStatic(inner.getModifiers()) && Modifier.isPublic(inner.getModifiers()) && inner.getDeclaredConstructors().size() == 0) {
-                            def innerAnnotation = new AnnotationNode(make(ConfigurationProperties))
-                            String innerClassName = inner.getNameWithoutPackage() - classNode.getNameWithoutPackage()
-                            innerClassName = innerClassName.substring(1) // remove starting dollar
-                            String newPath = Introspector.decapitalize(innerClassName)
-                            innerAnnotation.setMember("value", constX(newPath))
-                            inner.addAnnotation(innerAnnotation)
-                            new InjectVisitor(su, inner,true).visitClass(inner)
-                        }
-                    }
-                }
-
 
                 if(isAopProxyType) {
                     Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()

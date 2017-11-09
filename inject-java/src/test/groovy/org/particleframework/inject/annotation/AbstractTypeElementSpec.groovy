@@ -16,9 +16,7 @@
 package org.particleframework.inject.annotation
 
 import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
-import org.particleframework.annotation.processing.BeanDefinitionInjectProcessor
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.inject.BeanDefinition
@@ -89,7 +87,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         def stream = new ByteArrayOutputStream()
         new AnnotationMetadataWriter(className, toWrite)
                 .writeTo(stream)
-        className = className + AnnotationMetadataWriter.CLASS_NAME_SUFFIX
+        className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {

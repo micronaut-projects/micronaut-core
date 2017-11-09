@@ -49,6 +49,10 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         this.definition = definition;
     }
 
+    BeanDefinition<T> getDelegate() {
+        return definition;
+    }
+
     @Override
     public Class<? extends Annotation> getScope() {
         return definition.getScope();
@@ -241,6 +245,31 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public <T1> OptionalValues<T1> getValues(String annotation, Class<T1> valueType) {
         return getTarget().getValues(annotation, valueType);
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+        return getTarget().getDefaultValue(annotation, member,requiredType);
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+        return getTarget().getDefaultValue(annotation, member,requiredType);
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return getTarget().getAnnotation(annotationClass);
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return getTarget().getAnnotations();
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return getTarget().getDeclaredAnnotations();
     }
 
     interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {

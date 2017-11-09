@@ -18,7 +18,9 @@ package org.particleframework.core.annotation;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.value.OptionalValues;
 
+import java.lang.annotation.Annotation;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -61,5 +63,25 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
         return OptionalValues.empty();
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+        return Optional.empty();
+    }
+
+    @Override
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return null;
+    }
+
+    @Override
+    public Annotation[] getAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    @Override
+    public Annotation[] getDeclaredAnnotations() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 }

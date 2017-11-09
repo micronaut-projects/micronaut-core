@@ -13,33 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.docs.config.properties
+package org.particleframework.inject.annotation;
 
-// tag::imports[]
-import org.hibernate.validator.constraints.NotBlank
-import org.particleframework.context.annotation.ConfigurationProperties
-
-import javax.validation.constraints.Min
-// end::imports[]
+import org.particleframework.context.exceptions.BeanContextException;
 
 /**
+ * An exception that occurs constructing {@link org.particleframework.core.annotation.AnnotationMetadata}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
-@ConfigurationProperties('my.engine') // <1>
-class EngineConfig {
+public class AnnotationMetadataException extends BeanContextException {
+    public AnnotationMetadataException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    @NotBlank // <2>
-    String manufacturer = "Ford" // <3>
-
-    @Min(1L)
-    int cylinders
-    CrankShaft crankShaft
-
-    @ConfigurationProperties('crank-shaft')
-    static class CrankShaft { // <4>
-        Optional<Double> rodLength // <5>
+    public AnnotationMetadataException(String message) {
+        super(message);
     }
 }
-// end::class[]

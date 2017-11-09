@@ -57,6 +57,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Singleton
+@ConfigurationReader
 public @interface ForEach {
     /**
      * @return The bean type that this bean is driven by
@@ -66,6 +67,7 @@ public @interface ForEach {
     /**
      * @return The property that this bean is driven by
      */
+    @AliasFor(annotation = ConfigurationReader.class, member = "value")
     String property() default "";
 
     /**
