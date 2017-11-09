@@ -19,6 +19,7 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.ConvertibleValuesMap;
 import org.particleframework.core.reflect.ClassUtils;
@@ -38,6 +39,33 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedElement {
+
+    static {
+        ConversionService.SHARED.addConverter(AnnotationValue.class, Annotation.class, (TypeConverter<AnnotationValue, Annotation>) (object, targetType, context) -> {
+            Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
+            return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, ConvertibleValues.of(object.getValues())));
+        });
+
+        ConversionService.SHARED.addConverter(AnnotationValue[].class, Object[].class, (TypeConverter<AnnotationValue[], Object[]>) (object, targetType, context) -> {
+            List result = new ArrayList();
+            Class annotationClass = null;
+            for (AnnotationValue annotationValue : object) {
+                if(annotationClass == null) {
+                    // all annotations will be on the same type
+                    Optional<Class> aClass = ClassUtils.forName(annotationValue.getAnnotationName(), targetType.getClassLoader());
+                    if(!aClass.isPresent()) break;
+                    annotationClass = aClass.get();
+                }
+                Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, ConvertibleValues.of(annotationValue.getValues()));
+                if(annotation != null)
+                    result.add(annotation);
+            }
+            if(!result.isEmpty()) {
+                return Optional.of(result.toArray());
+            }
+            return Optional.empty();
+        });
+    }
 
     Set<String> declaredAnnotations;
     Set<String> declaredStereotypes;

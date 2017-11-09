@@ -22,7 +22,9 @@ import org.codehaus.groovy.ast.builder.AstBuilder
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requirements
 import org.particleframework.core.annotation.AnnotationMetadata
+import org.particleframework.inject.annotation.AnnotationValue
 import spock.lang.Specification
 
 import javax.inject.Qualifier
@@ -34,6 +36,30 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
+    void "test build repeatable annotations"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requirements([
+@Requires(property="blah"),
+@Requires(classes=Test.class) ])
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.hasDeclaredAnnotation(Requirements)
+        metadata.getValue(Requirements).get().size() == 2
+        metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
+        metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+    }
+
     void "test parse first level stereotype data"() {
 
         given:

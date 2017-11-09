@@ -17,14 +17,14 @@ package org.particleframework.ast.groovy.annotation
 
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.*
+import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
-import org.codehaus.groovy.ast.stmt.ReturnStatement
-import org.codehaus.groovy.ast.stmt.Statement
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.annotation.AbstractAnnotationMetadataBuilder
+import org.particleframework.inject.annotation.AnnotationValue
 
 /**
  * Groovy implementation of {@link AbstractAnnotationMetadataBuilder}
@@ -93,7 +93,23 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             ListExpression le = (ListExpression)annotationValue
             List converted = []
             for(exp in le.expressions) {
-                if(exp instanceof ConstantExpression) {
+                if(exp instanceof AnnotationConstantExpression) {
+                    AnnotationConstantExpression ann = (AnnotationConstantExpression)exp
+                    AnnotationNode value = (AnnotationNode)ann.getValue()
+
+                    def members = value.getMembers()
+                    if(members.isEmpty()) {
+                        converted.add(new AnnotationValue(value.classNode.name))
+                    }
+                    else {
+                        Map<CharSequence, Object> nestedValues = [:]
+                        for(m in members) {
+                            readAnnotationValues(m.key, m.value, nestedValues)
+                        }
+                        converted.add(new AnnotationValue(value.classNode.name, nestedValues))
+                    }
+                }
+                else if(exp instanceof ConstantExpression) {
                     converted.add(((ConstantExpression)exp).value)
                 }
                 else if(exp instanceof ClassExpression) {

@@ -25,6 +25,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -117,8 +118,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
-        if(memberName != null && annotationValue instanceof AnnotationValue) {
-            ((AnnotationValue)annotationValue).accept(new MetadataAnnotationValueVisitor(annotationValues, memberName), this);
+        if(memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
+            ((javax.lang.model.element.AnnotationValue)annotationValue).accept(new MetadataAnnotationValueVisitor(annotationValues, memberName), this);
         }
     }
 
@@ -219,7 +220,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
 
-    private static class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
+    private class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
         private final Map<CharSequence, Object> annotationValues;
         private final String memberName;
 
@@ -302,9 +303,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
 
         @Override
-        public Object visitArray(List<? extends AnnotationValue> vals, Object o) {
+        public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
             ArrayValueVisitor arrayValueVisitor = new ArrayValueVisitor();
-            for (AnnotationValue val : vals) {
+            for (javax.lang.model.element.AnnotationValue val : vals) {
                 val.accept(arrayValueVisitor, o);
             }
             annotationValues.put(memberName, arrayValueVisitor.getValues());
@@ -312,87 +313,117 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
 
         @SuppressWarnings("unchecked")
-        private static class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
+        private class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
 
             private List values = new ArrayList();
+            private Class arrayType;
 
             Object[] getValues() {
-                return values.toArray(new Object[values.size()]);
+                if(arrayType != null) {
+                    return values.toArray((Object[]) Array.newInstance(arrayType, values.size()));
+                }
+                else {
+                    return values.toArray(new Object[values.size()]);
+                }
             }
 
             @Override
             public Object visitBoolean(boolean b, Object o) {
+                arrayType = boolean.class;
                 values.add(b);
                 return null;
             }
 
             @Override
             public Object visitByte(byte b, Object o) {
+                arrayType = byte.class;
                 values.add(b);
                 return null;
             }
 
             @Override
             public Object visitChar(char c, Object o) {
+                arrayType = char.class;
                 values.add(c);
                 return null;
             }
 
             @Override
             public Object visitDouble(double d, Object o) {
+                arrayType = double.class;
                 values.add(d);
                 return null;
             }
 
             @Override
             public Object visitFloat(float f, Object o) {
+                arrayType = float.class;
                 values.add(f);
                 return null;
             }
 
             @Override
             public Object visitInt(int i, Object o) {
+                arrayType = int.class;
                 values.add(i);
                 return null;
             }
 
             @Override
             public Object visitLong(long i, Object o) {
+                arrayType = long.class;
                 values.add(i);
                 return null;
             }
 
             @Override
             public Object visitShort(short s, Object o) {
+                arrayType = short.class;
                 values.add(s);
                 return null;
             }
 
             @Override
             public Object visitString(String s, Object o) {
+                arrayType = String.class;
                 values.add(s);
                 return null;
             }
 
             @Override
             public Object visitType(TypeMirror t, Object o) {
+                arrayType = String.class;
                 values.add(t.toString());
                 return null;
             }
 
             @Override
             public Object visitEnumConstant(VariableElement c, Object o) {
+                arrayType = String.class;
                 values.add(c.getSimpleName().toString());
                 return null;
             }
 
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
+                arrayType = AnnotationValue.class;
+                Map<? extends Element, ?> annotationValues = readAnnotationValues(a);
+                if(annotationValues.isEmpty()) {
+                    values.add(new AnnotationValue(a.getAnnotationType().toString()));
+                }
+                else {
+
+                    Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+                    for (Map.Entry<? extends Element, ?> entry : annotationValues.entrySet()) {
+                        readAnnotationValues(getAnnotationMemberName(entry.getKey()), entry.getValue(), resolvedValues);
+                    }
+                    values.add(new AnnotationValue(a.getAnnotationType().toString(), resolvedValues));
+                }
                 return null;
             }
 
             @Override
-            public Object visitArray(List<? extends AnnotationValue> vals, Object o) {
+            public Object visitArray(List<? extends javax.lang.model.element.AnnotationValue> vals, Object o) {
                 return null;
             }
         }

@@ -70,6 +70,21 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalConstructor(
+                    AnnotationValue.class,
+                    String.class
+            )
+    );
+
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalConstructor(
+                    AnnotationValue.class,
+                    String.class,
+                    Map.class
+            )
+    );
+
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
 
@@ -258,7 +273,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         else if(value.getClass().isArray()) {
             Object[] array = (Object[]) value;
             int len = array.length;
-            pushNewArray(methodVisitor, Object.class, len);
+            pushNewArray(methodVisitor, ((Object[]) value).getClass().getComponentType(), len);
             for (int i = 0; i < array.length; i++) {
                 int index = i;
                 pushStoreInArray(methodVisitor, i, len, () ->
@@ -281,6 +296,23 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         else if(value instanceof Number) {
             methodVisitor.push(((Number) value).intValue());
             pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
+        }
+        else if(value instanceof AnnotationValue) {
+            AnnotationValue data = (AnnotationValue) value;
+            String annotationName = data.getAnnotationName();
+            Map<CharSequence, Object> values = data.getValues();
+            Type annotationValueType = Type.getType(AnnotationValue.class);
+            methodVisitor.newInstance(annotationValueType);
+            methodVisitor.dup();
+            methodVisitor.push(annotationName);
+
+            if(values != null) {
+                pushAnnotationAttributes(methodVisitor, values);
+                methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
+            }
+            else {
+                methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE);
+            }
         }
         else {
             methodVisitor.visitInsn(ACONST_NULL);

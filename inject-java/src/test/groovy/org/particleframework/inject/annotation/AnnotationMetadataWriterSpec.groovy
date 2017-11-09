@@ -17,6 +17,8 @@ package org.particleframework.inject.annotation
 
 import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requirements
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
 
 import javax.inject.Qualifier
@@ -30,6 +32,40 @@ import java.lang.annotation.Retention
  * @since 1.0
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
+
+    void "test build repeatable annotations"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property="blah")
+@Requires(classes=Test.class)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasDeclaredAnnotation(Requirements)
+        metadata.getValue(Requirements).get().size() == 2
+        metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
+        metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+
+        when:
+        Requires[] requires = metadata.getValue(Requirements, Requires[].class).get()
+
+        then:
+        requires.size() == 2
+        requires[0].property() == 'blah'
+    }
 
     void "test write first level stereotype data"() {
 

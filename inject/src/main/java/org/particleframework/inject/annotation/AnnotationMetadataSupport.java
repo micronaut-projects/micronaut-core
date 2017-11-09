@@ -80,7 +80,10 @@ class AnnotationMetadataSupport {
         if(proxyClass.isPresent()) {
             Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) (proxy, method, args) -> {
                 if(annotationValues.contains(method.getName())) {
-                    return annotationValues.get(method.getName(), method.getReturnType());
+                    Optional<?> result = annotationValues.get(method.getName(), method.getReturnType());
+                    if(result.isPresent()) {
+                        return result.get();
+                    }
                 }
                 return method.getDefaultValue();
             });
