@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
  * A BeanConfiguration is a grouping of several {@link BeanDefinition} instances
@@ -8,7 +9,7 @@ import org.particleframework.context.BeanContext;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanConfiguration {
+public interface BeanConfiguration extends AnnotationMetadataProvider {
 
     /**
      * @return The package for the bean configuration
@@ -38,11 +39,11 @@ public interface BeanConfiguration {
     /**
      * Check whether the specified bean definition class is within this bean configuration
      *
-     * @param beanDefinitionClass The bean definition class
+     * @param beanDefinitionReference The bean definition class
      *
      * @return True if it is
      */
-    boolean isWithin(BeanDefinitionClass beanDefinitionClass);
+    boolean isWithin(BeanDefinitionReference beanDefinitionReference);
 
     /**
      * Check whether the specified class is within this bean configuration

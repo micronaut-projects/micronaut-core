@@ -78,12 +78,22 @@ class AnnotationMetadataSupport {
     static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, ConvertibleValues<Object> annotationValues) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if(proxyClass.isPresent()) {
+            Method[] declaredMethods = annotationClass.getDeclaredMethods();
+            Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>(declaredMethods.length);
+            for (Method declaredMethod : declaredMethods) {
+                String name = declaredMethod.getName();
+                if ( annotationValues.contains(name) ) {
+                    Optional<?> converted = annotationValues.get(name, declaredMethod.getReturnType());
+                    converted.ifPresent(o -> resolvedValues.put(name, o));
+                }
+            }
             Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) (proxy, method, args) -> {
-                if(annotationValues.contains(method.getName())) {
-                    Optional<?> result = annotationValues.get(method.getName(), method.getReturnType());
-                    if(result.isPresent()) {
-                        return result.get();
-                    }
+                String name = method.getName();
+                if("annotationType".equals(name)) {
+                    return annotationClass;
+                }
+                if(resolvedValues.containsKey(name)) {
+                    return resolvedValues.get(name);
                 }
                 return method.getDefaultValue();
             });

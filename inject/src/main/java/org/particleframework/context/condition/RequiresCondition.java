@@ -1,17 +1,20 @@
 package org.particleframework.context.condition;
 
 import groovy.lang.GroovySystem;
-import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.annotation.Requirements;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.particleframework.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -22,48 +25,80 @@ import java.util.Optional;
  * An abstract {@link Condition} implementation that is based on the presence
  * of {@link Requires} annotation
  */
-public class RequiresCondition implements Condition<ConditionContext> {
+public class RequiresCondition implements Condition {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RequiresCondition.class);
-    private final Requires[] requiresAnnotations;
+    private final AnnotationMetadata annotationMetadata;
 
-    public RequiresCondition(Requires[] annotations) {
-        this.requiresAnnotations = annotations;
+    public RequiresCondition(AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = annotationMetadata;
     }
 
     @Override
     public boolean matches(ConditionContext context) {
-        if(requiresAnnotations.length == 0 ) {
-            return true;
-        }
+        if(annotationMetadata.hasStereotype(Requirements.class)) {
 
-        for (Requires annotation : requiresAnnotations) {
-            if(!matchesPresenceOfClasses(annotation)) {
+            Optional<AnnotationValue[]> requirements = annotationMetadata.getValue(Requirements.class, AnnotationValue[].class);
+
+            if(requirements.isPresent()) {
+                AnnotationValue[] annotationValues = requirements.get();
+
+                // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
+                for (AnnotationValue av : annotationValues) {
+                    if(!matchesPresenceOfClasses(context, av)) {
+                        return false;
+                    }
+                    if(!matchesPresenceOfBean(context, av)) {
+                        return false;
+                    }
+                }
+
+                // Now it is safe to initialize the annotation requirements
+                Requirements ann = annotationMetadata.getAnnotation(Requirements.class);
+
+                if(ann != null) {
+                    for (Requires requires : ann.value()) {
+                        if (processRequires(context, requires)) return false;
+                    }
+                }
+            }
+        }
+        else if(annotationMetadata.hasStereotype(Requires.class)) {
+            ConvertibleValues<Object> values = annotationMetadata.getValues(Requires.class);
+            if(!matchesPresenceOfClasses(context, values)) {
                 return false;
             }
-            if(!matchesEnvironment(context, annotation)) {
+            if(!matchPresentOfBeans(context, values)) {
                 return false;
             }
-            if(!matchesProperty(context, annotation)) {
-                return false;
-            }
-            if(!matchesMissingProperty(context, annotation)) {
-                return false;
-            }
-            if(!matchesPresenceOfBean(context, annotation)) {
-                return false;
-            }
-            if(!matchesConfiguration(context, annotation)) {
-                return false;
-            }
-            if(!matchesSdk(annotation)) {
-                return false;
-            }
-            if(!matchesConditions(context, annotation)) {
-                return false;
+
+            Requires ann = annotationMetadata.getAnnotation(Requires.class);
+            if(ann != null) {
+                if (processRequires(context, ann)) return false;
             }
         }
         return true;
+    }
+
+    protected boolean processRequires(ConditionContext context, Requires annotation) {
+        if(!matchesProperty(context, annotation)) {
+            return true;
+        }
+        if(!matchesMissingProperty(context, annotation)) {
+            return true;
+        }
+        if(!matchesEnvironment(context, annotation)) {
+            return true;
+        }
+        if(!matchesConfiguration(context, annotation)) {
+            return true;
+        }
+        if(!matchesSdk(annotation)) {
+            return true;
+        }
+        if(!matchesConditions(context, annotation)) {
+            return true;
+        }
+        return false;
     }
 
     private boolean matchesProperty(ConditionContext context, Requires annotation) {
@@ -165,31 +200,52 @@ public class RequiresCondition implements Condition<ConditionContext> {
         return true;
     }
 
-    protected boolean matchesPresenceOfClasses(Requires requires) {
-        try {
-            requires.classes();
-            return true;
-        } catch (TypeNotPresentException e) {
-            // type not present exception
-            return false;
-        }
+    protected boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue requires) {
+        ConvertibleValues<Object> convertibleValues = requires.getConvertibleValues();
+        return !matchesPresenceOfClasses(context, convertibleValues);
     }
-    protected boolean matchesPresenceOfBean(ConditionContext context, Requires requires) {
-        try {
-            Class[] beans = requires.beans();
-            if(beans.length == 0)
-                return true;
 
-            BeanContext beanContext = context.getBeanContext();
-            long allThere = Arrays.stream(beans)
-                    .filter(type -> beanContext.containsBean(type))
-                    .count();
+    protected boolean matchesPresenceOfBean(ConditionContext context, AnnotationValue requires) {
+        ConvertibleValues<Object> convertibleValues = requires.getConvertibleValues();
+        return matchPresentOfBeans(context, convertibleValues);
+    }
 
-            return beans.length == allThere;
-        } catch (TypeNotPresentException e) {
-            // type not present exception
-            return false;
+    private boolean matchesPresenceOfClasses(ConditionContext context, ConvertibleValues<Object> convertibleValues) {
+        if(convertibleValues.contains("classes")) {
+            Optional<String[]> classNames = convertibleValues.get("classes", String[].class);
+            if(classNames.isPresent()) {
+                String[] names = classNames.get();
+                ClassLoader classLoader = context.getBeanContext().getClassLoader();
+                for (String name : names) {
+                    if(!ClassUtils.forName(name, classLoader).isPresent()) {
+                        return false;
+                    }
+                }
+            }
         }
+        return true;
+    }
+
+    private boolean matchPresentOfBeans(ConditionContext context, ConvertibleValues<Object> convertibleValues) {
+        if(convertibleValues.contains("beans")) {
+            BeanContext beanContext = context.getBeanContext();
+            Optional<String[]> classNames = convertibleValues.get("beans", String[].class);
+            if(classNames.isPresent()) {
+                String[] names = classNames.get();
+                for (String name : names) {
+                    Optional<Class> type = ClassUtils.forName(name, beanContext.getClassLoader());
+                    if(!type.isPresent()) {
+                        return false;
+                    }
+                    else {
+                        if(!beanContext.containsBean(type.get())) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     protected boolean matchesConfiguration(ConditionContext context, Requires requires) {

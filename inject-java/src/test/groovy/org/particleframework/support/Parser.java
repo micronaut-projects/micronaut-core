@@ -37,13 +37,12 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import org.particleframework.annotation.processing.BeanDefinitionInjectProcessor;
+import org.particleframework.annotation.processing.PackageConfigurationInjectProcessor;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -65,8 +64,8 @@ public final class Parser {
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
      * <b>does not</b> compile the sources.
      */
-    public static Iterable<? extends JavaFileObject> generate(String className, String... lines) {
-        return generate(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
+    public static Iterable<? extends JavaFileObject> generate(String className, String code) {
+        return generate(JavaFileObjects.forSourceString(className, code));
     }
     /**
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
@@ -125,7 +124,11 @@ public final class Parser {
                                 Arrays.asList(sources),
                                 context);
         try {
-            task.setProcessors(Collections.singletonList(new BeanDefinitionInjectProcessor()));
+
+            List<Processor> processors = new ArrayList<>();
+            processors.add(new PackageConfigurationInjectProcessor());
+            processors.add(new BeanDefinitionInjectProcessor());
+            task.setProcessors(processors);
             task.generate();
 
             List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();

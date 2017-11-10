@@ -19,7 +19,9 @@ import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.util.Context
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.naming.NameUtils
+import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
+import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.support.Parser
 import spock.lang.Specification
 
@@ -64,6 +66,11 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    protected BeanConfiguration buildBeanConfiguration(String packageName, String cls) {
+        ClassLoader classLoader = buildClassLoader("${packageName}.package-info", cls)
+        return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
     }
 
     protected ClassLoader buildClassLoader(String className, String cls) {

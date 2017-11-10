@@ -23,8 +23,10 @@ import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.annotation.AnnotationValue
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import javax.inject.Qualifier
@@ -36,6 +38,27 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
+
+    @Ignore // Support for closure values not yet supported
+    void "test build annotation with closure value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(condition= { true })
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.hasDeclaredAnnotation(Requires)
+        metadata.isPresent(Requires, 'condition')
+        Closure.isAssignableFrom( metadata.getAnnotation(Requires).condition() )
+    }
+
     void "test build repeatable annotations"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\

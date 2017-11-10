@@ -3,6 +3,7 @@ package org.particleframework.annotation.processing;
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 import org.particleframework.inject.writer.BeanConfigurationWriter;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -50,12 +51,18 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             Object aPackage = super.visitPackage(packageElement, p);
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
-                BeanConfigurationWriter writer = new BeanConfigurationWriter(packageName);
+                BeanConfigurationWriter writer = new BeanConfigurationWriter(packageName, annotationUtils.getAnnotationMetadata(packageElement));
                 String configurationClassName = writer.getConfigurationClassName();
                 note("Creating class file %s for @Configuration in package-info", configurationClassName);
                 try {
                     JavaFileObject javaFileObject =
                         filer.createClassFile(configurationClassName, packageElement);
+
+                    AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
+                    JavaFileObject annotationMetadataFile = filer.createClassFile(annotationMetadataWriter.getClassName(), packageElement);
+                    try (OutputStream out = annotationMetadataFile.openOutputStream()) {
+                        annotationMetadataWriter.writeTo(out);
+                    }
                     try (OutputStream out = javaFileObject.openOutputStream()) {
                         writer.writeTo(out);
                     }

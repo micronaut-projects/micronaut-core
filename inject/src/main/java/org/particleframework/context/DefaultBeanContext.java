@@ -64,9 +64,9 @@ public class DefaultBeanContext implements BeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     public static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
-    private final Iterator<BeanDefinitionClass> beanDefinitionClassIterator;
+    private final Iterator<BeanDefinitionReference> beanDefinitionClassIterator;
     private final Iterator<BeanConfiguration> beanConfigurationIterator;
-    private final Collection<BeanDefinitionClass> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
+    private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     protected final Map<Class, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>(30);
     protected final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
 
@@ -554,12 +554,12 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Resolves the {@link BeanDefinitionClass} class instances. Default implementation uses ServiceLoader pattern
+     * Resolves the {@link BeanDefinitionReference} class instances. Default implementation uses ServiceLoader pattern
      *
      * @return The bean definition classes
      */
-    protected Iterable<BeanDefinitionClass> resolveBeanDefinitionClasses() {
-        return ServiceLoader.load(BeanDefinitionClass.class, classLoader);
+    protected Iterable<BeanDefinitionReference> resolveBeanDefinitionClasses() {
+        return ServiceLoader.load(BeanDefinitionReference.class, classLoader);
     }
 
     /**
@@ -576,8 +576,8 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param contextScopeBeans The context scope beans
      */
-    protected void initializeContext(List<BeanDefinitionClass> contextScopeBeans) {
-        for (BeanDefinitionClass contextScopeBean : contextScopeBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
+        for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
             try {
 
                 BeanDefinition beanDefinition = contextScopeBean.load();
@@ -605,8 +605,8 @@ public class DefaultBeanContext implements BeanContext {
         // first traverse component definition classes and load candidates
 
         if (!beanDefinitionsClasses.isEmpty()) {
-            Collection<BeanDefinitionClass> candidateClasses = new HashSet<>();
-            for (BeanDefinitionClass beanClass : beanDefinitionsClasses) {
+            Collection<BeanDefinitionReference> candidateClasses = new HashSet<>();
+            for (BeanDefinitionReference beanClass : beanDefinitionsClasses) {
                 try {
                     Class<?> candidateType = beanClass.getBeanType();
 
@@ -1109,27 +1109,27 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void readAllBeanDefinitionClasses() {
-        List<BeanDefinitionClass> contextScopeBeans = new ArrayList<>();
-        Map<String, BeanDefinitionClass> beanDefinitionsClassesByType = new HashMap<>();
-        Map<String, BeanDefinitionClass> beanDefinitionsClassesByDefinition = new HashMap<>();
-        Map<String, BeanDefinitionClass> replacementsByType = new LinkedHashMap<>();
-        Map<String, BeanDefinitionClass> replacementsByDefinition = new LinkedHashMap<>();
+        List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
+        Map<String, BeanDefinitionReference> beanDefinitionsClassesByType = new HashMap<>();
+        Map<String, BeanDefinitionReference> beanDefinitionsClassesByDefinition = new HashMap<>();
+        Map<String, BeanDefinitionReference> replacementsByType = new LinkedHashMap<>();
+        Map<String, BeanDefinitionReference> replacementsByDefinition = new LinkedHashMap<>();
         while (beanDefinitionClassIterator.hasNext()) {
-            BeanDefinitionClass beanDefinitionClass = beanDefinitionClassIterator.next();
-            if (beanDefinitionClass.isEnabled(this)) {
-                String replacesBeanTypeName = beanDefinitionClass.getReplacesBeanTypeName();
+            BeanDefinitionReference beanDefinitionReference = beanDefinitionClassIterator.next();
+            if (beanDefinitionReference.isEnabled(this)) {
+                String replacesBeanTypeName = beanDefinitionReference.getReplacesBeanTypeName();
                 if (replacesBeanTypeName != null) {
-                    replacementsByType.put(replacesBeanTypeName, beanDefinitionClass);
+                    replacementsByType.put(replacesBeanTypeName, beanDefinitionReference);
                 }
-                String replacesBeanDefinitionName = beanDefinitionClass.getReplacesBeanDefinitionName();
+                String replacesBeanDefinitionName = beanDefinitionReference.getReplacesBeanDefinitionName();
                 if (replacesBeanDefinitionName != null) {
-                    replacementsByDefinition.put(replacesBeanDefinitionName, beanDefinitionClass);
+                    replacementsByDefinition.put(replacesBeanDefinitionName, beanDefinitionReference);
                 }
 
-                beanDefinitionsClassesByType.put(beanDefinitionClass.getBeanTypeName(), beanDefinitionClass);
-                beanDefinitionsClassesByDefinition.put(beanDefinitionClass.toString(), beanDefinitionClass);
-                if (beanDefinitionClass.isContextScope()) {
-                    contextScopeBeans.add(beanDefinitionClass);
+                beanDefinitionsClassesByType.put(beanDefinitionReference.getBeanTypeName(), beanDefinitionReference);
+                beanDefinitionsClassesByDefinition.put(beanDefinitionReference.toString(), beanDefinitionReference);
+                if (beanDefinitionReference.isContextScope()) {
+                    contextScopeBeans.add(beanDefinitionReference);
                 }
             }
         }
@@ -1138,25 +1138,25 @@ public class DefaultBeanContext implements BeanContext {
         // This logic handles the @Replaces annotation
         // we go through all of the replacements and if the replacement hasn't been discarded
         // we lookup the bean to be replaced and remove it from the bean definitions and context scope beans
-        for (Map.Entry<String, BeanDefinitionClass> replacement : replacementsByType.entrySet()) {
-            BeanDefinitionClass replacementBeanClass = replacement.getValue();
+        for (Map.Entry<String, BeanDefinitionReference> replacement : replacementsByType.entrySet()) {
+            BeanDefinitionReference replacementBeanClass = replacement.getValue();
             String beanNameToBeReplaced = replacement.getKey();
             if (beanDefinitionsClassesByType.containsValue(replacementBeanClass)
                     && (beanDefinitionsClassesByType.containsKey(beanNameToBeReplaced))) {
 
-                BeanDefinitionClass removedClass = beanDefinitionsClassesByType.remove(beanNameToBeReplaced);
+                BeanDefinitionReference removedClass = beanDefinitionsClassesByType.remove(beanNameToBeReplaced);
                 beanDefinitionsClassesByDefinition.remove(removedClass.toString());
                 contextScopeBeans.remove(removedClass);
             }
         }
 
-        for (Map.Entry<String, BeanDefinitionClass> replacement : replacementsByDefinition.entrySet()) {
-            BeanDefinitionClass replacementBeanClass = replacement.getValue();
+        for (Map.Entry<String, BeanDefinitionReference> replacement : replacementsByDefinition.entrySet()) {
+            BeanDefinitionReference replacementBeanClass = replacement.getValue();
             String definitionToBeReplaced = replacement.getKey();
             if (beanDefinitionsClassesByDefinition.containsValue(replacementBeanClass)
                     && (beanDefinitionsClassesByDefinition.containsKey(definitionToBeReplaced))) {
 
-                BeanDefinitionClass removedClass = beanDefinitionsClassesByDefinition.remove(definitionToBeReplaced);
+                BeanDefinitionReference removedClass = beanDefinitionsClassesByDefinition.remove(definitionToBeReplaced);
                 beanDefinitionsClassesByType.remove(removedClass.getBeanTypeName());
                 contextScopeBeans.remove(removedClass);
             }
@@ -1164,7 +1164,7 @@ public class DefaultBeanContext implements BeanContext {
 
         this.beanDefinitionsClasses.addAll(beanDefinitionsClassesByDefinition.values());
 
-        Collection<BeanDefinitionClass> values = new HashSet<>(beanDefinitionsClasses);
+        Collection<BeanDefinitionReference> values = new HashSet<>(beanDefinitionsClasses);
         values.forEach(beanDefinitionClass -> {
                     for (BeanConfiguration configuration : beanConfigurations.values()) {
                         boolean enabled = configuration.isEnabled(this);

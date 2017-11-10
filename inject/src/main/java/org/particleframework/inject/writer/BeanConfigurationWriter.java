@@ -3,7 +3,9 @@ package org.particleframework.inject.writer;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractBeanConfiguration;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
 
 import java.io.File;
@@ -16,17 +18,18 @@ import java.io.OutputStream;
  * @since 1.0
  */
 @Internal
-public class BeanConfigurationWriter extends AbstractClassFileWriter {
+public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
+    public static final String CLASS_SUFFIX = "$BeanConfiguration";
     private final String packageName;
     private final String configurationClassName;
     private final String configurationClassInternalName;
 
-    public BeanConfigurationWriter(String packageName) {
+    public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
+        super(packageName + '.' + CLASS_SUFFIX, annotationMetadata);
         this.packageName = packageName;
-        String classShortName = "$BeanConfiguration";
-        this.configurationClassName = packageName + '.' + classShortName;
-        this.configurationClassInternalName = getInternalName(configurationClassName);
+        this.configurationClassName = targetClassType.getClassName();
+        this.configurationClassInternalName = targetClassType.getInternalName();
     }
 
     /**
@@ -44,6 +47,7 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
     public void writeTo(File targetDir) {
         try {
             ClassWriter classWriter = generateClassBytes();
+            getAnnotationMetadataWriter().writeTo(targetDir);
             writeClassToDisk(targetDir, classWriter, configurationClassName);
         } catch (Throwable e) {
             throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
@@ -73,29 +77,33 @@ public class BeanConfigurationWriter extends AbstractClassFileWriter {
             Type beanConfigurationType = Type.getType(superType);
 
             startClass(classWriter, configurationClassInternalName, beanConfigurationType);
-            MethodVisitor cv = startConstructor(classWriter);
+            writeAnnotationMetadataStaticInitializer(classWriter);
 
-            // ALOAD 0
-            cv.visitVarInsn(ALOAD, 0);
-            // LDC "..package name.."
-            cv.visitLdcInsn(packageName);
-
-            // INVOKESTATIC java/lang/Package.getPackage (Ljava/lang/String;)Ljava/lang/Package;
-            invokeStaticMethod(cv, Package.class, "getPackage", String.class);
-
-            // INVOKESPECIAL AbstractBeanConfiguration.<init> (Ljava/lang/Package;)V
-            invokeConstructor(cv, AbstractBeanConfiguration.class, Package.class);
-
-            // RETURN
-            cv.visitInsn(RETURN);
-            // MAXSTACK = 2
-            // MAXLOCALS = 1
-            cv.visitMaxs(2, 1);
+            writeConstructor(classWriter);
+            writeGetAnnotationMetadataMethod(classWriter);
 
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Particle version?: " + e.getMessage(), e);
         }
 
         return classWriter;
+    }
+
+    private void writeConstructor(ClassWriter classWriter) throws NoSuchMethodException {
+        GeneratorAdapter cv = startConstructor(classWriter);
+
+        // ALOAD 0
+        cv.loadThis();
+        // LDC "..package name.."
+        cv.push(packageName);
+
+        // INVOKESPECIAL AbstractBeanConfiguration.<init> (Ljava/lang/Package;)V
+        invokeConstructor(cv, AbstractBeanConfiguration.class, String.class);
+
+        // RETURN
+        cv.visitInsn(RETURN);
+        // MAXSTACK = 2
+        // MAXLOCALS = 1
+        cv.visitMaxs(2, 1);
     }
 }

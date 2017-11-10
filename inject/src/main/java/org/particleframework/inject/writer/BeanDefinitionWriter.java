@@ -15,7 +15,6 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
-import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,7 +23,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -175,7 +173,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
-    private static final String FIELD_ANNOTATION_METADATA = "$annotationMetadata";
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -223,7 +220,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
     private List<TypeAnnotationSource> annotationSourceList = new ArrayList<>();
-    private AnnotationMetadataWriter annotationMetadataWriter;
+    private final AnnotationMetadata annotationMetadata;
 
     /**
      * Creates a bean definition writer
@@ -236,8 +233,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public BeanDefinitionWriter(String packageName,
                                 String className,
                                 String scope,
-                                boolean isSingleton) {
-        this(packageName, className, packageName + '.' + className, false, scope, isSingleton);
+                                boolean isSingleton,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName, className, packageName + '.' + className, false, scope, isSingleton, annotationMetadata);
     }
 
 
@@ -255,8 +253,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 String providedClassName,
                                 boolean isInterface,
                                 String scope,
-                                boolean isSingleton) {
-        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface, scope, isSingleton);
+                                boolean isSingleton,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface, scope, isSingleton, annotationMetadata);
     }
 
 
@@ -276,11 +275,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 String providedClassName,
                                 boolean isInterface,
                                 String scope,
-                                boolean isSingleton) {
+                                boolean isSingleton,
+                                AnnotationMetadata annotationMetadata) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.packageName = packageName;
         this.isInterface = isInterface;
         this.beanFullClassName = packageName + '.' + className;
+        this.annotationMetadata = annotationMetadata;
         this.beanSimpleClassName = className;
         this.providedBeanClassName = providedClassName;
         this.beanDefinitionName = beanDefinitionName;
@@ -500,11 +501,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     protected void finalizeAnnotationMetadata() {
-        if(annotationMetadataWriter != null) {
+        if(annotationMetadata != null) {
 
             GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
             annotationMetadataMethod.loadThis();
-            annotationMetadataMethod.getStatic(beanDefinitionType, FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.getStatic(getTypeReference(beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
             annotationMetadataMethod.returnValue();
             annotationMetadataMethod.visitMaxs(1,1);
             annotationMetadataMethod.visitEnd();
@@ -530,11 +531,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             try {
-                if(annotationMetadataWriter != null) {
-                    try(OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
-                        annotationMetadataWriter.writeTo(outputStream);
-                    }
-                }
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
                 methodExecutors.forEach((className, classWriter) -> {
                     try {
@@ -792,6 +788,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return beanSimpleClassName;
     }
 
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return this.annotationMetadata;
+    }
+
     /**
      * Visits a field injection point
      *
@@ -849,13 +850,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD, isOptional);
     }
 
-    @Override
-    public void visitAnnotationMetadata(AnnotationMetadata metadata) {
-        Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
-        this.annotationMetadataWriter = new AnnotationMetadataWriter(beanDefinitionName, metadata);
-    }
-
-
     private void buildFactoryMethodClassConstructor(
             Object factoryClass,
             String methodName,
@@ -864,12 +858,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Map<String, Map<String, Object>> genericTypes) {
         Type factoryTypeRef = getTypeReference(factoryClass);
         this.constructorVisitor = buildProtectedConstructor(BEAN_DEFINITION_METHOD_CONSTRUCTOR);
-
-        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-        initializeAnnotationMetadata(staticInit);
-        staticInit.visitInsn(RETURN);
-        staticInit.visitMaxs(1,1);
-        staticInit.visitEnd();
 
         GeneratorAdapter defaultConstructor = new GeneratorAdapter(
                 startConstructor(classWriter),
@@ -1609,7 +1597,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_CONSTRUCTOR, TYPE_CONSTRUCTOR.getDescriptor(), null, null);
 
 
-
             Collection<Object> argumentClassNames = argumentTypes.values();
 
             pushGetConstructorForType(staticInit, this.beanType, argumentClassNames);
@@ -1619,7 +1606,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     FIELD_CONSTRUCTOR,
                     TYPE_CONSTRUCTOR
             );
-            initializeAnnotationMetadata(staticInit);
 
             staticInit.visitInsn(RETURN);
             staticInit.visitMaxs(1,1);
@@ -1741,18 +1727,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
 
-    }
-
-    private void initializeAnnotationMetadata(GeneratorAdapter staticInit) {
-        if( annotationMetadataWriter != null) {
-            Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
-            classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
-            Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-            staticInit.newInstance(concreteMetadataType);
-            staticInit.dup();
-            staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
-            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_METADATA, annotationMetadataType);
-        }
     }
 
     static void buildTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {

@@ -1,12 +1,19 @@
 package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.Internal;
 
 /**
- * <p>A bean definition class provides a reference to a {@link BeanDefinition} thus
- * allowing for soft loading of component definitions for purposes of type inspection.</p>
+ * <p>A bean definition reference provides a reference to a {@link BeanDefinition} thus
+ * allowing for soft loading of bean definitions without loading the actual types.</p>
+ *
+ * <p>This interface implements {@link AnnotationMetadataProvider} thus allowing the bean metadata to be introspected safely
+ * without loading the class or the annotations themselves.</p>
+ *
+ * <p>The actual bean will be loaded upon calling the {@link #load()} method. Note that consumers of this interface should call {@link #isPresent()} prior to loading to ensure an error does not occur</p>
  *
  * <p>The class can also decided whether to abort loading the definition by returning null</p>
  *
@@ -14,7 +21,7 @@ import org.particleframework.core.annotation.Internal;
  * @since 1.0
  */
 @Internal
-public interface BeanDefinitionClass<T> extends AnnotationSource {
+public interface BeanDefinitionReference<T> extends AnnotationMetadataProvider {
     /**
      * @return The underlying component type
      */
@@ -59,4 +66,5 @@ public interface BeanDefinitionClass<T> extends AnnotationSource {
      * @return True if it is
      */
     boolean isEnabled(BeanContext beanContext);
+
 }

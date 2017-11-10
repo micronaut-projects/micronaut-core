@@ -9,7 +9,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 @FunctionalInterface
-public interface Condition<T extends ConditionContext> extends Predicate<T> {
+public interface Condition extends Predicate<ConditionContext> {
 
     /**
      * Check whether a specific condition is met
@@ -17,10 +17,10 @@ public interface Condition<T extends ConditionContext> extends Predicate<T> {
      * @param context The condition context
      * @return True if has been met
      */
-    boolean matches(T context);
+    boolean matches(ConditionContext context);
 
     @Override
-    default boolean test(T condition) {
+    default boolean test(ConditionContext condition) {
         return matches(condition);
     }
 }

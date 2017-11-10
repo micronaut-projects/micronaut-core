@@ -61,7 +61,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                     result.add(annotation);
             }
             if(!result.isEmpty()) {
-                return Optional.of(result.toArray());
+                return Optional.of(result.toArray((Object[]) Array.newInstance(annotationClass, result.size())));
             }
             return Optional.empty();
         });
@@ -75,10 +75,11 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
 
     private Annotation[] allAnnotationArray;
     private Annotation[] declaredAnnotationArray;
-    private final Map<String, Annotation> annotationMap = new ConcurrentHashMap<>(2);
+    private final Map<String, Annotation> annotationMap;
 
     @Internal
     protected DefaultAnnotationMetadata() {
+        annotationMap = new ConcurrentHashMap<>(2);
     }
 
     /**
@@ -101,6 +102,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
+        this.annotationMap = allAnnotations != null ? new ConcurrentHashMap<>(allAnnotations.size()) : null;
         this.annotationsByStereotype = annotationsByStereotype;
     }
 
@@ -308,8 +310,8 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        if(annotationClass == null) return null;
-        String annotationName = annotationClass.getName();
+        if(annotationClass == null || annotationMap == null) return null;
+        String annotationName = annotationClass.getName().intern();
         if( hasAnnotation(annotationName)) {
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
                 ConvertibleValues<Object> annotationValues = getValues(annotationClass);
@@ -322,6 +324,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
 
     @Override
     public Annotation[] getAnnotations() {
+        if(annotationMap == null) return AnnotationUtil.ZERO_ANNOTATIONS;
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
@@ -336,6 +339,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
 
     @Override
     public Annotation[] getDeclaredAnnotations() {
+        if(annotationMap == null) return AnnotationUtil.ZERO_ANNOTATIONS;
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check

@@ -1,16 +1,18 @@
 package org.particleframework.context;
 
 import org.particleframework.context.condition.ConditionContext;
+import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
  * A Default context implementation
  */
-class DefaultConditionContext<T> implements ConditionContext<T> {
+class DefaultConditionContext<T extends AnnotationMetadataProvider> implements ConditionContext<T> {
 
     private final BeanContext beanContext;
     private final T component;
 
-    public DefaultConditionContext(BeanContext beanContext, T component) {
+    DefaultConditionContext(BeanContext beanContext, T component) {
         this.beanContext = beanContext;
         this.component = component;
     }

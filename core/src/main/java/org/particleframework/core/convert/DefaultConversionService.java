@@ -9,6 +9,7 @@ import org.particleframework.core.convert.format.ReadableBytesTypeConverter;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.IOUtils;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
@@ -105,6 +106,15 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     protected void registerDefaultConverters() {
+
+        // String -> Class
+        addConverter(CharSequence.class, Class.class, (object, targetType, context) -> {
+            ClassLoader classLoader = targetType.getClassLoader();
+            if(classLoader == null) {
+                classLoader = DefaultConversionService.class.getClassLoader();
+            }
+            return ClassUtils.forName(object.toString(), classLoader);
+        });
 
         // InputStream -> String
         addConverter(InputStream.class, String.class, (object, targetType, context) -> {

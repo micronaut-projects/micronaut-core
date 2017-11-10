@@ -60,11 +60,19 @@ class Test {
         metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
 
         when:
-        Requires[] requires = metadata.getValue(Requirements, Requires[].class).get()
+        Requires[] requires = metadata.getAnnotation(Requirements).value()
 
         then:
         requires.size() == 2
         requires[0].property() == 'blah'
+
+        when:
+        requires = metadata.getAnnotationsByType(Requires)
+
+        then:
+        requires.size() == 2
+        requires[0].property() == 'blah'
+
     }
 
     void "test write first level stereotype data"() {

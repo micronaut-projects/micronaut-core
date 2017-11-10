@@ -1,13 +1,13 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.Requirements;
-import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.BeanDefinitionClass;
+import org.particleframework.inject.BeanDefinitionReference;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,28 +22,19 @@ import java.util.Collection;
 @Internal
 public class AbstractBeanConfiguration implements BeanConfiguration {
 
-    private final Package thePackage;
     private final String packageName;
-    private final Collection<BeanDefinitionClass> beanDefinitionClasses = new ArrayList<>();
     private final Condition condition;
     private Boolean enabled = null;
 
-    protected AbstractBeanConfiguration(Package thePackage) {
-        this.thePackage = thePackage;
-        this.packageName = thePackage.getName();
-        Requires[] annotations = thePackage.getAnnotationsByType(Requires.class);
-        if(annotations.length == 0) {
-            Requirements requirements = thePackage.getAnnotation(Requirements.class);
-            if(requirements != null) {
-                annotations = requirements.value();
-            }
-        }
-        this.condition = annotations.length == 0 ? null : new RequiresCondition(annotations);
+    protected AbstractBeanConfiguration(String thePackage) {
+        this.packageName = thePackage.intern();
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        this.condition = annotationMetadata.hasDeclaredAnnotation(Requirements.class)? null : new RequiresCondition(annotationMetadata);
     }
 
     @Override
     public Package getPackage() {
-        return thePackage;
+        return Package.getPackage(packageName);
     }
 
     @Override
@@ -59,20 +50,20 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     @Override
     public boolean isEnabled(BeanContext context) {
         if(enabled == null) {
-            enabled = condition == null || condition.matches(new DefaultConditionContext(context, this));
+            enabled = condition == null || condition.matches(new DefaultConditionContext<>(context, this));
         }
         return enabled;
     }
 
     @Override
-    public boolean isWithin(BeanDefinitionClass beanDefinitionClass) {
-        String beanTypeName = beanDefinitionClass.getBeanTypeName();
+    public boolean isWithin(BeanDefinitionReference beanDefinitionReference) {
+        String beanTypeName = beanDefinitionReference.getBeanTypeName();
         return isWithin(beanTypeName);
     }
 
     @Override
     public String toString() {
-        return "Configuration: " + getPackage().getName();
+        return "Configuration: " + getName();
     }
 
     @Override
@@ -81,12 +72,4 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
         return pkgName.equals(this.packageName) || pkgName.startsWith(this.packageName + '.');
     }
 
-    Collection<BeanDefinitionClass> getBeanDefinitionClasses() {
-        return beanDefinitionClasses;
-    }
-
-    AbstractBeanConfiguration addDefinitionClass(BeanDefinitionClass definitionClass) {
-        beanDefinitionClasses.add(definitionClass);
-        return this;
-    }
 }

@@ -431,8 +431,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 false);
     }
 
-    protected MethodVisitor startPublicMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
-        return classWriter.visitMethod(ACC_PUBLIC, methodName, Type.getMethodType(Type.getType(returnType), new Type[0]).getDescriptor(), null, null);
+    protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
+        Type methodType = Type.getMethodType(Type.getType(returnType));
+
+        return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, methodName, methodType.getDescriptor(), null, null), ACC_PUBLIC, methodName, methodType.getDescriptor());
     }
 
     protected static String getInternalName(String className) {

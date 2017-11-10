@@ -1,8 +1,7 @@
 package org.particleframework.context.condition;
 
 import org.particleframework.context.BeanContext;
-import org.particleframework.inject.BeanConfiguration;
-import org.particleframework.inject.BeanDefinitionClass;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
  * The ConditionContext passed to a {@link Condition}
@@ -10,10 +9,12 @@ import org.particleframework.inject.BeanDefinitionClass;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConditionContext<T> {
+public interface ConditionContext<T extends AnnotationMetadataProvider> {
 
     /**
-     * @return The component for which the condition is being evaluated
+     * The component for which the condition is being evaluated
+     *
+     * @return Either a {@link org.particleframework.inject.BeanDefinition} or a {@link org.particleframework.inject.BeanConfiguration}
      */
     T getComponent();
 

@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject.annotation;
 
+import org.particleframework.core.convert.value.ConvertibleValues;
+
 import java.util.Map;
 
 /**
@@ -49,5 +51,12 @@ public class AnnotationValue {
      */
     public Map<CharSequence, Object> getValues() {
         return values;
+    }
+
+    /**
+     * @return The attribute values
+     */
+    public ConvertibleValues<Object> getConvertibleValues() {
+        return ConvertibleValues.of(values);
     }
 }

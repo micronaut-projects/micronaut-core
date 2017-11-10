@@ -18,6 +18,8 @@ package org.particleframework.inject.annotation
 import org.particleframework.context.annotation.Bean
 import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requires
+import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
 
 import javax.inject.Scope
@@ -28,6 +30,20 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
+
+    void "test build configuration"() {
+        given:
+        BeanConfiguration configuration = buildBeanConfiguration("test", '''
+@Configuration
+@Requires(property="foo")
+package test;
+import org.particleframework.context.annotation.*;
+
+''')
+        expect:
+        configuration != null
+        configuration.getAnnotationMetadata().hasStereotype(Requires)
+    }
 
     void "test build bean basic definition"() {
         given:

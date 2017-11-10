@@ -288,11 +288,6 @@ public interface BeanDefinitionVisitor {
                          boolean isOptional);
 
     /**
-     * Visit the annotation metadata for this bean
-     * @param metadata The annotation metadata
-     */
-    void visitAnnotationMetadata(AnnotationMetadata metadata);
-    /**
      * Adds a method as a source of annotations
      *
      * @param declaringType The declaring type
@@ -311,5 +306,9 @@ public interface BeanDefinitionVisitor {
      */
     String getBeanSimpleName();
 
+    /**
+     * @return The annotation metadata
+     */
+    AnnotationMetadata getAnnotationMetadata();
 
 }

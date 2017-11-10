@@ -171,7 +171,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
                 scopeClassName,
-                parent.isSingleton());
+                parent.isSingleton(),
+                parent.getAnnotationMetadata());
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
 
@@ -190,6 +191,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           String scope,
                           boolean isInterface,
                           boolean isSingleton,
+                          AnnotationMetadata annotationMetadata,
                           Object... interceptorTypes) {
         this.isIntroduction = true;
         this.packageName = packageName;
@@ -210,7 +212,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
                 scope,
-                isSingleton);
+                isSingleton, annotationMetadata);
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
 
@@ -906,14 +908,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitAnnotationMetadata(AnnotationMetadata metadata) {
-        if(parentWriter != null) {
-            parentWriter.visitAnnotationMetadata(metadata);
-        }
-        proxyBeanDefinitionWriter.visitAnnotationMetadata(metadata);
-    }
-
-    @Override
     public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
         proxyBeanDefinitionWriter.visitMethodAnnotationSource(declaringType, methodName, parameters);
     }
@@ -926,6 +920,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public String getBeanSimpleName() {
         return proxyBeanDefinitionWriter.getBeanSimpleName();
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return proxyBeanDefinitionWriter.getAnnotationMetadata();
     }
 
     @Override

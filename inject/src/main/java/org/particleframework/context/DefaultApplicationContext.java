@@ -3,22 +3,19 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
-import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.naming.Named;
-import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.BeanDefinitionClass;
+import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
-import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -152,7 +149,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void initializeContext(List<BeanDefinitionClass> contextScopeBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
         Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
         for (TypeConverter typeConverter : typeConverters) {
             Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
