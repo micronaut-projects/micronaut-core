@@ -39,13 +39,13 @@ class TypeQualifier<T> implements Qualifier<T> {
 
     private final List<Class> types;
 
-    TypeQualifier(@Nullable Class... types) {
+    TypeQualifier(@Nullable Class<?>... types) {
         this.types = new ArrayList<>();
         if(types != null) {
-            for (Class type : types) {
-                Optional<Type> typeOpt = AnnotationUtil.findAnnotation(type, Type.class);
-                if(typeOpt.isPresent()) {
-                    this.types.addAll(Arrays.asList(typeOpt.get().value()));
+            for (Class<?> type : types) {
+                Type typeAnn = type.getAnnotation(Type.class);
+                if(typeAnn != null) {
+                    this.types.addAll(Arrays.asList(typeAnn.value()));
                 }
                 else {
                     this.types.add(type);

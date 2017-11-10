@@ -245,7 +245,7 @@ public interface BeanDefinitionVisitor {
      * @param argumentTypes  The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
-     *
+     * @param annotationMetadata The annotation metadata for the method
      * @return The {@link ExecutableMethodWriter}. Calls should call {@link ExecutableMethodWriter#visitEnd()}  to finalize the method
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
@@ -254,7 +254,8 @@ public interface BeanDefinitionVisitor {
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, Object> qualifierTypes,
-                               Map<String, Map<String, Object>> genericTypes);
+                               Map<String, Map<String, Object>> genericTypes,
+                               AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a field injection point

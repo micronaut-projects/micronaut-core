@@ -295,7 +295,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             methodNode.name,
                             targetMethodParamsToType,
                             targetMethodQualifierTypes,
-                            targetMethodGenericTypeMap
+                            targetMethodGenericTypeMap,
+                            AstAnnotationUtils.getAnnotationMetadata(methodNode)
                     )
                 }
 
@@ -394,7 +395,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
-                                    targetMethodGenericTypeMap
+                                    targetMethodGenericTypeMap,
+                                    methodAnnotationMetadata
                             ).visitMethodAnnotationSource(
                                     beanMethodDeclaringType,
                                     methodName,
@@ -409,7 +411,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
-                                    targetMethodGenericTypeMap
+                                    targetMethodGenericTypeMap,
+                                    methodAnnotationMetadata
                             );
                         }
                     }.accept(methodNode.getReturnType())
@@ -523,7 +526,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 methodName,
                                 paramsToType,
                                 qualifierTypes,
-                                genericTypeMap)
+                                genericTypeMap, methodAnnotationMetadata)
                                 .visitEnd()
 
                         if((isAopProxyType && isPublic) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
@@ -547,7 +550,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         methodName,
                                         paramsToType,
                                         qualifierTypes,
-                                        genericTypeMap
+                                        genericTypeMap,
+                                        methodAnnotationMetadata
                                 )
                             }
                         }
@@ -742,7 +746,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getSetterName(propertyNode.name),
                             resolvedArguments,
                             resolvedQualifiers,
-                            resolvedGenericTypes
+                            resolvedGenericTypes,
+                            fieldAnnotationMetadata
                     )
                 }
             }

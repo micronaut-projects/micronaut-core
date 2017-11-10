@@ -32,6 +32,7 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ProxyBeanDefinition;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 import org.particleframework.inject.writer.*;
 
 import java.io.File;
@@ -315,7 +316,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   String methodName,
                                   Map<String, Object> argumentTypes,
                                   Map<String, Object> qualifierTypes,
-                                  Map<String, Map<String, Object>> genericTypes) {
+                                  Map<String, Map<String, Object>> genericTypes,
+                                  AnnotationMetadata annotationMetadata) {
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -348,7 +350,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
 
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface
+                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, annotationMetadata
             ) {
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
@@ -789,6 +791,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             out.write(classWriter.toByteArray());
             proxiedMethods.forEach((writer) -> {
                 try {
+                    AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
+                    try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
+                        annotationMetadataWriter.writeTo(outputStream);
+                    }
                     try (OutputStream outputStream = visitor.visitClass(writer.getClassName())) {
                         outputStream.write(writer.getClassWriter().toByteArray());
                     }
@@ -885,7 +891,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String methodName,
             Map<String, Object> argumentTypes,
             Map<String, Object> qualifierTypes,
-            Map<String, Map<String, Object>> genericTypes) {
+            Map<String, Map<String, Object>> genericTypes,
+            AnnotationMetadata annotationMetadata) {
         return proxyBeanDefinitionWriter.visitExecutableMethod(
                 declaringType,
                 returnType,
@@ -893,7 +900,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 methodName,
                 argumentTypes,
                 qualifierTypes,
-                genericTypes
+                genericTypes,
+                annotationMetadata
         );
     }
 

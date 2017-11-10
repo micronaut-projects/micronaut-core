@@ -1,7 +1,5 @@
 package org.particleframework.context;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.value.ConvertibleValues;
@@ -34,6 +32,7 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 /**
@@ -65,11 +64,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> invocableMethodMap = new LinkedHashMap<>(3);
-    private final Cache<Class, String> valuePrefixes = Caffeine
-            .newBuilder()
-            .initialCapacity(2)
-            .maximumSize(10)
-            .build();
+    private final Map<Class, String> valuePrefixes = new ConcurrentHashMap<>(2);
 
     /**
      * Constructs a bean definition that is produced from a method call on another type
@@ -440,7 +435,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         try {
             return bean;
         } finally {
-            valuePrefixes.invalidateAll();
+            valuePrefixes.clear();
         }
     }
 
@@ -1161,7 +1156,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     private String resolvePrefix(BeanResolutionContext resolutionContext, BeanContext beanContext, Class<?> declaringClass, Class<?> beanType) {
-        return valuePrefixes.get(declaringClass, aClass -> {
+        return valuePrefixes.computeIfAbsent(declaringClass, aClass -> {
             String configurationPropertiesString = resolveConfigPropertiesValue(declaringClass, beanContext);
             StringBuilder prefix = new StringBuilder();
             boolean isInner = declaringClass.getDeclaringClass() != null;

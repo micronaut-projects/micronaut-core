@@ -16,9 +16,12 @@
 package org.particleframework.inject.annotation
 
 import org.particleframework.context.annotation.Bean
+import org.particleframework.context.annotation.Executable
 import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
 
@@ -30,6 +33,27 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
+
+    void "test basic method annotation metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@javax.inject.Singleton
+class Test {
+
+    @Executable
+    void sometMethod() {}
+}
+''')
+        expect:
+        definition != null
+        definition.hasDeclaredAnnotation(Singleton)
+        definition.findMethod('sometMethod').isPresent()
+        definition.findMethod('sometMethod').get().annotationMetadata.hasDeclaredAnnotation(Executable)
+    }
 
     void "test build configuration"() {
         given:

@@ -33,6 +33,7 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+
     void "test build repeatable annotations"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\

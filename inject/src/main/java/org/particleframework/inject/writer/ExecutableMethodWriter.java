@@ -21,6 +21,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractExecutableMethod;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 
@@ -35,7 +36,7 @@ import static org.particleframework.inject.writer.BeanDefinitionWriter.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ExecutableMethodWriter extends AbstractClassFileWriter implements Opcodes
+public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes
 {
     public static final String FIELD_PARENT = "$parent";
     public static final String FIELD_METHOD = "$METHOD";
@@ -53,7 +54,8 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
     private boolean isStatic = false;
     private List<TypeAnnotationSource> annotationSources = new LinkedList<>();
 
-    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface) {
+    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
+        super(methodClassName, annotationMetadata);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;
@@ -116,6 +118,10 @@ public class ExecutableMethodWriter extends AbstractClassFileWriter implements O
 
         classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_METHOD, TYPE_METHOD.getDescriptor() , null, null);
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
+
+        // initialize and write the annotation metadata
+        initializeAnnotationMetadata(staticInit, classWriter);
+        writeGetAnnotationMetadataMethod(classWriter);
 
         pushGetMethodFromTypeCall(staticInit, declaringTypeObject, methodName, argumentTypeClasses);
         staticInit.putStatic(

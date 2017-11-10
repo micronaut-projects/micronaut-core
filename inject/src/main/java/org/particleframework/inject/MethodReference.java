@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.ReturnType;
@@ -28,7 +29,7 @@ import java.util.Arrays;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodReference<T,R> extends AnnotationSource {
+public interface MethodReference<T,R> extends AnnotationSource, AnnotationMetadataProvider {
 
     /**
      * The required argument types

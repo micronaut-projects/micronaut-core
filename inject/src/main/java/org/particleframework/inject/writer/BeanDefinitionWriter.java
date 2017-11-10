@@ -15,6 +15,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
 import java.io.IOException;
@@ -182,7 +183,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final Type scope;
     private final boolean isSingleton;
     private final Set<Class> interfaceTypes;
-    private final Map<String, ClassWriter> methodExecutors = new LinkedHashMap<>();
+    private final Map<String, ExecutableMethodWriter> methodExecutors = new LinkedHashMap<>();
     private final String providedBeanClassName;
     private final String packageName;
     private final String beanSimpleClassName;
@@ -532,10 +533,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             try {
                 ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
-                methodExecutors.forEach((className, classWriter) -> {
+                methodExecutors.forEach((className, executableMethodWriter) -> {
                     try {
+                        AnnotationMetadataWriter annotationMetadataWriter = executableMethodWriter.getAnnotationMetadataWriter();
+                        try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
+                            annotationMetadataWriter.writeTo(outputStream);
+                        }
                         try (OutputStream outputStream = visitor.visitClass(className)) {
-                            outputStream.write(classWriter.toByteArray());
+                            outputStream.write(executableMethodWriter.getClassWriter().toByteArray());
                         }
                         Optional<File> file = visitor.visitServiceDescriptor(className);
                         if(file.isPresent()) {
@@ -722,7 +727,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       String methodName,
                                       Map<String, Object> argumentTypes,
                                       Map<String, Object> qualifierTypes,
-                                      Map<String, Map<String, Object>> genericTypes) {
+                                      Map<String, Map<String, Object>> genericTypes,
+                                      AnnotationMetadata annotationMetadata) {
 
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
@@ -730,7 +736,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 beanFullClassName,
                 methodExecutorClassName,
                 methodProxyShortName,
-                isInterface);
+                isInterface,
+                annotationMetadata);
         // TODO: fix so that exec classes are static inner
 //        executableMethodWriter.makeStaticInner(beanDefinitionInternalName, (ClassWriter) classWriter);
         executableMethodWriter.visitMethod(
@@ -742,10 +749,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 qualifierTypes,
                 genericTypes
         );
-        ClassWriter classWriter = executableMethodWriter.getClassWriter();
 
-
-        methodExecutors.put(methodExecutorClassName, classWriter);
+        methodExecutors.put(methodExecutorClassName, executableMethodWriter);
 
         if(constructorVisitor == null) {
             throw new IllegalStateException("Method visitBeanDefinitionConstructor(..) should be called first!");
