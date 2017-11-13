@@ -171,7 +171,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         if (!entries.isEmpty()) {
                             for (Object key : entries.keySet()) {
                                 BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                if (primaryPrefix.equals(key.toString())) {
+                                if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
                                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                 }
                                 delegate.put(Named.class.getName(), key.toString());

@@ -15,7 +15,6 @@
  */
 package org.particleframework.context;
 
-import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
