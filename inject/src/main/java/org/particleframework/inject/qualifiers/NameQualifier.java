@@ -32,9 +32,6 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         check("beanType", beanType).notNull();
         check("candidates", candidates).notNull();
-        if (beanType.getAnnotation(ForEach.class) != null) {
-            return candidates;
-        }
         return candidates.filter(candidate -> {
                     String typeName;
                     AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();

@@ -164,12 +164,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 if (candidate.hasStereotype(ForEach.class)) {
 
                     String property = candidate.getValue(ForEach.class, "property", String.class).orElse(null);
+                    String primaryPrefix = candidate.getValue(ForEach.class, "primary", String.class).orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
                         if (!entries.isEmpty()) {
                             for (Object key : entries.keySet()) {
                                 BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                if (primaryPrefix.equals(key.toString())) {
+                                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                }
                                 delegate.put(Named.class.getName(), key.toString());
                                 transformedCandidates.add(delegate);
                             }
@@ -188,6 +192,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     if (dependentCandidate instanceof BeanDefinitionDelegate) {
                                         BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                         optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                                        parentDelegate.get(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, Boolean.class).ifPresent(isPrimary -> delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, isPrimary));
                                     } else {
                                         Optional<String> qualiferName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
                                         optional = qualiferName.map( name -> Qualifiers.byAnnotation(dependentCandidate, name));

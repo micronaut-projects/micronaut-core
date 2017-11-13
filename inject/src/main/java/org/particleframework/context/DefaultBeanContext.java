@@ -968,7 +968,6 @@ public class DefaultBeanContext implements BeanContext {
                 }
 
                 Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
-                        .filter(BeanDefinition::isPrimary)
                         .findFirst();
                 definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
             } else {

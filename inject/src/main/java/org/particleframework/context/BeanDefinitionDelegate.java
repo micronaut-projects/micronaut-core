@@ -15,6 +15,7 @@
  */
 package org.particleframework.context;
 
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
@@ -40,6 +41,8 @@ import java.util.stream.Stream;
 class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver {
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
+
+    public static final String PRIMARY_ATTRIBUTE = "org.particleframework.core.Primary";
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         if(!(definition instanceof BeanFactory)) {
@@ -74,7 +77,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary();
+        return definition.isPrimary() || (Boolean)attributes.getOrDefault(PRIMARY_ATTRIBUTE, false);
     }
 
     @Override
