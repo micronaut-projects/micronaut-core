@@ -45,6 +45,13 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 public class BeanDefinitionWriter extends AbstractClassFileWriter implements BeanDefinitionVisitor {
+    private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+            ReflectionUtils.class,
+            "getRequiredMethod",
+            Class.class,
+            String.class,
+            Class[].class
+    ));
     private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_METHOD = org.objectweb.asm.commons.Method.getMethod(
@@ -1840,7 +1847,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
 
         // 1st argument to addInjectPoint: The Method
-        pushInvokeMethodOnClass(methodVisitor, "getDeclaredMethod", String.class, Class[].class);
+        methodVisitor.invokeStatic(Type.getType(ReflectionUtils.class), METHOD_GET_REQUIRED_METHOD);
     }
 
     static void pushGetConstructorForType(GeneratorAdapter methodVisitor, Type beanType, Collection<Object> argumentClassNames) {

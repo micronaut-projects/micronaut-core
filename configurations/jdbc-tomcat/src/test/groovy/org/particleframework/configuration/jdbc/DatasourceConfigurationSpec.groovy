@@ -4,10 +4,12 @@ import org.apache.tomcat.jdbc.pool.DataSource
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.sql.ResultSet
 
+@Ignore
 class DatasourceConfigurationSpec extends Specification {
 
     void "test no configuration"() {

@@ -53,6 +53,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
@@ -220,15 +221,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isExecutableType = isAopProxyType || annotationUtils.hasStereotype(concreteClass, Executable.class);
         }
 
-        private boolean isConfigurationProperties(TypeElement concreteClass) {
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            if (annotationMetadata.hasStereotype(ConfigurationReader.class)) {
-                return true;
-            } else {
-                return annotationMetadata.getValue(ForEach.class, "property").isPresent();
-            }
-        }
-
         TypeElement getConcreteClass() {
             return concreteClass;
         }
@@ -353,13 +345,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     if (isConfigurationPropertiesType) {
                         // handle non @Inject, @Value fields as config properties
-                        ElementFilter.fieldsIn(elementUtils.getAllMembers(classElement)).forEach(
+                        List<? extends Element> members = elementUtils.getAllMembers(classElement);
+                        ElementFilter.fieldsIn(members).forEach(
                                 field -> {
                                     if (!modelUtils.isStatic(field) && !modelUtils.isFinal(field)) {
                                         visitConfigurationProperty(field, o);
                                     }
                                 }
                         );
+                        ElementFilter.methodsIn(members).forEach(method -> {
+                            if(!modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString())) {
+                                Element e = method.getEnclosingElement();
+                                if(e instanceof TypeElement && !e.equals(classElement)) {
+                                    if(!annotationUtils.hasStereotype(e, ConfigurationProperties.class)) {
+                                        visitExecutable(method, null);
+                                    }
+                                }
+                            }
+                        });
                     } else {
                         TypeElement superClass = modelUtils.superClassFor(classElement);
                         if (superClass != null && !modelUtils.isObjectClass(superClass)) {
@@ -369,7 +372,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     return scan(elements, o);
                 } else {
-//                note("Visited unexpected classElement %s for %s", classElement.getSimpleName(), o);
                     return null;
                 }
             }
@@ -664,10 +666,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return aopProxyWriter;
         }
 
-        private DynamicName createProxyKey(String beanName) {
-            return new DynamicName(beanName + "$Proxy");
-        }
-
         void visitAnnotatedMethod(ExecutableElement method, Object o) {
             ExecutableElementParamInfo params = populateParameterData(method);
             BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
@@ -853,14 +851,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return null;
         }
 
-        protected boolean isInheritedAndNotPublic(TypeElement declaringClass, Set<Modifier> modifiers) {
-            PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
-            PackageElement concretePackage = elementUtils.getPackageOf(concreteClass);
-            return !declaringClass.equals(concreteClass) &&
-                    !declaringPackage.equals(concretePackage) &&
-                    !(modifiers.contains(Modifier.PUBLIC));
-        }
-
         @Override
         public Object visitTypeParameter(TypeParameterElement e, Object o) {
             note("Visit param %s for %s", e.getSimpleName(), o);
@@ -871,6 +861,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         public Object visitUnknown(Element e, Object o) {
             note("Visit unknown %s for %s", e.getSimpleName(), o);
             return super.visitUnknown(e, o);
+        }
+
+        protected boolean isInheritedAndNotPublic(TypeElement declaringClass, Set<Modifier> modifiers) {
+            PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
+            PackageElement concretePackage = elementUtils.getPackageOf(concreteClass);
+            return !declaringClass.equals(concreteClass) &&
+                    !declaringPackage.equals(concretePackage) &&
+                    !(modifiers.contains(Modifier.PUBLIC));
         }
 
         private BeanDefinitionWriter createBeanDefinitionWriterFor(TypeElement typeElement) {
@@ -895,6 +893,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     scopeAnn.orElse(null),
                     isSingleton, annotationMetadata);
             return beanDefinitionWriter;
+        }
+
+        private boolean isConfigurationProperties(TypeElement concreteClass) {
+            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
+            return annotationMetadata.hasStereotype(ConfigurationReader.class) || annotationMetadata.getValue(ForEach.class, "property").isPresent();
+        }
+
+        private DynamicName createProxyKey(String beanName) {
+            return new DynamicName(beanName + "$Proxy");
         }
 
         private AopProxyWriter createAopWriterFor(TypeElement typeElement) {

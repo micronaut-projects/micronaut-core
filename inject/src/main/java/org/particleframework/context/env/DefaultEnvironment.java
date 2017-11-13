@@ -29,17 +29,11 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultEnvironment implements Environment {
+public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
     private final Set<String> names;
-    private final ConversionService conversionService;
-    // properties are stored in an array of maps organized by character in the alphabet
-    // this allows optimization of searches by prefix
-    private final Map<String,Object>[] catalog = new Map[57];
-    private final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
-    private final Map<Class, SoftServiceLoader> serviceMap = new ConcurrentHashMap<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
@@ -54,8 +48,8 @@ public class DefaultEnvironment implements Environment {
     }
 
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
+        super(conversionService);
         this.names = names == null ? Collections.emptySet() : Collections.unmodifiableSet(new HashSet<>(Arrays.asList(names)));
-        this.conversionService = conversionService;
         conversionService.addConverter(
                 CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
@@ -99,12 +93,17 @@ public class DefaultEnvironment implements Environment {
     }
 
     @Override
-    public Environment addPropertySource(PropertySource propertySource) {
+    public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.add(propertySource);
         if(isRunning()) {
             processPropertySource(propertySource, false);
         }
         return this;
+    }
+
+    @Override
+    public DefaultEnvironment addPropertySource(Map<String, ? super Object> values) {
+        return (DefaultEnvironment) super.addPropertySource(values);
     }
 
     @Override
@@ -139,47 +138,6 @@ public class DefaultEnvironment implements Environment {
     @Override
     public Set<String> getActiveNames() {
         return this.names;
-    }
-
-    @Override
-    public boolean containsProperty(@Nullable String name) {
-        if(StringUtils.isEmpty(name)) {
-            return false;
-        }
-        else {
-            Map<String, Object> entries = resolveEntriesForKey(name, false);
-            String subkeyPrefix = name + '.';
-            return entries != null && (entries.containsKey(name) || entries.keySet().stream().anyMatch(key -> key.startsWith(subkeyPrefix)));
-        }
-    }
-
-    @Override
-    public <T> Optional<T> getProperty(@Nullable String name, Class<T> requiredType, ConversionContext context) {
-        if(StringUtils.isEmpty(name)) {
-            return Optional.empty();
-        }
-        else {
-            Map<String,Object> entries = resolveEntriesForKey(name, false);
-            if(entries != null) {
-                Object value = entries.get(name);
-                if(value != null) {
-                    return conversionService.convert(value, requiredType, context);
-                }
-                else if(Map.class.isAssignableFrom(requiredType)) {
-                    Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return conversionService.convert(subMap, requiredType, context);
-                }
-                else if(Properties.class.isAssignableFrom(requiredType)) {
-                    Properties properties = resolveSubProperties(name, entries);
-                    return Optional.of((T) properties);
-                }
-                else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
-                    Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
-                }
-            }
-        }
-        return Optional.empty();
     }
 
     @Override
@@ -222,62 +180,6 @@ public class DefaultEnvironment implements Environment {
         return this;
     }
 
-    protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
-        // special handling for maps for resolving sub keys
-        Properties properties = new Properties();
-        String prefix = name + '.';
-        entries.entrySet().stream()
-                .filter(map -> map.getKey().startsWith(prefix))
-                .forEach(entry -> {
-                    Object value = entry.getValue();
-                    if(value != null) {
-                        String key = entry.getKey().substring(prefix.length());
-                        properties.put(key, value.toString());
-                    }
-                });
-
-        return properties;
-    }
-
-    protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries) {
-        // special handling for maps for resolving sub keys
-        Map<String, Object> subMap = new LinkedHashMap<>();
-        String prefix = name + '.';
-        for (Map.Entry<String, Object> map : entries.entrySet()) {
-            if (map.getKey().startsWith(prefix)) {
-                String subMapKey = map.getKey().substring(prefix.length());
-                int index = subMapKey.indexOf('.');
-                if (index == -1) {
-                    subMap.put(subMapKey, map.getValue());
-                } else {
-                    String mapKey = subMapKey.substring(0, index);
-                    if (!subMap.containsKey(mapKey)) {
-                        subMap.put(mapKey, new LinkedHashMap<>());
-                    }
-                    Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
-                    nestedMap.put(subMapKey.substring(index + 1), map.getValue());
-                }
-            }
-        }
-        return subMap;
-    }
-
-    protected void processPropertySource(PropertySource properties, boolean upperCaseUnderscoreSeperated) {
-        synchronized (catalog) {
-            for (String property : properties) {
-                Object value = properties.get(property);
-                if(upperCaseUnderscoreSeperated) {
-                    property = property.toLowerCase(Locale.ENGLISH).replace('_', '.');
-                }
-
-                Map entries = resolveEntriesForKey(property, true);
-                if(entries != null) {
-                    entries.put(property, value);
-                }
-            }
-        }
-    }
-
     /**
      * Creates the default annotation scanner
      *
@@ -286,25 +188,6 @@ public class DefaultEnvironment implements Environment {
      */
     protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
         return new CachingClassPathAnnotationScanner(classLoader);
-    }
-
-    protected Map<String,Object> resolveEntriesForKey(String name, boolean allowCreate) {
-        Map<String,Object> entries = null;
-        if(name.length() == 0) {
-            return null;
-        }
-        char firstChar = name.charAt(0);
-        if(Character.isLetter(firstChar)) {
-            int index = ((int)firstChar) - 65;
-            if(index < catalog.length && index > 0) {
-                entries = catalog[index];
-                if(allowCreate && entries == null) {
-                    entries = new LinkedHashMap<>(5);
-                    catalog[index] = entries;
-                }
-            }
-        }
-        return entries;
     }
 
 }
