@@ -80,5 +80,19 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
         }
         return this;
     }
-
+    /**
+     * Creates a new {@link ConvertibleValues} for the values
+     *
+     * @param values A map of values
+     * @param <T> The target generic type
+     * @return The values
+     */
+    static <T> MutableConvertibleValues<T> of(Map<CharSequence, T> values ) {
+        if(values == null) {
+            return new MutableConvertibleValuesMap<>();
+        }
+        else {
+            return new MutableConvertibleValuesMap<>( values);
+        }
+    }
 }

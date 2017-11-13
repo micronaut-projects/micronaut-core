@@ -1,6 +1,6 @@
 package org.particleframework.context;
 
-import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -22,9 +22,8 @@ public interface Qualifier<T> {
      * @param candidates The candidates
      * @return The qualified candidate or null it it cannot be qualified
      */
-    default Optional<BeanDefinition<T>> qualify(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
-        Stream<BeanDefinition<T>> reduced = reduce(beanType, candidates);
-        return reduced.findFirst();
+    default <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
+        return reduce(beanType, candidates).findFirst();
     }
 
     /**
@@ -33,5 +32,5 @@ public interface Qualifier<T> {
      * @param candidates The candidates
      * @return The qualified candidate or null it it cannot be qualified
      */
-    Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates);
+    <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates);
 }

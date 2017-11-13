@@ -7,6 +7,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractBeanConfiguration;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
 import java.io.OutputStream;
@@ -47,7 +48,10 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
     public void writeTo(File targetDir) {
         try {
             ClassWriter classWriter = generateClassBytes();
-            getAnnotationMetadataWriter().writeTo(targetDir);
+            AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
+            if(annotationMetadataWriter != null) {
+                annotationMetadataWriter.writeTo(targetDir);
+            }
             writeClassToDisk(targetDir, classWriter, configurationClassName);
         } catch (Throwable e) {
             throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);

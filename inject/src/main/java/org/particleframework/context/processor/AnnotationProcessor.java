@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.processor;
 
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
@@ -22,7 +23,7 @@ import java.lang.annotation.Annotation;
 /**
  * <p>An annotation processor is an object that processes the presence if a given annotation.</p>
  *
- * <p>The {@link #process(Object)} method returns void since a processor is not able to mutate the object itself or return an alternative instance, instead the design of a processor is to react to the rep</p>
+ * <p>The {@link #process(BeanDefinition, Object)} method returns void since a processor is not able to mutate the object itself or return an alternative instance, instead the design of a processor is to react to the rep</p>
  *
  * @see ExecutableMethodProcessor
  * @author Graeme Rocher
@@ -33,7 +34,8 @@ public interface AnnotationProcessor<A extends Annotation, T> {
     /**
      * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
      *
+     * @param beanDefinition
      * @param object The object to be processed
      */
-    void process(T object);
+    void process(BeanDefinition<?> beanDefinition, T object);
 }

@@ -1,12 +1,14 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationSource;
+
 /**
  * A constructor injection point
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint, ExecutionHandle<T> {
+public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint {
 
     /**
      * Invoke the constructor

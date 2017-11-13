@@ -22,6 +22,7 @@ import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
+import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.particleframework.inject.annotation.AnnotationValue
@@ -85,6 +86,23 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     protected void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
         if(annotationValue instanceof ConstantExpression) {
             annotationValues.put(memberName, ((ConstantExpression)annotationValue).value)
+        }
+        else if(annotationValue instanceof PropertyExpression) {
+            PropertyExpression pe = (PropertyExpression)annotationValue
+            if(pe.objectExpression instanceof ClassExpression) {
+                ClassExpression ce = (ClassExpression)pe.objectExpression
+                if( ce.type.isResolved() ) {
+                    Class typeClass = ce.type.typeClass
+                    try {
+                        def value = typeClass[pe.propertyAsString]
+                        if(value != null) {
+                            annotationValues.put(memberName, value)
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            }
         }
         else if(annotationValue instanceof ClassExpression) {
             annotationValues.put(memberName, ((ClassExpression)annotationValue).type.name)
@@ -155,7 +173,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
             ClassNode[] interfaces = classNode.getInterfaces()
             for (ClassNode anInterface : interfaces) {
-                if(!hierarchy.contains(anInterface)) {
+                if(!hierarchy.contains(anInterface) && anInterface.name != GroovyObject.name) {
                     hierarchy.add(anInterface)
                     populateTypeHierarchy(anInterface, hierarchy)
                 }

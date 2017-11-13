@@ -38,7 +38,6 @@ import org.particleframework.inject.writer.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
@@ -70,9 +69,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     ));
     private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
-    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", AnnotatedElement.class, Interceptor[].class);
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", ExecutableMethod.class, Interceptor[].class);
 
-    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", AnnotatedElement.class, Interceptor[].class);
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", ExecutableMethod.class, Interceptor[].class);
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Particle?")
@@ -231,11 +230,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public List<TypeAnnotationSource> getAnnotationSources() {
-        return proxyBeanDefinitionWriter.getAnnotationSources();
-    }
-
-    @Override
     public boolean isSingleton() {
         return proxyBeanDefinitionWriter.isSingleton();
     }
@@ -378,13 +372,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            String declaringClassName = getTypeReference(declaringType).getClassName();
-            if(!declaringClassName.equals(targetClassFullName)) {
-                executableMethodWriter.visitTypeAnnotationSource(targetClassFullName);
-            }
-
             executableMethodWriter.visitMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
-            executableMethodWriter.visitEnd();
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
@@ -792,8 +780,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxiedMethods.forEach((writer) -> {
                 try {
                     AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
-                    try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
-                        annotationMetadataWriter.writeTo(outputStream);
+                    if(annotationMetadataWriter != null) {
+                        try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
+                            annotationMetadataWriter.writeTo(outputStream);
+                        }
                     }
                     try (OutputStream outputStream = visitor.visitClass(writer.getClassName())) {
                         outputStream.write(writer.getClassWriter().toByteArray());
@@ -913,11 +903,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
         proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional);
-    }
-
-    @Override
-    public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        proxyBeanDefinitionWriter.visitMethodAnnotationSource(declaringType, methodName, parameters);
     }
 
     @Override

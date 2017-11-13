@@ -17,6 +17,7 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -37,8 +38,8 @@ class CompositeQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
-        Stream<BeanDefinition<T>> reduced = candidates;
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+        Stream<BT> reduced = candidates;
         for (Qualifier qualifier : qualifiers) {
             reduced = qualifier.reduce(beanType,candidates);
         }

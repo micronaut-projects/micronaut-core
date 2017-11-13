@@ -17,13 +17,13 @@ package org.particleframework.web.router;
 
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpStatus;
 import org.particleframework.core.type.Argument;
-import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.http.HttpStatus;
 
-import java.util.*;
-import java.util.function.Predicate;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**

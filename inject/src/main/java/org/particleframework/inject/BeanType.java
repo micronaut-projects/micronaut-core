@@ -13,23 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.validation;
+package org.particleframework.inject;
 
-import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Post;
-import javax.validation.constraints.Digits;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
+ * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller("/validated")
-@Validated
-public class ValidatedController {
+public interface BeanType<T> extends AnnotationMetadataProvider {
+    /**
+     * @return The underlying bean type
+     */
+    Class<T> getBeanType();
 
-
-    @Post
-    public String args(@Digits(integer = 3, fraction = 2) String amount) {
-        return "$" + amount;
+    /**
+     * @return The class name
+     */
+    default String getName() {
+        return getBeanType().getName();
     }
 }

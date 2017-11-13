@@ -15,15 +15,10 @@
  */
 package org.particleframework.inject;
 
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.type.Executable;
-import org.particleframework.core.type.ReturnType;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.Set;
 
 /**
  * <p>An executable method is a compile time produced invocation of a method call. Avoiding the use of reflection and allowing the JIT to optimize the call</p>
@@ -35,20 +30,4 @@ import java.util.Set;
  * @param <R> The result of the method call
  */
 public interface ExecutableMethod<T, R> extends Executable<T,R>, MethodReference<T,R> {
-
-    /**
-     * @return One or many {@link org.particleframework.context.annotation.Executable} annotations for this method
-     */
-    Collection<? extends Annotation> getExecutableAnnotations();
-
-    /**
-     * <p>The annotated elements that this {@link ExecutableMethod} is able to resolve annotations from</p>
-     *
-     * <p>These elements are used when resolving annotations via the {@link #findAnnotationsWithStereoType(Class)} method</p>
-     *
-     * @return An array of {@link AnnotatedElement} instances
-     */
-    default AnnotatedElement[] getAnnotatedElements() {
-        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-    }
 }

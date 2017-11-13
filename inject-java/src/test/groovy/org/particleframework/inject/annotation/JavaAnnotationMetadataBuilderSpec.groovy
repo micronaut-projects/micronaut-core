@@ -19,6 +19,7 @@ import org.particleframework.aop.Around
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
 
 import javax.inject.Qualifier
@@ -30,6 +31,43 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
+
+    void "test read external constants"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(property=AnnotationMetadata.VALUE_MEMBER)
+class Test {
+}
+''')
+        expect:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'value'
+    }
+
+    void "test read constants defined in class"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property=Test.TEST)
+class Test {
+    public static final String TEST = "blah";
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'blah'
+
+    }
 
     void "test build repeatable annotations"() {
         given:

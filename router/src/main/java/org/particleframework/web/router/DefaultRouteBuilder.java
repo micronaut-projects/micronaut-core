@@ -69,12 +69,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return property;
         }
     };
-    protected static final MediaType[] ZERO_MEDIA_TYPES = new MediaType[0];
-
 
     static final Object NO_VALUE = new Object();
-
-
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService<?> conversionService;
@@ -284,7 +280,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public Route accept(MediaType... mediaTypes) {
-            this.acceptedMediaTypes = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(mediaTypes)));
+            if(mediaTypes != null) {
+                this.acceptedMediaTypes = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(mediaTypes)));
+            }
             return this;
         }
 

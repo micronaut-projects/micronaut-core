@@ -1,14 +1,9 @@
 package org.particleframework.core.annotation;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.reflect.ReflectionUtils;
 
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -21,13 +16,16 @@ import java.util.*;
  */
 public class AnnotationUtil {
 
-    private static final Cache<AnnotationKey, Collection<Annotation>> ANNOTATIONS_BY_STEREOTYPE_CACHE = Caffeine.newBuilder()
-            .maximumSize(100)
-            .build();
-
-    private static final Cache<AnnotationKey, Collection<? extends Annotation>> ANNOTATIONS_BY_TYPE_CACHE = Caffeine.newBuilder()
-            .maximumSize(100)
-            .build();
+    public static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
+            Retention.class.getName(),
+            Deprecated.class.getName(),
+            Inherited.class.getName(),
+            SuppressWarnings.class.getName(),
+            Override.class.getName(),
+            Repeatable.class.getName(),
+            Documented.class.getName(),
+            Target.class.getName()
+    );
 
     /**
      * Constant indicating an zero annotation
@@ -38,7 +36,6 @@ public class AnnotationUtil {
      * Constant indicating an zero annotation
      */
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
-
     /**
      * An empty re-usable element
      */
@@ -133,20 +130,6 @@ public class AnnotationUtil {
     }
 
     /**
-     * Finds an annotation on the given class for the given stereotype. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     *
-     * @param type The type
-     * @param stereotypeName The stereotype
-     * @return The annotation
-     */
-    public static Optional<Annotation> findAnnotationWithStereoType(Class type, String stereotypeName) {
-        return findAnnotationsWithStereoType(type, stereotypeName).stream().findFirst();
-    }
-
-    /**
      * Finds an annotation on the given method for the given type. The result of this method is cached.
      * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
      * that code that utilizes the method should be executed once upon startup.
@@ -164,25 +147,6 @@ public class AnnotationUtil {
     }
 
 
-    /**
-     * Finds all annotations on the given method for the given type. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param method The method
-     * @param annotationType The type
-     * @param <T> The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Collection<T> findAnnotations(Method method, @Nullable Class<T> annotationType) {
-        if(annotationType == null || method == null) {
-            return Collections.emptySet();
-        }
-        AnnotationKey key = new AnnotationKey(method, annotationType.getName());
-        return (Collection<T>) ANNOTATIONS_BY_TYPE_CACHE.get(key, annotationKey ->
-                findAnnotationsByTypeNoCache(method, annotationType)
-        );
-    }
 
     /**
      * Finds an annotation on the given class for the given type. The result of this method is cached.
@@ -199,24 +163,6 @@ public class AnnotationUtil {
             return Optional.empty();
         }
         return findAnnotations(type, annotationType).stream().findFirst();
-    }
-
-    /**
-     * Finds all annotations on the given class for the given type. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param type The type to search
-     * @param annotationType The annotation type
-     * @param <T> The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Collection<T> findAnnotations(@Nullable Class type, @Nullable Class<T> annotationType) {
-        if(annotationType == null || type == null) {
-            return Collections.emptyList();
-        }
-        AnnotationKey key = new AnnotationKey(type, annotationType.getName());
-        return (Collection<T>) ANNOTATIONS_BY_TYPE_CACHE.get(key, annotationKey -> findAnnotationsByTypeNoCache(type, annotationType));
     }
 
     /**
@@ -365,68 +311,6 @@ public class AnnotationUtil {
         return Collections.unmodifiableCollection(annotationList);
     }
 
-    /**
-     * Find annotations for the given stereotype on the given class. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param type The class to search
-     * @param stereotype The stereotype
-     * @return The annotations
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(final Class type, final Class<?> stereotype) {
-        if(type == null || stereotype == null) {
-            return Collections.emptySet();
-        }
-        String stereotypeName = stereotype.getName();
-        return findAnnotationsWithStereoType(type, stereotypeName);
-    }
-
-    /**
-     * Find annotations for the given stereotype on the given class. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     *
-     * @param type The class to search
-     * @param stereotypeName The stereotype
-     * @return The annotations
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(final Class type, final String stereotypeName) {
-        AnnotationKey key = new AnnotationKey(type, stereotypeName);
-        return ANNOTATIONS_BY_STEREOTYPE_CACHE.get(key, annotationKey -> findAnnotationsWithStereoTypeNoCache(type, stereotypeName));
-    }
-
-
-    /**
-     * Find annotations for the given stereotype on the given method. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     *
-     * @param method The method
-     * @param stereotype The stereotype
-     * @return The annotation set
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(final Method method, final Class<?> stereotype) {
-        String stereotypeName = stereotype.getName();
-        return findAnnotationsWithStereoType(method, stereotypeName);
-    }
-
-    /**
-     * Find annotations for the given stereotype on the given method. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     *
-     * @param method The method
-     * @param stereotypeName The stereotype
-     * @return The annotation set
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(final Method method, final String stereotypeName) {
-        AnnotationKey key = new AnnotationKey(method, stereotypeName);
-        return ANNOTATIONS_BY_STEREOTYPE_CACHE.get(key, annotationKey -> findAnnotationsWithStereoTypeNoCache(method, stereotypeName));
-    }
 
     /**
      * Find all the annotations on the given {@link AnnotatedElement} candidates for the given stereotype
@@ -456,137 +340,11 @@ public class AnnotationUtil {
      * @return The collection of annotations
      */
     public static Collection<? extends Annotation> findAnnotationsWithStereoType(AnnotatedElement annotatedElement, Class<?> stereotype) {
-        if(annotatedElement instanceof Method) {
-            return findAnnotationsWithStereoType((Method)annotatedElement, stereotype);
-        }
-        else if(annotatedElement instanceof Class){
-            return findAnnotationsWithStereoType((Class)annotatedElement, stereotype);
-        }
         return findAnnotationsWithStereoType(stereotype, annotatedElement.getAnnotations());
     }
 
     private static boolean isNotInternalAnnotation(Annotation ann) {
-        return !Retention.class.isInstance(ann) && !Documented.class.isInstance(ann) && !Target.class.isInstance(ann);
+        return !INTERNAL_ANNOTATION_NAMES.contains(ann.annotationType().getName());
     }
 
-    private static Collection<Annotation> findAnnotationsWithStereoTypeNoCache(Method method,String stereotype) {
-        Collection<Annotation> annotations = new ArrayList<>(findAnnotationsWithStereoType(stereotype, method.getAnnotations()));
-        Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
-        while(classToSearch != Object.class && classToSearch != null) {
-            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
-            declaredMethod.ifPresent(superMethod -> fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(superMethod, stereotype)));
-            classToSearch = classToSearch.getSuperclass();
-        }
-        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
-        for (Class itfe : allInterfaces) {
-            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
-            declaredMethod.ifPresent(interfaceMethod ->
-                fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(interfaceMethod, stereotype))
-            );
-        }
-        fillAnnotations(annotations, findAnnotationsWithStereoTypeNoCache(method.getDeclaringClass(), stereotype));
-        return annotations.isEmpty() ? Collections.emptyList() : annotations;
-    }
-
-    private static void fillAnnotations(Collection annotations, Collection toAdd) {
-        for (Object ann : toAdd) {
-            if(!annotations.contains(ann)) {
-                annotations.add(ann);
-            }
-        }
-    }
-
-    private static Collection<Annotation> findAnnotationsWithStereoTypeNoCache(Class type, String stereotypeName) {
-        Collection<Annotation> annotationList = new ArrayList<>();
-        Class classToSearch = type;
-        while(classToSearch != Object.class && classToSearch != null) {
-            Annotation[] annotations = classToSearch.getAnnotations();
-            fillAnnotations(annotationList, findAnnotationsWithStereoType(stereotypeName, annotations));
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(classToSearch);
-            for (Class itfe : allInterfaces) {
-                fillAnnotations(annotationList, findAnnotationsWithStereoType(stereotypeName, itfe.getAnnotations()));
-            }
-            classToSearch = classToSearch.getSuperclass();
-        }
-        return Collections.unmodifiableCollection(annotationList);
-    }
-
-    private static <T extends Annotation> Collection<T> findAnnotationsByTypeNoCache(@Nullable Method method, @Nullable Class<T> annotationType) {
-        T annotation = method.getAnnotation(annotationType);
-        Collection<T> annotations = new ArrayList<>();
-        if(annotation != null) {
-            annotations.add(annotation);
-        }
-        Class<?> classToSearch = method.getDeclaringClass().getSuperclass();
-        while(classToSearch != Object.class && classToSearch != null) {
-            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(classToSearch, method.getName(), method.getParameterTypes());
-
-            if( declaredMethod.isPresent() ) {
-                annotation = declaredMethod.get().getAnnotation(annotationType);
-                if(annotation != null) {
-                    annotations.add(annotation);
-                }
-            }
-            classToSearch = classToSearch.getSuperclass();
-        }
-        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(method.getDeclaringClass());
-        for (Class itfe : allInterfaces) {
-            Optional<Method> declaredMethod = ReflectionUtils.getDeclaredMethod(itfe, method.getName(), method.getParameterTypes());
-            if( declaredMethod.isPresent() ) {
-                annotation = declaredMethod.get().getAnnotation(annotationType);
-                if(annotation != null) {
-                    annotations.add(annotation);
-                }
-            }
-        }
-        fillAnnotations(annotations, findAnnotationsByTypeNoCache(method.getDeclaringClass(), annotationType));
-        return annotations.isEmpty() ? Collections.emptyList() : annotations;
-    }
-
-    private static <T extends Annotation> Collection<T> findAnnotationsByTypeNoCache(@Nullable Class type, @Nullable Class<T> annotationType) {
-        Collection<T> annotationList = new ArrayList<>();
-        Class classToSearch = type;
-        while(classToSearch != Object.class && classToSearch != null) {
-            Annotation ann = classToSearch.getAnnotation(annotationType);
-            if(ann != null && !annotationList.contains(ann)) {
-                annotationList.add((T) ann);
-            }
-            classToSearch = classToSearch.getSuperclass();
-        }
-        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(type);
-        for (Class itfe : allInterfaces) {
-            fillAnnotations(annotationList, findAnnotationsByTypeNoCache(itfe, annotationType));
-        }
-        return annotationList.isEmpty() ? Collections.emptyList() : annotationList;
-    }
-
-    private static class AnnotationKey {
-
-
-        private final AnnotatedElement element;
-        private final String annotationClassName;
-
-        public AnnotationKey(AnnotatedElement element, String annotationClass) {
-            this.element = element;
-            this.annotationClassName = annotationClass;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            AnnotationKey that = (AnnotationKey) o;
-
-            if (!element.equals(that.element)) return false;
-            return annotationClassName.equals(that.annotationClassName);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = element.hashCode();
-            result = 31 * result + annotationClassName.hashCode();
-            return result;
-        }
-    }
 }

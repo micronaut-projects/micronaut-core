@@ -45,14 +45,12 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     private final Annotation[] annotations;
     private final ReturnType returnType;
     private final Method method;
-    private final AnnotatedElement[] annotationElements;
 
     protected AbstractExecutableMethod(Method method,
                                        Argument<?>[] genericReturnTypes,
                                        Argument...arguments) {
         this.method = method;
         this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
-        this.annotationElements = new AnnotatedElement[] { method, method.getDeclaringClass() };
         this.annotations = method.getAnnotations();
         this.declaringType = method.getDeclaringClass();
         this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
@@ -60,11 +58,6 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     protected AbstractExecutableMethod(Method method, Argument<?>[] genericReturnTypes) {
         this(method, genericReturnTypes, Argument.ZERO_ARGUMENTS);
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return annotationElements;
     }
 
     @Override
@@ -97,11 +90,6 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
     @Override
     public ReturnType getReturnType() {
         return returnType;
-    }
-
-    @Override
-    public Collection<? extends Annotation> getExecutableAnnotations() {
-        return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, this.annotations);
     }
 
     @Override

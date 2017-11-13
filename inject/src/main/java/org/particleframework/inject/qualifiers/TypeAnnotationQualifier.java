@@ -17,15 +17,12 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Nullable;
-import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,11 +32,11 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-class TypeQualifier<T> implements Qualifier<T> {
+class TypeAnnotationQualifier<T> implements Qualifier<T> {
 
     private final List<Class> types;
 
-    TypeQualifier(@Nullable Class<?>... types) {
+    TypeAnnotationQualifier(@Nullable Class<?>... types) {
         this.types = new ArrayList<>();
         if(types != null) {
             for (Class<?> type : types) {
@@ -56,8 +53,8 @@ class TypeQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
-        return candidates.filter(candidate -> areTypesCompatible(candidate.getType()));
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+        return candidates.filter(candidate -> areTypesCompatible(candidate.getBeanType()));
     }
 
     @Override
@@ -65,7 +62,7 @@ class TypeQualifier<T> implements Qualifier<T> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        TypeQualifier<?> that = (TypeQualifier<?>) o;
+        TypeAnnotationQualifier<?> that = (TypeAnnotationQualifier<?>) o;
 
         return types.equals(that.types);
     }

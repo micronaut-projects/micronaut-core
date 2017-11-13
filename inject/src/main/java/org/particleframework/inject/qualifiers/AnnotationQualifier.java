@@ -1,7 +1,7 @@
 package org.particleframework.inject.qualifiers;
 
 import org.particleframework.core.naming.NameResolver;
-import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
@@ -24,7 +24,7 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         String name;
         if (qualifier instanceof Named) {
             Named named = (Named) qualifier;
@@ -35,27 +35,7 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
             name = qualifier.annotationType().getSimpleName();
         }
 
-        return candidates.filter(candidate -> {
-                    String candidateName;
-                    if (candidate instanceof NameResolver) {
-                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getType().getSimpleName());
-                    } else {
-                        Named named = candidate.getType().getAnnotation(Named.class);
-                        candidateName = named != null ? named.value() : candidate.getType().getSimpleName();
-                    }
-
-                    if (candidateName.equalsIgnoreCase(name)) {
-                        return true;
-                    } else {
-
-                        String qualified = name + beanType.getSimpleName();
-                        if (qualified.equals(candidateName)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-        );
+        return reduceByAnnotation(beanType, candidates, name);
     }
 
 

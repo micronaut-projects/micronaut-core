@@ -160,14 +160,14 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
      */
     class ConstructorSegment extends AbstractSegment {
         ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
-            super(declaringClass, declaringClass.getType().getName(), argument);
+            super(declaringClass, declaringClass.getBeanType().getName(), argument);
         }
 
         @Override
         public String toString() {
             StringBuilder baseString = new StringBuilder("new ");
             BeanDefinition declaringType = getDeclaringType();
-            baseString.append(declaringType.getType().getSimpleName());
+            baseString.append(declaringType.getBeanType().getSimpleName());
             outputArguments(declaringType, baseString);
             return baseString.toString();
         }
@@ -204,7 +204,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         }
         @Override
         public String toString() {
-            return getDeclaringType().getType().getSimpleName() + "." + getName();
+            return getDeclaringType().getBeanType().getSimpleName() + "." + getName();
         }
     }
 

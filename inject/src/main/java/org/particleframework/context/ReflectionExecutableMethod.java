@@ -16,7 +16,6 @@
 package org.particleframework.context;
 
 import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
@@ -28,7 +27,6 @@ import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
 import java.util.*;
 
 /**
@@ -93,11 +91,6 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
     }
 
     @Override
-    public Collection<? extends Annotation> getExecutableAnnotations() {
-        return AnnotationUtil.findAnnotationsWithStereoType(Executable.class, method.getAnnotations());
-    }
-
-    @Override
     public Method getTargetMethod() {
         return method;
     }
@@ -109,7 +102,7 @@ class ReflectionExecutableMethod<T,R> implements ExecutableMethod<T,R> {
 
     @Override
     public Class getDeclaringType() {
-        return beanDefinition.getType();
+        return beanDefinition.getBeanType();
     }
 
     @Override

@@ -16,7 +16,7 @@
 package org.particleframework.http.server.netty.interceptor;
 
 import org.particleframework.http.HttpResponse;
-import org.particleframework.stereotype.Controller;
+import org.particleframework.http.annotation.Controller;
 
 /**
  * @author Graeme Rocher

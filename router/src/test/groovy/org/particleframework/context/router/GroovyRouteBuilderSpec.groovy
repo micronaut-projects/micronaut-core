@@ -18,7 +18,7 @@ package org.particleframework.context.router
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.http.HttpMethod
-import org.particleframework.stereotype.Controller
+import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.GroovyRouteBuilder
 import org.particleframework.web.router.RouteMatch
 import org.particleframework.web.router.Router

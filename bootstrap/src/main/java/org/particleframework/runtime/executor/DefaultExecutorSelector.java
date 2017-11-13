@@ -54,7 +54,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     @Override
     public Optional<ExecutorService> select(MethodReference method) {
-        if( method.isAnyAnnotationPresent(blockingAnnotations) ) {
+        if( method.hasStereotype(blockingAnnotations) ) {
             return beanLocator.findBean(
                     ExecutorService.class,
                     Qualifiers.byName(IOExecutorService.NAME)

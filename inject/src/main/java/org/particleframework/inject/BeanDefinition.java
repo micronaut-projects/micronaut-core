@@ -2,8 +2,7 @@ package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
-import org.particleframework.core.annotation.AnnotationMetadata;
-import org.particleframework.core.annotation.AnnotationSource;
+import org.particleframework.core.annotation.AnnotationMetadataDelegate;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
 
@@ -18,7 +17,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotationMetadata, Named {
+public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T> {
 
     /**
      * @return The scope of the component
@@ -47,7 +46,8 @@ public interface BeanDefinition<T> extends AnnotationMetadata, Named {
     /**
      * @return The component type
      */
-    Class<T> getType();
+    @Override
+    Class<T> getBeanType();
 
     /**
      * The single concrete constructor that is an injection point for creating the bean.
@@ -111,10 +111,10 @@ public interface BeanDefinition<T> extends AnnotationMetadata, Named {
      * @return An optional {@link ExecutableMethod}
      * @throws IllegalStateException If the method cannot be found
      */
+    @SuppressWarnings("unchecked")
     default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
-
         return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
-                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getType(), name, argumentTypes));
+                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
     }
 
     /**
@@ -143,4 +143,9 @@ public interface BeanDefinition<T> extends AnnotationMetadata, Named {
      * @return The injected bean
      */
     T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+
+    /**
+     * @return The {@link ExecutableMethod} instances for this definition
+     */
+    Collection<ExecutableMethod<T,?>> getExecutableMethods();
 }

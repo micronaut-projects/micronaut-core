@@ -21,8 +21,7 @@ import org.grails.orm.hibernate.cfg.Settings
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
-import org.particleframework.stereotype.Controller
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Controller
 import spock.lang.Specification
 
 /**

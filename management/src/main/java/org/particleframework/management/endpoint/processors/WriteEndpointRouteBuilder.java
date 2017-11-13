@@ -22,6 +22,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.uri.UriTemplate;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.EndpointConfiguration;
@@ -37,23 +38,25 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Write> {
+public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Endpoint> {
 
     public WriteEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }
 
     @Override
-    public void process(ExecutableMethod<?, ?> method) {
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         Class<?> declaringType = method.getDeclaringType();
-        Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
+        if(method.hasStereotype(Write.class)) {
 
-        registeredEndpoint.ifPresent(config -> {
-            Write annotation = method.getAnnotation(Write.class);
-            UriTemplate template = buildUriTemplate(method, config.getId());
-            POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-                    .accept(MediaType.of(annotation.consumes()));
-        });
+            Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
+            registeredEndpoint.ifPresent(config -> {
+                Write annotation = method.getAnnotation(Write.class);
+                UriTemplate template = buildUriTemplate(method, config.getId());
+                POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
+                        .accept(MediaType.of(annotation.consumes()));
+            });
+        }
     }
 
 

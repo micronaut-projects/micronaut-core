@@ -17,13 +17,10 @@ package org.particleframework.inject.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Repeatable;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.*;
 
 /**
@@ -36,12 +33,6 @@ import java.util.*;
  * @since 1.0
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
-    private static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
-            Retention.class.getName(),
-            Repeatable.class.getName(),
-            Documented.class.getName(),
-            Target.class.getName()
-    );
 
     /**
      * Build the meta data for the given element. If the element is a method the class metadata will be included
@@ -51,7 +42,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public AnnotationMetadata build(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        return buildInternal(element, annotationMetadata, true);
+        return buildInternal(null, element, annotationMetadata, true);
     }
 
     /**
@@ -62,9 +53,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public AnnotationMetadata buildForMethod(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        return buildInternal(element, annotationMetadata, false);
+        return buildInternal(null, element, annotationMetadata, false);
     }
 
+    /**
+     * Build the meta data for the given method element excluding any class metadata
+     *
+     * @param parent The parent element
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParent(T parent, T element) {
+        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        return buildInternal(parent, element, annotationMetadata, false);
+    }
     /**
      * Get the type of the given annotation
      * @param annotationMirror The annotation
@@ -170,8 +172,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return Collections.emptyMap();
     }
 
-    private AnnotationMetadata buildInternal(T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
+    private AnnotationMetadata buildInternal(T parent, T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations);
+        if(parent != null) {
+            hierarchy.add(0, parent);
+        }
         for (T currentElement : hierarchy) {
             List<? extends A> annotationHierarchy =
                     getAnnotationsForType(currentElement);
@@ -182,7 +187,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
             for (A a : annotationHierarchy) {
                 String annotationName = getAnnotationTypeName(a);
-                if(INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
+                if(AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
 
                 Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
                 List<A> stereotypeHierarchy = new ArrayList<>();
@@ -232,7 +237,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         for (A annotationMirror : annotationMirrors) {
 
             String annotationName = getAnnotationTypeName(annotationMirror);
-            if(!INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
                 T annotationType = getTypeForAnnotation(annotationMirror);
                 hierarchy.add(annotationMirror);
                 buildStereotypeHierarchy(annotationType, hierarchy);

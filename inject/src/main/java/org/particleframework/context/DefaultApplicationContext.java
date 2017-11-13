@@ -51,18 +51,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         this.environment = createEnvironment(environmentNames);
     }
 
-    @Override
-    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
-        return getEnvironment().findServices(type, condition.and((String name) -> {
-                    for (BeanConfiguration beanConfiguration : beanConfigurations.values()) {
-                        if (!beanConfiguration.isEnabled(this) && beanConfiguration.isWithin(name)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-        ));
-    }
 
     @Override
     public ApplicationContext registerSingleton(Object singleton) {

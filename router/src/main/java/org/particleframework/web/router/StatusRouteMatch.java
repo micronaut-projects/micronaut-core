@@ -85,8 +85,4 @@ class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
         };
     }
 
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return executableMethod.getAnnotatedElements();
-    }
 }

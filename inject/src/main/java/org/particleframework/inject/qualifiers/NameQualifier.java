@@ -2,14 +2,15 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.ForEach;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import javax.inject.Named;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.particleframework.core.util.ArgumentUtils.check;
@@ -28,26 +29,28 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         check("beanType", beanType).notNull();
         check("candidates", candidates).notNull();
-        if(beanType.getAnnotation(ForEach.class) != null) {
+        if (beanType.getAnnotation(ForEach.class) != null) {
             return candidates;
         }
         return candidates.filter(candidate -> {
                     String typeName;
-                    Optional<String> beanQualifier = candidate.hasStereotype(Named.class) ? candidate.getValue(Named.class, String.class) : Optional.empty();
+                    AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+                    Optional<String> beanQualifier = annotationMetadata.hasStereotype(Named.class) ? annotationMetadata.getValue(Named.class, String.class) : Optional.empty();
                     typeName = beanQualifier.orElseGet(() -> {
-                        if(candidate instanceof NameResolver) {
+                        if (candidate instanceof NameResolver) {
                             Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
-                            return resolvedName.orElse(candidate.getType().getSimpleName());
+                            return resolvedName.orElse(candidate.getBeanType().getSimpleName());
                         }
-                        return candidate.getType().getSimpleName();
+                        return candidate.getBeanType().getSimpleName();
                     });
                     return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
                 }
         );
     }
+
 
     @Override
     public boolean equals(Object o) {
@@ -61,7 +64,7 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
 
     @Override
     public String toString() {
-        return "@Named('"+name+"')";
+        return "@Named('" + name + "')";
     }
 
     @Override
@@ -72,5 +75,29 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
     @Override
     public String getName() {
         return name;
+    }
+
+    protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName) {
+        return candidates.filter(candidate -> {
+                    String candidateName;
+                    if (candidate instanceof NameResolver) {
+                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
+                    } else {
+                        Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                        candidateName = annotation.orElse( candidate.getBeanType().getSimpleName() );
+                    }
+
+                    if (candidateName.equalsIgnoreCase(annotationName)) {
+                        return true;
+                    } else {
+
+                        String qualified = annotationName + beanType.getSimpleName();
+                        if (qualified.equals(candidateName)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+        );
     }
 }

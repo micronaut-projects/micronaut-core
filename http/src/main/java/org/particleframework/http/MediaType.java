@@ -15,6 +15,7 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.value.OptionalValues;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +33,12 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class MediaType implements CharSequence {
+
+    static {
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
+                new MediaType(charSequence.toString())
+        );
+    }
 
     /**
      * A wildcard media type representing all types

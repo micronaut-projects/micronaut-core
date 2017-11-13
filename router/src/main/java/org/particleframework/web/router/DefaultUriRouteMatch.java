@@ -120,11 +120,6 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return executableMethod.getAnnotatedElements();
-    }
-
-    @Override
     public String toString() {
         return httpMethod + " - " +  matchInfo.getUri();
     }

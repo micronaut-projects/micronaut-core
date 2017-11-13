@@ -16,7 +16,7 @@
 package org.particleframework.context.router
 
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.stereotype.Controller
+import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.Router
 import org.particleframework.web.router.annotation.Get
 import org.particleframework.web.router.annotation.Post

@@ -1,5 +1,6 @@
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.type.Executable;
 
 import java.lang.reflect.AnnotatedElement;
@@ -11,7 +12,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint extends CallableInjectionPoint, Executable, AnnotatedElement {
+public interface MethodInjectionPoint extends CallableInjectionPoint, Executable, AnnotationSource {
 
     /**
      * @return The setter to invoke to set said property

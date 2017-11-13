@@ -22,7 +22,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Action
 public @interface Error {
     /**
-     * @return The URI of the GET route if not specified inferred from the method name and arguments
+     * @return The {@link HttpStatus} code to map
      */
     HttpStatus value() default HttpStatus.INTERNAL_SERVER_ERROR;
 }

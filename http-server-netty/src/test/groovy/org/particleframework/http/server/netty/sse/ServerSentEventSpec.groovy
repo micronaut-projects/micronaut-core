@@ -22,7 +22,7 @@ import org.particleframework.context.annotation.Requires
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.sse.Event
 import org.particleframework.http.sse.EventStream
-import org.particleframework.stereotype.Controller
+import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.annotation.Get
 import org.reactivestreams.Subscriber
 

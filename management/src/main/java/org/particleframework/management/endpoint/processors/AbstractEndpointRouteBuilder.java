@@ -18,6 +18,7 @@ package org.particleframework.management.endpoint.processors;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.async.subscriber.Completable;
 import org.particleframework.http.annotation.Parameter;
@@ -59,7 +60,7 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.getValue(Endpoint.class, String.class).orElse(null);
                     if (id == null || !ENDPOINT_ID_PATTERN.matcher(id).matches()) {
-                        throw new BeanContextException("Invalid @Endpoint ID - Should only contain letters: " + id);
+                        id = NameUtils.hyphenate( beanDefinition.getName() );
                     }
 
                     Optional<EndpointConfiguration> config = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName(id));

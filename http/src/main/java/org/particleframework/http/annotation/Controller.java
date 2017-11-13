@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.stereotype;
+package org.particleframework.http.annotation;
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.http.MediaType;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -48,10 +50,12 @@ public @interface Controller {
     /**
      * @return The produced MediaType values. Defaults to application/json
      */
-    String[] produces() default {"application/json"};
+    @AliasFor(annotation = Produces.class, member = "value")
+    String[] produces() default MediaType.APPLICATION_JSON;
 
     /**
      * @return The consumed MediaType for request bodies Defaults to application/json
      */
-    String[] consumes() default {"application/json"};
+    @AliasFor(annotation = Consumes.class, member = "value")
+    String[] consumes() default MediaType.APPLICATION_JSON;
 }

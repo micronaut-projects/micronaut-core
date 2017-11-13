@@ -33,6 +33,73 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test read enum constants"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(sdk=Requires.Sdk.JAVA, version="1.8")
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
+        metadata.getValue(Requires, "version").get() == "1.8"
+    }
+
+    void "test read external constants"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(property=AnnotationMetadata.VALUE_MEMBER)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'value'
+    }
+
+    void "test read constants defined in class"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property=Test.TEST)
+class Test {
+    public static final String TEST = "blah";
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'blah'
+
+    }
 
     void "test build repeatable annotations"() {
         given:

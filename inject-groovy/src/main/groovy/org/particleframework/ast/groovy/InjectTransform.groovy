@@ -27,6 +27,7 @@ import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.BeanDefinitionReference
+import org.particleframework.inject.annotation.AnnotationMetadataReference
 import org.particleframework.inject.annotation.AnnotationMetadataWriter
 import org.particleframework.inject.writer.*
 
@@ -127,8 +128,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     beanReferenceWriter.setReplaceBeanName(replacesOpt.get())
                 }
                 beanDefinitionClassName = beanReferenceWriter.getBeanDefinitionReferenceClassName()
-                def annotationMetadataWriter = beanReferenceWriter.getAnnotationMetadataWriter()
-                annotationMetadataWriter.writeTo(classesDir)
+                AnnotationMetadataWriter annotationMetadataWriter = beanReferenceWriter.getAnnotationMetadataWriter()
+                annotationMetadataWriter?.writeTo(classesDir)
                 beanReferenceWriter.writeTo(classesDir)
 
             } catch (Throwable e) {
@@ -272,6 +273,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
+            AnnotationMetadata typeAnnotationMetadata = aopProxyWriter.getAnnotationMetadata()
             PublicMethodVisitor publicMethodVisitor = new PublicMethodVisitor(sourceUnit) {
 
                 @Override
@@ -288,6 +290,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             targetMethodGenericTypeMap)
 
 
+                    AnnotationMetadata annotationMetadata
+                    if( AstAnnotationUtils.isAnnotated(methodNode) ) {
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode);
+                    }
+                    else {
+                        annotationMetadata = new AnnotationMetadataReference(
+                                aopProxyWriter.getBeanDefinitionName(),
+                                typeAnnotationMetadata
+                        )
+                    }
                     aopProxyWriter.visitAroundMethod(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                             resolvedReturnType,
@@ -296,7 +308,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             targetMethodParamsToType,
                             targetMethodQualifierTypes,
                             targetMethodGenericTypeMap,
-                            AstAnnotationUtils.getAnnotationMetadata(methodNode)
+                            annotationMetadata
                     )
                 }
 
@@ -341,12 +353,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                 beanMethodWriter.visitBeanFactoryMethod(AstGenericUtils.resolveTypeReference(concreteClass), methodName, paramsToType, qualifierTypes, genericTypeMap)
-                String beanMethodDeclaringType = declaringClass.name
-                beanMethodWriter.visitMethodAnnotationSource(
-                        beanMethodDeclaringType,
-                        methodName,
-                        paramsToType
-                )
 
                 if(methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
@@ -367,11 +373,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     else {
                         populateProxyWriterConstructor(producedType, proxyWriter)
                     }
-                    proxyWriter.visitMethodAnnotationSource(
-                            beanMethodDeclaringType,
-                            methodName,
-                            paramsToType
-                    )
 
                     new PublicMethodVisitor(sourceUnit) {
 
@@ -388,6 +389,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap )
+                            AnnotationMetadata annotationMetadata
+                            if( AstAnnotationUtils.isAnnotated(methodNode) ) {
+                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode, targetBeanMethodNode);
+                            }
+                            else {
+                                annotationMetadata = new AnnotationMetadataReference(
+                                        beanMethodWriter.getBeanDefinitionName(),
+                                        methodAnnotationMetadata
+                                )
+                            }
+
                             beanMethodWriter.visitExecutableMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
@@ -396,13 +408,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap,
-                                    methodAnnotationMetadata
-                            ).visitMethodAnnotationSource(
-                                    beanMethodDeclaringType,
-                                    methodName,
-                                    paramsToType
-                            ).visitEnd()
-
+                                    annotationMetadata
+                            )
 
                             proxyWriter.visitAroundMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
@@ -412,8 +419,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap,
-                                    methodAnnotationMetadata
-                            );
+                                    annotationMetadata
+                            )
                         }
                     }.accept(methodNode.getReturnType())
                     beanDefinitionWriters.put(new AnnotatedNode(), proxyWriter)
@@ -527,7 +534,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 paramsToType,
                                 qualifierTypes,
                                 genericTypeMap, methodAnnotationMetadata)
-                                .visitEnd()
 
                         if((isAopProxyType && isPublic) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
 

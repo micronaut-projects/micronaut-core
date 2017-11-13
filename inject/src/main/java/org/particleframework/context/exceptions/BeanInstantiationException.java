@@ -2,6 +2,7 @@ package org.particleframework.context.exceptions;
 
 import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 /**
  * Thrown when no such beans exists
@@ -24,10 +25,10 @@ public class BeanInstantiationException extends BeanContextException {
     public BeanInstantiationException(BeanResolutionContext resolutionContext, String message) {
         super(MessageUtils.buildMessage(resolutionContext,message));
     }
-    public <T> BeanInstantiationException(BeanDefinition<T> beanDefinition, Throwable cause) {
+    public <T> BeanInstantiationException(BeanType<T> beanDefinition, Throwable cause) {
         super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + cause.getMessage(), cause);
     }
-    public <T> BeanInstantiationException(BeanDefinition<T> beanDefinition, String message) {
+    public <T> BeanInstantiationException(BeanType<T> beanDefinition, String message) {
         super("Error instantiating bean of type [" + beanDefinition.getName() + "]: " + message);
     }
 }

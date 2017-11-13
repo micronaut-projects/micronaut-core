@@ -15,6 +15,7 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.bind.annotation.Bindable;
 import org.particleframework.core.convert.ArgumentConversionContext;
@@ -65,6 +66,11 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
             }
         }
 
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return executableMethod.getAnnotationMetadata();
     }
 
     @SuppressWarnings("unchecked")

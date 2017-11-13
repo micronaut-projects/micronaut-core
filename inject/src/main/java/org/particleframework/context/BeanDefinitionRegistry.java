@@ -20,6 +20,7 @@ import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -158,5 +159,10 @@ public interface BeanDefinitionRegistry {
         return containsBean(beanType, null);
     }
 
-
+    /**
+     * Get all of the {@link BeanDefinition} for the given qualifier
+     * @param qualifier The qualifer
+     * @return The bean definitions
+     */
+    Collection<BeanDefinition<?>> getBeanDefinitions(Qualifier<Object> qualifier);
 }

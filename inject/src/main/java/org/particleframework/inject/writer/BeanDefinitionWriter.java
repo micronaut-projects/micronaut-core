@@ -220,7 +220,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private boolean beanFinalized = false;
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
-    private List<TypeAnnotationSource> annotationSourceList = new ArrayList<>();
     private final AnnotationMetadata annotationMetadata;
 
     /**
@@ -301,11 +300,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     public ClassVisitor getClassWriter() {
         return classWriter;
-    }
-
-    @Override
-    public List<TypeAnnotationSource> getAnnotationSources() {
-        return annotationSourceList;
     }
 
     @Override
@@ -491,11 +485,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
             }
 
-            if(!annotationSourceList.isEmpty()) {
-                GeneratorAdapter annotatedElementMethod = writeGetAnnotatedElementsMethod(classWriter, TYPE_ABSTRACT_BEAN_DEFINITION, annotationSourceList);
-                annotatedElementMethod.visitMaxs(1,1);
-            }
-
             classWriter.visitEnd();
         }
         this.beanFinalized = true;
@@ -532,22 +521,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             try {
-                ServiceDescriptorGenerator serviceDescriptorGenerator = new ServiceDescriptorGenerator();
                 methodExecutors.forEach((className, executableMethodWriter) -> {
                     try {
                         AnnotationMetadataWriter annotationMetadataWriter = executableMethodWriter.getAnnotationMetadataWriter();
-                        try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
-                            annotationMetadataWriter.writeTo(outputStream);
+                        if(annotationMetadataWriter != null) {
+
+                            try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
+                                annotationMetadataWriter.writeTo(outputStream);
+                            }
                         }
                         try (OutputStream outputStream = visitor.visitClass(className)) {
                             outputStream.write(executableMethodWriter.getClassWriter().toByteArray());
-                        }
-                        Optional<File> file = visitor.visitServiceDescriptor(className);
-                        if(file.isPresent()) {
-                            serviceDescriptorGenerator.generate(
-                                    file.get(),
-                                    className,
-                                    ExecutableMethod.class);
                         }
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -770,11 +754,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return executableMethodWriter;
     }
 
-
-    @Override
-    public void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        this.annotationSourceList.add(new MethodAnnotationSource(declaringType, methodName, parameters));
-    }
 
     @Override
     public String toString() {

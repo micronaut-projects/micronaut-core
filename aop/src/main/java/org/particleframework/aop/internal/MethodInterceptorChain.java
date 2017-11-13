@@ -43,11 +43,6 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
     }
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return executionHandle.getAnnotatedElements();
-    }
-
-    @Override
     public String getMethodName() {
         return executionHandle.getMethodName();
     }
@@ -57,10 +52,6 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
         return executionHandle.getArgumentTypes();
     }
 
-    @Override
-    public Collection<? extends Annotation> getExecutableAnnotations() {
-        return executionHandle.getExecutableAnnotations();
-    }
 
     @Override
     public Method getTargetMethod() {
@@ -76,5 +67,6 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
     public Class<T> getDeclaringType() {
         return executionHandle.getDeclaringType();
     }
+
 
 }

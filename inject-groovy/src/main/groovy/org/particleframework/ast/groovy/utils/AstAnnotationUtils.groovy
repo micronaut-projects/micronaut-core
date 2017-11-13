@@ -10,6 +10,7 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
 import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import org.particleframework.core.annotation.AnnotationMetadata
+import org.particleframework.core.annotation.AnnotationUtil
 import org.particleframework.core.annotation.Internal
 
 import java.lang.annotation.Annotation
@@ -28,7 +29,7 @@ class AstAnnotationUtils {
 
     private static final Cache<AnnotatedNode, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(100).build();
 
-    /**
+     /**
      * Get the {@link AnnotationMetadata} for the given annotated node
      * @param annotatedNode The node
      * @return The metadata
@@ -37,6 +38,16 @@ class AstAnnotationUtils {
         return annotationMetadataCache.get(annotatedNode, { AnnotatedNode annotatedNode1 ->
             new GroovyAnnotationMetadataBuilder().build(annotatedNode1)
         })
+    }
+
+    /**
+     * Get the {@link AnnotationMetadata} for the given annotated node
+     * @param parent the parent
+     * @param annotatedNode The node
+     * @return The metadata
+     */
+    static AnnotationMetadata getAnnotationMetadata(AnnotatedNode parent, AnnotatedNode annotatedNode) {
+        new GroovyAnnotationMetadataBuilder().buildForParent(parent, annotatedNode)
     }
 
     /**
@@ -67,6 +78,19 @@ class AstAnnotationUtils {
     }
 
     /**
+     * Whether the node is annotated with any non internal annotations
+     * @param annotatedNode The annotated node
+     * @return True if it is
+     */
+    static boolean isAnnotated(AnnotatedNode annotatedNode) {
+        for(ann in annotatedNode.annotations) {
+            if(AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
+                return true
+            }
+        }
+        return false
+    }
+    /**
      * Finds an annotation for the given annotated node and type
      *
      * @param annotatedNode The annotated node
@@ -93,7 +117,7 @@ class AstAnnotationUtils {
                 if(annotationClassNode.name == annotationName) {
                     return ann
                 }
-                else if (!(annotationClassNode.name in [Retention.name, Documented.name, Target.name])) {
+                else if (!(annotationClassNode.name in AnnotationUtil.INTERNAL_ANNOTATION_NAMES)) {
 
                     ann = findAnnotation(annotationClassNode, annotationName)
                     if(ann != null) {

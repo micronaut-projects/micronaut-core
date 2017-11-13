@@ -2,9 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.annotation.AnnotationMetadata;
-import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.util.StringUtils;
-import org.particleframework.core.value.OptionalValues;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.event.BeanInitializedEventListener;
 import org.particleframework.context.event.BeanInitializingEvent;
@@ -63,7 +61,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<FieldInjectionPoint> fieldInjectionPoints = new ArrayList<>(3);
     protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
-    protected final Map<MethodKey, ExecutableMethod<T, ?>> invocableMethodMap = new LinkedHashMap<>(3);
+    protected final Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap = new LinkedHashMap<>(3);
     private final Map<Class, String> valuePrefixes = new ConcurrentHashMap<>(2);
 
     /**
@@ -102,66 +100,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
     }
 
-    @Override
-    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-        return getAnnotationMetadata().getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return getAnnotationMetadata().getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return getAnnotationMetadata().getDeclaredAnnotations();
-    }
-
-
-    @Override
-    public boolean hasDeclaredAnnotation(String annotation) {
-        return getAnnotationMetadata().hasDeclaredAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasAnnotation(String annotation) {
-        return getAnnotationMetadata().hasAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasStereotype(String annotation) {
-        return getAnnotationMetadata().hasStereotype(annotation);
-    }
-
-    @Override
-    public boolean hasDeclaredStereotype(String annotation) {
-        return getAnnotationMetadata().hasDeclaredStereotype(annotation);
-    }
-
-    @Override
-    public Set<String> getAnnotationNamesByStereotype(String stereotype) {
-        return getAnnotationMetadata().getAnnotationNamesByStereotype(stereotype);
-    }
-
-    @Override
-    public ConvertibleValues<Object> getValues(String annotation) {
-        return getAnnotationMetadata().getValues(annotation);
-    }
-
-    @Override
-    public <T1> OptionalValues<T1> getValues(String annotation, Class<T1> valueType) {
-        return getAnnotationMetadata().getValues(annotation, valueType);
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
-        return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
-    }
 
     @Override
     public boolean isIterable() {
@@ -176,14 +114,14 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Override
     public Optional<ExecutableMethod<T, ?>> findMethod(String name, Class... argumentTypes) {
         MethodKey methodKey = new MethodKey(name, argumentTypes);
-        ExecutableMethod<T, ?> invocableMethod = invocableMethodMap.get(methodKey);
+        ExecutableMethod<T, ?> invocableMethod = executableMethodMap.get(methodKey);
         if (invocableMethod != null) {
             return Optional.of(invocableMethod);
         } else {
             Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
             return method.map(theMethod -> {
                         ReflectionExecutableMethod<T, Object> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
-                        invocableMethodMap.put(methodKey, reflectionMethod);
+                        executableMethodMap.put(methodKey, reflectionMethod);
                         return reflectionMethod;
                     }
             );
@@ -192,8 +130,8 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if (invocableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
-            return invocableMethodMap
+        if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+            return executableMethodMap
                     .values()
                     .stream()
                     .filter((method) -> method.getMethodName().equals(name));
@@ -240,7 +178,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     @Override
-    public Class<T> getType() {
+    public Class<T> getBeanType() {
         return type;
     }
 
@@ -276,7 +214,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public String getName() {
-        return getType().getName();
+        return getBeanType().getName();
     }
 
     @Override
@@ -290,9 +228,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         return (T) injectBean(resolutionContext, context, bean);
     }
 
-    @Internal
-    protected AnnotationMetadata getAnnotationMetadata() {
-        return AnnotationMetadata.EMPTY_METADATA;
+    @Override
+    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+        return Collections.unmodifiableCollection(this.executableMethodMap.values());
     }
 
     /**
@@ -306,7 +244,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected Object getProxiedBean(BeanContext beanContext) {
         DefaultBeanContext defaultBeanContext = (DefaultBeanContext) beanContext;
         Optional<String> qualifier = getAnnotationMetadata().getAnnotationNameByStereotype(javax.inject.Qualifier.class);
-        return defaultBeanContext.getProxyTargetBean(getType(), (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null));
+        return defaultBeanContext.getProxyTargetBean(getBeanType(), (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null));
     }
 
     /**
@@ -318,7 +256,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     @Internal
     protected AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
         MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
-        invocableMethodMap.put(key, executableMethod);
+        executableMethodMap.put(key, executableMethod);
         return this;
     }
 
@@ -614,7 +552,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 } else {
                     String argumentName = argument.getName();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
-                    String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getType(), argumentName, valAnn);
+                    String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argument, argumentType, valString);
                     if (!value.isPresent() && argumentType == Optional.class) {
@@ -963,7 +901,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 if (isInnerConfiguration(fieldType)) {
                     return context.createBean(fieldType);
                 } else {
-                    Class<?> beanType = injectionPoint.getDeclaringBean().getType();
+                    Class<?> beanType = injectionPoint.getDeclaringBean().getBeanType();
                     Class<?> declaringClass = field.getDeclaringClass();
 
                     String valString = resolveValueString(
@@ -1151,7 +1089,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     private boolean isInnerConfiguration(Class argumentType) {
         return isConfigurationProperties() &&
                 argumentType.getName().indexOf('$') > -1 &&
-                Arrays.asList(getType().getClasses()).contains(argumentType) &&
+                Arrays.asList(getBeanType().getClasses()).contains(argumentType) &&
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers());
     }
 
@@ -1225,7 +1163,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private String resolveConfigPropertiesValue(Class<?> supertype, BeanContext beanContext) {
         BeanDefinition<?> definition;
-        if(supertype.equals(getType())) {
+        if(supertype.equals(getBeanType())) {
             definition = this;
         }
         else {

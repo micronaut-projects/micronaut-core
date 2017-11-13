@@ -37,11 +37,6 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionConstructor();
 
     /**
-     * @return A list {@link TypeAnnotationSource} for this class
-     */
-    List<TypeAnnotationSource> getAnnotationSources();
-
-    /**
      * @return Wetherh the provided type an interface
      */
     boolean isInterface();
@@ -287,15 +282,6 @@ public interface BeanDefinitionVisitor {
                          Object fieldType,
                          String fieldName,
                          boolean isOptional);
-
-    /**
-     * Adds a method as a source of annotations
-     *
-     * @param declaringType The declaring type
-     * @param methodName The method name
-     * @param parameters The parameter to the method
-     */
-    void visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters);
 
     /**
      * @return The package name of the bean

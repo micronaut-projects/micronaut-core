@@ -17,6 +17,7 @@ package org.particleframework.aop.internal;
 
 import org.particleframework.aop.*;
 import org.particleframework.context.annotation.Type;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
@@ -76,15 +77,14 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         }
     }
 
-
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        return attributes.get(name, requiredType);
+    public AnnotationMetadata getAnnotationMetadata() {
+        return executionHandle.getAnnotationMetadata();
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        return attributes.get(name, requiredType);
+    public MutableConvertibleValues<Object> getAttributes() {
+        return attributes;
     }
 
     @Override
@@ -137,53 +137,6 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         }
     }
 
-    @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return findAnnotation(annotationClass).orElse(null);
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return executionHandle.getAnnotatedElements();
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return executionHandle.getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return executionHandle.getDeclaredAnnotations();
-    }
-
-    @Override
-    public InterceptorChain<B,R> put(CharSequence key, Object value) {
-        attributes.put(key, value);
-        return this;
-    }
-
-    @Override
-    public Set<String> getNames() {
-        return attributes.getNames();
-    }
-
-    @Override
-    public Collection<Object> values() {
-        return attributes.values();
-    }
-
-    @Override
-    public InterceptorChain<B,R> remove(CharSequence key) {
-        attributes.remove(key);
-        return this;
-    }
-
-    @Override
-    public InterceptorChain<B,R> clear() {
-        attributes.clear();
-        return this;
-    }
 
 
     /**
@@ -194,7 +147,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     @Internal
-    public static Interceptor[] resolveAroundInterceptors(AnnotatedElement method, Interceptor...interceptors) {
+    public static Interceptor[] resolveAroundInterceptors(ExecutableMethod<?,?> method, Interceptor...interceptors) {
         return resolveInterceptorsInternal(method, Around.class, interceptors);
     }
 
@@ -207,7 +160,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     @Internal
-    public static Interceptor[] resolveIntroductionInterceptors(AnnotatedElement method, Interceptor...interceptors) {
+    public static Interceptor[] resolveIntroductionInterceptors(ExecutableMethod<?,?> method, Interceptor...interceptors) {
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(method, interceptors);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
         if(introductionInterceptors.length == 0) {
@@ -217,18 +170,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     }
 
 
-    private static Interceptor[] resolveInterceptorsInternal(AnnotatedElement method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
-        Set<Annotation> annotations;
-        if(method instanceof ExecutableMethod) {
-            ExecutableMethod executableMethod = (ExecutableMethod) method;
-            annotations = new HashSet<>(executableMethod.findAnnotationsWithStereoType(annotationType));
-        }
-        else {
-            annotations = new HashSet<>(AnnotationUtil.findAnnotationsWithStereoType(annotationType, method.getAnnotations()));
-        }
+    private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?,?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
+        Set<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
 
         Set<Class> applicableClasses = annotations.stream()
-                .map((Annotation ann) -> ann.annotationType().getAnnotation(Type.class))
+                .map(type-> type.getAnnotation(Type.class))
                 .filter(Objects::nonNull)
                 .flatMap(type ->
                         Arrays.stream(type.value())

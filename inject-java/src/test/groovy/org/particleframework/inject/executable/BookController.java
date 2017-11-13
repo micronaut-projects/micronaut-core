@@ -1,12 +1,11 @@
 package org.particleframework.inject.executable;
 
 import org.particleframework.context.annotation.Executable;
-import org.particleframework.stereotype.Controller;
 
 import javax.inject.Inject;
 import java.util.List;
 
-@Controller
+@Executable
 public class BookController {
     @Inject
     BookService bookService;

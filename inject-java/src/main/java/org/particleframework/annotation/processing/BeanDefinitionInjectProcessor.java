@@ -19,6 +19,7 @@ import org.particleframework.aop.Interceptor;
 import org.particleframework.aop.Introduction;
 import org.particleframework.aop.writer.AopProxyWriter;
 import org.particleframework.context.annotation.*;
+import org.particleframework.inject.annotation.AnnotationMetadataReference;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalValues;
@@ -241,6 +242,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE) && modelUtils.isAbstract(classElement)) {
 
+                AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
                 AopProxyWriter aopProxyWriter = createAopWriterFor(classElement);
                 ExecutableElement constructor = classElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(classElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
@@ -269,6 +271,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Object> methodParameters = params.getParameters();
                         Map<String, Object> methodQualifier = params.getQualifierTypes();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
+                        AnnotationMetadata annotationMetadata;
+                        if( annotationUtils.isAnnotated(method) ) {
+                            annotationMetadata = annotationUtils.getAnnotationMetadata(classElement, method);
+                        }
+                        else {
+                            annotationMetadata = new AnnotationMetadataReference(
+                                    aopProxyWriter.getBeanDefinitionName(),
+                                    typeAnnotationMetadata
+                            );
+                        }
+
 
                         aopProxyWriter.visitAroundMethod(
                                 owningType,
@@ -278,7 +291,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationUtils.getAnnotationMetadata(method)
+                                annotationMetadata
 
                         );
                     }
@@ -425,11 +438,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     beanMethodParams.getQualifierTypes(),
                     beanMethodParams.getGenericTypes()
             );
-            beanMethodWriter.visitMethodAnnotationSource(
-                    beanMethodDeclaringType,
-                    beanMethodName,
-                    beanMethodParameters
-            );
 
             AnnotationMetadata methodAnnotationMetadata = new JavaAnnotationMetadataBuilder(elementUtils).buildForMethod(beanMethod);
             if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
@@ -455,12 +463,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         constructorData,
                         interceptorTypes);
 
-                proxyWriter.visitMethodAnnotationSource(
-                        beanMethodDeclaringType,
-                        beanMethodName,
-                        beanMethodParameters
-                );
-
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
                     @Override
                     protected void accept(ExecutableElement method, AopProxyWriter aopProxyWriter) {
@@ -476,6 +478,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Object> methodQualifier = params.getQualifierTypes();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
+                        AnnotationMetadata annotationMetadata;
+                        if( annotationUtils.isAnnotated(method) ) {
+                            annotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod, method);
+                        }
+                        else {
+                            annotationMetadata = new AnnotationMetadataReference(
+                                    beanMethodWriter.getBeanDefinitionName(),
+                                    methodAnnotationMetadata
+                            );
+                        }
+
                         beanMethodWriter.visitExecutableMethod(
                                 owningType,
                                 resolvedReturnType,
@@ -484,12 +497,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                methodAnnotationMetadata
-                        ).visitMethodAnnotationSource(
-                                beanMethodDeclaringType,
-                                beanMethodName,
-                                beanMethodParameters
-                        ).visitEnd();
+                                annotationMetadata
+                        );
 
 
                         aopProxyWriter.visitAroundMethod(
@@ -500,7 +509,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                methodAnnotationMetadata
+                                annotationMetadata
 
                         );
                     }
@@ -542,8 +551,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     method.getSimpleName().toString(),
                     params.getParameters(),
                     params.getQualifierTypes(),
-                    params.getGenericTypes(), methodAnnotationMetadata)
-                    .visitEnd();
+                    params.getGenericTypes(), methodAnnotationMetadata);
 
             boolean hasExplicitAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
             if (isAopProxyType || hasExplicitAround) {

@@ -18,7 +18,7 @@ package example;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import org.particleframework.http.annotation.Body;
-import org.particleframework.stereotype.Controller;
+import org.particleframework.http.annotation.Controller;
 import org.particleframework.validation.Validated;
 import org.particleframework.web.router.annotation.Get;
 import org.particleframework.web.router.annotation.Post;

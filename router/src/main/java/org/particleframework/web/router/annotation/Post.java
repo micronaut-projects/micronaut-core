@@ -15,7 +15,9 @@
  */
 package org.particleframework.web.router.annotation;
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Consumes;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -38,10 +40,18 @@ public @interface Post {
     /**
      * @return The URI of the POST route if not specified inferred from the method name and arguments
      */
+    @AliasFor(annotation = Action.class, member = "value")
     String value() default "";
+
+    /**
+     * @return The URI of the POST route if not specified inferred from the method name and arguments
+     */
+    @AliasFor(annotation = Action.class, member = "value")
+    String uri() default "";
 
     /**
      * @return The default consumes, otherwise override from controller
      */
+    @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
 }

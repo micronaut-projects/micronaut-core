@@ -21,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -217,34 +216,6 @@ public class DefaultEnvironment implements Environment {
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;
-    }
-
-    @Override
-    public <T> Iterable<T> findServices(Class<T> type, Predicate<String> condition) {
-        SoftServiceLoader<T> services =  serviceMap
-                                            .computeIfAbsent(type, (serviceType)-> SoftServiceLoader.load(serviceType, getClassLoader(), condition) );
-        Iterator<SoftServiceLoader.Service<T>> iterator = services.iterator();
-        return () -> new Iterator<T>() {
-            SoftServiceLoader.Service<T> nextService = null;
-            @Override
-            public boolean hasNext() {
-                if(nextService != null) return true;
-                while(iterator.hasNext() && (nextService == null || !nextService.isPresent())) {
-                    nextService = iterator.next();
-                }
-                return nextService != null;
-            }
-
-            @Override
-            public T next() {
-                if(!hasNext()) {
-                    throw new NoSuchElementException();
-                }
-                SoftServiceLoader.Service<T> next = this.nextService;
-                nextService = null;
-                return next.load();
-            }
-        };
     }
 
     protected Properties resolveSubProperties(String name, Map<String, Object> entries) {

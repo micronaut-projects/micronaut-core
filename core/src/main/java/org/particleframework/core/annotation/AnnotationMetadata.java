@@ -22,6 +22,7 @@ import org.particleframework.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <p>An interface implemented at compile time by Particle that allows the inspection of annotation metadata and stereotypes</p>
@@ -170,7 +171,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<Class> getAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
+    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
         return getAnnotationTypeByStereotype(stereotype.getName());
     }
 
@@ -179,8 +180,12 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<Class> getAnnotationTypeByStereotype(String stereotype) {
-        return getAnnotationNameByStereotype(stereotype).flatMap(name -> ClassUtils.forName(name, getClass().getClassLoader()));
+    @SuppressWarnings("unchecked")
+    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(String stereotype) {
+        return getAnnotationNameByStereotype(stereotype).flatMap(name -> {
+            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
+            return opt.map(aClass -> (Class<? extends Annotation>) aClass);
+        });
     }
 
     /**
@@ -208,6 +213,20 @@ public interface AnnotationMetadata extends AnnotatedElement {
      */
     default Set<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
         return getAnnotationNamesByStereotype(stereotype.getName());
+    }
+
+    /**
+     * Resolve all of the annotation names that feature the given stereotype
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     */
+    @SuppressWarnings("unchecked")
+    default Set<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
+        Set<String> names = getAnnotationNamesByStereotype(stereotype.getName());
+        return names.stream().map(name -> ClassUtils.forName(name, AnnotationMetadata.class.getClassLoader()))
+                      .filter(Optional::isPresent)
+                      .map(opt -> (Class<? extends Annotation>)opt.get())
+                      .collect(Collectors.toSet());
     }
     /**
      * Get all of the values for the given annotation
@@ -471,6 +490,20 @@ public interface AnnotationMetadata extends AnnotatedElement {
     @SuppressWarnings("unchecked")
     default boolean hasStereotype(Class<? extends Annotation>... annotations) {
         for (Class<? extends Annotation> annotation : annotations) {
+            if(hasStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * Check whether any of the given stereotypes is present
+     * @param annotations The annotations
+     * @return True if any of the given stereotypes are present
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasStereotype(String[] annotations) {
+        for (String annotation : annotations) {
             if(hasStereotype(annotation)) {
                 return true;
             }

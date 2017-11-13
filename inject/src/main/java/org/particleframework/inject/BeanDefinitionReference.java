@@ -21,11 +21,7 @@ import org.particleframework.core.annotation.Internal;
  * @since 1.0
  */
 @Internal
-public interface BeanDefinitionReference<T> extends AnnotationMetadataProvider {
-    /**
-     * @return The underlying component type
-     */
-    Class<T> getBeanType();
+public interface BeanDefinitionReference<T> extends BeanType<T> {
 
     /**
      * @return The name of the bean type

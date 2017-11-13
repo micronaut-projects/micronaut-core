@@ -19,6 +19,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.inject.annotation.AnnotationMetadataReference;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 /**
@@ -31,10 +32,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     public static final String FIELD_ANNOTATION_METADATA = "$ANNOTATION_METADATA";
     protected final AnnotationMetadataWriter annotationMetadataWriter;
     protected final Type targetClassType;
+    protected final AnnotationMetadata annotationMetadata;
 
     public AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
         this.targetClassType = getTypeReference(className);
-        this.annotationMetadataWriter = new AnnotationMetadataWriter(className, annotationMetadata);
+        this.annotationMetadataWriter = annotationMetadata instanceof AnnotationMetadataReference ? null : new AnnotationMetadataWriter(className, annotationMetadata);
+        this.annotationMetadata = annotationMetadata;
     }
 
     /**
@@ -44,32 +47,43 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         return annotationMetadataWriter;
     }
 
-    protected void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter) {
-        Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
-        classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
-        Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-        staticInit.newInstance(concreteMetadataType);
-        staticInit.dup();
-        staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
-
-        staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);
-    }
-
     protected void writeGetAnnotationMetadataMethod(ClassWriter classWriter) {
         GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
         annotationMetadataMethod.loadThis();
-        annotationMetadataMethod.getStatic(targetClassType, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+        if(annotationMetadata instanceof AnnotationMetadataReference) {
+            AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
+            String className = reference.getClassName() + BeanDefinitionReferenceWriter.REF_SUFFIX;
+            annotationMetadataMethod.getStatic(getTypeReference(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+        }
+        else {
+            annotationMetadataMethod.getStatic(targetClassType, AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
+        }
         annotationMetadataMethod.returnValue();
         annotationMetadataMethod.visitMaxs(1,1);
         annotationMetadataMethod.visitEnd();
     }
 
     protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter) {
-        // write the static initializers for the annotation metadata
-        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-        initializeAnnotationMetadata(staticInit, classWriter);
-        staticInit.visitInsn(RETURN);
-        staticInit.visitMaxs(1,1);
-        staticInit.visitEnd();
+        if(!(annotationMetadata instanceof AnnotationMetadataReference)) {
+
+            // write the static initializers for the annotation metadata
+            GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
+            initializeAnnotationMetadata(staticInit, classWriter);
+            staticInit.visitInsn(RETURN);
+            staticInit.visitMaxs(1,1);
+            staticInit.visitEnd();
+        }
+    }
+
+    void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter) {
+        Type annotationMetadataType= Type.getType(AnnotationMetadata.class);
+        classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
+
+        Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
+        staticInit.newInstance(concreteMetadataType);
+        staticInit.dup();
+        staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
+
+        staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);
     }
 }

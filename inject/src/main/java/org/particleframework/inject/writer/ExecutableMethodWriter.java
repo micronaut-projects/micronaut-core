@@ -24,6 +24,7 @@ import org.particleframework.context.AbstractExecutableMethod;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
+import org.particleframework.inject.annotation.AnnotationMetadataReference;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -52,7 +53,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private String outerClassName = null;
     private boolean isStatic = false;
-    private List<TypeAnnotationSource> annotationSources = new LinkedList<>();
 
     public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata);
@@ -120,7 +120,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
 
         // initialize and write the annotation metadata
-        initializeAnnotationMetadata(staticInit, classWriter);
+        if(!(annotationMetadata instanceof AnnotationMetadataReference)) {
+            initializeAnnotationMetadata(staticInit, classWriter);
+        }
         writeGetAnnotationMetadataMethod(classWriter);
 
         pushGetMethodFromTypeCall(staticInit, declaringTypeObject, methodName, argumentTypeClasses);
@@ -212,18 +214,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
     }
 
-    private void writeMethodAnnotationSources() {
-        if(!annotationSources.isEmpty()) {
-            // override the getAnnotatedElements() method
-            GeneratorAdapter generatorAdapter = super.writeGetAnnotatedElementsMethod(
-                    classWriter,
-                    Type.getType(AbstractExecutableMethod.class),
-                    annotationSources
-            );
-            generatorAdapter.visitMaxs(1,1);
-            generatorAdapter.endMethod();
-        }
-    }
 
     protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
         Type returnTypeObject = getTypeReference(returnType);
@@ -266,35 +256,5 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         makeInner(parentInternalName, classWriter);
     }
 
-    /**
-     * Finalize writing the method
-     */
-    public void visitEnd() {
-        writeMethodAnnotationSources();
-    }
-    /**
-     * Adds a method as a source of annotations
-     *
-     * @param declaringType The declaring type
-     * @param methodName The method name
-     * @param parameters The parameter to the method
-     */
-    public ExecutableMethodWriter visitMethodAnnotationSource(Object declaringType, String methodName, Map<String, Object> parameters) {
-        annotationSources.add(new MethodAnnotationSource(declaringType, methodName, parameters));
-        return this;
-    }
-
-    /**
-     * Adds a type as a source of annotations
-     *
-     * @param declaringType The declaring type
-     */
-    public ExecutableMethodWriter visitTypeAnnotationSource(Object declaringType) {
-        TypeAnnotationSource annotationSource = new TypeAnnotationSource(declaringType);
-        if(!this.annotationSources.contains(annotationSource)) {
-            this.annotationSources.add(annotationSource);
-        }
-        return this;
-    }
 
 }

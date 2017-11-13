@@ -39,6 +39,46 @@ import javax.inject.Singleton
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
 
+    void "test read external constants"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(property=AnnotationMetadata.VALUE_MEMBER)
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'value'
+    }
+
+    void "test read constants"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test', '''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property=Test.TEST)
+class Test {
+    public static final String TEST = "blah";
+}
+''')
+
+
+        expect:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'blah'
+
+    }
+
+
     @Ignore // Support for closure values not yet supported
     void "test build annotation with closure value"() {
         given:

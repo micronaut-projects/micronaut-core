@@ -17,15 +17,15 @@ package org.particleframework.web.router;
 
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.core.type.Argument;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.stereotype.Controller;
+import org.particleframework.http.annotation.Controller;
 import org.particleframework.web.router.annotation.Action;
 import org.particleframework.http.annotation.Consumes;
 
@@ -47,21 +47,19 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
     }
 
     @Override
-    public void process(ExecutableMethod method) {
+    public void process(BeanDefinition beanDefinition, ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
-        Optional<Controller> optional = AnnotationUtil.findAnnotation(declaringType, Controller.class);
-        if (optional.isPresent() && !AnnotationUtil.findAnnotationWithStereoType(method, Action.class).isPresent()) {
-            Controller controllerAnn = optional.get();
+        if (beanDefinition.hasStereotype(Controller.class) && !method.hasDeclaredStereotype(Action.class)) {
+            MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
 
             Class[] argumentTypes = method.getArgumentTypes();
             if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[argumentTypes.length - 1])) {
                 Class argumentType = argumentTypes[argumentTypes.length-1];
                 ErrorRoute errorRoute = error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                errorRoute = (ErrorRoute) processAccepts(controllerAnn, errorRoute);
-                processAccepts(declaringType.getAnnotation(Consumes.class), errorRoute);
+                errorRoute.accept(consumes);
             }
             else {
-                String annotationValue = controllerAnn.value();
+                String annotationValue = beanDefinition.getValue(Controller.class, String.class).orElse("");
                 String path;
                 if(annotationValue.isEmpty()) {
                     path = getUriNamingStrategy().resolveUri(declaringType);
@@ -90,8 +88,7 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
                             methodName,
                             method.getArgumentTypes()
                     );
-                    uriRoute = (UriRoute) processAccepts(controllerAnn, uriRoute);
-                    processAccepts(declaringType.getAnnotation(Consumes.class), uriRoute);
+                    uriRoute.accept(consumes);
                 });
 
             }
@@ -99,22 +96,4 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
         }
     }
 
-    protected Route processAccepts(Controller controllerAnn, Route route) {
-        String[] consumes = controllerAnn.consumes();
-        return processConsumes(route, consumes);
-    }
-
-    protected Route processAccepts(Consumes consumesAnn, Route route) {
-        if(consumesAnn != null) {
-            String[] consumes = consumesAnn.value();
-            return processConsumes(route, consumes);
-        }
-        return route;
-    }
-
-
-    private Route processConsumes(Route route, String... consumes) {
-        MediaType[] accepts = Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new);
-        return route.accept(accepts);
-    }
 }

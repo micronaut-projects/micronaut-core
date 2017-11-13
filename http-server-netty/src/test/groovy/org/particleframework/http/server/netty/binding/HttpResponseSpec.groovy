@@ -21,7 +21,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.server.netty.AbstractParticleSpec
-import org.particleframework.stereotype.Controller
+import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.annotation.Get
 import spock.lang.Unroll
 

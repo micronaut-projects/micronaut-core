@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.processor;
 
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.context.annotation.Executable;
 
@@ -54,8 +55,9 @@ public interface ExecutableMethodProcessor<A extends Annotation> extends Annotat
     /**
      * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
      *
+     * @param beanDefinition
      * @param method The executable method
      */
     @Override
-    void process(ExecutableMethod<?,?> method);
+    void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method);
 }

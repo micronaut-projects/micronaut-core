@@ -2,7 +2,6 @@ package org.particleframework.context.env;
 
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
-import org.particleframework.context.ServiceLocator;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
@@ -25,7 +24,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader, ServiceLocator {
+public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
 
     /**
      * The test environment

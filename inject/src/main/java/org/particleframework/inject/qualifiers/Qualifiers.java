@@ -71,7 +71,13 @@ public class Qualifiers {
     }
 
     /**
-     * Build a qualifier for the given annotation
+     * <p>Build a qualifier for the given annotation. This qualifier will match a candidate under the following circumstances:</p>
+     *
+     * <ul>
+     *     <li>If the <tt>type</tt> parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
+     *     <li>If the <tt>type</tt> parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
+     *
+     * </ul>
      *
      * @param metadata The metadata
      * @param type The annotation type
@@ -93,6 +99,18 @@ public class Qualifiers {
         }
         return new AnnotationMetadataQualifier<>(metadata, type);
     }
+
+    /**
+     * Build a qualifier for the given annotation
+     *
+     * @param stereotype The stereotype
+     * @param <T> The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byStereotype(Class<? extends Annotation> stereotype) {
+        return new AnnotationStereotypeQualifier<>(stereotype);
+    }
+
     /**
      * Build a qualifier for the given generic type arguments
      *
@@ -112,6 +130,6 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byType(Class...typeArguments) {
-        return new TypeQualifier<>(typeArguments);
+        return new TypeAnnotationQualifier<>(typeArguments);
     }
 }

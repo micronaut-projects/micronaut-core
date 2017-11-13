@@ -15,6 +15,8 @@
  */
 package org.particleframework.web.router.annotation;
 
+import org.particleframework.context.annotation.AliasFor;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -36,6 +38,13 @@ public @interface Trace {
     /**
      * @return The URI of the TRACE route if not specified inferred from the method name and arguments
      */
+    @AliasFor(annotation = Action.class, member = "value")
     String value() default "";
+
+    /**
+     * @return The URI of the TRACE route if not specified inferred from the method name and arguments
+     */
+    @AliasFor(annotation = Action.class, member = "value")
+    String uri() default "";
 
 }

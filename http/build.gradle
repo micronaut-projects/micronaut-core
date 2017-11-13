@@ -1,3 +1,5 @@
 dependencies {
-    compile project(":core")
+    compile project(":inject")
+
+    testCompile project(":inject-groovy")
 }

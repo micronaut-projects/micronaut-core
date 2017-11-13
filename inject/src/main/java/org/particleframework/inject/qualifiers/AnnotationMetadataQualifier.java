@@ -19,6 +19,7 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import javax.inject.Named;
 import java.util.Optional;
@@ -40,7 +41,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         String name;
         if (Named.class.getName().equals(getName())) {
             String v = annotationMetadata.getValue(Named.class, String.class).orElse(null);
@@ -55,29 +56,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             name = getName();
         }
 
-        return candidates.filter(candidate -> {
-                    String candidateName;
-                    if(candidate instanceof NameResolver) {
-                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getType().getSimpleName());
-                    }
-                    else {
-                        Optional<String> annotation = candidate.getValue(Named.class, String.class);
-                        candidateName = annotation.orElse( candidate.getType().getSimpleName() );
-                    }
-
-                    if(candidateName.equalsIgnoreCase(name)) {
-                        return true;
-                    }
-                    else {
-
-                        String qualified = name + beanType.getSimpleName();
-                        if(qualified.equals(candidateName)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-        );
+        return reduceByAnnotation(beanType, candidates, name);
     }
 
 }

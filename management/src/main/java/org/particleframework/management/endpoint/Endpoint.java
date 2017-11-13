@@ -46,13 +46,13 @@ public @interface Endpoint {
      * @return The ID of the endpoint
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
-    String value();
+    String value() default "";
 
     /**
      * @return The ID of the endpoint
      */
     @AliasFor(member = "value")
-    String id();
+    String id() default "";
     /**
      * @return The default prefix to use
      */

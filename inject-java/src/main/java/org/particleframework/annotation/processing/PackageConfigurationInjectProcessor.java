@@ -59,9 +59,11 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
                         filer.createClassFile(configurationClassName, packageElement);
 
                     AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
-                    JavaFileObject annotationMetadataFile = filer.createClassFile(annotationMetadataWriter.getClassName(), packageElement);
-                    try (OutputStream out = annotationMetadataFile.openOutputStream()) {
-                        annotationMetadataWriter.writeTo(out);
+                    if(annotationMetadataWriter != null) {
+                        JavaFileObject annotationMetadataFile = filer.createClassFile(annotationMetadataWriter.getClassName(), packageElement);
+                        try (OutputStream out = annotationMetadataFile.openOutputStream()) {
+                            annotationMetadataWriter.writeTo(out);
+                        }
                     }
                     try (OutputStream out = javaFileObject.openOutputStream()) {
                         writer.writeTo(out);

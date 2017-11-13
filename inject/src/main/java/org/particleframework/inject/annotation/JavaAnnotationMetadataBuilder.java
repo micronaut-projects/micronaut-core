@@ -293,7 +293,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitEnumConstant(VariableElement c, Object o) {
-            annotationValues.put(memberName, c.getConstantValue());
+            annotationValues.put(memberName, c.toString());
             return null;
         }
 

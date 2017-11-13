@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.core.annotation.AnnotationMetadataDelegate;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.Executable;
@@ -30,7 +31,7 @@ import java.lang.reflect.AnnotatedElement;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ExecutionHandle<R> extends AnnotationSource {
+public interface ExecutionHandle<R> extends AnnotationMetadataDelegate {
 
     /**
      * @return The declaring type

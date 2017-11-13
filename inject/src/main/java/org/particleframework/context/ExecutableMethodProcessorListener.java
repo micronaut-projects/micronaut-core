@@ -17,58 +17,38 @@ package org.particleframework.context;
 
 import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
+import org.particleframework.context.processor.AnnotationProcessor;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.async.subscriber.Completable;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.context.annotation.Executable;
+import org.particleframework.inject.qualifiers.Qualifiers;
 
-import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
  * <p>A {@link BeanCreatedEventListener} that will monitor the creation of {@link ExecutableMethodProcessor} instances
- * and call {@link ExecutableMethodProcessor#process(ExecutableMethod)} for each available {@link ExecutableMethod}</p>
+ * and call {@link AnnotationProcessor#process(BeanDefinition, Object)} for each available {@link ExecutableMethod}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 class ExecutableMethodProcessorListener implements BeanCreatedEventListener<ExecutableMethodProcessor> {
 
-    private volatile Map<Class<? extends Annotation>, List<ExecutableMethod>> executableMethodsByAnnotation;
 
     @Override
     public ExecutableMethodProcessor onCreated(BeanCreatedEvent<ExecutableMethodProcessor> event) {
         ExecutableMethodProcessor processor = event.getBean();
         BeanContext beanContext = event.getSource();
-        if (beanContext instanceof ApplicationContext) {
-
-            Map<Class<? extends Annotation>, List<ExecutableMethod>> methodsByAnnotation = getExecutableMethodsByAnnotation((ApplicationContext) beanContext);
-            if(!methodsByAnnotation.isEmpty()) {
-
-                Optional<Class> targetAnnotation = GenericTypeUtils.resolveInterfaceTypeArgument(processor.getClass(), ExecutableMethodProcessor.class);
-                if (!targetAnnotation.isPresent()) {
-                    for (List<ExecutableMethod> executableMethods : methodsByAnnotation.values()) {
-                        for (ExecutableMethod executableMethod : executableMethods) {
-                            processor.process(executableMethod);
-                        }
-                    }
-                } else {
-                    Class annotationType = targetAnnotation.get();
-                    methodsByAnnotation
-                            .keySet()
-                            .stream()
-                            .filter((type) ->
-                                    type == annotationType || AnnotationUtil.findAnnotationWithStereoType(type, annotationType).isPresent()
-                            )
-                            .forEach((key) -> {
-                                        List<ExecutableMethod> executableMethods = methodsByAnnotation.get(key);
-                                        for (ExecutableMethod executableMethod : executableMethods) {
-                                            processor.process(executableMethod);
-                                        }
-                                    }
-                            );
+        Optional<Class> targetAnnotation = GenericTypeUtils.resolveInterfaceTypeArgument(processor.getClass(), ExecutableMethodProcessor.class);
+        if (targetAnnotation.isPresent()) {
+            Class annotationType = targetAnnotation.get();
+            Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(annotationType));
+            for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
+                for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
+                    processor.process(beanDefinition, executableMethod);
                 }
             }
         }
@@ -80,50 +60,4 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         return processor;
     }
 
-    Map<Class<? extends Annotation>, List<ExecutableMethod>> getExecutableMethodsByAnnotation(ApplicationContext beanContext) {
-        Map<Class<? extends Annotation>, List<ExecutableMethod>> result = executableMethodsByAnnotation;
-        if (result == null) {
-            synchronized (this) { // double check
-                result = executableMethodsByAnnotation;
-                if (result == null) {
-                    executableMethodsByAnnotation = result = loadExecutableMethods(beanContext);
-                }
-            }
-        }
-        return result;
-    }
-
-    // TODO: Performance of this will degrade as application grows, need to alter this to only process classes annotated with @Executable
-    private Map<Class<? extends Annotation>, List<ExecutableMethod>> loadExecutableMethods(ApplicationContext applicationContext) {
-        Iterable<ExecutableMethod> executableMethods = applicationContext.findServices(ExecutableMethod.class);
-        Map<Class<? extends Annotation>, List<ExecutableMethod>> result = new LinkedHashMap<>();
-        for (ExecutableMethod executableMethod : executableMethods) {
-            Collection<Annotation> annotations = executableMethod.getExecutableAnnotations();
-            Class declaringType = executableMethod.getDeclaringType();
-            if(applicationContext.findBeanDefinition(declaringType).isPresent()) {
-
-                if(annotations.isEmpty()) {
-                    Optional<Annotation> execOpt = AnnotationUtil.findAnnotationWithStereoType(declaringType, Executable.class);
-                    execOpt.ifPresent(annotation ->
-                        registerExecutableMethod(result, annotation, executableMethod)
-                    );
-                }
-                else {
-
-                    for (Annotation annotation : annotations) {
-                        registerExecutableMethod(result, annotation, executableMethod);
-                    }
-                }
-            }
-
-        }
-        return result;
-    }
-
-    private void registerExecutableMethod(Map<Class<? extends Annotation>, List<ExecutableMethod>> result, Annotation annotation, ExecutableMethod executableMethod) {
-        Class<? extends Annotation> key = annotation.annotationType();
-        List<ExecutableMethod> methodList = result.computeIfAbsent(key, k -> new ArrayList<>());
-        methodList.add(executableMethod);
-        result.put(key, methodList);
-    }
 }

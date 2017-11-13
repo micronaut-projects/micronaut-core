@@ -27,7 +27,6 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.inject.*;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -79,8 +78,8 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     }
 
     @Override
-    public Class<T> getType() {
-        return definition.getType();
+    public Class<T> getBeanType() {
+        return definition.getBeanType();
     }
 
     @Override
@@ -136,6 +135,11 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
         return definition.inject(resolutionContext, context, bean);
+    }
+
+    @Override
+    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+        return definition.getExecutableMethods();
     }
 
     @Override

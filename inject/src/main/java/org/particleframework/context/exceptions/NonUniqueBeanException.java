@@ -39,7 +39,7 @@ public class NonUniqueBeanException extends NoSuchBeanException {
     private static <T> String buildMessage(Iterator<BeanDefinition<T>> possibleCandidates) {
         final StringBuilder message = new StringBuilder("Multiple possible bean candidates found: [");
         while (possibleCandidates.hasNext()) {
-            Class next = possibleCandidates.next().getType();
+            Class next = possibleCandidates.next().getBeanType();
             message.append(next.getName());
             if(possibleCandidates.hasNext()) {
                 message.append(", ");

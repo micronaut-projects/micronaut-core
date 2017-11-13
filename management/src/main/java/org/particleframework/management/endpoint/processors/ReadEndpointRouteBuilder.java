@@ -19,6 +19,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.uri.UriTemplate;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.EndpointConfiguration;
@@ -34,20 +35,23 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Read>{
+public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Endpoint>{
 
     public ReadEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }
 
     @Override
-    public void process(ExecutableMethod<?, ?> method) {
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         Class<?> declaringType = method.getDeclaringType();
-        Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
+        if(method.hasStereotype(Read.class)) {
 
-        registeredEndpoint.ifPresent(config -> {
-            UriTemplate template = buildUriTemplate(method, config.getId());
-            GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
-        });
+            Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
+
+            registeredEndpoint.ifPresent(config -> {
+                UriTemplate template = buildUriTemplate(method, config.getId());
+                GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+            });
+        }
     }
 }

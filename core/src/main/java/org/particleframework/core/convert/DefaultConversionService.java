@@ -50,7 +50,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()
             .maximumSize(60)
-            .softValues()
             .build();
 
     public DefaultConversionService() {
@@ -105,6 +104,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return this;
     }
 
+    @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
 
         // String -> Class
@@ -558,6 +558,45 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 }
                 return CollectionUtils.convertCollection((Class) targetType, list);
             }
+        });
+
+
+        // Object[] -> Object[] (inner type conversion)
+        addConverter(Object[].class, Object[].class, (object, targetType, context) -> {
+            Class<?> targetComponentType = targetType.getComponentType();
+            List results = new ArrayList();
+            for (Object o : object) {
+                Optional<?> converted = convert(o, targetComponentType, context);
+                if(converted.isPresent()) {
+                    results.add(converted.get());
+                }
+            }
+            return Optional.of(results.toArray((Object[]) Array.newInstance(targetComponentType, results.size())));
+        });
+
+        addConverter(Iterable.class, Object[].class, (object, targetType, context) -> {
+            Class<?> targetComponentType = targetType.getComponentType();
+            List results = new ArrayList();
+            for (Object o : object) {
+                Optional<?> converted = convert(o, targetComponentType, context);
+                if(converted.isPresent()) {
+                    results.add(converted.get());
+                }
+            }
+            return Optional.of(results.toArray((Object[]) Array.newInstance(targetComponentType, results.size())));
+        });
+
+        addConverter(Object.class, Object[].class, (object, targetType, context) -> {
+            Class<?> targetComponentType = targetType.getComponentType();
+            Optional<?> converted = convert(object, targetComponentType);
+            if(converted.isPresent()) {
+
+                Object[] result = (Object[]) Array.newInstance(targetComponentType, 1);
+                result[0] = converted.get();
+                return Optional.of(result);
+            }
+
+            return Optional.empty();
         });
 
         // Map -> Map (inner type conversion)

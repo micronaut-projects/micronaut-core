@@ -19,21 +19,21 @@ import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.MethodConvention;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Consumes;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.stereotype.Controller;
+import org.particleframework.http.annotation.Controller;
 import org.particleframework.web.router.annotation.*;
 import org.particleframework.web.router.annotation.Error;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
-import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 /**
  * Responsible for building {@link Route} instances for the annotations found in the {@link org.particleframework.web.router.annotation} package
@@ -42,163 +42,150 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Singleton
-public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Action> {
+public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
 
-    private final Map<Class, BiFunction<Annotation, ExecutableMethod, Route>> httpMethodsHandlers = new LinkedHashMap<>();
+    private final Map<Class, Consumer<ExecutableMethod>> httpMethodsHandlers = new LinkedHashMap<>();
 
 
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        httpMethodsHandlers.put(Get.class, (Annotation ann, ExecutableMethod method) -> {
-                    UriRoute route = GET(resolveUri(((Get) ann).value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Get.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                Route route = GET(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
-        httpMethodsHandlers.put(Post.class, (Annotation ann, ExecutableMethod method) -> {
-                    Post postAnn = (Post) ann;
-                    MediaType[] consumes = resolveConsumes(method, postAnn.consumes());
-                    Route route = POST(resolveUri(postAnn.value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (consumes.length > 0) {
-                        route = route.accept(consumes);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+            });
+        });
+
+        httpMethodsHandlers.put(Post.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                Route route = POST(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                route = route.accept(consumes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Put.class, (Annotation ann, ExecutableMethod method) -> {
-                    Put putAnn = (Put) ann;
-                    MediaType[] consumes = resolveConsumes(method, putAnn.consumes());
-                    Route route = PUT(resolveUri(putAnn.value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (consumes.length > 0) {
-                        route = route.accept(consumes);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Put.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                Route route = PUT(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                route = route.accept(consumes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Patch.class, (Annotation ann, ExecutableMethod method) -> {
-                    Patch patchAnn = (Patch) ann;
-                    MediaType[] consumes = resolveConsumes(method, patchAnn.consumes());
-                    Route route = PATCH(resolveUri(patchAnn.value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (consumes.length > 0) {
-                        route = route.accept(consumes);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Patch.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                Route route = PATCH(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                route = route.accept(consumes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Delete.class, (Annotation ann, ExecutableMethod method) -> {
-                    Delete deleteAnn = (Delete) ann;
-                    MediaType[] consumes = resolveConsumes(method, deleteAnn.consumes());
-                    Route route = DELETE(resolveUri(deleteAnn.value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (consumes.length > 0) {
-                        route = route.accept(consumes);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Delete.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                Route route = DELETE(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                route = route.accept(consumes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Head.class, (Annotation ann, ExecutableMethod method) -> {
-                    UriRoute route = HEAD(resolveUri(((Head) ann).value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+
+        httpMethodsHandlers.put(Head.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                Route route = HEAD(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Options.class, (Annotation ann, ExecutableMethod method) -> {
-                    Options optionsAnn = (Options) ann;
-                    MediaType[] consumes = resolveConsumes(method, optionsAnn.consumes());
-                    Route route = OPTIONS(resolveUri(optionsAnn.value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (consumes.length > 0) {
-                        route = route.accept(consumes);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Options.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                Route route = OPTIONS(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                route = route.accept(consumes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Trace.class, (Annotation ann, ExecutableMethod method) -> {
-                    UriRoute route = TRACE(resolveUri(((Trace) ann).value(),
-                            method,
-                            uriNamingStrategy),
-                            method.getDeclaringType(),
-                            method.getMethodName(),
-                            method.getArgumentTypes());
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route: {}", route);
-                    }
-                    return route;
+        httpMethodsHandlers.put(Trace.class, (ExecutableMethod method) -> {
+            Optional<String> uri = method.getValue(Action.class, String.class);
+            uri.ifPresent(val -> {
+                Route route = TRACE(resolveUri(val,
+                        method,
+                        uriNamingStrategy),
+                        method.getDeclaringType(),
+                        method.getMethodName(),
+                        method.getArgumentTypes());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
                 }
-        );
+            });
+        });
 
-        httpMethodsHandlers.put(Error.class, (Annotation ann, ExecutableMethod method) ->
-                status(((Error) ann).value(), method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes())
-        );
-    }
+        httpMethodsHandlers.put(Error.class, (ExecutableMethod method) -> {
+                    Optional<HttpStatus> value = method.getValue(Error.class, HttpStatus.class);
+                    value.ifPresent(httpStatus -> status(httpStatus, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes()));
+                }
 
-    private MediaType[] resolveConsumes(ExecutableMethod<?,?> method, String... consumes) {
-        if (consumes.length > 0) {
-            return Arrays.stream(consumes).map(MediaType::new).toArray(MediaType[]::new);
-        } else {
-            return Arrays.stream(method.findAnnotation(Consumes.class).map(Consumes::value).orElseGet(() -> {
-                Controller annotation = method.getDeclaringType().getAnnotation(Controller.class);
-                return annotation != null ? annotation.consumes() : new String[0];
-            })).map(MediaType::new).toArray(MediaType[]::new);
-        }
+        );
     }
 
     private String resolveUri(String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
@@ -213,13 +200,12 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @Override
-    public void process(ExecutableMethod<?, ?> method) {
-        Optional<Annotation> actionAnn = method.findAnnotationWithStereoType(Action.class);
-        actionAnn.ifPresent(annotation -> {
-                    Class<? extends Annotation> annotationClass = annotation.annotationType();
-                    BiFunction<Annotation, ExecutableMethod, Route> handler = httpMethodsHandlers.get(annotationClass);
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(Action.class);
+        actionAnn.ifPresent(annotationClass -> {
+                    Consumer<ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
                     if (handler != null) {
-                        handler.apply(annotation, method);
+                        handler.accept(method);
                     }
                 }
         );

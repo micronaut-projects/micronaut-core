@@ -22,7 +22,6 @@ import org.particleframework.inject.ExecutionHandle
 import org.particleframework.inject.ExecutableMethod
 import org.particleframework.inject.MethodExecutionHandle
 import org.particleframework.context.annotation.Executable
-import org.particleframework.stereotype.Controller
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -83,7 +82,7 @@ class ExecutableSpec extends Specification {
 @Singleton
 class BookService {}
 
-@Controller
+@Executable
 class BookController {
     @Inject
     BookService bookService

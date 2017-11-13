@@ -269,6 +269,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         else if(value instanceof String) {
             methodVisitor.push((String)value);
         }
+        else if(value instanceof Enum) {
+            Enum enumObject = (Enum) value;
+            Class declaringClass = enumObject.getDeclaringClass();
+            Type t = Type.getType(declaringClass);
+            methodVisitor.getStatic(t, value.toString(), t);
+//            methodVisitor.push(value.toString());
+        }
         else if(value.getClass().isArray()) {
             Object[] array = (Object[]) value;
             int len = array.length;

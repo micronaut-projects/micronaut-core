@@ -18,10 +18,13 @@ package org.particleframework.annotation.processing;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 
 import javax.inject.Qualifier;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -97,6 +100,15 @@ class AnnotationUtils {
         return annotationMetadataCache.get(element, element1 -> new JavaAnnotationMetadataBuilder(elementUtils).build(element1));
     }
 
+    /**
+     * Get the annotation metadata for the given element
+     * @param parent The parent
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata getAnnotationMetadata(Element parent, Element element) {
+        return new JavaAnnotationMetadataBuilder(elementUtils).buildForParent(parent, element);
+    }
 
     /**
      * Resolve the {@link Qualifier} to use for the given element
@@ -107,5 +119,19 @@ class AnnotationUtils {
         return getAnnotationMetadata(element).getAnnotationNameByStereotype(Qualifier.class).orElse(null);
     }
 
-
+    /**
+     * Check whether the method is annotated
+     * @param method The method
+     * @return True if it is annotated with non internal annotations
+     */
+    public boolean isAnnotated(ExecutableElement method) {
+        List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            String typeName = annotationMirror.getAnnotationType().toString();
+            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(typeName)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

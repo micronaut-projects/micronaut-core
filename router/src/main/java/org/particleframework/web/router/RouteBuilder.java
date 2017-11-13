@@ -22,8 +22,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.stereotype.Controller;
-import org.particleframework.web.router.annotation.Get;
+import org.particleframework.http.annotation.Controller;
 
 import java.util.List;
 

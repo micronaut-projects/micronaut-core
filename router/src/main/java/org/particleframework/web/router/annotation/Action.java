@@ -15,7 +15,9 @@
  */
 package org.particleframework.web.router.annotation;
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.http.annotation.Controller;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -25,7 +27,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>A meta annotation for HTTP {@link org.particleframework.stereotype.Controller} actions</p>
+ * <p>A meta annotation for HTTP {@link Controller} actions</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,4 +37,16 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE})
 @Executable
 public @interface Action {
+
+    /**
+     * @return The URI of the action if not specified inferred from the method name and arguments
+     */
+    String value() default "";
+
+    /**
+     * @return The URI of the PATCH route if not specified inferred from the method name and arguments
+     */
+    @AliasFor(member = "value")
+    String uri() default "";
+
 }

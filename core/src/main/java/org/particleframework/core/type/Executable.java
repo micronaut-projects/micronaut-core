@@ -15,8 +15,7 @@
  */
 package org.particleframework.core.type;
 
-import org.particleframework.core.annotation.AnnotationSource;
-import org.particleframework.core.type.Argument;
+import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated code</p>
@@ -27,7 +26,7 @@ import org.particleframework.core.type.Argument;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  */
-public interface Executable<T, R> extends AnnotationSource {
+public interface Executable<T, R> extends AnnotationMetadataProvider {
     /**
      * The required argument types
      */

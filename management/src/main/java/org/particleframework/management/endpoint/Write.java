@@ -15,7 +15,11 @@
  */
 package org.particleframework.management.endpoint;
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Consumes;
+import org.particleframework.http.annotation.Produces;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -44,10 +48,12 @@ public @interface Write {
     /**
      * @return The produced MediaType values. Defaults to application/json
      */
-    String[] produces() default {"application/json"};
+    @AliasFor(annotation = Produces.class, value = "value")
+    String[] produces() default MediaType.APPLICATION_JSON;
 
     /**
      * @return The consumed MediaType for request bodies Defaults to application/json
      */
-    String[] consumes() default {"application/json"};
+    @AliasFor(annotation = Consumes.class, value = "value")
+    String[] consumes() default MediaType.APPLICATION_JSON;
 }

@@ -13,31 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.context;
+package org.particleframework.inject.qualifiers;
 
-import org.particleframework.core.type.Argument;
+import org.particleframework.context.Qualifier;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.ConstructorInjectionPoint;
+import org.particleframework.inject.BeanType;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
+import java.util.stream.Stream;
 
 /**
- * <p>Calls a method that constructs the object</p>
+ * A {@link Qualifier} that qualifies based on a bean stereotype
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class MethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
-    public MethodConstructorInjectionPoint(BeanDefinition declaringComponent, Method method, boolean requiresReflection, Argument...arguments) {
-        super(declaringComponent, method, requiresReflection, arguments);
+class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
+
+    private final Class<? extends Annotation> stereotype;
+
+    public AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
+        this.stereotype = stereotype;
     }
 
     @Override
-    public Object invoke(Object... args) {
-        throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+        return candidates.filter(candidate -> candidate.getAnnotationMetadata().hasStereotype(stereotype));
     }
-
 }

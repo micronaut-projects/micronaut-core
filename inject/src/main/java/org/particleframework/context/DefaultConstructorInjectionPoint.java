@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.exceptions.BeanInstantiationException;
+import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.BeanDefinition;
@@ -18,7 +19,7 @@ import java.lang.reflect.Modifier;
  * @since 1.0
  */
 @Internal
-class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
+class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, AnnotationSource {
     private final Constructor<T> constructor;
     private final Argument[] arguments;
     private final BeanDefinition declaringComponent;
@@ -49,10 +50,6 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         return requiresReflection;
     }
 
-    @Override
-    public Class getDeclaringType() {
-        return getDeclaringBean().getType();
-    }
 
     @Override
     public Argument[] getArguments() {
@@ -89,7 +86,6 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         }
     }
 
-    @Override
     public AnnotatedElement[] getAnnotatedElements() {
         return new AnnotatedElement[] { constructor, constructor.getDeclaringClass() };
     }

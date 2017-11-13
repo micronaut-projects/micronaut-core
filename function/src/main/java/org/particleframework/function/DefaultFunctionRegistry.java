@@ -21,6 +21,7 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
@@ -118,7 +119,7 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<Functi
     }
 
     @Override
-    public void process(ExecutableMethod<?, ?> method) {
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         FunctionBean annotation = method.getAnnotation(FunctionBean.class);
         String functionId = annotation.value();
         Class<?> declaringType = method.getDeclaringType();

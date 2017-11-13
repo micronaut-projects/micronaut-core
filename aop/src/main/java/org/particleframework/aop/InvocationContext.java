@@ -15,6 +15,7 @@
  */
 package org.particleframework.aop;
 
+import org.particleframework.core.annotation.AnnotationMetadataDelegate;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.ArgumentValue;
 import org.particleframework.core.type.Executable;
@@ -32,7 +33,12 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InvocationContext<T, R> extends Executable<T, R>, MutableConvertibleValues<Object> {
+public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMetadataDelegate {
+
+    /**
+     * @return Attributes that can be stored within the context to pass between interceptors
+     */
+    MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The bound {@link ArgumentValue} instances

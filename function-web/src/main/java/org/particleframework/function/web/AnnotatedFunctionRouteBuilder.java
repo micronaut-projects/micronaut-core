@@ -26,6 +26,7 @@ import org.particleframework.function.DefaultFunctionRegistry;
 import org.particleframework.function.FunctionBean;
 import org.particleframework.function.FunctionRegistry;
 import org.particleframework.http.MediaType;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.web.router.DefaultRouteBuilder;
 import org.particleframework.web.router.UriRoute;
@@ -61,7 +62,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
 
     @SuppressWarnings("unchecked")
     @Override
-    public void process(ExecutableMethod<?, ?> method) {
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         FunctionBean annotation = method.getAnnotation(FunctionBean.class);
         String functionPath = annotation.value();
         Class<?> declaringType = method.getDeclaringType();
@@ -100,7 +101,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
                         .acceptAll();
                }
             }
-            ((ExecutableMethodProcessor)functionRegistry).process(method);
+            ((ExecutableMethodProcessor)functionRegistry).process(beanDefinition, method);
         }
     }
 

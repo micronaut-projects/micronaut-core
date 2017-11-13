@@ -56,40 +56,12 @@ class InterceptorChainSpec extends Specification {
 
         then:
         result == "good"
-        chain.get("invoked", List).get() == [1,2,3]
+        chain.getAttributes().get("invoked", List).get() == [1,2,3]
     }
 
     @CompileStatic
     private sort(Interceptor[] interceptors) {
         OrderUtil.sort((Interceptor[]) interceptors)
-    }
-
-    void "test interceptor chain interaction with Java code"() {
-        given:
-        String className = FooJava$InterceptedProxy.getName();
-        String classAsPath = className.replace('.', '/') + ".class";
-        InputStream stream = FooJava$Intercepted.getClassLoader().getResourceAsStream(classAsPath);
-        ClassReader reader = new ClassReader(stream)
-//        reader.accept(new TraceClassVisitor((ClassVisitor)null, new ASMifier(), new PrintWriter(System.out)), 0);
-
-        Interceptor[] interceptors = [new OneInterceptor(), new ArgMutating()]
-        def executionHandle = Mock(ExecutableMethod)
-        def handleLocator = Mock(ExecutionHandleLocator)
-        def arg = Mock(Argument)
-        executionHandle.getDeclaringType() >> InterceptorChainSpec
-        executionHandle.getMethodName() >> "test"
-
-        arg.getName() >> 'name'
-        arg.getType() >> String
-
-        executionHandle.getArguments() >> ([arg] as Argument[])
-
-        handleLocator.getExecutableMethod(*_) >> executionHandle
-
-        FooJava$Intercepted foo  = new FooJava$Intercepted(10,  interceptors )
-
-        expect:
-        foo.blah("test") == 'Name is changed'
     }
 
     static class ArgMutating implements Interceptor {
@@ -113,7 +85,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.put("invoked", [1])
+            context.getAttributes().put("invoked", [1])
             return context.proceed()
         }
     }
@@ -126,7 +98,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.get("invoked", List).get().add(2)
+            context.getAttributes().get("invoked", List).get().add(2)
             return context.proceed()
         }
     }
@@ -140,7 +112,7 @@ class InterceptorChainSpec extends Specification {
 
         @Override
         Object intercept(InvocationContext context) {
-            context.get("invoked", List).get().add(3)
+            context.getAttributes().get("invoked", List).get().add(3)
             return context.proceed()
         }
     }

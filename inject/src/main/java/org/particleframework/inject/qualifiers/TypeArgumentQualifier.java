@@ -17,7 +17,7 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanType;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -38,14 +38,14 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public Stream<BeanDefinition<T>> reduce(Class<T> beanType, Stream<BeanDefinition<T>> candidates) {
+    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate ->{
             if(beanType.isInterface()) {
-                Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getType(), beanType);
+                Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType);
                 return areTypesCompatible(classes);
             }
             else {
-                Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getType(), beanType);
+                Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType);
                 return areTypesCompatible(classes);
             }
         });

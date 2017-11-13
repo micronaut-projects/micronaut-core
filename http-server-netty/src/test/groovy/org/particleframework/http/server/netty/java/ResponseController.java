@@ -16,7 +16,7 @@
 package org.particleframework.http.server.netty.java;
 
 import org.particleframework.http.*;
-import org.particleframework.stereotype.Controller;
+import org.particleframework.http.annotation.Controller;
 import org.particleframework.web.router.annotation.Get;
 
 /**
