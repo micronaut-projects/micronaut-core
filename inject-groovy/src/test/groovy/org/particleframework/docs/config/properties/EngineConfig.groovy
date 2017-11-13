@@ -35,11 +35,11 @@ class EngineConfig {
 
     @Min(1L)
     int cylinders
-    CrankShaft crankShaft
+    CrankShaft crankShaft = new CrankShaft()
 
     @ConfigurationProperties('crank-shaft')
     static class CrankShaft { // <4>
-        Optional<Double> rodLength // <5>
+        Optional<Double> rodLength = Optional.empty() // <5>
     }
 }
 // end::class[]

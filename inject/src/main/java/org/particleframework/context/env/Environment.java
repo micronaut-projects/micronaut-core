@@ -1,5 +1,7 @@
 package org.particleframework.context.env;
 
+import org.particleframework.core.annotation.Nullable;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.core.convert.ConversionService;
@@ -12,10 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.net.URL;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -55,17 +54,6 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param pkg The package to add
      * @return This environment
      */
-    default Environment addPackage(Package pkg) {
-        addPackage(pkg.getName());
-        return this;
-    }
-
-    /**
-     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA or GORM)
-     *
-     * @param pkg The package to add
-     * @return This environment
-     */
     Environment addPackage(String pkg);
 
     /**
@@ -88,6 +76,29 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @return The application packages
      */
     Collection<String> getPackages();
+
+    /**
+     * Add a property source for the given map
+     * @param values The values
+     * @return This environment
+     */
+    default Environment addPropertySource(@Nullable Map<String, ? super Object> values) {
+        if(CollectionUtils.isNotEmpty(values)) {
+            return addPropertySource(PropertySource.of(values));
+        }
+        return this;
+    }
+
+    /**
+     * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA or GORM)
+     *
+     * @param pkg The package to add
+     * @return This environment
+     */
+    default Environment addPackage(Package pkg) {
+        addPackage(pkg.getName());
+        return this;
+    }
 
     /**
      * Scan the current environment for classes annotated with the given annotation. Use with care, repeated

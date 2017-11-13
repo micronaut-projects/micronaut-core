@@ -174,6 +174,25 @@ public interface BeanDefinitionVisitor {
                           Map<String, Object> genericTypes,
                           boolean isOptional);
 
+
+    /**
+     * Visits an injection point for a setter.
+     *
+     * @param declaringType      The declaring type
+     * @param qualifierType      The qualifier type
+     * @param requiresReflection Whether the setter requires reflection
+     * @param valueType          The field type
+     * @param setterName         The setter name
+     * @param genericTypes       The generic types
+     * @param isOptional         Whether the setter is optional
+     */
+    void visitSetterValue(Object declaringType,
+                          Object qualifierType,
+                          boolean requiresReflection,
+                          Object valueType,
+                          String setterName,
+                          Map<String, Object> genericTypes,
+                          boolean isOptional);
     /**
      * Visits a method injection point
      *

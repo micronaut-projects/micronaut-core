@@ -210,4 +210,29 @@ public class NameUtils {
         }
         return className;
     }
+
+    /**
+     * Is the given method name a valid setter name
+     * @param methodName The method name
+     * @return True if it is a valid setter name
+     */
+    public static boolean isSetterName(String methodName) {
+        int len = methodName.length();
+        if (len > 3 && methodName.startsWith("set")) {
+            if (Character.isUpperCase(methodName.charAt(3))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the equivalent property name for the given setter
+     * @param setterName The setter
+     * @return The property name
+     */
+    public static String getPropertyNameForSetter(String setterName) {
+        if(isSetterName(setterName)) {
+            return decapitalize( setterName.substring(3) );
+        }
+        return setterName;
+    }
 }

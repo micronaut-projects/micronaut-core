@@ -417,6 +417,34 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
             }
+            else {
+                if(isConfigurationPropertiesType && modelUtils.isPublic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
+                    BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
+                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
+                        writer.setValidated(true);
+                    }
+                    String qualifierRef = annotationUtils.resolveQualifier(method);
+                    TypeMirror valueType = method.getParameters().get(0).asType();
+                    Object fieldType = modelUtils.resolveTypeReference(valueType);
+                    Map<String, Object> genericTypes = Collections.emptyMap();
+                    TypeKind typeKind = valueType.getKind();
+                    if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
+                        genericTypes = genericUtils.resolveGenericTypes(valueType);
+                    }
+
+                    TypeElement declaringClass = modelUtils.classElementFor(method);
+
+                    writer.visitSetterValue(
+                            modelUtils.resolveTypeReference(declaringClass),
+                            qualifierRef,
+                            modelUtils.requiresReflection(method),
+                            fieldType,
+                            method.getSimpleName().toString(),
+                            genericTypes,
+                            isConfigurationPropertiesType);
+
+                }
+            }
 
             return null;
         }
@@ -805,17 +833,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             isConfigurationPropertiesType);
                 } else {
                     boolean isPrivate = modelUtils.isPrivate(field);
-                    boolean requiresReflection = isPrivate || isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());
+                    boolean requiresReflection = isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());
 
-                    Object declaringType = modelUtils.resolveTypeReference(declaringClass);
-                    String fieldName = field.getSimpleName().toString();
-                    writer.visitFieldValue(
-                            declaringType,
-                            qualifierRef,
-                            requiresReflection,
-                            fieldType,
-                            fieldName,
-                            isConfigurationPropertiesType);
+                    if(!isPrivate) {
+                        Object declaringType = modelUtils.resolveTypeReference(declaringClass);
+                        String fieldName = field.getSimpleName().toString();
+                        writer.visitFieldValue(
+                                declaringType,
+                                qualifierRef,
+                                requiresReflection,
+                                fieldType,
+                                fieldName,
+                                isConfigurationPropertiesType);
+
+                    }
                 }
             }
 

@@ -16,7 +16,7 @@ class MyConfig {
     List<URL> emptyList
     Map<String,Integer> flags
     Optional<URL> url
-    Optional<URL> anotherUrl
+    Optional<URL> anotherUrl = Optional.empty()
     Inner inner
 
     Integer getAnotherPort() {

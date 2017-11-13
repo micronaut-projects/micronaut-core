@@ -19,7 +19,7 @@ public class MyConfig {
     List<URL> emptyList;
     Map<String,Integer> flags;
     Optional<URL> url;
-    Optional<URL> anotherUrl;
+    Optional<URL> anotherUrl = Optional.empty();
     Inner inner;
     protected int defaultPort = 9999;
     protected Integer anotherPort;

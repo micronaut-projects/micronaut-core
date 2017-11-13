@@ -1,16 +1,12 @@
 package org.particleframework.inject.writer;
 
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.core.annotation.AnnotationMetadata;
-import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
@@ -104,65 +100,37 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             )
     );
 
-    private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.postConstruct(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.preDestroy(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Annotation.class, boolean.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.addInjectionPoint(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method ADD_FIELD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Annotation.class, boolean.class);
 
-    private static final Method ADD_METHOD_INJECTION_POINT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addInjectionPoint", Method.class, Argument[].class, boolean.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.addInjectionPoint(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method ADD_METHOD_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Method.class, Argument[].class, boolean.class);
 
-    private static final Method ADD_SETTER_INJECTION_POINT_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Method.class, Argument.class, boolean.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.addInjectionPoint(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method ADD_SETTER_INJECTION_POINT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addInjectionPoint", Field.class, Method.class, Argument.class, boolean.class);
 
-    private static final Method ADD_EXECUTABLE_METHOD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "addExecutableMethod", ExecutableMethod.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.addExecutableMethod(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method ADD_EXECUTABLE_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "addExecutableMethod", ExecutableMethod.class);
 
-    private static final Method GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getBeanForConstructorArgument", BeanResolutionContext.class, BeanContext.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getBeanForConstructorArgument(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getBeanForConstructorArgument", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_VALUE_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForConstructorArgument", BeanResolutionContext.class, BeanContext.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getBeanForConstructorArgument(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_VALUE_FOR_CONSTRUCTOR_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForConstructorArgument", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_BEAN_FOR_FIELD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getBeanForField", BeanResolutionContext.class, BeanContext.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getBeanForField(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_BEAN_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getBeanForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_VALUE_FOR_FIELD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getValueForField(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_OPTIONAL_VALUE_FOR_FIELD = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getValueForField(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method CONTAINS_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getBeanForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getBeanForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getBeanForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
 
-    private static final Method GET_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method GET_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
 
-    private static final Method GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getDeclaredMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class, Object.class).orElseThrow(() ->
-            new IllegalStateException("AbstractBeanDefinition.getValueForMethodArgument(..) method not found. Incompatible version of Particle on the classpath?")
-    );
+    private static final Method CONTAINS_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
+
+
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Annotation.class, boolean.class, Class.class, Constructor.class, Argument[].class
     ));
@@ -562,7 +530,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT);
+            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_BEAN_FOR_METHOD_ARGUMENT, false);
 
         }
         currentMethodIndex++;
@@ -582,9 +550,42 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         addInjectionPointForSetterInternal(qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, fieldName, setterName, fieldType, isOptional ? GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT : GET_VALUE_FOR_METHOD_ARGUMENT);
+            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
         }
         currentMethodIndex++;
+    }
+
+    @Override
+    public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object valueType, String setterName, Map<String, Object> genericTypes, boolean isOptional) {
+        Type declaringTypeRef = getTypeReference(declaringType);
+
+
+        // load 'this'
+        constructorVisitor.visitVarInsn(ALOAD, 0);
+
+        // 1st argument: The method
+        int currentMethodVar = pushGetMethodFromTypeCallLocalVariable(constructorVisitor, declaringTypeRef, setterName,Collections.singletonList(valueType));
+        String propertyName = NameUtils.getPropertyNameForSetter(setterName);
+        constructorVisitor.visitVarInsn(ALOAD, currentMethodVar);
+            pushBuildArgumentsForMethod(
+                    constructorVisitor,
+                    generatorAdapter -> generatorAdapter.visitVarInsn(ALOAD, currentMethodVar),
+                    Collections.singletonMap(propertyName, valueType),
+                    qualifierType != null ? Collections.singletonMap(propertyName, qualifierType) : Collections.emptyMap(),
+                    Collections.singletonMap(propertyName, genericTypes));
+
+        // 5th argument to addInjectionPoint: do we need reflection?
+        constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
+
+
+        // invoke add injection point method
+        pushInvokeMethodOnSuperClass(constructorVisitor, ADD_METHOD_INJECTION_POINT_METHOD);
+
+        if (!requiresReflection) {
+            resolveBeanOrValueForSetter(declaringTypeRef, setterName, valueType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
+        }
+        currentMethodIndex++;
+
     }
 
     @Override
@@ -831,7 +832,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // The constructor is a zero args constructor therefore there are no other local variables and "this" is stored in the 0 index.
         // The "currentFieldIndex" variable is used as a reference point for both the position of the local variable and also
         // for later on within the "build" method to in order to call "getBeanForField" with the appropriate index
-        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional ? GET_OPTIONAL_VALUE_FOR_FIELD : GET_VALUE_FOR_FIELD, isOptional);
+        visitFieldInjectionPointInternal(declaringType, qualifierType, requiresReflection, fieldType, fieldName, GET_VALUE_FOR_FIELD, isOptional);
     }
 
     private void buildFactoryMethodClassConstructor(
@@ -885,10 +886,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
 
-    private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isOptional) {
+    private void visitFieldInjectionPointInternal(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, Method methodToInvoke, boolean isValueOptional) {
         // ready this
-        MethodVisitor constructorVisitor = this.constructorVisitor;
-        constructorVisitor.visitVarInsn(ALOAD, 0);
+        GeneratorAdapter constructorVisitor = this.constructorVisitor;
+
+
+        constructorVisitor.loadThis();
 
         // lookup the Field instance from the declaring type
         Type declaringTypeRef = getTypeReference(declaringType);
@@ -909,33 +912,46 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // third argument is whether it requires reflection
-        constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
+        constructorVisitor.push(requiresReflection);
 
         // invoke addInjectionPoint method
         pushInvokeMethodOnSuperClass(constructorVisitor, ADD_FIELD_INJECTION_POINT_METHOD);
 
-
         GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
+
+        Label falseCondition = null;
+        if(isValueOptional) {
+            Label trueCondition = new Label();
+            falseCondition = new Label();
+            injectMethodVisitor.loadThis();
+            // 1st argument load BeanResolutionContext
+            injectMethodVisitor.loadArg(0);
+            // 2nd argument load BeanContext
+            injectMethodVisitor.loadArg(1);
+            // 3rd argument the field index
+            injectMethodVisitor.push(currentFieldIndex);
+
+            // invoke method containsValueForMethodArgument
+            injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(CONTAINS_VALUE_FOR_FIELD));
+            injectMethodVisitor.push(false);
+
+            injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ,falseCondition );
+            injectMethodVisitor.visitLabel(trueCondition);
+        }
+
         if (!requiresReflection) {
             // if reflection is not required then set the field automatically within the body of the "injectBean" method
 
-            boolean isOptionalValue = methodToInvoke == GET_OPTIONAL_VALUE_FOR_FIELD && isOptional;
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
             // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
             // load 'this'
-            injectMethodVisitor.visitVarInsn(ALOAD, 0);
+            injectMethodVisitor.loadThis();
             // 1st argument load BeanResolutionContext
             injectMethodVisitor.visitVarInsn(ALOAD, 1);
             // 2nd argument load BeanContext
             injectMethodVisitor.visitVarInsn(ALOAD, 2);
             // 3rd argument the field index
             injectMethodVisitor.push(currentFieldIndex);
-            // 4th argument the current value
-            if (isOptionalValue) {
-                injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
-                injectMethodVisitor.visitFieldInsn(GETFIELD, declaringTypeRef.getInternalName(), fieldName, getTypeDescriptor(fieldType));
-                pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
-            }
             // invoke getBeanForField
             pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
             // cast the return value to the correct type
@@ -947,7 +963,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // if reflection is required at reflective call
             pushInjectMethodForIndex(injectMethodVisitor, injectInstanceIndex, currentFieldIndex, "injectBeanField");
         }
+        if(falseCondition != null) {
+            injectMethodVisitor.visitLabel(falseCondition);
+        }
         currentFieldIndex++;
+
     }
 
     private int pushGetFieldFromTypeLocalVariable(MethodVisitor methodVisitor, Type declaringType, String fieldName) {
@@ -1175,9 +1195,32 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
-    private void resolveBeanOrValueForSetter(Type declaringTypeRef, String fieldName, String setterName, Object fieldType, Method resolveMethod) {
+    private void resolveBeanOrValueForSetter(Type declaringTypeRef, String setterName, Object fieldType, Method resolveMethod, boolean isValueOptional) {
+        GeneratorAdapter injectVisitor = this.injectMethodVisitor;
+
+        Label falseCondition = null;
+        if(isValueOptional) {
+            Label trueCondition = new Label();
+            falseCondition = new Label();
+            injectVisitor.loadThis();
+            // 1st argument load BeanResolutionContext
+            injectVisitor.loadArg(0);
+            // 2nd argument load BeanContext
+            injectVisitor.loadArg(1);
+            // 3rd argument the field index
+            injectVisitor.push(currentMethodIndex);
+            // 4th argument the argument index
+            injectVisitor.push(0);
+
+            // invoke method containsValueForMethodArgument
+            injectVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(CONTAINS_VALUE_FOR_METHOD_ARGUMENT));
+            injectVisitor.push(false);
+
+            injectVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ,falseCondition );
+            injectVisitor.visitLabel(trueCondition);
+        }
         // invoke the method on this injected instance
-        injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+        injectVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
         String methodDescriptor = getMethodDescriptor("void", Collections.singletonList(fieldType));
         // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
         // load 'this'
@@ -1189,21 +1232,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 3rd argument the field index
         injectMethodVisitor.push(currentMethodIndex);
         // 4th argument the argument index
-        injectMethodVisitor.push(0);
-        if (resolveMethod == GET_OPTIONAL_VALUE_FOR_METHOD_ARGUMENT) {
-            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
-            String getterName = "get" + NameUtils.capitalize(fieldName);
-            org.objectweb.asm.commons.Method getterMethod = org.objectweb.asm.commons.Method.getMethod(getTypeReference(fieldType).getClassName() + " " + getterName + "()");
-            injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL, declaringTypeRef.getInternalName(), getterName, getterMethod.getDescriptor(), false);
-            pushBoxPrimitiveIfNecessary(fieldType, injectMethodVisitor);
-        }
+        // 5th argument is the default value
+        injectVisitor.push(0);
         // invoke getBeanForField
-        pushInvokeMethodOnSuperClass(injectMethodVisitor, resolveMethod);
+        pushInvokeMethodOnSuperClass(injectVisitor, resolveMethod);
         // cast the return value to the correct type
-        pushCastToType(injectMethodVisitor, fieldType);
-        injectMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+        pushCastToType(injectVisitor, fieldType);
+        injectVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 declaringTypeRef.getInternalName(), setterName,
                 methodDescriptor, false);
+        if(falseCondition != null) {
+            injectVisitor.visitLabel(falseCondition);
+        }
     }
 
     static void pushInvokeMethodOnClass(MethodVisitor methodVisitor, String classMethodName, Class... classMethodArgs) {

@@ -20,6 +20,7 @@ import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
+import org.particleframework.inject.AbstractTypeElementSpec
 
 import javax.inject.Qualifier
 import javax.inject.Scope

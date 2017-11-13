@@ -1,7 +1,9 @@
 package org.particleframework.core.reflect;
 
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.exception.InvocationException;
+import org.particleframework.core.util.StringUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -61,6 +63,20 @@ public class ReflectionUtils {
             put(Short.class, Short.BYTES);
         }
     });
+
+    /**
+     * Is the method a setter
+     *
+     * @param name The method name
+     * @param args The arguments
+     * @return True if it is
+     */
+    public static boolean isSetter(String name, Class[] args) {
+        if (StringUtils.isEmpty(name) || args == null)return false;
+        if (args.length != 1) return false;
+
+        return NameUtils.isSetterName(name);
+    }
 
     /**
      * Obtain the wrapper type for the given primitive type

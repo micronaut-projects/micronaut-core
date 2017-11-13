@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject.annotation
+package org.particleframework.inject
 
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.util.Context
@@ -21,6 +21,8 @@ import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.inject.BeanConfiguration
 import org.particleframework.inject.BeanDefinition
+import org.particleframework.inject.annotation.AnnotationMetadataWriter
+import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder
 import org.particleframework.inject.writer.BeanConfigurationWriter
 import org.particleframework.support.Parser
 import spock.lang.Specification

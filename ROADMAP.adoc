@@ -6,10 +6,6 @@ The following features are a TODO list of things to do on Particle before launch
 
 ### Core Features
 
-#### Annotation Abstraction
-
-We need to produce compile time annotation metadata and get rid of `AnnotationUtils` which is a performance problem. At compile time we should produce an `AnnotationMetadata` interface that has the same features as the current `AnnotationSource` API but without the costly reflection based lookups. We should also support the equivalent of `AliasFor` in Spring.
-
 #### Generic Type Abstraction for Factory Beans
 
 This is currently not possible due to type erasure:

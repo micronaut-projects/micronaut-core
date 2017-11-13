@@ -2,6 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.annotation.AnnotationMetadata;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.event.BeanInitializedEventListener;
@@ -490,7 +491,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             if (isInject) {
                 value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
             } else {
-                value = getValueForField(resolutionContext, context, fieldInjectionPoint, null);
+                value = getValueForField(resolutionContext, context, index);
             }
             if (value != null) {
                 fieldInjectionPoint.set(bean, value);
@@ -518,27 +519,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) throws Throwable {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
-        return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, null);
-    }
-
-    /**
-     * Obtains a value for the given method argument
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param methodIndex       The method index
-     * @param argIndex          The argument index
-     * @return The value
-     */
-    @Internal
-    protected Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Object defaultValue) throws Throwable {
-        MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
-        Argument argument = injectionPoint.getArguments()[argIndex];
-        return getValueForMethodArgument(resolutionContext, context, injectionPoint, argument, defaultValue);
-    }
-
-
-    private Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument, Object defaultValue) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         if (context instanceof ApplicationContext) {
@@ -555,27 +535,19 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                     String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     Optional value = resolveValue(applicationContext, argument, argumentType, valString);
-                    if (!value.isPresent() && argumentType == Optional.class) {
-                        return value;
+                    if (argumentType == Optional.class) {
+                        return resolveOptionalObject(value);
                     } else {
-                        return value.orElseGet(() -> {
-                            if (valAnn == null && isConfigurationProperties()) {
-                                String cliOption = resolveCliOption(argumentName);
-                                if (cliOption != null) {
-                                    return resolveValue(applicationContext,
-                                            argument,
-                                            argumentType,
-                                            cliOption)
-                                            .orElse(defaultValue);
-                                } else {
-                                    return defaultValue;
-                                }
-                            } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
-                                throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
-                            } else {
-                                return null;
-                            }
-                        });
+                        if(value.isPresent()) {
+                            return value.get();
+                        }
+                        else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
+                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
+                        }
+                        else {
+                            return null;
+                        }
+
                     }
                 }
             } finally {
@@ -586,6 +558,54 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
         }
     }
+
+    private Object resolveOptionalObject(Optional value) {
+        if(!value.isPresent()) {
+            return value;
+        }
+        else {
+            Object convertedOptional = value.get();
+            if(convertedOptional instanceof Optional) {
+                return convertedOptional;
+            }
+            else {
+                return value;
+            }
+        }
+    }
+
+
+    /**
+     * Obtains a value for the given method argument
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param methodIndex       The method index
+     * @param argIndex          The argument index
+     * @return The value
+     */
+    @Internal
+    protected boolean containsValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) throws Throwable {
+        if(context instanceof ApplicationContext) {
+            MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
+            Argument argument = injectionPoint.getArguments()[argIndex];
+            String argumentName = argument.getName();
+            Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
+            Value valAnn = argument.getAnnotation(Value.class);
+            String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
+            ApplicationContext applicationContext = (ApplicationContext) context;
+            boolean result = applicationContext.containsProperty(valString);
+            if(!result && isConfigurationProperties()) {
+                String cliOption = resolveCliOption(argument.getName());
+                if(cliOption != null) {
+                    return applicationContext.containsProperty(cliOption);
+                }
+            }
+            return result;
+        }
+        return false;
+    }
+
 
     /**
      * Obtains a bean definition for the method at the given index and the argument at the given index
@@ -870,27 +890,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      */
     @Internal
     protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
-        return getValueForField(resolutionContext, context, fieldIndex, null);
-    }
-
-    /**
-     * Obtains a value for the given field from the bean context
-     * <p>
-     * Warning: this method is used by internal generated code and should not be called by user code.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The context
-     * @param fieldIndex        The index of the field
-     * @return The resolved bean
-     */
-    @Internal
-    protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Object defaultValue) throws Throwable {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-        return getValueForField(resolutionContext, context, injectionPoint, defaultValue);
-    }
-
-    @Internal
-    protected Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint, Object defaultValue) throws Throwable {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
         try {
@@ -906,29 +906,19 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
                     String valString = resolveValueString(
                             resolutionContext,
-                            context, declaringClass,
+                            context,
+                            declaringClass,
                             beanType,
                             injectionPoint.getName(),
                             valueAnn
                     );
                     Argument fieldArgument = injectionPoint.asArgument();
                     Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
-                    if (!value.isPresent() && fieldType == Optional.class) {
-                        return value;
+                    if (fieldType == Optional.class) {
+                        return resolveOptionalObject(value);
                     } else {
-                        if (isConfigurationProperties() && valueAnn == null) {
-                            return value.orElseGet(() -> {
-                                String cliOption = resolveCliOption(field.getName());
-                                if (cliOption != null) {
-                                    return resolveValue((ApplicationContext) context,
-                                            fieldArgument,
-                                            fieldType,
-                                            cliOption)
-                                            .orElse(defaultValue);
-                                } else {
-                                    return defaultValue;
-                                }
-                            });
+                        if (value.isPresent()) {
+                            return value.get();
                         } else {
                             return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
                         }
@@ -942,6 +932,55 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         }
     }
 
+
+    /**
+     * Obtains a value for the given field argument
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param fieldIndex The field index
+     * @return True if it does
+     */
+    @Internal
+    protected boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
+        if(context instanceof ApplicationContext) {
+
+            FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+            Value valueAnn = injectionPoint.getAnnotation(Value.class);
+            Class<?> beanType = injectionPoint.getDeclaringBean().getBeanType();
+            Class<?> declaringClass = injectionPoint.getField().getDeclaringClass();
+
+            String valString = resolveValueString(
+                    resolutionContext,
+                    context,
+                    declaringClass,
+                    beanType,
+                    injectionPoint.getName(),
+                    valueAnn
+            );
+            ApplicationContext applicationContext = (ApplicationContext) context;
+            boolean result = applicationContext.containsProperty(valString);
+            if(!result && isConfigurationProperties()) {
+                String cliOption = resolveCliOption(injectionPoint.getName());
+                if(cliOption != null) {
+                    return applicationContext.containsProperty(cliOption);
+                }
+            }
+            return result;
+        }
+        return false;
+    }
+
+    /**
+     * Resolves a bean for the given {@link FieldInjectionPoint}
+     *
+     * @param resolutionContext The {@link BeanResolutionContext}
+     * @param context The {@link BeanContext}
+     * @param injectionPoint The {@link FieldInjectionPoint}
+     * @return The resolved bean
+     * @throws DependencyInjectionException If the bean cannot be resolved
+     */
+    @Internal
     protected Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
         Class beanType = injectionPoint.getType();
         if (beanType.isArray()) {
@@ -1040,29 +1079,38 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, Argument<?> argument, Class argumentTYpe, String valString) {
+    private Optional resolveValue(ApplicationContext context, Argument<?> argument, Class argumentType, String valString) {
+        Optional value = resolveValueFromContext(context, argument, argumentType, valString);
+        if(!value.isPresent() && isConfigurationProperties()) {
+            String cliOption = resolveCliOption(argument.getName());
+            if (cliOption != null) {
+                return resolveValueFromContext(context,
+                        argument,
+                        argumentType,
+                        cliOption);
+            }
+        }
+        return value;
+    }
 
+    private Optional resolveValueFromContext(ApplicationContext context, Argument<?> argument, Class<?> argumentType, String valString) {
         int i = valString.indexOf(':');
         Object defaultValue = null;
         if (i > -1) {
-            Optional converted = context.getConversionService().convert(valString.substring(i + 1, valString.length()), argumentTYpe);
+            defaultValue = valString.substring(i + 1, valString.length());
             valString = valString.substring(0, i);
-            defaultValue = converted.orElse(null);
         }
         Optional value;
-
-
-        ConversionContext conversionContext = ConversionContext.of(argument);
-        value = context.getProperty(valString, (Class<?>) argumentTYpe, conversionContext);
+        ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+        value = context.getProperty(valString, argumentType, conversionContext);
 
         if (defaultValue != null && !value.isPresent()) {
-            value = Optional.of(defaultValue);
+            value = context.getConversionService().convert(defaultValue, conversionContext);
         }
         return value;
     }
 
     private String resolveValueString(BeanResolutionContext resolutionContext, BeanContext beanContext, Class<?> declaringClass, Class<?> beanType, String name, Value val) {
-
         String valString;
         if (val == null) {
             if (isConfigurationProperties()) {

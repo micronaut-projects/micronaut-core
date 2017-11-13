@@ -101,6 +101,9 @@ public class DefaultEnvironment implements Environment {
     @Override
     public Environment addPropertySource(PropertySource propertySource) {
         propertySources.add(propertySource);
+        if(isRunning()) {
+            processPropertySource(propertySource, false);
+        }
         return this;
     }
 
@@ -145,7 +148,8 @@ public class DefaultEnvironment implements Environment {
         }
         else {
             Map<String, Object> entries = resolveEntriesForKey(name, false);
-            return entries != null && entries.keySet().stream().anyMatch(key -> key.startsWith(name));
+            String subkeyPrefix = name + '.';
+            return entries != null && (entries.containsKey(name) || entries.keySet().stream().anyMatch(key -> key.startsWith(subkeyPrefix)));
         }
     }
 

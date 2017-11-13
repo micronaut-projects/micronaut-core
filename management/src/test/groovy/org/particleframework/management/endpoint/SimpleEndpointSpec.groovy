@@ -54,8 +54,8 @@ class SimpleEndpointSpec extends Specification {
         response.code() == HttpStatus.OK.code
         response.body().string() == 'test foo'
 
-//        cleanup:
-//        applicationContext.close()
+        cleanup:
+        applicationContext.close()
     }
 
     void "test read simple endpoint with argument"() {

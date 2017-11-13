@@ -41,8 +41,8 @@ public class HttpServerConfiguration {
     @ReadableBytes
     protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
     protected SslConfiguration ssl;
-    protected MultipartConfiguration multipart;
-    protected CorsConfiguration cors;
+    protected MultipartConfiguration multipart =  new MultipartConfiguration();
+    protected CorsConfiguration cors = new CorsConfiguration();
     /**
      * The default server port
      */
