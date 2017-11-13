@@ -20,8 +20,10 @@ include "spring"
 //include "runtime-green-lightning"
 include "test-suite"
 include "validation"
+include "jdbc"
 
 // configurations
 include "configurations/hibernate-validator"
 include "configurations/hibernate-gorm"
 include "configurations/jackson"
+include "configurations/jdbc-tomcat"

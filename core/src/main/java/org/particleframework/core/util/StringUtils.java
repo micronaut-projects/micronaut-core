@@ -33,7 +33,7 @@ public class StringUtils {
      * @param str The string
      * @return True if is
      */
-    public static boolean isEmpty(@Nullable  CharSequence str) {
+    public static boolean isEmpty(@Nullable CharSequence str) {
         return str == null || str.length() == 0;
     }
 
@@ -44,8 +44,28 @@ public class StringUtils {
      * @param str The string
      * @return True if is
      */
-    public static boolean isNotEmpty(@Nullable  CharSequence str) {
+    public static boolean isNotEmpty(@Nullable CharSequence str) {
         return !isEmpty(str);
+    }
+
+    /**
+     * Return whether the given string has non whitespace characters
+     *
+     * @param str The string
+     * @return True if is
+     */
+    public static boolean hasText(@Nullable CharSequence str) {
+        if (isEmpty(str)) {
+            return false;
+        }
+
+        int strLen = str.length();
+        for (int i = 0; i < strLen; i++) {
+            if (!Character.isWhitespace(str.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
