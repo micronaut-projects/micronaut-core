@@ -1199,11 +1199,14 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private void prependSuperClasses(StringBuilder prefix, Class<?> nestedType, BeanContext beanContext) {
         String configurationPropertiesPrefix;
+        String nestedConfigurationPropertiesPrefix = resolveConfigPropertiesValue(nestedType, beanContext);
         Class<?> supertype = nestedType.getSuperclass();
         while (supertype != null && supertype != Object.class) {
             configurationPropertiesPrefix = resolveConfigPropertiesValue(supertype, beanContext);
             if (configurationPropertiesPrefix != null) {
-                prefix.insert(0, configurationPropertiesPrefix + '.');
+                if (nestedConfigurationPropertiesPrefix == null || !nestedConfigurationPropertiesPrefix.equals(configurationPropertiesPrefix)) {
+                    prefix.insert(0, configurationPropertiesPrefix + '.');
+                }
             }
             supertype = supertype.getSuperclass();
         }
