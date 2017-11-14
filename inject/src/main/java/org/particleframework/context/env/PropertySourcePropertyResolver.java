@@ -233,11 +233,46 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 if(upperCaseUnderscoreSeperated) {
                     property = property.toLowerCase(Locale.ENGLISH).replace('_', '.');
                 }
-
-                Map entries = resolveEntriesForKey(property, true);
-                if(entries != null) {
-                    entries.put(property, value);
+                int i = property.indexOf('[');
+                if(i > -1 && property.endsWith("]")) {
+                    String index = property.substring(i + 1, property.length() -1);
+                    if(StringUtils.isNotEmpty(index)) {
+                        property = property.substring(0, i);
+                        Map entries = resolveEntriesForKey(property, true);
+                        Object v = entries.get(property);
+                        if(StringUtils.isDigits(index)) {
+                            Integer number = Integer.valueOf(index);
+                            List list;
+                            if(v instanceof List) {
+                                list = (List) v;
+                            }
+                            else {
+                                list = new ArrayList(number);
+                                entries.put(property, list);
+                            }
+                            list.add(number, value);
+                        }
+                        else {
+                            Map map;
+                            if(v instanceof Map) {
+                                map = (Map) v;
+                            }
+                            else {
+                                map = new LinkedHashMap(3);
+                                entries.put(property, map);
+                            }
+                            map.put(index, value);
+                        }
+                    }
                 }
+                else {
+
+                    Map entries = resolveEntriesForKey(property, true);
+                    if(entries != null) {
+                        entries.put(property, value);
+                    }
+                }
+
             }
         }
     }

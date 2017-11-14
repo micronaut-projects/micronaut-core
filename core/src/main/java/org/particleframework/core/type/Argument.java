@@ -18,6 +18,7 @@ package org.particleframework.core.type;
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Nullable;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.Named;
 
 import java.lang.annotation.Annotation;
@@ -125,7 +126,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      */
     static <T> Argument<T> of(
             Class<T> type) {
-        return new DefaultArgument<>(type, type.getSimpleName(), null, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), null, Argument.ZERO_ARGUMENTS);
     }
     /**
      * Creates a new argument for the given type and name

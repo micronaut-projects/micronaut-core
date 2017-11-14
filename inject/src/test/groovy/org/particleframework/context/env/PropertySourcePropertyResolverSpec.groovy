@@ -37,11 +37,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty(key, type).get() == expected
 
         where:
-        property      | value       | key            | type    | expected
-        'foo.bar'     | 'test'      | 'foo.bar'      | String  | 'test'
-        'foo.bar'     | '10'        | 'foo.bar'      | Integer | 10
-        'foo.bar'     | ['10']      | 'foo.bar[0]'   | Integer | 10
-        'foo.bar'     | [foo: '10'] | 'foo.bar[foo]' | Integer | 10
-        'foo.bar.baz' | '10'        | 'foo.bar[baz]' | Integer | 10
+        property       | value       | key            | type    | expected
+        'foo.bar'      | 'test'      | 'foo.bar'      | String  | 'test'
+        'foo.bar'      | '10'        | 'foo.bar'      | Integer | 10
+        'foo.bar'      | ['10']      | 'foo.bar[0]'   | Integer | 10
+        'foo.bar'      | [foo: '10'] | 'foo.bar[foo]' | Integer | 10
+        'foo.bar.baz'  | '10'        | 'foo.bar[baz]' | Integer | 10
+        'foo.bar[0]'   | '10'        | 'foo.bar[0]'   | Integer | 10
+        'foo.bar[0]'   | '10'        | 'foo.bar'      | List    | ['10']
+        'foo.bar[baz]' | '10'        | 'foo.bar[baz]' | Integer | 10
+        'foo.bar[baz]' | '10'        | 'foo.bar'      | Map     | [baz: '10']
     }
 }
