@@ -32,7 +32,7 @@ import java.util.concurrent.Executor
  */
 class RefreshScopeSpec extends Specification {
 
-    void "test fire refresh event that refreshes all beans"() {
+    void "test fire refresh event that refreshes all"() {
         given:
         System.setProperty("foo.bar", "test")
         ApplicationContext beanContext = ApplicationContext.build().start()
@@ -64,7 +64,40 @@ class RefreshScopeSpec extends Specification {
 
         cleanup:
         beanContext.stop()
+    }
 
+    void "test fire refresh event that refreshes environment diff"() {
+        given:
+        System.setProperty("foo.bar", "test")
+        ApplicationContext beanContext = ApplicationContext.build().start()
+
+        // override IO executor with synchronous impl
+        beanContext.registerSingleton(Executor.class, new Executor() {
+            @Override
+            void execute(Runnable command) {
+                command.run()
+            }
+        }, Qualifiers.byName(IOExecutorService.NAME))
+
+        when:
+        RefreshBean bean = beanContext.getBean(RefreshBean)
+
+        then:
+        bean.testValue() == 'test'
+        bean.testConfigProps() == 'test'
+
+        when:
+        System.setProperty("foo.bar", "bar")
+        Environment environment = beanContext.getEnvironment()
+        Map<String, Object> previousValues = environment.refreshAndDiff()
+        beanContext.publishEvent(new RefreshEvent(previousValues))
+
+        then:
+        bean.testValue() == 'bar'
+        bean.testConfigProps() == 'bar'
+
+        cleanup:
+        beanContext.stop()
     }
 
     @Refreshable
@@ -88,8 +121,39 @@ class RefreshScopeSpec extends Specification {
         }
     }
 
+    @Refreshable("foo")
+    static class RefreshBean2 {
+
+        final MyConfig config
+        final SecondConfig secondConfig
+        @Value('foo.bar')
+        String foo
+
+        RefreshBean2(MyConfig config, SecondConfig secondConfig1) {
+            this.config = config
+            this.secondConfig = secondConfig1
+        }
+
+        String testValue() {
+            return foo
+        }
+
+        String testConfigProps() {
+            return config.bar
+        }
+
+        String testSecondConfigProps() {
+            return config.bar
+        }
+    }
+
     @ConfigurationProperties('foo')
     static class MyConfig {
         String bar
+    }
+
+    @ConfigurationProperties('second')
+    static class SecondConfig {
+        String bar = "default"
     }
 }

@@ -37,7 +37,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
-    private final Map<String,Object>[] catalog = new Map[57];
+    protected final Map<String,Object>[] catalog = new Map[57];
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}

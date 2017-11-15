@@ -154,8 +154,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment stop() {
         running.set(false);
+        synchronized (catalog) {
+            for (int i = 0; i < catalog.length; i++) {
+                catalog[i] = null;
+            }
+        }
         return this;
     }
+
+    @Override
+    public Map<String, Object> refreshAndDiff() {
+        Map<String,Object>[] copiedCatalog = copyCatalog();
+        refresh();
+        return diffCatalog(copiedCatalog, catalog);
+    }
+
+
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
@@ -184,4 +198,60 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return new CachingClassPathAnnotationScanner(classLoader);
     }
 
+    private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        for (int i = 0; i < original.length; i++) {
+            Map<String, Object> map = original[i];
+            Map<String, Object> newMap = newCatalog[i];
+            boolean hasNew = newMap != null;
+            boolean hasOld = map != null;
+            if(!hasOld && hasNew) {
+                changes.putAll(newMap);
+            }
+            else {
+                if(!hasNew && hasOld) {
+                    changes.putAll(map);
+                }
+                else if(hasOld && hasNew) {
+                    diffMap(map, newMap, changes);
+                }
+            }
+        }
+        return changes;
+    }
+
+    private void diffMap(Map<String, Object> map, Map<String, Object> newMap, Map<String, Object> changes) {
+        for (Map.Entry<String, Object> entry : newMap.entrySet()) {
+            String key = entry.getKey();
+            Object newValue = entry.getValue();
+            if(!map.containsKey(key)) {
+                changes.put(key, newValue);
+            }
+            else {
+                Object oldValue = map.get(key);
+                boolean hasNew = newValue != null;
+                boolean hasOld = oldValue != null;
+                if(hasNew && !hasOld) {
+                    changes.put(key, null);
+                }
+                else if(hasOld && !hasNew) {
+                    changes.put(key, oldValue);
+                }
+                else if(hasNew && hasOld && !newValue.equals(oldValue)) {
+                    changes.put(key, oldValue);
+                }
+            }
+        }
+    }
+
+    private Map<String, Object>[] copyCatalog() {
+        Map<String, Object>[] newCatalog = new Map[catalog.length];
+        for (int i = 0; i < catalog.length; i++) {
+            Map<String, Object> entry = catalog[i];
+            if(entry != null) {
+                newCatalog[i] = new LinkedHashMap<>(entry);
+            }
+        }
+        return newCatalog;
+    }
 }

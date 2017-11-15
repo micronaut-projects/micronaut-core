@@ -78,6 +78,13 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     Collection<String> getPackages();
 
     /**
+     * Refresh the environment from the list of {@link PropertySource} instances and return a diff of the changes
+     *
+     * @return The values that changed
+     */
+    Map<String, Object> refreshAndDiff();
+
+    /**
      * Add a property source for the given map
      * @param values The values
      * @return This environment

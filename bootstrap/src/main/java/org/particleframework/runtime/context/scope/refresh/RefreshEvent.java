@@ -19,6 +19,7 @@ import org.particleframework.context.event.ApplicationEvent;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -29,16 +30,16 @@ import java.util.Set;
  */
 public class RefreshEvent extends ApplicationEvent {
 
-    static final Collection<String> ALL_KEYS = Collections.singletonList("*");
+    static final Map<String, Object> ALL_KEYS = Collections.singletonMap("all", "*");
 
     /**
      * Constructs a prototypical Event.
      *
-     * @param source The configuration keys to be refreshed
+     * @param changes The keys that changed and the previous values of said keys
      * @throws IllegalArgumentException if source is null.
      */
-    public RefreshEvent(Set<String> source) {
-        super(source);
+    public RefreshEvent(Map<String, Object> changes) {
+        super(changes);
     }
 
     /**
@@ -51,7 +52,7 @@ public class RefreshEvent extends ApplicationEvent {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Collection<String> getSource() {
-        return (Collection<String>) super.getSource();
+    public Map<String, Object> getSource() {
+        return (Map<String, Object>) super.getSource();
     }
 }

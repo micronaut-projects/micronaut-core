@@ -19,6 +19,7 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanRegistration;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.context.annotation.ConfigurationReader;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.core.util.ArrayUtils;
@@ -36,7 +37,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -103,17 +103,14 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @Override
     public void onApplicationEvent(RefreshEvent event) {
         executorService.execute(() -> {
-            Collection<String> keys = event.getSource();
-            if(keys == RefreshEvent.ALL_KEYS) {
+            Map<String, Object> changes = event.getSource();
+            if(changes == RefreshEvent.ALL_KEYS) {
                 disposeOfAllBeans();
-                Collection<BeanRegistration<?>> registrations =
-                        beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
-                for (BeanRegistration<?> registration : registrations) {
-                    beanContext.refreshBean(registration.getIdentifier());
-                }
+                refreshAllConfigurationProperties();
             }
             else {
-                disposeOfBeanSubset(keys);
+                disposeOfBeanSubset(changes.keySet());
+                refreshSubsetOfConfigurationProperties(changes.keySet());
             }
         });
 
@@ -127,7 +124,30 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         return readWriteLock;
     }
 
-    protected void disposeOfBeanSubset(Collection<String> keys) {
+    private void refreshSubsetOfConfigurationProperties(Set<String> keySet) {
+        Collection<BeanRegistration<?>> registrations =
+                beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+        for (BeanRegistration<?> registration : registrations) {
+            BeanDefinition<?> definition = registration.getBeanDefinition();
+            Optional<String> value = definition.getValue(ConfigurationReader.class, String.class);
+            if(value.isPresent()) {
+                String configPrefix = value.get();
+                if(keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
+                    beanContext.refreshBean(registration.getIdentifier());
+                }
+            }
+        }
+    }
+
+    private void refreshAllConfigurationProperties() {
+        Collection<BeanRegistration<?>> registrations =
+                beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+        for (BeanRegistration<?> registration : registrations) {
+            beanContext.refreshBean(registration.getIdentifier());
+        }
+    }
+
+    private void disposeOfBeanSubset(Collection<String> keys) {
         for (String beanKey : refreshableBeans.keySet()) {
             BeanRegistration beanRegistration = refreshableBeans.get(beanKey);
             BeanDefinition definition = beanRegistration.getBeanDefinition();
@@ -154,7 +174,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         }
     }
 
-    protected void disposeOfAllBeans() {
+    private void disposeOfAllBeans() {
         for (String key : refreshableBeans.keySet()) {
             disposeOfBean(key);
         }
