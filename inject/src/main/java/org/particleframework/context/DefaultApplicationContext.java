@@ -62,6 +62,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return (ApplicationContext) super.registerSingleton(beanType, singleton);
     }
 
+    @Override
+    public <T> ApplicationContext registerSingleton(Class<T> beanType, T singleton, Qualifier<T> qualifier) {
+        return (ApplicationContext) super.registerSingleton(beanType, singleton, qualifier);
+    }
+
     /**
      * Creates the default environment for the given environment name
      *

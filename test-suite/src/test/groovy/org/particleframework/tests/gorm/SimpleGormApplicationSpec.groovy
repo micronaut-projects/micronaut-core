@@ -22,6 +22,7 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.http.annotation.Controller
+import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
 /**
@@ -33,31 +34,33 @@ class SimpleGormApplicationSpec extends Specification {
 
     void "test Particle server running"() {
         when:
-        System.setProperty(Settings.SETTING_DB_CREATE, "create-drop")
-        int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = ParticleApplication.run([PersonController] as Class[],'-port',newPort.toString())
-
+        EmbeddedServer server = ApplicationContext.build(PersonController)
+                .environment({ env -> env.addPropertySource([(Settings.SETTING_DB_CREATE): "create-drop"]) })
+                .start()
+                .getBean(EmbeddedServer)
+                .start()
         then:
-        new URL("http://localhost:$newPort/people").getText(readTimeout:3000) == "People: []"
+        new URL(server.URL, "/people").getText(readTimeout: 3000) == "People: []"
 
         cleanup:
-        System.setProperty(Settings.SETTING_DB_CREATE, "")
-        applicationContext?.stop()
+        server?.stop()
     }
 
     void "test Particle server running again"() {
         when:
-        System.setProperty(Settings.SETTING_DB_CREATE, "create-drop")
-        int newPort = SocketUtils.findAvailableTcpPort()
-        ApplicationContext applicationContext = ParticleApplication.run([PersonController] as Class[],'-port',newPort.toString())
+        EmbeddedServer server = ApplicationContext.build(PersonController)
+                .environment({ env -> env.addPropertySource([(Settings.SETTING_DB_CREATE): "create-drop"]) })
+                .start()
+                .getBean(EmbeddedServer)
+                .start()
 
 
         then:
-        new URL("http://localhost:$newPort/people").getText(readTimeout:3000) == "People: []"
+        new URL(server.URL, "/people").getText(readTimeout: 3000) == "People: []"
 
         cleanup:
         System.setProperty(Settings.SETTING_DB_CREATE, "")
-        applicationContext?.stop()
+        server?.stop()
     }
 
 

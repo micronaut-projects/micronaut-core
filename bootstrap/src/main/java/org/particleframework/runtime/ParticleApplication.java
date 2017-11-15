@@ -64,7 +64,14 @@ public class ParticleApplication {
         CommandLine commandLine = CommandLine.parse(args);
 
         environments.addAll( deduceEnvironments() );
-        ApplicationContext applicationContext = ApplicationContext.build(applicationClass.getClassLoader(), environments.toArray(new String[environments.size()]));
+        String[] envArray = this.environments.toArray(new String[this.environments.size()]);
+        ApplicationContext applicationContext;
+        if(applicationClass != null) {
+            applicationContext = ApplicationContext.build(applicationClass, envArray);
+        }
+        else {
+            applicationContext = ApplicationContext.build(ApplicationContext.class.getClassLoader(), envArray);
+        }
         applicationContext.registerSingleton(commandLine);
 
         // Add packages to scan
@@ -102,12 +109,12 @@ public class ParticleApplication {
                         LOG.info("Startup completed in {}ms. Server Running: ", took, embeddedServer.getURL());
                     }
                 } catch (Throwable e) {
-                    handleStartupException(environments, e);
+                    handleStartupException(this.environments, e);
                 }
             }));
             return applicationContext;
         } catch (Throwable e) {
-            handleStartupException(environments, e);
+            handleStartupException(this.environments, e);
             return null;
         }
     }

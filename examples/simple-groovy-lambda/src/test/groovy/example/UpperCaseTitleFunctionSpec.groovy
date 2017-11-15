@@ -40,7 +40,6 @@ class UpperCaseTitleFunctionSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
-        String url = "http://localhost:$server.port"
         OkHttpClient client = new OkHttpClient()
         def data = '{"title":"The Stand"}'
         def body = RequestBody.create(
@@ -48,7 +47,7 @@ class UpperCaseTitleFunctionSpec extends Specification {
                 data)
 
         def request = new Request.Builder()
-                .url("$url/upper-case-title")
+                .url(new URL(server.URL, "/upper-case-title"))
                 .post(body)
 
         when:
