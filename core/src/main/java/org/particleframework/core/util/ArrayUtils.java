@@ -47,4 +47,14 @@ public class ArrayUtils {
 
         return c;
     }
+
+    /**
+     * Whether the given array is empty
+     *
+     * @param array The array
+     * @return True if it is
+     */
+    public static boolean isEmpty(Object[] array) {
+        return array == null || array.length == 0;
+    }
 }

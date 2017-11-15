@@ -16,8 +16,10 @@
 package org.particleframework.context;
 
 import org.particleframework.context.event.ApplicationEventPublisher;
+import org.particleframework.inject.BeanIdentifier;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * <p>The core BeanContext abstraction which which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
@@ -106,6 +108,16 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     <T> T destroyBean(Class<T> beanType);
 
     /**
+     * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
+     *
+     * <p>Note that if the bean was produced by a {@link org.particleframework.context.annotation.Factory} then this method will refresh the factory too</p>
+     *
+     * @param identifier The {@link BeanIdentifier}
+     * @return An {@link Optional} of the instance if it exists for the given registration
+     */
+    <T> Optional<T> refreshBean(BeanIdentifier identifier);
+
+    /**
      * @return The class loader used by this context
      */
     ClassLoader getClassLoader();
@@ -154,4 +166,6 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     static BeanContext build(ClassLoader classLoader) {
         return new DefaultBeanContext(classLoader);
     }
+
+
 }

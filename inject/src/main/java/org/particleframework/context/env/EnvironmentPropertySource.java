@@ -15,31 +15,30 @@
  */
 package org.particleframework.context.env;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Map;
-import java.util.Properties;
-
 /**
+ * Loads properties from environment variables via {@link System#getenv()}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class PropertiesPropertySourceLoader extends AbstractPropertySourceLoader {
+public class EnvironmentPropertySource extends MapPropertySource {
 
-    public static final String PROPERTIES_EXTENSION = "properties";
+    /**
+     * The position of the loader
+     */
+    public static final int POSITION = SystemPropertiesPropertySource.POSITION - 100;
 
-
-    @Override
-    protected String getFileExtension() {
-        return PROPERTIES_EXTENSION;
+    public EnvironmentPropertySource() {
+        super(System.getenv());
     }
 
     @Override
-    protected void processInput(InputStream input, Map<String, Object> finalMap) throws IOException {
-        Properties props = new Properties();
-        props.load(input);
-        for (Map.Entry<Object, Object> entry : props.entrySet()) {
-            finalMap.put(entry.getKey().toString(), entry.getValue());
-        }
+    public int getOrder() {
+        return POSITION;
+    }
+
+    @Override
+    public boolean hasUpperCaseKeys() {
+        return true;
     }
 }

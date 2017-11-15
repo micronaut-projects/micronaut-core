@@ -58,22 +58,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         );
         this.classLoader = classLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
-
-        SoftServiceLoader<PropertySourceLoader> propertySources = SoftServiceLoader.load(PropertySourceLoader.class);
-        for (SoftServiceLoader.Service<PropertySourceLoader> loader : propertySources) {
-            if(loader.isPresent()) {
-                Optional<PropertySource> propertySource = loader.load().load(this);
-                propertySource.ifPresent(this::addPropertySource);
-
-            }
-        }
-        addPropertySource(new MapPropertySource(System.getProperties()));
-        addPropertySource(new MapPropertySource(System.getenv()) {
-            @Override
-            public boolean hasUpperCaseKeys() {
-                return true;
-            }
-        });
     }
 
     @Override
@@ -144,6 +128,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment start() {
         if(running.compareAndSet(false, true)) {
             ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
+            SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = SoftServiceLoader.load(PropertySourceLoader.class);
+            for (SoftServiceLoader.Service<PropertySourceLoader> loader : propertySourceLoaders) {
+                if(loader.isPresent()) {
+                    Optional<PropertySource> propertySource = loader.load().load(this);
+                    propertySource.ifPresent(propertySources::add);
+
+                }
+            }
+            propertySources.add(new SystemPropertiesPropertySource());
+            propertySources.add(new EnvironmentPropertySource());
             OrderUtil.sort(propertySources);
             for (PropertySource propertySource : propertySources) {
                 processPropertySource(propertySource, propertySource.hasUpperCaseKeys());

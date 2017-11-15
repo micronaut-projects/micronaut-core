@@ -22,6 +22,7 @@ import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.runtime.context.env.CommandLinePropertySource;
 import org.particleframework.runtime.exceptions.ApplicationStartupException;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -77,10 +78,8 @@ public class ParticleApplication {
             environment.addPackage(aPackage);
         }
         // Add the system properties passed via the command line
-        environment.addPropertySource(new MapPropertySource(commandLine.getSystemProperties()));
+        environment.addPropertySource(new CommandLinePropertySource(commandLine));
 
-        // add the undeclared options
-        environment.addPropertySource(new MapPropertySource(commandLine.getUndeclaredOptions()));
 
         for (Map<String, Object> propertyMap : propertyMaps) {
             environment.addPropertySource(new MapPropertySource(propertyMap));
