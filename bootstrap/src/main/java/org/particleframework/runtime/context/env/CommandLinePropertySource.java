@@ -17,6 +17,7 @@ package org.particleframework.runtime.context.env;
 
 import org.particleframework.context.env.AbstractPropertySourceLoader;
 import org.particleframework.context.env.MapPropertySource;
+import org.particleframework.context.env.SystemPropertiesPropertySource;
 import org.particleframework.core.cli.CommandLine;
 
 import java.util.Collections;
@@ -31,7 +32,7 @@ import java.util.Map;
  */
 public class CommandLinePropertySource extends MapPropertySource {
 
-    public static final int POSITION = AbstractPropertySourceLoader.DEFAULT_POSITION - 100;
+    public static final int POSITION = SystemPropertiesPropertySource.POSITION + 100;
 
     public CommandLinePropertySource(CommandLine commandLine) {
         super(resolveValues(commandLine));

@@ -133,7 +133,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 if(loader.isPresent()) {
                     Optional<PropertySource> propertySource = loader.load().load(this);
                     propertySource.ifPresent(propertySources::add);
-
                 }
             }
             propertySources.add(new SystemPropertiesPropertySource());

@@ -24,6 +24,49 @@ import spock.lang.Specification
  * @since 1.0
  */
 class JsonPropertySourceLoaderSpec extends Specification {
+    void "test json env property source loader"() {
+        given:
+        EnvJsonPropertySourceLoader loader = new EnvJsonPropertySourceLoader() {
+            @Override
+            protected String getEnvValue() {
+                return '''\
+{ "hibernate":
+    { "cache":
+        { "queries": false }
+    },
+  "dataSource":
+    { "pooled": true,
+      "driverClassName": "org.h2.Driver",
+      "username": "sa",
+      "password": "", 
+      "something": [1,2]  
+    }
+}   
+'''
+            }
+        }
+
+        when:
+        Environment env = Mock(Environment)
+        env.isPresent(_) >> true
+        env.getActiveNames() >> ([] as Set)
+
+        def result = loader.load(env)
+
+        then:
+        result.isPresent()
+
+        when:
+        PropertySource propertySource = result.get()
+
+        then:
+        propertySource.get("hibernate.cache.queries") == false
+        propertySource.get("dataSource.pooled") == true
+        propertySource.get("dataSource.password") == ''
+        propertySource.get("dataSource.something") == [1,2]
+
+
+    }
 
     void "test json property source loader"() {
         given:

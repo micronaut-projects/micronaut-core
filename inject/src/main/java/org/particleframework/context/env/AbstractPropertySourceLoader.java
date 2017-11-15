@@ -71,7 +71,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     protected abstract String getFileExtension();
 
     private void loadProperties(Environment environment, String fileName, Map<String, Object> finalMap) {
-        Optional<InputStream> config = environment.getResourceAsStream(fileName);
+        Optional<InputStream> config = readInput(environment, fileName);
         if(config.isPresent()) {
             try(InputStream input = config.get()) {
                 processInput(input, finalMap);
@@ -80,6 +80,10 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 throw new ValueException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
             }
         }
+    }
+
+    protected Optional<InputStream> readInput(Environment environment, String fileName) {
+        return environment.getResourceAsStream(fileName);
     }
 
     protected abstract void processInput(InputStream input, Map<String, Object> finalMap) throws IOException;
