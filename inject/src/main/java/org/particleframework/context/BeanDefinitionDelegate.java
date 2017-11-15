@@ -76,7 +76,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary() || (Boolean)attributes.getOrDefault(PRIMARY_ATTRIBUTE, false);
+        return definition.isPrimary() || get(PRIMARY_ATTRIBUTE, Boolean.class).orElse(false);
     }
 
     @Override

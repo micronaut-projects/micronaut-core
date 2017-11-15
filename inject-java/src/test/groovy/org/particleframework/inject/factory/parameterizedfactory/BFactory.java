@@ -41,7 +41,6 @@ public class BFactory {
         name = name.toUpperCase();
     }
 
-    @Bean
     @Singleton
     B get() {
         assert postConstructCalled : "post construct should have been called";

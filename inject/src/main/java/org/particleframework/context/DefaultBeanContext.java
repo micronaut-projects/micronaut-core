@@ -1037,11 +1037,6 @@ public class DefaultBeanContext implements BeanContext {
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         } else {
-
-            if (candidates.size() == 1) {
-                return candidates.iterator().next();
-            }
-
             BeanDefinition<T> definition = null;
             Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
             if (exactMatches.size() == 1) {

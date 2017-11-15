@@ -287,7 +287,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         return stereotypes;
     }
 
-    private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
+    public Map<String, Map<CharSequence, Object>> getAllAnnotations() {
         Map<String, Map<CharSequence, Object>>  annotations = this.allAnnotations;
         if (annotations == null) {
             this.allAnnotations = annotations = new HashMap<>(3);
