@@ -68,5 +68,9 @@ public class MethodInterceptorChain<T, R> extends InterceptorChain<T,R> implemen
         return executionHandle.getDeclaringType();
     }
 
-
+    @Override
+    public String toString() {
+        return executionHandle.toString();
+    }
 }
+

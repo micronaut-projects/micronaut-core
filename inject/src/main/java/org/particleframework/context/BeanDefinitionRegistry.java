@@ -46,6 +46,7 @@ public interface BeanDefinitionRegistry {
      *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
+     * @param type the bean type
      * @param singleton The singleton bean
      *
      * @return This bean context
@@ -53,6 +54,19 @@ public interface BeanDefinitionRegistry {
     <T> BeanDefinitionRegistry registerSingleton(Class<T> type, T singleton);
 
 
+    /**
+     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
+     *
+     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by invoking any {@link javax.annotation.PostConstruct} hooks.</p>
+     *
+     * <p>If no bean definition data is found the bean is registered as is.</p>
+     *
+     * @param type The bean type
+     * @param singleton The singleton bean
+     * @param qualifier The bean qualifier
+     * @return This bean context
+     */
+    <T> BeanDefinitionRegistry registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier);
     /**
      * Obtain a bean configuration by name
      *
@@ -165,4 +179,11 @@ public interface BeanDefinitionRegistry {
      * @return The bean definitions
      */
     Collection<BeanDefinition<?>> getBeanDefinitions(Qualifier<Object> qualifier);
+
+    /**
+     * Find active {@link javax.inject.Singleton} beans for the given qualifier
+     * @param qualifier The qualifier
+     * @return The beans
+     */
+    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
 }

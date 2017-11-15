@@ -28,6 +28,7 @@ public class PropertiesPropertySourceLoader extends AbstractPropertySourceLoader
 
     public static final String PROPERTIES_EXTENSION = "properties";
 
+
     @Override
     protected String getFileExtension() {
         return PROPERTIES_EXTENSION;

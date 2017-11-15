@@ -47,6 +47,9 @@ public @interface Controller {
      */
     String value() default "";
 
+    @AliasFor(member = "value")
+    String uri() default "";
+
     /**
      * @return The produced MediaType values. Defaults to application/json
      */

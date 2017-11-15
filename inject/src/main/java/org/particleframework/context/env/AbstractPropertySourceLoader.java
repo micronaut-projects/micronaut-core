@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.env;
 
+import org.particleframework.core.order.Ordered;
 import org.particleframework.core.value.ValueException;
 import org.particleframework.core.util.Toggleable;
 
@@ -26,10 +27,20 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
+ * An abstract implementation of the {@link PropertySourceLoader} interface
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AbstractPropertySourceLoader implements PropertySourceLoader, Toggleable {
+public abstract class AbstractPropertySourceLoader implements PropertySourceLoader, Toggleable, Ordered{
+
+    public static final int DEFAULT_POSITION = EnvironmentPropertySource.POSITION - 100;
+
+    @Override
+    public int getOrder() {
+        return DEFAULT_POSITION;
+    }
+
     @Override
     public Optional<PropertySource> load(String name, Environment environment) {
         if(isEnabled()) {
@@ -41,7 +52,12 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 loadProperties(environment, name + "-"+ activeName +"." + ext, finalMap);
             }
             if(!finalMap.isEmpty()) {
-                MapPropertySource newPropertySource = new MapPropertySource(finalMap);
+                MapPropertySource newPropertySource = new MapPropertySource(finalMap) {
+                    @Override
+                    public int getOrder() {
+                        return AbstractPropertySourceLoader.this.getOrder();
+                    }
+                };
                 return Optional.of(newPropertySource);
             }
         }
@@ -55,7 +71,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     protected abstract String getFileExtension();
 
     private void loadProperties(Environment environment, String fileName, Map<String, Object> finalMap) {
-        Optional<InputStream> config = environment.getResourceAsStream(fileName);
+        Optional<InputStream> config = readInput(environment, fileName);
         if(config.isPresent()) {
             try(InputStream input = config.get()) {
                 processInput(input, finalMap);
@@ -64,6 +80,10 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 throw new ValueException("I/O exception occurred reading ["+fileName+"]: " + e.getMessage(), e);
             }
         }
+    }
+
+    protected Optional<InputStream> readInput(Environment environment, String fileName) {
+        return environment.getResourceAsStream(fileName);
     }
 
     protected abstract void processInput(InputStream input, Map<String, Object> finalMap) throws IOException;

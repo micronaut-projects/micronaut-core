@@ -13,33 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.server;
-
-import org.particleframework.context.LifeCycle;
-
-import java.net.URL;
+package org.particleframework.context.env;
 
 /**
- * <p>An EmbeddedServer is a general abstraction to manage the lifecycle of any server implementation within
- * a running Particle application</p>
+ * Loads properties from environment variables via {@link System#getenv()}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
+public class EnvironmentPropertySource extends MapPropertySource {
 
     /**
-     * @return The port exposed by the server
+     * The position of the loader
      */
-    int getPort();
+    public static final int POSITION = SystemPropertiesPropertySource.POSITION - 100;
 
-    /**
-     * @return The host of the server
-     */
-    String getHost();
+    public EnvironmentPropertySource() {
+        super(System.getenv());
+    }
 
-    /**
-     * @return The full URL to the server
-     */
-    URL getURL();
+    @Override
+    public int getOrder() {
+        return POSITION;
+    }
+
+    @Override
+    public boolean hasUpperCaseKeys() {
+        return true;
+    }
 }

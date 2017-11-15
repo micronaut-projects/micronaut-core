@@ -49,7 +49,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -169,6 +168,37 @@ public class DefaultBeanContext implements BeanContext {
         return this;
     }
 
+    @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})
+    @Override
+    public <T> Optional<T> refreshBean(BeanIdentifier identifier) {
+        if(identifier != null) {
+            BeanRegistration beanRegistration = singletonObjects.get(identifier);
+            if(beanRegistration != null) {
+                BeanDefinition definition = beanRegistration.getBeanDefinition();
+                return Optional.of((T) definition.inject(this, beanRegistration.getBean()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier) {
+        if(qualifier == null) {
+            return Collections.emptyList();
+        }
+        List result = singletonObjects
+                .values()
+                .stream()
+                .filter(registration -> {
+                    BeanDefinition beanDefinition = registration.beanDefinition;
+                    return qualifier.reduce(beanDefinition.getBeanType(), Stream.of(beanDefinition)).findFirst().isPresent();
+                })
+                .collect(Collectors.toList());
+        return (Collection<BeanRegistration<?>>)result;
+    }
+
+    @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
         Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
@@ -240,19 +270,24 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> BeanContext registerSingleton(Class<T> beanType, T singleton) {
+        return registerSingleton(beanType, singleton, null);
+    }
+
+    @Override
+    public <T> BeanContext registerSingleton(Class<T> beanType, T singleton, Qualifier<T> qualifier) {
         if (singleton == null) {
             throw new IllegalArgumentException("Passed singleton cannot be null");
         }
-        BeanKey beanKey = new BeanKey(beanType, null);
+        BeanKey beanKey = new BeanKey(beanType, qualifier);
         synchronized (singletonObjects) {
             initializedObjectsByType.invalidateAll();
 
-            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, null, false, true).orElse(null);
-            if (beanDefinition != null) {
+            BeanDefinition<T> beanDefinition = findConcreteCandidate(beanType, qualifier, false, true).orElse(null);
+            if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
-                singletonObjects.put(beanKey, new BeanRegistration<>(beanDefinition, singleton));
+                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
-                singletonObjects.put(beanKey, new BeanRegistration<>(new NoInjectionBeanDefinition<>(beanType), singleton));
+                singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, new NoInjectionBeanDefinition<>(beanType), singleton));
             }
         }
         return this;
@@ -912,6 +947,19 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }
+            else if(key.qualifier == null) {
+                BeanRegistration registration = entry.getValue();
+                Object existing = registration.bean;
+                if(beanType.isInstance(existing)) {
+                    Optional<BeanDefinition> candidate = qualifier.reduce(beanType, Stream.of(registration.beanDefinition)).findFirst();
+                    if(candidate.isPresent()) {
+                        synchronized (singletonObjects) {
+                            bean = (T) existing;
+                            registerSingletonBean(candidate.get(), beanType, bean, qualifier, true);
+                        }
+                    }
+                }
+            }
         }
         return bean;
     }
@@ -1095,11 +1143,12 @@ public class DefaultBeanContext implements BeanContext {
                 LOG.debug("Registering singleton bean for type [{}]: {} ", beanType.getName(), createdBean);
             }
         }
-        BeanRegistration<T> registration = new BeanRegistration<>(beanDefinition, createdBean);
+        BeanKey key = new BeanKey<>(beanType, qualifier);
+        BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
 
 
         if (singleCandidate) {
-            singletonObjects.put(new BeanKey(beanType, qualifier), registration);
+            singletonObjects.put(key, registration);
         }
 
         Class<?> createdType = createdBean.getClass();
@@ -1109,7 +1158,7 @@ public class DefaultBeanContext implements BeanContext {
 
             Class annotation = qualifierAnn.get();
             if (Primary.class == annotation) {
-                BeanKey primaryBeanKey = new BeanKey(beanType, null);
+                BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
                 singletonObjects.put(primaryBeanKey, registration);
             } else {
 
@@ -1120,7 +1169,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         } else {
             if (!beanDefinition.hasDeclaredAnnotation(ForEach.class)) {
-                BeanKey primaryBeanKey = new BeanKey(createdType, null);
+                BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                 singletonObjects.put(primaryBeanKey, registration);
             }
         }
@@ -1443,21 +1492,6 @@ public class DefaultBeanContext implements BeanContext {
             return method.invoke(beanContext.getBean(beanType), arguments);
         }
 
-    }
-
-    private static final class BeanRegistration<T> {
-        private final BeanDefinition<T> beanDefinition;
-        private T bean;
-
-        BeanRegistration(BeanDefinition<T> beanDefinition, T bean) {
-            this.beanDefinition = beanDefinition;
-            this.bean = bean;
-        }
-
-        @Override
-        public String toString() {
-            return "BeanRegistration: " + bean;
-        }
     }
 
     private static final class BeanKey<T> implements BeanIdentifier {

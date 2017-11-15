@@ -1,10 +1,8 @@
 package org.particleframework.context.env.groovy;
 
+import org.particleframework.context.env.*;
+import org.particleframework.core.order.Ordered;
 import org.particleframework.core.value.ValueException;
-import org.particleframework.context.env.Environment;
-import org.particleframework.context.env.MapPropertySource;
-import org.particleframework.context.env.PropertySource;
-import org.particleframework.context.env.PropertySourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +19,12 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class GroovyPropertySourceLoader implements PropertySourceLoader {
+public class GroovyPropertySourceLoader implements PropertySourceLoader, Ordered {
+
+    @Override
+    public int getOrder() {
+        return EnvironmentPropertySource.POSITION - 100;
+    }
 
     @Override
     public Optional<PropertySource> load(String name, Environment environment) {
@@ -32,7 +35,12 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader {
             loadProperties(environment, name + "-"+ activeName +".groovy", finalMap);
         }
         if(!finalMap.isEmpty()) {
-            MapPropertySource newPropertySource = new MapPropertySource(finalMap);
+            MapPropertySource newPropertySource = new MapPropertySource(finalMap) {
+                @Override
+                public int getOrder() {
+                    return GroovyPropertySourceLoader.this.getOrder();
+                }
+            };
             return Optional.of(newPropertySource);
         }
 

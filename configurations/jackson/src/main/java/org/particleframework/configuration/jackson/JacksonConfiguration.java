@@ -23,6 +23,7 @@ public class JacksonConfiguration {
     protected String dateFormat;
     protected Locale locale;
     protected TimeZone timeZone;
+    protected int arraySizeThreshold = 100;
     protected Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
     protected Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
     protected Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
@@ -91,5 +92,12 @@ public class JacksonConfiguration {
      */
     public Map<JsonGenerator.Feature, Boolean> getGeneratorSettings() {
         return generator;
+    }
+
+    /**
+     * @return The array size threshold to use when using Jackson for data binding
+     */
+    public int getArraySizeThreshold() {
+        return arraySizeThreshold;
     }
 }

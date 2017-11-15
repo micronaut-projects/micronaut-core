@@ -18,6 +18,7 @@ package org.particleframework.core.util;
 import org.particleframework.core.annotation.Nullable;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Utility methods for Strings
@@ -26,6 +27,9 @@ import java.util.*;
  * @since 1.0
  */
 public class StringUtils {
+
+    public static final String[] EMPTY_STRING_ARRAY = new String[0];
+    private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
     /**
      * Return whether the given string is empty
@@ -105,5 +109,15 @@ public class StringUtils {
             answer.put(values[i++].toString().intern(), values[i++]);
         }
         return answer;
+    }
+
+    /**
+     * Is the given string a series of digits
+     *
+     * @param str The string
+     * @return True if it is a series of digits
+     */
+    public static boolean isDigits(String str) {
+        return isNotEmpty(str) && DIGIT_PATTERN.matcher(str).matches();
     }
 }
