@@ -169,12 +169,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 if (candidate.hasStereotype(ForEach.class)) {
 
                     String property = candidate.getValue(ForEach.class, "property", String.class).orElse(null);
+                    String primaryPrefix = candidate.getValue(ForEach.class, "primary", String.class).orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
                         if (!entries.isEmpty()) {
                             for (Object key : entries.keySet()) {
                                 BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
+                                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                }
                                 delegate.put(Named.class.getName(), key.toString());
                                 transformedCandidates.add(delegate);
                             }
@@ -193,6 +197,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     if (dependentCandidate instanceof BeanDefinitionDelegate) {
                                         BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                         optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                                        parentDelegate.get(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, Boolean.class).ifPresent(isPrimary -> delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, isPrimary));
+                                        delegate.put(ForEach.class.getName(), true);
                                     } else {
                                         Optional<String> qualiferName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
                                         optional = qualiferName.map( name -> Qualifiers.byAnnotation(dependentCandidate, name));
@@ -234,27 +240,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
-        ForEach forEach = beanType.getAnnotation(ForEach.class);
-        if (forEach != null) {
+        if (candidates.stream().allMatch( c -> {
+            if (c instanceof BeanDefinitionDelegate) {
+                return ((BeanDefinitionDelegate) c).get(ForEach.class.getName(), Boolean.class, false) || c.getBeanType().isAnnotationPresent(ForEach.class);
+            } else {
+                return false;
+            }
+        })) {
             if (qualifier == null) {
-                Class[] value = forEach.value();
-                if (value.length == 1) {
-                    ForEach annotation = (ForEach) value[0].getAnnotation(ForEach.class);
-                    if (annotation != null) {
-                        String primary = annotation.primary();
-                        if (StringUtils.isNotEmpty(primary)) {
-                            return candidates.stream()
-                                    .filter(candidate -> {
-                                        if (candidate instanceof BeanDefinitionDelegate) {
-                                            BeanDefinitionDelegate<T> delegate = (BeanDefinitionDelegate) candidate;
-                                            Optional<String> optional = delegate.get(Named.class.getName(), String.class);
-                                            return optional.map(val-> val.equals(primary)).orElse(false);
-                                        }
-                                        return false;
-                                    }).findFirst().orElse(null);
-                        }
-                    }
-                }
                 Optional<BeanDefinition<T>> first = candidates.stream().findFirst();
                 return first.orElse(null);
             } else if (qualifier instanceof Named) {
@@ -281,6 +274,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 }
             }
         }
+
         return super.findConcreteCandidate(beanType, qualifier, candidates);
     }
 }

@@ -1016,7 +1016,6 @@ public class DefaultBeanContext implements BeanContext {
                 }
 
                 Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
-                        .filter(BeanDefinition::isPrimary)
                         .findFirst();
                 definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
             } else {
@@ -1086,11 +1085,6 @@ public class DefaultBeanContext implements BeanContext {
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         } else {
-
-            if (candidates.size() == 1) {
-                return candidates.iterator().next();
-            }
-
             BeanDefinition<T> definition = null;
             Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
             if (exactMatches.size() == 1) {

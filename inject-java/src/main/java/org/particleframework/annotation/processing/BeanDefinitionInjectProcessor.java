@@ -30,6 +30,7 @@ import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
+import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
@@ -388,7 +389,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
             // handle @Bean annotation for @Factory class
-            if (isFactoryType && methodAnnotationMetadata.hasStereotype(Bean.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
+            if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
                 visitBeanFactoryMethod(method);
                 return null;
             }

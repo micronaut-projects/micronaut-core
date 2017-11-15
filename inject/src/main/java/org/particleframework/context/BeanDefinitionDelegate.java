@@ -41,6 +41,8 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
 
+    public static final String PRIMARY_ATTRIBUTE = "org.particleframework.core.Primary";
+
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         if(!(definition instanceof BeanFactory)) {
             throw new IllegalArgumentException("Delegate can only be used for bean factories");
@@ -74,7 +76,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary();
+        return definition.isPrimary() || get(PRIMARY_ATTRIBUTE, Boolean.class).orElse(false);
     }
 
     @Override

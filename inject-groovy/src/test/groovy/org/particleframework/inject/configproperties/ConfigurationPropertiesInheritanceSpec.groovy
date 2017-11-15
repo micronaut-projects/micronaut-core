@@ -50,6 +50,25 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
 
     }
 
+    void "test configuration properties binding extending POJO"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+                'foo.baz.otherProperty':'x',
+                'foo.baz.onlySetter':'y',
+                'foo.baz.port': 55
+        ))
+
+        applicationContext.start()
+
+        MyOtherConfig config = applicationContext.getBean(MyOtherConfig)
+
+        expect:
+        config.port == 55
+        config.otherProperty == 'x'
+        config.onlySetter == 'y'
+    }
+
     @ConfigurationProperties('foo.bar')
     static class MyConfig {
         int port

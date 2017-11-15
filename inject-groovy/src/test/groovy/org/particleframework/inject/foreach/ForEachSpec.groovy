@@ -18,6 +18,7 @@ package org.particleframework.inject.foreach
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.annotation.ConfigurationProperties
+import org.particleframework.context.annotation.Factory
 import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
@@ -163,6 +164,27 @@ class ForEachSpec extends Specification {
 
     }
 
+    void "test configuration properties binding by a non bean type"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+                'foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888',
+        ))
+
+        applicationContext.start()
+
+        NonBeanClass bean = applicationContext.getBean(NonBeanClass)
+        NonBeanClass bean2 = applicationContext.getBean(NonBeanClass, Qualifiers.byName("two"))
+
+        expect:
+        bean != bean2
+        bean.port == 8080
+        bean2.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
 
     void "test configuration properties binding by bean type with primary"() {
         given:
@@ -229,6 +251,27 @@ class ForEachSpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+    }
+
+    void "test configuration properties binding by non bean type with primary"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+                'foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888',
+        ))
+
+        applicationContext.start()
+
+        NonBeanClassWithPrimary bean2 = applicationContext.getBean(NonBeanClassWithPrimary)
+        NonBeanClassWithPrimary bean = applicationContext.getBean(NonBeanClassWithPrimary, Qualifiers.byName("one"))
+
+        expect:
+        bean.port == 8080
+        bean2.port == 8888
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test resolve for empty configuration"() {
@@ -326,5 +369,43 @@ class MyConfigurationWithPrimary {
     @ConfigurationProperties("inner")
     static class Inner {
         String enabled
+    }
+}
+
+@Factory
+class MyNonBean {
+
+    @ForEach(MyConfiguration.class)
+    NonBeanClass nonBeanClass(MyConfiguration myConfiguration) {
+        new NonBeanClass(myConfiguration.port)
+    }
+
+}
+
+@Factory
+class MyNonBeanWithPrimary {
+
+    @ForEach(MyConfigurationWithPrimary.class)
+    NonBeanClassWithPrimary nonBeanClassWithPrimary(MyConfigurationWithPrimary myConfiguration) {
+        new NonBeanClassWithPrimary(myConfiguration.port)
+    }
+}
+
+
+class NonBeanClass {
+
+    int port
+
+    NonBeanClass(int port) {
+        this.port = port
+    }
+}
+
+class NonBeanClassWithPrimary {
+
+    int port
+
+    NonBeanClassWithPrimary(int port) {
+        this.port = port
     }
 }

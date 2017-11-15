@@ -26,6 +26,7 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ForEachSpec extends Specification {
+
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -91,6 +92,9 @@ class ForEachSpec extends Specification {
         bean2.primitiveDefaultValue == 9999
         bean2.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test configuration properties binding by bean type"() {
@@ -159,8 +163,32 @@ class ForEachSpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
     }
 
+    void "test configuration properties binding by a non bean type"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+                'foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888',
+        ))
+
+        applicationContext.start()
+
+        NonBeanClass bean = applicationContext.getBean(NonBeanClass)
+        NonBeanClass bean2 = applicationContext.getBean(NonBeanClass, Qualifiers.byName("two"))
+
+        expect:
+        bean != bean2
+        bean.port == 8080
+        bean2.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
 
     void "test configuration properties binding by bean type with primary"() {
         given:
@@ -227,6 +255,30 @@ class ForEachSpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test configuration properties binding by non bean type with primary"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(new MapPropertySource(
+                'foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888',
+        ))
+
+        applicationContext.start()
+
+        NonBeanClassWithPrimary bean2 = applicationContext.getBean(NonBeanClassWithPrimary)
+        NonBeanClassWithPrimary bean = applicationContext.getBean(NonBeanClassWithPrimary, Qualifiers.byName("one"))
+
+        expect:
+        bean.port == 8080
+        bean2.port == 8888
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test resolve for empty configuration"() {
@@ -243,5 +295,8 @@ class ForEachSpec extends Specification {
         applicationContext.getBeansOfType(MyConfiguration).size() == 0
         applicationContext.streamOfType(MyBean).count() == 0
         applicationContext.streamOfType(MyConfiguration).count() == 0
+
+        cleanup:
+        applicationContext.close()
     }
 }

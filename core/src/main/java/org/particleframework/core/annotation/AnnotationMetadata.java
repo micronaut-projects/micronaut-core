@@ -531,4 +531,21 @@ public interface AnnotationMetadata extends AnnotatedElement {
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         return stereotype != null && hasDeclaredStereotype(stereotype.getName());
     }
+
+    /**
+     * Checks whether this object has any of the given stereotype directly declared on the object
+     *
+     * @param annotations The annotations
+     *
+     * @return True if any of the given stereotypes are present
+     */
+    @SuppressWarnings("unchecked")
+    default boolean hasDeclaredStereotype(Class<? extends Annotation>... annotations) {
+        for (Class<? extends Annotation> annotation : annotations) {
+            if(hasDeclaredStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
