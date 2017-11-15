@@ -37,7 +37,7 @@ class ValidatedSpec extends Specification {
 
     def "test validated annotation validates beans"() {
         given:
-        ApplicationContext beanContext = ApplicationContext.run("test")
+        ApplicationContext beanContext = ApplicationContext.run()
         Foo foo = beanContext.getBean(Foo)
 
         when:"invalid data is passed"
@@ -58,14 +58,13 @@ class ValidatedSpec extends Specification {
 
     def "test validated controller args"() {
         given:
-        ApplicationContext context = ParticleApplication.runOnRandomPort()
-        int port = context.getBean(EmbeddedServer).getPort()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         OkHttpClient client = new OkHttpClient()
 
         when:
         def request = new Request.Builder()
-                .url("http://localhost:$port/validated/args")
+                .url(new URL(server.URL,"/validated/args"))
                 .post(RequestBody.create(MediaType.parse("application/json"), '{"amount":"xxx"}'))
         def response = client.newCall(
                 request.build()
@@ -81,7 +80,7 @@ class ValidatedSpec extends Specification {
         result.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
 
         cleanup:
-        context.close()
+        server.close()
     }
 }
 

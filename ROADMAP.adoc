@@ -28,6 +28,14 @@ At compile time we know the types but at runtime the lambda loses type informati
 
 We need to allow `Introduction` advise to specify additional interfaces that should be be implemented by the interceptor.
 
+#### Aspect Implementations
+
+We need to implement AOP annotations for:
+
+- Retry
+- Hystrix
+- Caching
+
 #### Configuration Sharing
 
 Need a mechanism for configuration discovery and sharing across the federation
@@ -42,7 +50,6 @@ We need endpoints for managing and/or exposing information about:
 - beans
 - routes
 - health checks
-- refresh
 - server stop/start
 
 These should be built on the `Endpoint` API
@@ -64,6 +71,10 @@ Content negotiation must be supported
 #### WebSocket Support
 
 WebSocket Support must be implemented
+
+#### Support for Views
+
+Some view technology support and port GSON views to Particle.
 
 ### HTTP Client
 

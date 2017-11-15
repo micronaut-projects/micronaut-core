@@ -35,16 +35,15 @@ class SimpleEndpointSpec extends Specification {
 
     void "test read simple endpoint"() {
         given:
-        ApplicationContext applicationContext = ParticleApplication.runOnRandomPort(
-                'endpoints.simple.myValue':'foo'
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['endpoints.simple.myValue':'foo']
         )
-        int port = applicationContext.getBean(EmbeddedServer).getPort()
 
         OkHttpClient client = new OkHttpClient()
 
         when:
         def request = new Request.Builder()
-                .url("http://localhost:$port/simple")
+                .url( new URL(server.URL, "/simple"))
 
         def response = client.newCall(
                 request.build()
@@ -55,21 +54,21 @@ class SimpleEndpointSpec extends Specification {
         response.body().string() == 'test foo'
 
         cleanup:
-        applicationContext.close()
+        server.close()
     }
 
     void "test read simple endpoint with argument"() {
         given:
-        ApplicationContext applicationContext = ParticleApplication.runOnRandomPort(
-                'endpoints.simple.myValue':'foo'
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['endpoints.simple.myValue':'foo']
         )
-        int port = applicationContext.getBean(EmbeddedServer).getPort()
+
 
         OkHttpClient client = new OkHttpClient()
 
         when:
         def request = new Request.Builder()
-                .url("http://localhost:$port/simple/baz")
+                .url(new URL(server.URL, "/simple/baz"))
 
         def response = client.newCall(
                 request.build()
@@ -80,21 +79,20 @@ class SimpleEndpointSpec extends Specification {
         response.body().string() == 'test baz'
 
         cleanup:
-        applicationContext.close()
+        server.close()
     }
 
     void "test write simple endpoint"() {
         given:
-        ApplicationContext applicationContext = ParticleApplication.runOnRandomPort(
-                'endpoints.simple.myValue':'foo'
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['endpoints.simple.myValue':'foo']
         )
-        int port = applicationContext.getBean(EmbeddedServer).getPort()
 
         OkHttpClient client = new OkHttpClient()
 
         when:
         def request = new Request.Builder()
-                .url("http://localhost:$port/simple")
+                .url(new URL(server.URL, "/simple"))
                 .post(RequestBody.create(MediaType.parse("text/plain"), "bar"))
         def response = client.newCall(
                 request.build()
@@ -106,7 +104,7 @@ class SimpleEndpointSpec extends Specification {
 
         when:
         request = new Request.Builder()
-                .url("http://localhost:$port/simple")
+                .url(new URL(server.URL, "/simple"))
 
         response = client.newCall(
                 request.build()
@@ -117,21 +115,21 @@ class SimpleEndpointSpec extends Specification {
         response.body().string() == 'test bar'
 
         cleanup:
-        applicationContext.close()
+        server.close()
     }
 
     void "test disable endpoint"() {
         given:
-        ApplicationContext applicationContext = ParticleApplication.runOnRandomPort(
-                'endpoints.simple.enabled':false
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['endpoints.simple.enabled':false]
         )
-        int port = applicationContext.getBean(EmbeddedServer).getPort()
+
 
         OkHttpClient client = new OkHttpClient()
 
         when:
         def request = new Request.Builder()
-                .url("http://localhost:$port/simple")
+                .url(new URL(server.URL, "/simple"))
 
         def response = client.newCall(
                 request.build()
@@ -141,7 +139,7 @@ class SimpleEndpointSpec extends Specification {
         response.code() == HttpStatus.NOT_FOUND.code
 
         cleanup:
-        applicationContext.close()
+        server.close()
     }
 }
 

@@ -22,6 +22,9 @@ import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.util.ArrayUtils;
+import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.runtime.context.env.CommandLinePropertySource;
 import org.particleframework.runtime.exceptions.ApplicationStartupException;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -46,7 +49,7 @@ public class ParticleApplication {
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private String[] args = new String[0];
-    private String environment;
+    private Set<String> environments = new HashSet<>();
     private Package defaultPackage;
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
     private Collection<Map<String,Object>> propertyMaps = new ArrayList<>();
@@ -57,11 +60,11 @@ public class ParticleApplication {
     /**
      * @return Run this {@link ParticleApplication}
      */
-    public ApplicationContext start() {
+    public ApplicationContext start(Class applicationClass) {
         CommandLine commandLine = CommandLine.parse(args);
 
-        String environmentToUse = environment == null ? deduceEnvironment() : environment;
-        ApplicationContext applicationContext = ApplicationContext.build(environmentToUse);
+        environments.addAll( deduceEnvironments() );
+        ApplicationContext applicationContext = ApplicationContext.build(applicationClass.getClassLoader(), environments.toArray(new String[environments.size()]));
         applicationContext.registerSingleton(commandLine);
 
         // Add packages to scan
@@ -93,19 +96,18 @@ public class ParticleApplication {
             embeddedContainerBean.ifPresent((embeddedServer -> {
                 try {
                     embeddedServer.start();
-                    // TODO: Different protocols and hosts
                     if(LOG.isInfoEnabled()) {
                         long end = System.currentTimeMillis();
                         long took = end - start;
-                        LOG.info("Startup completed in {}ms. Server Running: http://localhost:{}", took, embeddedServer.getPort());
+                        LOG.info("Startup completed in {}ms. Server Running: ", took, embeddedServer.getURL());
                     }
                 } catch (Throwable e) {
-                    handleStartupException(environmentToUse, e);
+                    handleStartupException(environments, e);
                 }
             }));
             return applicationContext;
         } catch (Throwable e) {
-            handleStartupException(environmentToUse, e);
+            handleStartupException(environments, e);
             return null;
         }
     }
@@ -153,12 +155,12 @@ public class ParticleApplication {
     /**
      * Set the environment
      *
-     * @param environment The environment
+     * @param environments The environment
      * @return This application
      */
-    public ParticleApplication env(@Nullable String environment) {
-        if (environment != null && environment.length() > 0) {
-            this.environment = environment;
+    public ParticleApplication env(@Nullable String... environments) {
+        if (ArrayUtils.isNotEmpty(environments)) {
+            this.environments = CollectionUtils.setOf(environments);
         }
         return this;
     }
@@ -257,23 +259,6 @@ public class ParticleApplication {
     }
 
     /**
-     * Run the application on a Random port
-     *
-     * @return The {@link ApplicationContext}
-     */
-    public static ApplicationContext runOnRandomPort() {
-        return run(new Class[0], "-port", String.valueOf(SocketUtils.findAvailableTcpPort()));
-    }
-
-    /**
-     * Run the application on a Random port
-     * @param properties Any custom properties
-     * @return The {@link ApplicationContext}
-     */
-    public static ApplicationContext runOnRandomPort(Map<String, Object> properties) {
-        return build("-port", String.valueOf(SocketUtils.findAvailableTcpPort())).properties(properties).start();
-    }
-    /**
      * Run the application for the given arguments.
      *
      * @param cls The application class
@@ -295,20 +280,20 @@ public class ParticleApplication {
         return new ParticleApplication()
                 .classes(classes)
                 .args(args)
-                .start();
+                .start(ArrayUtils.isNotEmpty(classes) ? classes[0] : ParticleApplication.class);
     }
 
     /**
      * Default handling of startup exceptions.
-     * @param environment The environment
+     * @param environments The environment
      * @param exception The exception
      * @throws ApplicationStartupException If the server cannot be shutdown with an appropriate exist code
      */
-    protected void handleStartupException(String environment, Throwable exception)  {
+    protected void handleStartupException(Set<String> environments, Throwable exception)  {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         Integer code = exitCodeMapper.apply(exception);
         if(code > 0) {
-            if(!Environment.TEST.equals(environment)) {
+            if(!environments.contains( Environment.TEST)) {
                 if(LOG.isErrorEnabled()) {
                     LOG.error("Error starting Particle server: " + exception.getMessage(), exception);
                 }
@@ -318,7 +303,7 @@ public class ParticleApplication {
         throw new ApplicationStartupException("Error starting Particle server: " + exception.getMessage(), exception);
     }
 
-    private String deduceEnvironment() {
+    private Set<String> deduceEnvironments() {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         for (StackTraceElement stackTraceElement : stackTrace) {
             String methodName = stackTraceElement.getMethodName();
@@ -326,7 +311,7 @@ public class ParticleApplication {
                 String className = stackTraceElement.getClassName();
                 String packageName = NameUtils.getPackageName(className);
                 defaultPackage = Package.getPackage(packageName);
-                return Environment.TEST;
+                return CollectionUtils.setOf(Environment.TEST);
             }
             else if("main".equals(methodName)) {
                 String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
@@ -335,12 +320,12 @@ public class ParticleApplication {
             else {
                 String className = stackTraceElement.getClassName();
                 if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                    return Environment.TEST;
+                    return CollectionUtils.setOf(Environment.TEST);
                 }
             }
         }
 
-        return null;
+        return Collections.emptySet();
     }
 
 }
