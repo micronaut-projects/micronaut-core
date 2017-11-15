@@ -26,6 +26,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.Named;
@@ -49,6 +50,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -205,6 +208,20 @@ public class NettyHttpServer implements EmbeddedServer {
     @Override
     public int getPort() {
         return serverPort;
+    }
+
+    @Override
+    public String getHost() {
+        return serverConfiguration.getHost().orElse("localhost");
+    }
+
+    @Override
+    public URL getURL() {
+        try {
+            return new URL("http://" + getHost() + ':' + getPort());
+        } catch (MalformedURLException e) {
+            throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
+        }
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {

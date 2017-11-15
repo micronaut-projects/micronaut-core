@@ -25,7 +25,7 @@ import org.particleframework.core.util.Toggleable;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "endpoints")
+@ForEach(property = "endpoints", primary = "all")
 public class EndpointConfiguration implements Toggleable {
 
     protected boolean enabled = true;

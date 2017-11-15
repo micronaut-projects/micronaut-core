@@ -63,7 +63,8 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        beanContext.stop()
+        System.setProperty("foo.bar", "")
+        beanContext?.stop()
     }
 
     void "test fire refresh event that refreshes environment diff"() {
@@ -83,6 +84,7 @@ class RefreshScopeSpec extends Specification {
         RefreshBean bean = beanContext.getBean(RefreshBean)
 
         then:
+        bean.hashCode() == bean.hashCode()
         bean.testValue() == 'test'
         bean.testConfigProps() == 'test'
 
@@ -97,7 +99,8 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        beanContext.stop()
+        System.setProperty("foo.bar", "")
+        beanContext?.stop()
     }
 
     @Refreshable
@@ -132,6 +135,11 @@ class RefreshScopeSpec extends Specification {
         RefreshBean2(MyConfig config, SecondConfig secondConfig1) {
             this.config = config
             this.secondConfig = secondConfig1
+        }
+
+        @Override
+        int hashCode() {
+            return super.hashCode()
         }
 
         String testValue() {

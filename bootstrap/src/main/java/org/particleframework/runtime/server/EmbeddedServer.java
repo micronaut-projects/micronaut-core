@@ -17,6 +17,8 @@ package org.particleframework.runtime.server;
 
 import org.particleframework.context.LifeCycle;
 
+import java.net.URL;
+
 /**
  * <p>An EmbeddedServer is a general abstraction to manage the lifecycle of any server implementation within
  * a running Particle application</p>
@@ -30,4 +32,14 @@ public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
      * @return The port exposed by the server
      */
     int getPort();
+
+    /**
+     * @return The host of the server
+     */
+    String getHost();
+
+    /**
+     * @return The full URL to the server
+     */
+    URL getURL();
 }

@@ -45,6 +45,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Implementation of {@link Refreshable}
  *
  * @see Refreshable
+ * @see RefreshEvent
  * @author Graeme Rocher
  * @since 1.0
  */

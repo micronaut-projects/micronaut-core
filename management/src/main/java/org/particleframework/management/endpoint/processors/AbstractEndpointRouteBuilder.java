@@ -63,19 +63,35 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
                         id = NameUtils.hyphenate( beanDefinition.getName() );
                     }
 
-                    Optional<EndpointConfiguration> config = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName(id));
-                    if(config.isPresent()) {
-                        EndpointConfiguration endpointConfiguration = config.get();
-                        if(endpointConfiguration.isEnabled()) {
-
-                            return Optional.of(endpointConfiguration);
-                        }
-                    }
+                    return findEndpointConfiguration(id);
                 }
             }
 
             return Optional.empty();
         });
+    }
+
+    private Optional<EndpointConfiguration> findEndpointConfiguration(String id) {
+        Optional<EndpointConfiguration> config = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName(id));
+        if(config.isPresent()) {
+            EndpointConfiguration endpointConfiguration = config.get();
+            if(endpointConfiguration.isEnabled()) {
+                return Optional.of(endpointConfiguration);
+            }
+        }
+        else {
+            Optional<EndpointConfiguration> allConfig = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName("all"));
+            if(allConfig.isPresent()) {
+                EndpointConfiguration c = allConfig.get();
+                if(c.isEnabled()) {
+                    return Optional.of(c);
+                }
+            }
+            else {
+                return Optional.of(new EndpointConfiguration(id));
+            }
+        }
+        return Optional.empty();
     }
 
     @Override

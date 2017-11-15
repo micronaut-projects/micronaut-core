@@ -1,9 +1,13 @@
 package org.particleframework.context;
 
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertySource;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -63,21 +67,59 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * Run the {@link ApplicationContext}. This method will instantiate a new {@link ApplicationContext} and call {@link #start()}
      *
      * @param environments The environments to use
-     * @return The running {@link BeanContext}
+     * @return The running {@link ApplicationContext}
      */
     static ApplicationContext run(String... environments) {
         return build(environments).start();
     }
 
     /**
+     * Run the {@link ApplicationContext}. This method will instantiate a new {@link ApplicationContext} and call {@link #start()}
+     *
+     * @return The running {@link ApplicationContext}
+     */
+    static ApplicationContext run() {
+        return run(StringUtils.EMPTY_STRING_ARRAY);
+    }
+    /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
-     * if the {@link ApplicationContext} requires graceful shutdown
+     * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
      * @param type The environment to use
      * @return The running {@link BeanContext}
      */
-    static <T> T run(Class<T> type) {
-        T bean = build(Environment.DEVELOPMENT)
+    static <T> T run(Class<T> type, String... environments) {
+        return run(type, Collections.emptyMap(), environments);
+    }
+
+    /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
+     * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
+     *
+     * @param type The environment to use
+     * @param properties Additional properties
+     * @param environments The environment names
+     * @return The running {@link BeanContext}
+     */
+    static <T> T run(Class<T> type, Map<String, Object> properties, String... environments) {
+        PropertySource propertySource = PropertySource.of(properties);
+        return run(type, propertySource, environments);
+    }
+
+
+    /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
+     * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
+     *
+     * @param type The environment to use
+     * @param propertySource Additional properties
+     * @param environments The environment names
+     * @return The running {@link BeanContext}
+     */
+    static <T> T run(Class<T> type, PropertySource propertySource, String... environments) {
+        T bean = build(type.getClassLoader(), environments)
+                .environment(env -> env.addPropertySource(propertySource)
+                                       .addPackage(type.getPackage()))
                 .start()
                 .getBean(type);
         if(bean instanceof LifeCycle) {
@@ -96,6 +138,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(String... environments) {
+        if(environments == null) environments = StringUtils.EMPTY_STRING_ARRAY;
         return new DefaultApplicationContext(environments);
     }
 
