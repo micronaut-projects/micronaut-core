@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Blocking {
 }

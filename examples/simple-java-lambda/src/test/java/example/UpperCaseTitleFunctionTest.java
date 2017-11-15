@@ -22,6 +22,8 @@ import org.particleframework.http.HttpStatus;
 import org.particleframework.runtime.server.EmbeddedServer;
 
 import java.io.IOException;
+import java.net.URL;
+
 import static org.junit.Assert.*;
 /**
  * @author Graeme Rocher
@@ -32,11 +34,10 @@ public class UpperCaseTitleFunctionTest {
     @Test
     public void testFunction() throws IOException {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
-        String server = "http://localhost:" + embeddedServer.getPort();
         OkHttpClient client = new OkHttpClient();
         String data = "{\"title\":\"The Stand\"}";
         Request.Builder request = new Request.Builder()
-                .url(server + "/uppercase")
+                .url(new URL(embeddedServer.getURL(), "/uppercase"))
                 .post(createBody(data));
 
         Response response = client.newCall(request.build()).execute();

@@ -63,6 +63,9 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     @Override
     <T> ApplicationContext registerSingleton(Class<T> type, T singleton);
 
+    @Override
+    <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier);
+
     /**
      * Run the {@link ApplicationContext}. This method will instantiate a new {@link ApplicationContext} and call {@link #start()}
      *
@@ -81,12 +84,41 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     static ApplicationContext run() {
         return run(StringUtils.EMPTY_STRING_ARRAY);
     }
+
     /**
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param type The environment to use
-     * @return The running {@link BeanContext}
+     * @param properties Additional properties
+     * @param environments The environment names
+     * @return The running {@link ApplicationContext}
+     */
+    static ApplicationContext run(Map<String, Object> properties, String... environments) {
+        PropertySource propertySource = PropertySource.of(properties);
+        return run(propertySource, environments);
+    }
+
+
+    /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
+     * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
+     *
+     * @param properties Additional properties
+     * @param environments The environment names
+     * @return The running {@link ApplicationContext}
+     */
+    static ApplicationContext run(PropertySource properties, String... environments) {
+        return build(environments)
+                .environment(env -> env.addPropertySource(properties))
+                .start();
+    }
+    /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
+     * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
+     *
+     * @param type The type of the bean to run
+     * @param environments The environments to use
+     * @return The running bean
      */
     static <T> T run(Class<T> type, String... environments) {
         return run(type, Collections.emptyMap(), environments);
@@ -96,10 +128,10 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type. Note this method should not be used
      * if the {@link ApplicationContext} requires graceful shutdown unless the returned bean takes responsibility for shutting down the context
      *
-     * @param type The environment to use
+     * @param type The type of the bean to run
      * @param properties Additional properties
      * @param environments The environment names
-     * @return The running {@link BeanContext}
+     * @return The running bean
      */
     static <T> T run(Class<T> type, Map<String, Object> properties, String... environments) {
         PropertySource propertySource = PropertySource.of(properties);
@@ -170,5 +202,18 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      */
     static ApplicationContext build(ClassLoader classLoader, String... environments) {
         return new DefaultApplicationContext(classLoader, environments);
+    }
+
+    /**
+     * Build a {@link ApplicationContext}
+     *
+     * @param mainClass The main class of the application
+     * @param environments The environment to use
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static ApplicationContext build(Class mainClass, String... environments) {
+        DefaultApplicationContext applicationContext = new DefaultApplicationContext(mainClass.getClassLoader(), environments);
+        applicationContext.getEnvironment().addPackage(mainClass.getPackage());
+        return applicationContext;
     }
 }
