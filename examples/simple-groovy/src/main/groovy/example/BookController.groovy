@@ -16,7 +16,7 @@
 package example
 
 import grails.gorm.transactions.Transactional
-import org.particleframework.stereotype.Controller
+import org.particleframework.http.annotation.Controller
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject
