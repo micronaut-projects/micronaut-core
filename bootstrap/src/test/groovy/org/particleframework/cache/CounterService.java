@@ -16,14 +16,13 @@
 package org.particleframework.cache;
 
 import org.particleframework.cache.annotation.CacheConfig;
-import org.particleframework.cache.annotation.CacheInvalidate;
+import org.particleframework.cache.annotation.CacheEvict;
 import org.particleframework.cache.annotation.CachePut;
 import org.particleframework.cache.annotation.Cacheable;
 
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * @author Graeme Rocher
@@ -53,16 +52,16 @@ public class CounterService {
     }
 
 
-    @CacheInvalidate(all = true)
+    @CacheEvict(all = true)
     public void reset() {
         counters.clear();
     }
 
-    @CacheInvalidate()
+    @CacheEvict()
     public void reset(String name) {
         counters.remove(name);
     }
-    @CacheInvalidate
+    @CacheEvict
     public void set(String name, int val) {
         counters.put(name, val);
     }

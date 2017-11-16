@@ -23,7 +23,7 @@ import org.particleframework.cache.Cache;
 import org.particleframework.cache.CacheManager;
 import org.particleframework.cache.SyncCache;
 import org.particleframework.cache.annotation.CacheConfig;
-import org.particleframework.cache.annotation.CacheInvalidate;
+import org.particleframework.cache.annotation.CacheEvict;
 import org.particleframework.cache.annotation.CachePut;
 import org.particleframework.cache.annotation.Cacheable;
 import org.particleframework.context.BeanContext;
@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 /**
- * <p>An AOP {@link MethodInterceptor} implementation for the Cache annotations {@link Cacheable}, {@link CachePut} and {@link CacheInvalidate}</p>
+ * <p>An AOP {@link MethodInterceptor} implementation for the Cache annotations {@link Cacheable}, {@link CachePut} and {@link CacheEvict}</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -117,8 +117,8 @@ public class CachingInterceptor implements MethodInterceptor {
             result = context.proceed();
         }
 
-        if(context.hasStereotype(CacheInvalidate.class)) {
-            CacheInvalidate cacheConfig = context.getAnnotation(CacheInvalidate.class);
+        if(context.hasStereotype(CacheEvict.class)) {
+            CacheEvict cacheConfig = context.getAnnotation(CacheEvict.class);
             boolean async = cacheConfig.async();
             if(async) {
                 ioExecutor.submit(() ->
@@ -168,13 +168,13 @@ public class CachingInterceptor implements MethodInterceptor {
         }
     }
 
-    private void processCacheInvalidate(MethodInvocationContext context, CacheConfig defaultConfig, CacheKeyGenerator defaultKeyGenerator, CacheInvalidate cacheConfig, boolean async) {
-        String[] cacheNames = context.isPresent(CacheInvalidate.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
+    private void processCacheInvalidate(MethodInvocationContext context, CacheConfig defaultConfig, CacheKeyGenerator defaultKeyGenerator, CacheEvict cacheConfig, boolean async) {
+        String[] cacheNames = context.isPresent(CacheEvict.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
         boolean invalidateAll = cacheConfig.all();
         CacheKeyGenerator keyGenerator = defaultKeyGenerator;
         Object key = null;
         if(!invalidateAll) {
-            if(context.isPresent(CacheInvalidate.class, ATTRIBUTE_KEY_GENERATOR)) {
+            if(context.isPresent(CacheEvict.class, ATTRIBUTE_KEY_GENERATOR)) {
                 keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
             }
             key = keyGenerator.generateKey(context);

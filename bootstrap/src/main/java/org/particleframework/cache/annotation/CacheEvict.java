@@ -32,7 +32,7 @@ import java.lang.annotation.*;
 @Inherited
 @Documented
 @CacheConfig
-public @interface CacheInvalidate {
+public @interface CacheEvict {
     /**
      * Alias for {@link CacheConfig#cacheNames}.
      */

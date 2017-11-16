@@ -16,7 +16,7 @@
 package org.particleframework.cache
 
 import org.particleframework.cache.annotation.CacheConfig
-import org.particleframework.cache.annotation.CacheInvalidate
+import org.particleframework.cache.annotation.CacheEvict
 import org.particleframework.cache.annotation.CachePut
 import org.particleframework.cache.annotation.Cacheable
 import org.particleframework.context.ApplicationContext
@@ -142,16 +142,16 @@ class SyncCacheSpec extends Specification {
         }
 
 
-        @CacheInvalidate(all = true)
+        @CacheEvict(all = true)
         void reset() {
             counters.clear()
         }
 
-        @CacheInvalidate()
+        @CacheEvict()
         void reset(String name) {
             counters.remove(name)
         }
-        @CacheInvalidate
+        @CacheEvict
         void set(String name, int val) {
             counters.put(name, val)
         }
