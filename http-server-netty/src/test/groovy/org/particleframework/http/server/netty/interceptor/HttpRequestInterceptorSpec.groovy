@@ -23,7 +23,7 @@ import org.particleframework.http.server.netty.AbstractParticleSpec
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpRequestInterceptorSpec extends AbstractParticleSpec {
+class  HttpRequestInterceptorSpec extends AbstractParticleSpec {
 
     void "test interceptor execution and order - write replacement"() {
         when:

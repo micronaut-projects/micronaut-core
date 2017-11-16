@@ -34,11 +34,8 @@ class SimpleGormApplicationSpec extends Specification {
 
     void "test Particle server running"() {
         when:
-        EmbeddedServer server = ApplicationContext.build(PersonController)
-                .environment({ env -> env.addPropertySource([(Settings.SETTING_DB_CREATE): "create-drop"]) })
-                .start()
-                .getBean(EmbeddedServer)
-                .start()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(Settings.SETTING_DB_CREATE): "create-drop"])
+
         then:
         new URL(server.URL, "/people").getText(readTimeout: 3000) == "People: []"
 
@@ -48,11 +45,7 @@ class SimpleGormApplicationSpec extends Specification {
 
     void "test Particle server running again"() {
         when:
-        EmbeddedServer server = ApplicationContext.build(PersonController)
-                .environment({ env -> env.addPropertySource([(Settings.SETTING_DB_CREATE): "create-drop"]) })
-                .start()
-                .getBean(EmbeddedServer)
-                .start()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(Settings.SETTING_DB_CREATE): "create-drop"])
 
 
         then:

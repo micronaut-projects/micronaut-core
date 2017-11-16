@@ -43,6 +43,12 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
     @Override
     ApplicationContext stop();
 
+    @Override
+    <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier);
+
+    @Override
+    <T> ApplicationContext registerSingleton(Class<T> type, T singleton);
+
     /**
      * Allow configuration the {@link Environment}
      *
@@ -59,12 +65,6 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
     }
-
-    @Override
-    <T> ApplicationContext registerSingleton(Class<T> type, T singleton);
-
-    @Override
-    <T> ApplicationContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier);
 
     /**
      * Run the {@link ApplicationContext}. This method will instantiate a new {@link ApplicationContext} and call {@link #start()}
