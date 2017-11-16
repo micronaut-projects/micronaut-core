@@ -4,12 +4,12 @@ import org.apache.tomcat.jdbc.pool.DataSource
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.sql.ResultSet
 
-@Ignore
 class DatasourceConfigurationSpec extends Specification {
 
     void "test no configuration"() {
@@ -29,7 +29,7 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default.jndiName': 'x'
+                'datasources.default': [:]
         ))
         applicationContext.start()
 
@@ -79,7 +79,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.close()
     }
 
-    void "test all properties are bindable"() {
+    void "test properties are bindable"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
@@ -91,6 +91,8 @@ class DatasourceConfigurationSpec extends Specification {
                 'datasources.default.jndiName': 'java:comp/env/FooBarPool',
                 'datasources.default.dbProperties.DB_CLOSE_ON_EXIT': true,
                 'datasources.default.dbProperties.DB_CLOSE_DELAY': 1,
+                'datasources.default.defaultAutoCommit': true,
+                'datasources.default.defaultCatalog': 'catalog',
         ))
         applicationContext.start()
 
@@ -103,57 +105,52 @@ class DatasourceConfigurationSpec extends Specification {
 
         then:
         dataSource.abandonWhenPercentageFull == 99
-        !dataSource.accessToUnderlyingConnectionAllowed
+        dataSource.accessToUnderlyingConnectionAllowed //Currently no-oped
         dataSource.alternateUsernameAllowed
         dataSource.commitOnReturn
         dataSource.connectionProperties == 'prop1=value1;prop2=value2'
         dataSource.dataSourceJNDI == 'java:comp/env/FooBarPool'
-        dataSource.dbProperties.get('DB_CLOSE_ON_EXIT') == 'TRUE'
+        dataSource.dbProperties.get('DB_CLOSE_ON_EXIT') == 'true'
         dataSource.dbProperties.get('DB_CLOSE_DELAY') == '1'
-        /*//dataSource.setDefaultAutoCommit();
-        //dataSource.setDefaultCatalog();
-        //dataSource.setDefaultReadOnly();
-        dataSource.setDefaultTransactionIsolation();
-        dataSource.setDriverClassName(); //determine
-        dataSource.setFairQueue();
-        dataSource.setIgnoreExceptionOnPreLoad();
-        dataSource.setInitialSize();
-        dataSource.setInitSQL();
-        dataSource.setJdbcInterceptors();
-        dataSource.setJmxEnabled();
-        dataSource.setLogAbandoned();
-        dataSource.setLoginTimeout();
-        dataSource.setLogValidationErrors();
-        dataSource.setMaxActive();
-        dataSource.setMaxAge();
-        dataSource.setMaxIdle();
-        dataSource.setMaxWait();
-        dataSource.setMinEvictableIdleTimeMillis();
-        dataSource.setMinIdle();
-        dataSource.setName();
-        dataSource.setNumTestsPerEvictionRun();
-        dataSource.setPassword();
-        dataSource.setPropagateInterruptState();
-        dataSource.setRemoveAbandoned();
-        dataSource.setRemoveAbandonedTimeout();
-        dataSource.setRollbackOnReturn();
-        dataSource.setSuspectTimeout();
-        dataSource.setTestOnBorrow();
-        dataSource.setTestOnConnect();
-        dataSource.setTestOnReturn();
-        dataSource.setTestWhileIdle();
-        dataSource.setTimeBetweenEvictionRunsMillis();
-        dataSource.setUrl();
-        dataSource.setUseDisposableConnectionFacade();
-        dataSource.setUseEquals();
-        dataSource.setUseLock();
-        dataSource.setUsername();
-        dataSource.setUseStatementFacade();
-        dataSource.setValidationInterval();
-        dataSource.setValidationQuery();
-        dataSource.setValidationQueryTimeout();
-        dataSource.setValidator();
-        dataSource.setValidatorClassName();*/
+        dataSource.defaultAutoCommit
+        dataSource.defaultCatalog == 'catalog'
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test multiple data sources are configured"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'datasources.default': [:],
+                'datasources.foo': [:]
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(DataSource)
+        applicationContext.containsBean(DatasourceConfiguration)
+
+        when:
+        DataSource dataSource = applicationContext.getBean(DataSource)
+
+        then: //The default configuration is supplied because H2 is on the classpath
+        dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.username == 'sa'
+        dataSource.poolProperties.password == ''
+        dataSource.name == 'default'
+        dataSource.driverClassName == 'org.h2.Driver'
+
+        when:
+        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo"))
+
+        then: //The default configuration is supplied because H2 is on the classpath
+        dataSource.url == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.username == 'sa'
+        dataSource.poolProperties.password == ''
+        dataSource.name == 'foo'
+        dataSource.driverClassName == 'org.h2.Driver'
 
         cleanup:
         applicationContext.close()

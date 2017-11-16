@@ -8,7 +8,8 @@ import org.particleframework.context.annotation.ForEach;
 @Factory
 public class DatasourceFactory {
 
-    @ForEach(DatasourceConfiguration.class)
+    @ForEach(value = DatasourceConfiguration.class)
+    @Bean(preDestroy = "close")
     public DataSource dataSource(DatasourceConfiguration datasourceConfiguration) {
         return new DataSource(datasourceConfiguration);
     }
