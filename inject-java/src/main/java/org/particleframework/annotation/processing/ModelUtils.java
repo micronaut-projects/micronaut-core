@@ -217,7 +217,7 @@ class ModelUtils {
             if (componentType.getKind().isPrimitive()) {
                 result = classOfPrimitiveArrayFor(componentType.toString());
             } else {
-                result = arrayType.toString();
+                result = typeUtils.erasure(type).toString();
             }
         } else if (type.getKind() != VOID) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());

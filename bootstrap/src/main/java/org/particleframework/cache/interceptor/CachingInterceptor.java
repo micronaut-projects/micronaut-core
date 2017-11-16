@@ -1,0 +1,142 @@
+/*
+ * Copyright 2017 original authors
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. 
+ */
+package org.particleframework.cache.interceptor;
+
+import org.particleframework.aop.MethodInterceptor;
+import org.particleframework.aop.MethodInvocationContext;
+import org.particleframework.cache.CacheManager;
+import org.particleframework.cache.SyncCache;
+import org.particleframework.cache.annotation.CacheConfig;
+import org.particleframework.cache.annotation.CacheInvalidate;
+import org.particleframework.cache.annotation.CachePut;
+import org.particleframework.cache.annotation.Cacheable;
+import org.particleframework.context.BeanContext;
+import org.particleframework.core.reflect.InstantiationUtils;
+import org.particleframework.core.util.ArrayUtils;
+
+import javax.inject.Singleton;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * <p>An AOP {@link MethodInterceptor} implementation for the Cache annotations {@link Cacheable}, {@link CachePut} and {@link CacheInvalidate}</p>
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Singleton
+public class CachingInterceptor implements MethodInterceptor {
+    private static final String ATTRIBUTE_KEY_GENERATOR = "keyGenerator";
+    private final CacheManager cacheManager;
+    private final Map<Class<? extends KeyGenerator>, KeyGenerator> keyGenerators = new ConcurrentHashMap<>();
+    private final BeanContext beanContext;
+
+    public CachingInterceptor(CacheManager cacheManager, BeanContext beanContext) {
+        this.cacheManager = cacheManager;
+        this.beanContext = beanContext;
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext context) {
+        if(context.hasStereotype(CacheConfig.class)) {
+            Object result;
+            CacheConfig defaultConfig = context.getAnnotation(CacheConfig.class);
+            KeyGenerator defaultKeyGenerator = getKeyGenerator(defaultConfig.keyGenerator());
+            if(context.hasStereotype(CachePut.class)) {
+                CachePut cacheConfig = context.getAnnotation(CachePut.class);
+                String[] cacheNames = resolveCachePutCacheNames(context, defaultConfig, cacheConfig);
+                KeyGenerator keyGenerator = defaultKeyGenerator;
+                if(context.isPresent(CachePut.class, ATTRIBUTE_KEY_GENERATOR)) {
+                    keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
+                }
+                result = context.proceed();
+                if(!ArrayUtils.isEmpty(cacheNames)) {
+
+                    Object key = keyGenerator.generateKey(context);
+                    for (String cacheName : cacheNames) {
+                        SyncCache syncCache = cacheManager.getCache(cacheName);
+                        syncCache.put(key, result);
+                    }
+                }
+            }
+            else if(context.hasStereotype(Cacheable.class)) {
+                Cacheable cacheConfig = context.getAnnotation(Cacheable.class);
+                String[] cacheNames = context.isPresent(Cacheable.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
+                if(ArrayUtils.isEmpty(cacheNames)) {
+                    result = context.proceed();
+                }
+                else {
+                    KeyGenerator keyGenerator = defaultKeyGenerator;
+                    if(context.isPresent(Cacheable.class, ATTRIBUTE_KEY_GENERATOR)) {
+                        keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
+                    }
+
+                    SyncCache syncCache = cacheManager.getCache(cacheNames[0]);
+                    Object key = keyGenerator.generateKey(context);
+                    result = syncCache.get(key, context.getReturnType().getType(), context::proceed);
+                }
+            }
+            else {
+                result = context.proceed();
+            }
+
+            if(context.hasStereotype(CacheInvalidate.class)) {
+                CacheInvalidate cacheConfig = context.getAnnotation(CacheInvalidate.class);
+                String[] cacheNames = context.isPresent(CacheInvalidate.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
+                boolean invalidateAll = cacheConfig.all();
+                KeyGenerator keyGenerator = defaultKeyGenerator;
+                Object key = null;
+                if(!invalidateAll) {
+                    if(context.isPresent(CacheInvalidate.class, ATTRIBUTE_KEY_GENERATOR)) {
+                        keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
+                    }
+                    key = keyGenerator.generateKey(context);
+                }
+
+                if(!ArrayUtils.isEmpty(cacheNames)) {
+
+                    for (String cacheName : cacheNames) {
+                        SyncCache syncCache = cacheManager.getCache(cacheName);
+                        if(invalidateAll) {
+                            syncCache.invalidateAll();
+                        }
+                        else {
+                            syncCache.invalidate(key);
+                        }
+                    }
+                }
+
+            }
+            return result;
+        }
+        else {
+            return context.proceed();
+        }
+    }
+
+    protected String[] resolveCachePutCacheNames(MethodInvocationContext context, CacheConfig defaultConfig, CachePut cacheConfig) {
+        return context.isPresent(CachePut.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
+    }
+
+    protected KeyGenerator getKeyGenerator(Class<? extends KeyGenerator> type) {
+        return keyGenerators.computeIfAbsent(type, aClass -> {
+                    if(beanContext.containsBean(aClass)) {
+                        return beanContext.getBean(aClass);
+                    }
+                    return InstantiationUtils.instantiate(aClass);
+                });
+    }
+}

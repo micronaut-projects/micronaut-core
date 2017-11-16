@@ -15,15 +15,58 @@
  */
 package org.particleframework.cache
 
+import org.particleframework.cache.annotation.CacheConfig
+import org.particleframework.cache.annotation.CacheInvalidate
+import org.particleframework.cache.annotation.CachePut
+import org.particleframework.cache.annotation.Cacheable
 import org.particleframework.context.ApplicationContext
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
+
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class SyncCacheSpec extends Specification {
+
+    void "test cacheable annotations"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'particle.caches.counter.initialCapacity':10,
+                'particle.caches.counter.maximumSize':20
+        )
+
+        when:
+        CounterService counterService = applicationContext.getBean(CounterService)
+        def result =counterService.increment("test")
+
+        then:
+        result == 1
+        counterService.getValue("test") == 1
+        counterService.getValue("test") == 1
+
+        when:
+        result = counterService.incrementNoCache("test")
+
+        then:
+        result == 2
+        counterService.getValue("test") == 1
+
+        when:
+        counterService.reset("test")
+        then:
+        counterService.getValue("test") == 0
+
+        when:
+        result = counterService.increment("test")
+
+        then:
+        result == 1
+        counterService.getValue("test") == 1
+
+    }
 
     void "test configure sync cache"() {
         given:
@@ -73,5 +116,44 @@ class SyncCacheSpec extends Specification {
 
         cleanup:
         applicationContext.stop()
+    }
+
+    @Singleton
+    @CacheConfig(cacheNames = ['counter'])
+    static class CounterService {
+        Map<String, Integer> counters = new LinkedHashMap<>()
+
+        int incrementNoCache(String name) {
+            int value = counters.computeIfAbsent(name, { 0 })
+            counters.put(name, ++value)
+            return value
+        }
+
+        @CachePut
+        int increment(String name) {
+            int value = counters.computeIfAbsent(name, { 0 })
+            counters.put(name, ++value)
+            return value
+        }
+
+        @Cacheable
+        int getValue(String name) {
+            return counters.computeIfAbsent(name, { 0 })
+        }
+
+
+        @CacheInvalidate(all = true)
+        void reset() {
+            counters.clear()
+        }
+
+        @CacheInvalidate()
+        void reset(String name) {
+            counters.remove(name)
+        }
+        @CacheInvalidate
+        void set(String name, int val) {
+            counters.put(name, val)
+        }
     }
 }

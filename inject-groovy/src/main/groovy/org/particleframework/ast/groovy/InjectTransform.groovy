@@ -296,7 +296,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     else {
                         annotationMetadata = new AnnotationMetadataReference(
-                                aopProxyWriter.getBeanDefinitionName(),
+                                aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         )
                     }
@@ -395,12 +395,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                             else {
                                 annotationMetadata = new AnnotationMetadataReference(
-                                        beanMethodWriter.getBeanDefinitionName(),
+                                        beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                         methodAnnotationMetadata
                                 )
                             }
 
-                            beanMethodWriter.visitExecutableMethod(
+                            ExecutableMethodWriter writer = beanMethodWriter.visitExecutableMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
                                     returnTypeGenerics,
@@ -419,7 +419,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap,
-                                    annotationMetadata
+                                    new AnnotationMetadataReference(writer.getClassName(), annotationMetadata)
                             )
                         }
                     }.accept(methodNode.getReturnType())
@@ -526,7 +526,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                        beanWriter.visitExecutableMethod(
+                        ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
@@ -557,7 +557,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         paramsToType,
                                         qualifierTypes,
                                         genericTypeMap,
-                                        methodAnnotationMetadata
+                                        new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
                                 )
                             }
                         }
@@ -781,7 +781,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(aopProxyWriter != null) {
                     Map<String, Map<String,Object>> resolvedGenericTypes = [(propertyNode.name):AstGenericUtils.extractPlaceholders(propertyNode.type)]
                     Map<String, Object> resolvedArguments = [(propertyNode.name):AstGenericUtils.resolveTypeReference(propertyNode.type)]
-                    Map<String, Object> resolvedQualifiers = [(propertyNode.name):resolveQualifier(propertyNode.field)]
+                    Object qualifier = resolveQualifier(propertyNode.field)
+                    Map<String, Object> resolvedQualifiers
+                    if(qualifier != null) {
+                        resolvedQualifiers = [(propertyNode.name): qualifier]
+                    }
+                    else {
+                        resolvedQualifiers = Collections.emptyMap()
+                    }
                     aopWriter.visitAroundMethod(
                             propertyNode.getDeclaringClass().name,
                             void.class,

@@ -30,7 +30,6 @@ import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
-import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
@@ -270,7 +269,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                         else {
                             annotationMetadata = new AnnotationMetadataReference(
-                                    aopProxyWriter.getBeanDefinitionName(),
+                                    aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                     typeAnnotationMetadata
                             );
                         }
@@ -510,17 +509,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         AnnotationMetadata annotationMetadata;
+                        boolean isAnnotationReference = false;
                         if( annotationUtils.isAnnotated(method) ) {
                             annotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod, method);
                         }
                         else {
+                            isAnnotationReference = true;
                             annotationMetadata = new AnnotationMetadataReference(
-                                    beanMethodWriter.getBeanDefinitionName(),
+                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                     methodAnnotationMetadata
                             );
                         }
 
-                        beanMethodWriter.visitExecutableMethod(
+                        ExecutableMethodWriter executableMethodWriter = beanMethodWriter.visitExecutableMethod(
                                 owningType,
                                 resolvedReturnType,
                                 returnTypeGenerics,
@@ -540,7 +541,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(),annotationMetadata): annotationMetadata
 
                         );
                     }
@@ -575,7 +576,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
             if (typeRef == null) typeRef = modelUtils.resolveTypeReference(concreteClass);
 
-            beanWriter.visitExecutableMethod(
+            ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                     typeRef,
                     modelUtils.resolveTypeReference(returnType),
                     returnTypeGenerics,
@@ -606,6 +607,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 aopProxyWriter.visitInterceptorTypes(interceptorTypes);
 
+                boolean isAnnotationReference = methodAnnotationMetadata instanceof AnnotationMetadataReference;
+
                 aopProxyWriter.visitAroundMethod(
                         typeRef,
                         modelUtils.resolveTypeReference(returnType),
@@ -613,7 +616,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         method.getSimpleName().toString(),
                         params.getParameters(),
                         params.getQualifierTypes(),
-                        params.getGenericTypes(), methodAnnotationMetadata);
+                        params.getGenericTypes(), !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(),methodAnnotationMetadata): methodAnnotationMetadata);
 
 
             }

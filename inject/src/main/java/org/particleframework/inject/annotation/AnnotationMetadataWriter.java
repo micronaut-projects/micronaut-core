@@ -27,6 +27,7 @@ import org.particleframework.inject.writer.ClassGenerationException;
 import java.io.File;
 import java.io.OutputStream;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -91,7 +92,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     /**
      * Constructs a new writer for the given class name and metadata
      *
-     * @param className The class name for which the metadata relates
+     * @param className          The class name for which the metadata relates
      * @param annotationMetadata The annotation metadata
      */
     public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
@@ -259,24 +260,19 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     private static void pushValue(GeneratorAdapter methodVisitor, Object value) {
-        if(value == null) {
+        if (value == null) {
             methodVisitor.visitInsn(ACONST_NULL);
-        }
-        else if(value instanceof Boolean) {
-            methodVisitor.push((Boolean)value);
+        } else if (value instanceof Boolean) {
+            methodVisitor.push((Boolean) value);
             pushBoxPrimitiveIfNecessary(boolean.class, methodVisitor);
-        }
-        else if(value instanceof String) {
-            methodVisitor.push((String)value);
-        }
-        else if(value instanceof Enum) {
+        } else if (value instanceof String) {
+            methodVisitor.push((String) value);
+        } else if (value instanceof Enum) {
             Enum enumObject = (Enum) value;
             Class declaringClass = enumObject.getDeclaringClass();
             Type t = Type.getType(declaringClass);
             methodVisitor.getStatic(t, value.toString(), t);
-//            methodVisitor.push(value.toString());
-        }
-        else if(value.getClass().isArray()) {
+        } else if (value.getClass().isArray()) {
             Object[] array = (Object[]) value;
             int len = array.length;
             pushNewArray(methodVisitor, ((Object[]) value).getClass().getComponentType(), len);
@@ -286,24 +282,37 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                         pushValue(methodVisitor, array[index])
                 );
             }
-        }
-        else if(value instanceof Long) {
+        } else if (value instanceof List) {
+            List array = (List) value;
+            int len = array.size();
+            if(len == 0) {
+                pushNewArray(methodVisitor, Object.class, len);
+            }
+            else {
+                boolean first = true;
+                for (int i = 0; i < len; i++) {
+                    Object v = array.get(i);
+                    if(first) {
+                        Class type = v == null ? Object.class : v.getClass();
+                        pushNewArray(methodVisitor, type, len);
+                        first = false;
+                    }
+                    pushStoreInArray(methodVisitor, i, len, () -> pushValue(methodVisitor, v));
+                }
+            }
+        } else if (value instanceof Long) {
             methodVisitor.push(((Long) value));
             pushBoxPrimitiveIfNecessary(long.class, methodVisitor);
-        }
-        else if(value instanceof Double) {
+        } else if (value instanceof Double) {
             methodVisitor.push(((Double) value));
             pushBoxPrimitiveIfNecessary(double.class, methodVisitor);
-        }
-        else if(value instanceof Float) {
+        } else if (value instanceof Float) {
             methodVisitor.push(((Float) value));
             pushBoxPrimitiveIfNecessary(float.class, methodVisitor);
-        }
-        else if(value instanceof Number) {
+        } else if (value instanceof Number) {
             methodVisitor.push(((Number) value).intValue());
             pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
-        }
-        else if(value instanceof AnnotationValue) {
+        } else if (value instanceof AnnotationValue) {
             AnnotationValue data = (AnnotationValue) value;
             String annotationName = data.getAnnotationName();
             Map<CharSequence, Object> values = data.getValues();
@@ -312,15 +321,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.dup();
             methodVisitor.push(annotationName);
 
-            if(values != null) {
+            if (values != null) {
                 pushAnnotationAttributes(methodVisitor, values);
                 methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
-            }
-            else {
+            } else {
                 methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE);
             }
-        }
-        else {
+        } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
     }
