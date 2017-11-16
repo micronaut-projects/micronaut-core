@@ -16,6 +16,8 @@
 package org.particleframework.core.util;
 
 import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.Iterator;
 
 /**
  * Utility methods for working with arrays
@@ -66,5 +68,28 @@ public class ArrayUtils {
      */
     public static boolean isNotEmpty(Object[] array) {
         return !isEmpty(array);
+    }
+
+    /**
+     * Produce a string representation of the given array
+     * @param array The array
+     * @return The string representation
+     */
+    public static String toString(Object...array) {
+
+        if(isEmpty(array)) {
+            return "[]";
+        }
+        else {
+            StringBuilder builder = new StringBuilder("[");
+            Iterator<Object> i = Arrays.asList(array).iterator();
+            while(i.hasNext()) {
+                builder.append(i.next());
+                if(i.hasNext()) {
+                    builder.append(",");
+                }
+            }
+            return builder.toString();
+        }
     }
 }

@@ -20,6 +20,7 @@ import org.particleframework.core.util.ArrayUtils;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * A key that uses the parameters of a method
@@ -55,5 +56,10 @@ public class MethodParameterKey implements Serializable {
     @Override
     public int hashCode() {
         return hashCode;
+    }
+
+    @Override
+    public String toString() {
+        return MethodParameterKey.class.getSimpleName() + ": " + ArrayUtils.toString(params);
     }
 }

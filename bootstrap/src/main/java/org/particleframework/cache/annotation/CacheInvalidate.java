@@ -56,4 +56,10 @@ public @interface CacheInvalidate {
      * @return Whether all values within the cache should be evicted or only those for the generated key
      */
     boolean all() default false;
+
+    /**
+     * Whether the cache operation should be performed asynchronously and not blocking the returning value
+     * @return True if should be done asynchronously
+     */
+    boolean async() default false;
 }
