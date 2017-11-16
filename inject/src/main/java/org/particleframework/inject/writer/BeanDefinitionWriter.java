@@ -488,30 +488,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void writeTo(File compilationDir) throws IOException {
-        accept(newClassWriterOutputVisitor(compilationDir));
-    }
-
-    @Override
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         try (OutputStream out = visitor.visitClass(getBeanDefinitionName())) {
             try {
-                methodExecutors.forEach((className, executableMethodWriter) -> {
-                    try {
-                        AnnotationMetadataWriter annotationMetadataWriter = executableMethodWriter.getAnnotationMetadataWriter();
-                        if(annotationMetadataWriter != null) {
-
-                            try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
-                                annotationMetadataWriter.writeTo(outputStream);
-                            }
-                        }
-                        try (OutputStream outputStream = visitor.visitClass(className)) {
-                            outputStream.write(executableMethodWriter.getClassWriter().toByteArray());
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+                for (ExecutableMethodWriter methodWriter : methodExecutors.values()) {
+                    methodWriter.accept(visitor);
+                }
             } catch (RuntimeException e) {
                 Throwable cause = e.getCause();
                 if (cause instanceof IOException) {

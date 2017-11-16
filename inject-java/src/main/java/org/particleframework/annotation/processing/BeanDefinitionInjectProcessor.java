@@ -171,19 +171,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             Optional<String> replacesType = annotationUtils.getAnnotationMetadata(beanClassElement).getValue(Replaces.class, String.class);
             replacesType.ifPresent(beanDefinitionReferenceWriter::setReplaceBeanName);
+            beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
 
-            JavaFileObject beanDefClassFileObject = filer.createClassFile(className);
-            AnnotationMetadataWriter annotationMetadataWriter = beanDefinitionReferenceWriter.getAnnotationMetadataWriter();
-            if(annotationMetadataWriter != null) {
-                JavaFileObject metadataFileObject = filer.createClassFile(annotationMetadataWriter.getClassName());
-                try (OutputStream out = metadataFileObject.openOutputStream()) {
-                    annotationMetadataWriter.writeTo(out);
-                }
-            }
-
-            try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
-                beanDefinitionReferenceWriter.writeTo(out);
-            }
 
 
             Optional<File> targetDirectory = getTargetDirectory();

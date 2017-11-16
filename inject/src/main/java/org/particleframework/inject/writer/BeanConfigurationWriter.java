@@ -10,6 +10,7 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 
 /**
@@ -40,21 +41,16 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         return configurationClassName;
     }
 
-    /**
-     * Writes the configuration class for a {@link org.particleframework.context.annotation.Configuration}
-     *
-     * @param targetDir   The target directory for compilation
-     */
-    public void writeTo(File targetDir) {
-        try {
+
+    @Override
+    public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+        AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
+        if(annotationMetadataWriter != null) {
+            annotationMetadataWriter.accept(classWriterOutputVisitor);
+        }
+        try(OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
             ClassWriter classWriter = generateClassBytes();
-            AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-            if(annotationMetadataWriter != null) {
-                annotationMetadataWriter.writeTo(targetDir);
-            }
-            writeClassToDisk(targetDir, classWriter, configurationClassName);
-        } catch (Throwable e) {
-            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
+            outputStream.write(classWriter.toByteArray());
         }
     }
 

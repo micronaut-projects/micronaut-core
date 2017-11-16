@@ -23,8 +23,10 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.writer.AbstractClassFileWriter;
 import org.particleframework.inject.writer.ClassGenerationException;
+import org.particleframework.inject.writer.ClassWriterOutputVisitor;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.List;
@@ -112,21 +114,17 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Write the class to the target directory
+     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
      *
-     * @param targetDir The target directory
+     * @param outputVisitor The {@link ClassWriterOutputVisitor}
+     * @throws IOException If an error occurs
      */
-    public void writeTo(File targetDir) {
-        try {
+    public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
+        try(OutputStream outputStream = outputVisitor.visitClass(className)) {
             ClassWriter classWriter = generateClassBytes();
-
-            writeClassToDisk(targetDir, classWriter, getInternalName(className));
-
-        } catch (Throwable e) {
-            throw new ClassGenerationException("Error generating annotation metadata: " + e.getMessage(), e);
+            outputStream.write(classWriter.toByteArray());
         }
     }
-
     /**
      * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object
      *
@@ -331,4 +329,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.visitInsn(ACONST_NULL);
         }
     }
+
+
 }

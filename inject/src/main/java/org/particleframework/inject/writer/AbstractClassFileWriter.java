@@ -566,6 +566,22 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
+     * Write the class to the target directory
+     *
+     * @param targetDir The target directory
+     */
+    public void writeTo(File targetDir) throws IOException {
+        accept(newClassWriterOutputVisitor(targetDir));
+    }
+
+    /**
+     * Accept a ClassWriterOutputVisitor to write this writer to disk
+     *
+     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     */
+    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
+
+    /**
      * Represents a method {@link AnnotationSource} reference
      */
     protected class MethodAnnotationSource extends TypeAnnotationSource{

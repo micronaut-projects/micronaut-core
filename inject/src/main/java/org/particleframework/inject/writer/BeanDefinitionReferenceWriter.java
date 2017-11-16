@@ -10,7 +10,9 @@ import org.particleframework.core.annotation.Internal;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
+import javax.tools.JavaFileObject;
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 
 /**
@@ -94,40 +96,22 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * Write the class to the target directory
+     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
      *
-     * @param targetDir The target directory
+     * @param outputVisitor The {@link ClassWriterOutputVisitor}
+     * @throws IOException If an error occurs
      */
-    public void writeTo(File targetDir) {
-        try {
+    @Override
+    public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
+        if(annotationMetadataWriter != null) {
+            annotationMetadataWriter.accept(outputVisitor);
+        }
+        try(OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
             ClassWriter classWriter = generateClassBytes();
-
-            AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-            if(annotationMetadataWriter != null) {
-                annotationMetadataWriter.writeTo(targetDir);
-            }
-            writeClassToDisk(targetDir, classWriter, beanDefinitionClassInternalName);
-
-        } catch (Throwable e) {
-            throw new ClassGenerationException("Error generating bean definition class for bean definition ["+beanDefinitionName+"]: " + e.getMessage(), e);
+            outputStream.write(classWriter.toByteArray());
         }
     }
 
-    /**
-     * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object
-     *
-     * @param outputStream the output stream pointing to the target class file
-     */
-    public void writeTo(OutputStream outputStream) {
-        try {
-            ClassWriter classWriter = generateClassBytes();
-
-            writeClassToDisk(outputStream, classWriter);
-
-        } catch (Throwable e) {
-            throw new ClassGenerationException("Error generating bean definition class for bean definition ["+beanDefinitionName+"]: " + e.getMessage(), e);
-        }
-    }
 
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -185,7 +169,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         return classWriter;
     }
 
-
     private void writeReplacementIfNecessary(ClassWriter classWriter, String replaceBeanName, String method) {
         if(replaceBeanName != null) {
             MethodVisitor getReplacesBeanTypeNameMethod = startPublicMethodZeroArgs(classWriter, String.class, method);
@@ -194,5 +177,4 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             getReplacesBeanTypeNameMethod.visitMaxs(1, 1);
         }
     }
-
 }

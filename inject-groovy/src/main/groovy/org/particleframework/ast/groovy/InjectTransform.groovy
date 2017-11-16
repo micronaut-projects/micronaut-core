@@ -128,8 +128,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     beanReferenceWriter.setReplaceBeanName(replacesOpt.get())
                 }
                 beanDefinitionClassName = beanReferenceWriter.getBeanDefinitionReferenceClassName()
-                AnnotationMetadataWriter annotationMetadataWriter = beanReferenceWriter.getAnnotationMetadataWriter()
-                annotationMetadataWriter?.writeTo(classesDir)
                 beanReferenceWriter.writeTo(classesDir)
 
             } catch (Throwable e) {
