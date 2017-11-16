@@ -15,9 +15,11 @@
  */
 package org.particleframework.cache.annotation;
 
+import org.particleframework.cache.interceptor.CachingInterceptor;
 import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
 import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.AliasFor;
+import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.*;
 
@@ -33,6 +35,7 @@ import java.lang.annotation.*;
 @Inherited
 @Documented
 @CacheConfig
+@Type(CachingInterceptor.class)
 public @interface Cacheable {
 
     /**

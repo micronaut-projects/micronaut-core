@@ -312,7 +312,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         if(annotationClass == null || annotationMap == null) return null;
         String annotationName = annotationClass.getName().intern();
-        if( hasAnnotation(annotationName)) {
+        if( hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
                 ConvertibleValues<Object> annotationValues = getValues(annotationClass);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);

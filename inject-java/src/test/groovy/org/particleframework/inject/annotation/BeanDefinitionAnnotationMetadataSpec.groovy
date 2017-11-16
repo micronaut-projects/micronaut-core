@@ -33,6 +33,23 @@ import javax.inject.Singleton
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
+    void "expression parse PoC"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property="${Test.class.getName()}")
+@javax.inject.Singleton
+class Test {
+}
+''')
+        expect:
+        definition != null
+    }
+
+
     void "test basic method annotation metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.Test','''\

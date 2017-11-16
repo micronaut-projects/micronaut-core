@@ -17,6 +17,7 @@ package example;
 
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
+import org.particleframework.cache.annotation.Cacheable;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.validation.Validated;
@@ -38,6 +39,7 @@ import java.util.List;
 public class BookController {
 
     @Get
+    @Cacheable("books")
     public List<Book> index() {
         return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
     }
