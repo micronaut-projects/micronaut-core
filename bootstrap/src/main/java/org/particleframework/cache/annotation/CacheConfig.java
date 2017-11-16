@@ -17,8 +17,8 @@ package org.particleframework.cache.annotation;
 
 import org.particleframework.aop.Around;
 import org.particleframework.cache.interceptor.CachingInterceptor;
-import org.particleframework.cache.interceptor.DefaultKeyGenerator;
-import org.particleframework.cache.interceptor.KeyGenerator;
+import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
+import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.*;
@@ -47,5 +47,5 @@ public @interface CacheConfig {
     /**
      * @return The default bean type of the key generator
      */
-    Class<? extends KeyGenerator> keyGenerator() default DefaultKeyGenerator.class;
+    Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
 }

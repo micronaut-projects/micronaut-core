@@ -23,7 +23,7 @@ import org.particleframework.aop.MethodInvocationContext;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface KeyGenerator {
+public interface CacheKeyGenerator {
 
     /**
      * Generate a key for the given {@link MethodInvocationContext}

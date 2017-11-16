@@ -19,12 +19,12 @@ import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.core.util.ArrayUtils;
 
 /**
- * A default implementation of the {@link KeyGenerator} interface
+ * A default implementation of the {@link CacheKeyGenerator} interface
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultKeyGenerator implements KeyGenerator {
+public class DefaultCacheKeyGenerator implements CacheKeyGenerator {
     @Override
     public Object generateKey(MethodInvocationContext invocationContext) {
         Object[] params = invocationContext.getParameterValues();

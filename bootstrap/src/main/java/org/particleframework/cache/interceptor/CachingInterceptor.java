@@ -15,6 +15,7 @@
  */
 package org.particleframework.cache.interceptor;
 
+import org.particleframework.aop.InterceptPhase;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.cache.AsyncCache;
@@ -45,9 +46,10 @@ import java.util.concurrent.ExecutorService;
  */
 @Singleton
 public class CachingInterceptor implements MethodInterceptor {
+    public static final int POSITION = InterceptPhase.CACHE.getPosition();
     private static final String ATTRIBUTE_KEY_GENERATOR = "keyGenerator";
     private final CacheManager cacheManager;
-    private final Map<Class<? extends KeyGenerator>, KeyGenerator> keyGenerators = new ConcurrentHashMap<>();
+    private final Map<Class<? extends CacheKeyGenerator>, CacheKeyGenerator> keyGenerators = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
     private final ExecutorService ioExecutor;
 
@@ -57,6 +59,11 @@ public class CachingInterceptor implements MethodInterceptor {
         this.cacheManager = cacheManager;
         this.beanContext = beanContext;
         this.ioExecutor = ioExecutor;
+    }
+
+    @Override
+    public int getOrder() {
+        return POSITION;
     }
 
     @Override
@@ -78,11 +85,11 @@ public class CachingInterceptor implements MethodInterceptor {
     protected Object interceptSync(MethodInvocationContext context) {
         Object result;
         CacheConfig defaultConfig = context.getAnnotation(CacheConfig.class);
-        KeyGenerator defaultKeyGenerator = getKeyGenerator(defaultConfig.keyGenerator());
+        CacheKeyGenerator defaultKeyGenerator = getKeyGenerator(defaultConfig.keyGenerator());
         if(context.hasStereotype(CachePut.class)) {
             CachePut cacheConfig = context.getAnnotation(CachePut.class);
             String[] cacheNames = resolveCachePutCacheNames(context, defaultConfig, cacheConfig);
-            KeyGenerator keyGenerator = defaultKeyGenerator;
+            CacheKeyGenerator keyGenerator = defaultKeyGenerator;
             if(context.isPresent(CachePut.class, ATTRIBUTE_KEY_GENERATOR)) {
                 keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
             }
@@ -96,7 +103,7 @@ public class CachingInterceptor implements MethodInterceptor {
                 result = context.proceed();
             }
             else {
-                KeyGenerator keyGenerator = defaultKeyGenerator;
+                CacheKeyGenerator keyGenerator = defaultKeyGenerator;
                 if(context.isPresent(Cacheable.class, ATTRIBUTE_KEY_GENERATOR)) {
                     keyGenerator = getKeyGenerator(cacheConfig.keyGenerator());
                 }
@@ -130,7 +137,7 @@ public class CachingInterceptor implements MethodInterceptor {
         return context.isPresent(CachePut.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
     }
 
-    protected KeyGenerator getKeyGenerator(Class<? extends KeyGenerator> type) {
+    protected CacheKeyGenerator getKeyGenerator(Class<? extends CacheKeyGenerator> type) {
         return keyGenerators.computeIfAbsent(type, aClass -> {
                     if(beanContext.containsBean(aClass)) {
                         return beanContext.getBean(aClass);
@@ -139,10 +146,10 @@ public class CachingInterceptor implements MethodInterceptor {
                 });
     }
 
-    private void processCachePut(MethodInvocationContext context, Object result, CachePut cacheConfig, String[] cacheNames, KeyGenerator keyGenerator) {
+    private void processCachePut(MethodInvocationContext context, Object result, CachePut cacheConfig, String[] cacheNames, CacheKeyGenerator keyGenerator) {
         if(!ArrayUtils.isEmpty(cacheNames)) {
             if(cacheConfig.async()) {
-                KeyGenerator finalKeyGenerator = keyGenerator;
+                CacheKeyGenerator finalKeyGenerator = keyGenerator;
                 ioExecutor.submit(() -> {
                     Object key = finalKeyGenerator.generateKey(context);
                     for (String cacheName : cacheNames) {
@@ -161,10 +168,10 @@ public class CachingInterceptor implements MethodInterceptor {
         }
     }
 
-    private void processCacheInvalidate(MethodInvocationContext context, CacheConfig defaultConfig, KeyGenerator defaultKeyGenerator, CacheInvalidate cacheConfig, boolean async) {
+    private void processCacheInvalidate(MethodInvocationContext context, CacheConfig defaultConfig, CacheKeyGenerator defaultKeyGenerator, CacheInvalidate cacheConfig, boolean async) {
         String[] cacheNames = context.isPresent(CacheInvalidate.class, "cacheNames") ? cacheConfig.cacheNames() : defaultConfig.cacheNames();
         boolean invalidateAll = cacheConfig.all();
-        KeyGenerator keyGenerator = defaultKeyGenerator;
+        CacheKeyGenerator keyGenerator = defaultKeyGenerator;
         Object key = null;
         if(!invalidateAll) {
             if(context.isPresent(CacheInvalidate.class, ATTRIBUTE_KEY_GENERATOR)) {

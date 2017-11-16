@@ -15,6 +15,7 @@
  */
 package org.particleframework.validation;
 
+import org.particleframework.aop.InterceptPhase;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 
@@ -39,7 +40,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
     /**
      * The position of the interceptor. See {@link org.particleframework.core.order.Ordered}
      */
-    public static final int POSITION = 0;
+    public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
 
     @Override
     public int getOrder() {

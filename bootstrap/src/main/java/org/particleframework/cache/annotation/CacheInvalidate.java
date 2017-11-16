@@ -15,8 +15,8 @@
  */
 package org.particleframework.cache.annotation;
 
-import org.particleframework.cache.interceptor.DefaultKeyGenerator;
-import org.particleframework.cache.interceptor.KeyGenerator;
+import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
+import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.AliasFor;
 
 import java.lang.annotation.*;
@@ -50,7 +50,7 @@ public @interface CacheInvalidate {
      * Alias for {@link CacheConfig#keyGenerator}.
      */
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
-    Class<? extends KeyGenerator> keyGenerator() default DefaultKeyGenerator.class;
+    Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
 
     /**
      * @return Whether all values within the cache should be evicted or only those for the generated key
