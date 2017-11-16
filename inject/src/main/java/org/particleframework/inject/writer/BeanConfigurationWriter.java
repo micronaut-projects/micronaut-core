@@ -1,17 +1,19 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractBeanConfiguration;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.io.service.ServiceDescriptorGenerator;
+import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Optional;
 
 /**
  * Writes configuration classes for configuration packages using ASM
@@ -34,14 +36,6 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         this.configurationClassInternalName = targetClassType.getInternalName();
     }
 
-    /**
-     * @return The configuration class name
-     */
-    public String getConfigurationClassName() {
-        return configurationClassName;
-    }
-
-
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
@@ -52,19 +46,9 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-    }
-
-    /**
-     * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object
-     *
-     * @param outputStream the output stream pointing to the target class file
-     */
-    public void writeTo(OutputStream outputStream) {
-        try {
-            ClassWriter classWriter = generateClassBytes();
-            writeClassToDisk(outputStream, classWriter);
-        } catch (Throwable e) {
-            throw new ClassGenerationException("Error generating configuration class. I/O exception occurred: " + e.getMessage(), e);
+        Optional<File> file = classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class);
+        if(file.isPresent()) {
+            ServiceDescriptorGenerator.generate(configurationClassName, file.get());
         }
     }
 

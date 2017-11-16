@@ -1,5 +1,6 @@
 package org.particleframework.annotation.processing;
 
+import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.inject.writer.ClassWriterOutputVisitor;
 
 import javax.annotation.processing.Filer;
@@ -27,6 +28,8 @@ public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
 
     @Override
     public Optional<File> visitServiceDescriptor(String classname) throws IOException {
-        return Optional.ofNullable(targetDirectory);
+        return Optional.ofNullable(targetDirectory).map(root ->
+            new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
+        );
     }
 }

@@ -79,14 +79,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction";
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
-    private ServiceDescriptorGenerator serviceDescriptorGenerator;
     private ClassWriterOutputVisitor classWriterOutputVisitor;
     private Set<String> processed = new HashSet<>();
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        this.serviceDescriptorGenerator = new ServiceDescriptorGenerator();
         this.beanDefinitionWriters = new LinkedHashMap<>();
         this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
@@ -172,17 +170,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Optional<String> replacesType = annotationUtils.getAnnotationMetadata(beanClassElement).getValue(Replaces.class, String.class);
             replacesType.ifPresent(beanDefinitionReferenceWriter::setReplaceBeanName);
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
-
-
-
-            Optional<File> targetDirectory = getTargetDirectory();
-            if (targetDirectory.isPresent()) {
-
-                serviceDescriptorGenerator.generate(
-                        targetDirectory.get(),
-                        beanDefinitionReferenceWriter.getBeanDefinitionReferenceClassName(),
-                        BeanDefinitionReference.class);
-            }
         } catch (IOException e) {
             // raise a compile error
             error("Unexpected error: %s", e.getMessage());

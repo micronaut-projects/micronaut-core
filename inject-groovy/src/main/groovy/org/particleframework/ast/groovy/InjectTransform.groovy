@@ -19,16 +19,12 @@ import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.*
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.annotation.Internal
-import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtils
 import org.particleframework.core.value.OptionalValues
-import org.particleframework.inject.BeanConfiguration
-import org.particleframework.core.annotation.AnnotationMetadata
-import org.particleframework.inject.BeanDefinitionReference
 import org.particleframework.inject.annotation.AnnotationMetadataReference
-import org.particleframework.inject.annotation.AnnotationMetadataWriter
 import org.particleframework.inject.writer.*
 
 import javax.annotation.PostConstruct
@@ -63,26 +59,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 if (AstAnnotationUtils.hasStereotype(packageNode, Configuration)) {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(packageNode))
-                    String configurationName = null
-
                     try {
                         writer.writeTo(source.configuration.targetDirectory)
-                        configurationName = writer.getConfigurationClassName()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
-                    }
-
-                    if(configurationName != null) {
-
-                        try {
-                            ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-                            File targetDirectory = source.configuration.targetDirectory
-                            if (targetDirectory != null) {
-                                generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
-                            }
-                        } catch (Throwable e) {
-                            AstMessageUtils.error(source, classNode, "Error generating bean configuration descriptor for package-info class [${classNode.name}]: $e.message")
-                        }
                     }
                 }
 
@@ -111,11 +91,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
 
-        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
-            String beanDefinitionClassName = null
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
@@ -127,8 +105,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(replacesOpt.isPresent()) {
                     beanReferenceWriter.setReplaceBeanName(replacesOpt.get())
                 }
-                beanDefinitionClassName = beanReferenceWriter.getBeanDefinitionReferenceClassName()
                 beanReferenceWriter.writeTo(classesDir)
+                beanDefWriter.visitBeanDefinitionEnd()
+                beanDefWriter.writeTo(classesDir)
 
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
@@ -137,32 +116,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
 
-            if (beanDefinitionClassName != null) {
-                boolean abort = false
-                try {
-                    generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionReference)
-                }
-                catch (Throwable e) {
-                    abort = true
-
-                    AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanTypeName}]: $e.message")
-                    if(e.message == null) {
-                        e.printStackTrace(System.err)
-                    }
-                }
-                if(!abort) {
-                    try {
-                        beanDefWriter.visitBeanDefinitionEnd()
-                        beanDefWriter.writeTo(classesDir)
-                    } catch (Throwable e) {
-                        AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanTypeName}]: $e.message")
-                        if(e.message == null) {
-                            e.printStackTrace(System.err)
-                        }
-
-                    }
-                }
-            }
 
         }
     }

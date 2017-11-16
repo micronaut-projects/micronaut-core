@@ -4,6 +4,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.particleframework.core.annotation.AnnotationSource;
+import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.ArrayUtils;
 
@@ -483,7 +484,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
             @Override
             public Optional<File> visitServiceDescriptor(String classname) {
-                return Optional.ofNullable(compilationDir);
+                return Optional.ofNullable(compilationDir).map(root ->
+                        new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
+                );
             }
         };
     }

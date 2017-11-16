@@ -7,13 +7,14 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.particleframework.context.AbstractBeanDefinitionReference;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.annotation.AnnotationMetadataWriter;
+import org.particleframework.inject.BeanDefinitionReference;
 
-import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Optional;
 
 /**
  * Writes the bean definition class file to disk
@@ -43,6 +44,27 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
+     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
+     *
+     * @param outputVisitor The {@link ClassWriterOutputVisitor}
+     * @throws IOException If an error occurs
+     */
+    @Override
+    public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
+        if(annotationMetadataWriter != null) {
+            annotationMetadataWriter.accept(outputVisitor);
+        }
+        try(OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
+            ClassWriter classWriter = generateClassBytes();
+            outputStream.write(classWriter.toByteArray());
+        }
+        Optional<File> file = outputVisitor.visitServiceDescriptor(BeanDefinitionReference.class);
+        if(file.isPresent()) {
+            ServiceDescriptorGenerator.generate(beanDefinitionReferenceClassName, file.get());
+        }
+    }
+
+    /**
      * Set whether the bean should be in context scope
      *
      * @param contextScope The context scope
@@ -68,13 +90,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * @return Obtains the class internal name of the bean definition to be written
-     */
-    public String getBeanDefinitionClassInternalName() {
-        return beanDefinitionClassInternalName;
-    }
-
-    /**
      * Obtains the class name of the bean definition to be written. Java Annotation Processors need
      * this information to create a JavaFileObject using a Filer.
      *
@@ -85,33 +100,8 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         if(newClassName.endsWith("[]")) {
             newClassName = newClassName.substring(0, newClassName.length()-2);
         }
-        return newClassName + "Class";
+        return newClassName + REF_SUFFIX;
     }
-
-    /**
-     * @return Obtains the class name of the bean definition class to be written
-     */
-    public String getBeanDefinitionReferenceClassName() {
-        return beanDefinitionReferenceClassName;
-    }
-
-    /**
-     * Accept an {@link ClassWriterOutputVisitor} to write all generated classes
-     *
-     * @param outputVisitor The {@link ClassWriterOutputVisitor}
-     * @throws IOException If an error occurs
-     */
-    @Override
-    public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        if(annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(outputVisitor);
-        }
-        try(OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
-            ClassWriter classWriter = generateClassBytes();
-            outputStream.write(classWriter.toByteArray());
-        }
-    }
-
 
     private ClassWriter generateClassBytes() {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);

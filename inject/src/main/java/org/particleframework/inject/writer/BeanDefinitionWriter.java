@@ -11,9 +11,6 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
-import org.particleframework.inject.annotation.AnnotationMetadataWriter;
-
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;

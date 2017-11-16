@@ -36,11 +36,8 @@ import static org.particleframework.core.io.service.SoftServiceLoader.META_INF_S
  */
 public class ServiceDescriptorGenerator {
 
-    public void generate(File targetDirectory, String className, Class serviceType) throws IOException {
-        File servicesDir = new File(targetDirectory, META_INF_SERVICES);
-        servicesDir.mkdirs();
-
-        File descriptor = new File(servicesDir, serviceType.getName());
+    public static void generate(String className, File descriptor) throws IOException {
+        descriptor.getParentFile().mkdirs();
         Charset charset = StandardCharsets.UTF_8;
         Path filePath = descriptor.toPath();
         if (descriptor.exists()) {

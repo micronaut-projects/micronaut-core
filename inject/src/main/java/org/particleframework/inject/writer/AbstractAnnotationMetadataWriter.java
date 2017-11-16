@@ -43,7 +43,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * @return The annotation metadata writer
      */
-    public AnnotationMetadataWriter getAnnotationMetadataWriter() {
+    protected AnnotationMetadataWriter getAnnotationMetadataWriter() {
         return annotationMetadataWriter;
     }
 
