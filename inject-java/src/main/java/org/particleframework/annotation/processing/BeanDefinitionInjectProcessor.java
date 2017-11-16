@@ -901,7 +901,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            return annotationMetadata.hasStereotype(ConfigurationReader.class) || annotationMetadata.getValue(ForEach.class, "property").isPresent();
+            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || (annotationMetadata.hasDeclaredStereotype(ForEach.class) && annotationMetadata.getValue(ForEach.class, "property").isPresent());
         }
 
         private DynamicName createProxyKey(String beanName) {

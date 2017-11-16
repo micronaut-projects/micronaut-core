@@ -104,12 +104,12 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public boolean isIterable() {
-        return hasStereotype(ForEach.class);
+        return hasDeclaredStereotype(ForEach.class);
     }
 
     @Override
     public boolean isPrimary() {
-        return hasStereotype(Primary.class);
+        return hasDeclaredStereotype(Primary.class);
     }
 
     @Override

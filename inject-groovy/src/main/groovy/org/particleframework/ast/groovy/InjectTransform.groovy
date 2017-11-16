@@ -259,8 +259,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
-            if( annotationMetadata.hasStereotype(ConfigurationReader) ) {
-                if(annotationMetadata.hasStereotype(ForEach)) {
+            if( annotationMetadata.hasDeclaredStereotype(ConfigurationReader) ) {
+                if(annotationMetadata.hasDeclaredStereotype(ForEach)) {
                     return annotationMetadata
                             .getValue(ForEach, "property", String)
                             .isPresent()

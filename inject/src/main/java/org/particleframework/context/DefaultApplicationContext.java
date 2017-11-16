@@ -166,7 +166,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
             List<BeanDefinition> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
-                if (candidate.hasStereotype(ForEach.class)) {
+                if (candidate.hasDeclaredStereotype(ForEach.class)) {
 
                     String property = candidate.getValue(ForEach.class, "property", String.class).orElse(null);
                     String primaryPrefix = candidate.getValue(ForEach.class, "primary", String.class).orElse(null);
@@ -242,7 +242,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
         if (candidates.stream().allMatch( c -> {
             if (c instanceof BeanDefinitionDelegate) {
-                return ((BeanDefinitionDelegate) c).get(ForEach.class.getName(), Boolean.class, false) || c.getBeanType().isAnnotationPresent(ForEach.class);
+                return ((BeanDefinitionDelegate) c).get(ForEach.class.getName(), Boolean.class, false) || c.hasDeclaredAnnotation(ForEach.class);
             } else {
                 return false;
             }
