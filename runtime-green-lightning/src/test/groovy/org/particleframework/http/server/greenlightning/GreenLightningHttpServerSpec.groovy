@@ -1,9 +1,9 @@
 package org.particleframework.http.server.greenlightning
 
 import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.ParticleApplication
-import org.particleframework.stereotype.Controller
+import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.web.router.annotation.Get
 import org.particleframework.web.router.annotation.Put
 import spock.lang.Specification
@@ -13,9 +13,10 @@ class GreenLightningHttpServerSpec extends Specification {
     void "test Particle server running"() {
         when:
         ApplicationContext applicationContext = ParticleApplication.run()
+        int port = applicationContext.getBean(EmbeddedServer).getPort()
 
         then:
-        new URL("http://localhost:8080/person/Fred").getText(readTimeout: 3000) == "Person Named Fred"
+        new URL("http://localhost:${port}/person/Fred").getText(readTimeout: 3000) == "Person Named Fred"
 
         cleanup:
         applicationContext?.stop()
