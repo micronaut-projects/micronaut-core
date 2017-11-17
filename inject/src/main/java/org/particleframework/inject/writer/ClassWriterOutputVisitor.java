@@ -21,4 +21,13 @@ public interface ClassWriterOutputVisitor {
      * @throws IOException
      */
     Optional<File> visitServiceDescriptor(String classname) throws IOException;
+
+    /**
+     * @param type The service type
+     * @return the output directory
+     * @throws IOException
+     */
+    default Optional<File> visitServiceDescriptor(Class type) throws IOException {
+        return visitServiceDescriptor(type.getName());
+    }
 }

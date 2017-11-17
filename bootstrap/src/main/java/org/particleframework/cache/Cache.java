@@ -32,22 +32,5 @@ public interface Cache<C> {
      */
     C getNativeCache();
 
-    /**
-     * <p>Cache the specified value using the specified key</p>
-     *
-     * @param key the key with which the specified value is to be associated
-     * @param value the value to be associated with the specified key
-     */
-    void put(Object key, Object value);
 
-    /**
-     * Invalidate the value for the given key
-     * @param key The key to invalid
-     */
-    void invalidate(Object key);
-
-    /**
-     * Invalidate all cached values within this cache
-     */
-    void invalidateAll();
 }

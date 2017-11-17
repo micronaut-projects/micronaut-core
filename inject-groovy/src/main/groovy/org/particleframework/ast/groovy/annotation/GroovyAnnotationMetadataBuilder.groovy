@@ -114,18 +114,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 if(exp instanceof AnnotationConstantExpression) {
                     AnnotationConstantExpression ann = (AnnotationConstantExpression)exp
                     AnnotationNode value = (AnnotationNode)ann.getValue()
-
-                    def members = value.getMembers()
-                    if(members.isEmpty()) {
-                        converted.add(new AnnotationValue(value.classNode.name))
-                    }
-                    else {
-                        Map<CharSequence, Object> nestedValues = [:]
-                        for(m in members) {
-                            readAnnotationValues(m.key, m.value, nestedValues)
-                        }
-                        converted.add(new AnnotationValue(value.classNode.name, nestedValues))
-                    }
+                    converted.add(readNestedAnnotationValue(value))
                 }
                 else if(exp instanceof ConstantExpression) {
                     converted.add(((ConstantExpression)exp).value)

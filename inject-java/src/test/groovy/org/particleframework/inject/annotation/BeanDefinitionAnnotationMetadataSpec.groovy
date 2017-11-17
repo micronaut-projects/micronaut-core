@@ -19,6 +19,7 @@ import org.particleframework.context.annotation.Bean
 import org.particleframework.context.annotation.Executable
 import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
 import org.particleframework.inject.AbstractTypeElementSpec
 import org.particleframework.inject.BeanConfiguration
@@ -32,6 +33,73 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
+
+    void "test alias for existing member values within annotation values"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+import org.particleframework.context.annotation.*;
+
+@javax.inject.Singleton
+@TestCachePut("test")
+@TestCachePut("blah")
+class Test {
+
+}
+''')
+        expect:
+        definition != null
+        definition.getAnnotation(TestCachePuts.class).value()[0].value() == (['test'] as String[])
+        definition.getAnnotation(TestCachePuts.class).value()[0].cacheNames() == (['test'] as String[])
+        definition.getAnnotation(TestCachePuts.class).value()[1].value() == (['blah'] as String[])
+        definition.getAnnotation(TestCachePuts.class).value()[1].cacheNames() == (['blah'] as String[])
+    }
+
+    void "test alias for existing member values"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+import org.particleframework.context.annotation.*;
+
+@javax.inject.Singleton
+@TestCachePut("test")
+class Test {
+
+}
+''')
+        expect:
+        definition != null
+        definition.getAnnotation(TestCachePut.class).value() == (['test'] as String[])
+        definition.getAnnotation(TestCachePut.class).cacheNames() == (['test'] as String[])
+    }
+
+    void "test repeated annotation values"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@javax.inject.Singleton
+@Requires(property="foo", value="bar")
+@Requires(property="baz", value="stuff")
+class Test {
+
+    @Executable
+    void sometMethod() {}
+}
+''')
+        expect:
+        definition != null
+        definition.getAnnotation(Requirements.class).value()[0].property() == 'foo'
+        definition.getAnnotation(Requirements.class).value()[0].value() == 'bar'
+        definition.getAnnotation(Requirements.class).value()[1].property() == 'baz'
+        definition.getAnnotation(Requirements.class).value()[1].value() == 'stuff'
+    }
 
     void "test basic method annotation metadata"() {
         given:

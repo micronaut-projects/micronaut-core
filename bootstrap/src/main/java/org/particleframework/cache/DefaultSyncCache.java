@@ -18,7 +18,10 @@ package org.particleframework.cache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.ForEach;
+import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -57,24 +60,24 @@ public class DefaultSyncCache implements SyncCache<Cache> {
     }
 
     @Override
-    public <T> Optional<T> get(Object key, Class<T> requiredType) {
+    public <T> Optional<T> get(Object key, Argument<T> requiredType) {
         Object value = cache.getIfPresent(key);
         if(value != null) {
-            return conversionService.convert(value, requiredType);
+            return conversionService.convert(value, ConversionContext.of(requiredType));
         }
         return Optional.empty();
     }
 
     @Override
-    public <T> T get(Object key, Class<T> requiredType, Supplier<T> supplier) {
+    public <T> T get(Object key, Argument<T> requiredType, Supplier<T> supplier) {
         Object value = cache.get(key, o -> supplier.get());
         if(value != null) {
-            Optional<T> converted = conversionService.convert(value, requiredType);
+            Optional<T> converted = conversionService.convert(value, ConversionContext.of(requiredType));
             return converted.orElseThrow(()->
                     new IllegalArgumentException("Cache supplier returned a value that cannot be converted to type: " + requiredType.getName())
             );
         }
-        throw new IllegalArgumentException("Cache supplier returned null");
+        return (T) value;
     }
 
     @Override
@@ -89,7 +92,13 @@ public class DefaultSyncCache implements SyncCache<Cache> {
 
     @Override
     public void put(Object key, Object value) {
-        cache.put(key, value);
+        if(value == null) {
+            // null is the same as removal
+            cache.invalidate(key);
+        }
+        else {
+            cache.put(key, value);
+        }
     }
 
     @SuppressWarnings("unchecked")

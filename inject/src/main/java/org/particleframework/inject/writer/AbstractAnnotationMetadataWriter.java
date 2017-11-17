@@ -43,7 +43,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * @return The annotation metadata writer
      */
-    public AnnotationMetadataWriter getAnnotationMetadataWriter() {
+    protected AnnotationMetadataWriter getAnnotationMetadataWriter() {
         return annotationMetadataWriter;
     }
 
@@ -52,7 +52,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         annotationMetadataMethod.loadThis();
         if(annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
-            String className = reference.getClassName() + BeanDefinitionReferenceWriter.REF_SUFFIX;
+            String className = reference.getClassName();
             annotationMetadataMethod.getStatic(getTypeReference(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         }
         else {

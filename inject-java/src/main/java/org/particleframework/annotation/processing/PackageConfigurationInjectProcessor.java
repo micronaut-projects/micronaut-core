@@ -29,12 +29,10 @@ import java.util.Set;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private ServiceDescriptorGenerator serviceDescriptorGenerator;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        serviceDescriptorGenerator = new ServiceDescriptorGenerator();
     }
 
     @Override
@@ -52,28 +50,9 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(packageName, annotationUtils.getAnnotationMetadata(packageElement));
-                String configurationClassName = writer.getConfigurationClassName();
-                note("Creating class file %s for @Configuration in package-info", configurationClassName);
                 try {
-                    JavaFileObject javaFileObject =
-                        filer.createClassFile(configurationClassName, packageElement);
-
-                    AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
-                    if(annotationMetadataWriter != null) {
-                        JavaFileObject annotationMetadataFile = filer.createClassFile(annotationMetadataWriter.getClassName(), packageElement);
-                        try (OutputStream out = annotationMetadataFile.openOutputStream()) {
-                            annotationMetadataWriter.writeTo(out);
-                        }
-                    }
-                    try (OutputStream out = javaFileObject.openOutputStream()) {
-                        writer.writeTo(out);
-                    }
-                    if (configurationClassName != null) {
-                        Optional<File> targetDirectory = getTargetDirectory();
-                        if(targetDirectory.isPresent()) {
-                            serviceDescriptorGenerator.generate(targetDirectory.get(), configurationClassName, BeanConfiguration.class);
-                        }
-                    }
+                    BeanDefinitionWriterVisitor visitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
+                    writer.accept(visitor);
                 } catch (IOException e) {
                     error("Unexpected error: %s", e.getMessage());
                 }

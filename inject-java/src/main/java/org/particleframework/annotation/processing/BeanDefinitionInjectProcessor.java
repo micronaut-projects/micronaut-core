@@ -30,7 +30,6 @@ import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.annotation.AnnotationMetadataWriter;
-import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
@@ -80,14 +79,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction";
 
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
-    private ServiceDescriptorGenerator serviceDescriptorGenerator;
     private ClassWriterOutputVisitor classWriterOutputVisitor;
     private Set<String> processed = new HashSet<>();
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        this.serviceDescriptorGenerator = new ServiceDescriptorGenerator();
         this.beanDefinitionWriters = new LinkedHashMap<>();
         this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
@@ -172,29 +169,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             Optional<String> replacesType = annotationUtils.getAnnotationMetadata(beanClassElement).getValue(Replaces.class, String.class);
             replacesType.ifPresent(beanDefinitionReferenceWriter::setReplaceBeanName);
-
-            JavaFileObject beanDefClassFileObject = filer.createClassFile(className);
-            AnnotationMetadataWriter annotationMetadataWriter = beanDefinitionReferenceWriter.getAnnotationMetadataWriter();
-            if(annotationMetadataWriter != null) {
-                JavaFileObject metadataFileObject = filer.createClassFile(annotationMetadataWriter.getClassName());
-                try (OutputStream out = metadataFileObject.openOutputStream()) {
-                    annotationMetadataWriter.writeTo(out);
-                }
-            }
-
-            try (OutputStream out = beanDefClassFileObject.openOutputStream()) {
-                beanDefinitionReferenceWriter.writeTo(out);
-            }
-
-
-            Optional<File> targetDirectory = getTargetDirectory();
-            if (targetDirectory.isPresent()) {
-
-                serviceDescriptorGenerator.generate(
-                        targetDirectory.get(),
-                        beanDefinitionReferenceWriter.getBeanDefinitionReferenceClassName(),
-                        BeanDefinitionReference.class);
-            }
+            beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         } catch (IOException e) {
             // raise a compile error
             error("Unexpected error: %s", e.getMessage());
@@ -270,7 +245,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                         else {
                             annotationMetadata = new AnnotationMetadataReference(
-                                    aopProxyWriter.getBeanDefinitionName(),
+                                    aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                     typeAnnotationMetadata
                             );
                         }
@@ -510,17 +485,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         AnnotationMetadata annotationMetadata;
+                        boolean isAnnotationReference = false;
                         if( annotationUtils.isAnnotated(method) ) {
                             annotationMetadata = annotationUtils.getAnnotationMetadata(beanMethod, method);
                         }
                         else {
+                            isAnnotationReference = true;
                             annotationMetadata = new AnnotationMetadataReference(
-                                    beanMethodWriter.getBeanDefinitionName(),
+                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                     methodAnnotationMetadata
                             );
                         }
 
-                        beanMethodWriter.visitExecutableMethod(
+                        ExecutableMethodWriter executableMethodWriter = beanMethodWriter.visitExecutableMethod(
                                 owningType,
                                 resolvedReturnType,
                                 returnTypeGenerics,
@@ -540,7 +517,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 methodParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(),annotationMetadata): annotationMetadata
 
                         );
                     }
@@ -575,7 +552,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
             if (typeRef == null) typeRef = modelUtils.resolveTypeReference(concreteClass);
 
-            beanWriter.visitExecutableMethod(
+            ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                     typeRef,
                     modelUtils.resolveTypeReference(returnType),
                     returnTypeGenerics,
@@ -606,6 +583,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 aopProxyWriter.visitInterceptorTypes(interceptorTypes);
 
+                boolean isAnnotationReference = methodAnnotationMetadata instanceof AnnotationMetadataReference;
+
                 aopProxyWriter.visitAroundMethod(
                         typeRef,
                         modelUtils.resolveTypeReference(returnType),
@@ -613,7 +592,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         method.getSimpleName().toString(),
                         params.getParameters(),
                         params.getQualifierTypes(),
-                        params.getGenericTypes(), methodAnnotationMetadata);
+                        params.getGenericTypes(), !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(),methodAnnotationMetadata): methodAnnotationMetadata);
 
 
             }
@@ -898,7 +877,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            return annotationMetadata.hasStereotype(ConfigurationReader.class) || annotationMetadata.getValue(ForEach.class, "property").isPresent();
+            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || (annotationMetadata.hasDeclaredStereotype(ForEach.class) && annotationMetadata.getValue(ForEach.class, "property").isPresent());
         }
 
         private DynamicName createProxyKey(String beanName) {

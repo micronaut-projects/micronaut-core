@@ -19,16 +19,12 @@ import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.*
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.annotation.Internal
-import org.particleframework.core.io.service.ServiceDescriptorGenerator
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtils
 import org.particleframework.core.value.OptionalValues
-import org.particleframework.inject.BeanConfiguration
-import org.particleframework.core.annotation.AnnotationMetadata
-import org.particleframework.inject.BeanDefinitionReference
 import org.particleframework.inject.annotation.AnnotationMetadataReference
-import org.particleframework.inject.annotation.AnnotationMetadataWriter
 import org.particleframework.inject.writer.*
 
 import javax.annotation.PostConstruct
@@ -63,26 +59,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 PackageNode packageNode = classNode.getPackage()
                 if (AstAnnotationUtils.hasStereotype(packageNode, Configuration)) {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(packageNode))
-                    String configurationName = null
-
                     try {
                         writer.writeTo(source.configuration.targetDirectory)
-                        configurationName = writer.getConfigurationClassName()
                     } catch (Throwable e) {
                         AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
-                    }
-
-                    if(configurationName != null) {
-
-                        try {
-                            ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
-                            File targetDirectory = source.configuration.targetDirectory
-                            if (targetDirectory != null) {
-                                generator.generate(targetDirectory, configurationName, BeanConfiguration.class)
-                            }
-                        } catch (Throwable e) {
-                            AstMessageUtils.error(source, classNode, "Error generating bean configuration descriptor for package-info class [${classNode.name}]: $e.message")
-                        }
                     }
                 }
 
@@ -111,11 +91,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
 
-        ServiceDescriptorGenerator generator = new ServiceDescriptorGenerator()
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
             File classesDir = source.configuration.targetDirectory
-            String beanDefinitionClassName = null
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
@@ -127,10 +105,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(replacesOpt.isPresent()) {
                     beanReferenceWriter.setReplaceBeanName(replacesOpt.get())
                 }
-                beanDefinitionClassName = beanReferenceWriter.getBeanDefinitionReferenceClassName()
-                AnnotationMetadataWriter annotationMetadataWriter = beanReferenceWriter.getAnnotationMetadataWriter()
-                annotationMetadataWriter?.writeTo(classesDir)
                 beanReferenceWriter.writeTo(classesDir)
+                beanDefWriter.visitBeanDefinitionEnd()
+                beanDefWriter.writeTo(classesDir)
 
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
@@ -139,32 +116,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
 
-            if (beanDefinitionClassName != null) {
-                boolean abort = false
-                try {
-                    generator.generate(classesDir, beanDefinitionClassName, BeanDefinitionReference)
-                }
-                catch (Throwable e) {
-                    abort = true
-
-                    AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class descriptor for dependency injection of class [${beanTypeName}]: $e.message")
-                    if(e.message == null) {
-                        e.printStackTrace(System.err)
-                    }
-                }
-                if(!abort) {
-                    try {
-                        beanDefWriter.visitBeanDefinitionEnd()
-                        beanDefWriter.writeTo(classesDir)
-                    } catch (Throwable e) {
-                        AstMessageUtils.error(source, beanClassNode, "Error generating bean definition for dependency injection of class [${beanTypeName}]: $e.message")
-                        if(e.message == null) {
-                            e.printStackTrace(System.err)
-                        }
-
-                    }
-                }
-            }
 
         }
     }
@@ -259,8 +210,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
-            if( annotationMetadata.hasStereotype(ConfigurationReader) ) {
-                if(annotationMetadata.hasStereotype(ForEach)) {
+            if( annotationMetadata.hasDeclaredStereotype(ConfigurationReader) ) {
+                if(annotationMetadata.hasDeclaredStereotype(ForEach)) {
                     return annotationMetadata
                             .getValue(ForEach, "property", String)
                             .isPresent()
@@ -296,7 +247,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     else {
                         annotationMetadata = new AnnotationMetadataReference(
-                                aopProxyWriter.getBeanDefinitionName(),
+                                aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         )
                     }
@@ -395,12 +346,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                             else {
                                 annotationMetadata = new AnnotationMetadataReference(
-                                        beanMethodWriter.getBeanDefinitionName(),
+                                        beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                         methodAnnotationMetadata
                                 )
                             }
 
-                            beanMethodWriter.visitExecutableMethod(
+                            ExecutableMethodWriter writer = beanMethodWriter.visitExecutableMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
                                     resolvedReturnType,
                                     returnTypeGenerics,
@@ -419,7 +370,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
                                     targetMethodGenericTypeMap,
-                                    annotationMetadata
+                                    new AnnotationMetadataReference(writer.getClassName(), annotationMetadata)
                             )
                         }
                     }.accept(methodNode.getReturnType())
@@ -526,7 +477,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                        beanWriter.visitExecutableMethod(
+                        ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
@@ -557,7 +508,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         paramsToType,
                                         qualifierTypes,
                                         genericTypeMap,
-                                        methodAnnotationMetadata
+                                        new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
                                 )
                             }
                         }
@@ -781,7 +732,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if(aopProxyWriter != null) {
                     Map<String, Map<String,Object>> resolvedGenericTypes = [(propertyNode.name):AstGenericUtils.extractPlaceholders(propertyNode.type)]
                     Map<String, Object> resolvedArguments = [(propertyNode.name):AstGenericUtils.resolveTypeReference(propertyNode.type)]
-                    Map<String, Object> resolvedQualifiers = [(propertyNode.name):resolveQualifier(propertyNode.field)]
+                    Object qualifier = resolveQualifier(propertyNode.field)
+                    Map<String, Object> resolvedQualifiers
+                    if(qualifier != null) {
+                        resolvedQualifiers = [(propertyNode.name): qualifier]
+                    }
+                    else {
+                        resolvedQualifiers = Collections.emptyMap()
+                    }
                     aopWriter.visitAroundMethod(
                             propertyNode.getDeclaringClass().name,
                             void.class,

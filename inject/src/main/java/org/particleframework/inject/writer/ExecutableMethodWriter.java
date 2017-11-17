@@ -25,7 +25,10 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.annotation.AnnotationMetadataReference;
+import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.*;
 
@@ -67,10 +70,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     public String getClassName() {
         return className;
-    }
-
-    public ClassWriter getClassWriter() {
-        return classWriter;
     }
 
     public String getInternalName() {
@@ -257,4 +256,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     }
 
 
+    @Override
+    public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+        AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
+        if(annotationMetadataWriter != null) {
+            annotationMetadataWriter.accept(classWriterOutputVisitor);
+        }
+        try(OutputStream outputStream = classWriterOutputVisitor.visitClass(className)) {
+            outputStream.write(classWriter.toByteArray());
+        }
+    }
 }

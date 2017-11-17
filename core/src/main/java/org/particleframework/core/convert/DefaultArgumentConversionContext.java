@@ -30,13 +30,13 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-class DefaultArgumentConversionContext implements ArgumentConversionContext {
-    private final Argument<?> argument;
+class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T> {
+    private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
     private final List<ConversionError> conversionErrors = new ArrayList<>();
 
-    DefaultArgumentConversionContext(Argument<?> argument, Locale finalLocale, Charset finalCharset) {
+    DefaultArgumentConversionContext(Argument<T> argument, Locale finalLocale, Charset finalCharset) {
         this.argument = argument;
         this.finalLocale = finalLocale;
         this.finalCharset = finalCharset;
@@ -100,7 +100,7 @@ class DefaultArgumentConversionContext implements ArgumentConversionContext {
     }
 
     @Override
-    public Argument<?> getArgument() {
+    public Argument<T> getArgument() {
         return argument;
     }
 }

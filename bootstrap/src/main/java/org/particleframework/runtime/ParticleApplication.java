@@ -20,11 +20,9 @@ import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
-import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.CollectionUtils;
-import org.particleframework.core.util.StringUtils;
 import org.particleframework.runtime.context.env.CommandLinePropertySource;
 import org.particleframework.runtime.exceptions.ApplicationStartupException;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -50,7 +48,6 @@ public class ParticleApplication {
     private Collection<String> configurationExcludes = new HashSet<>();
     private String[] args = new String[0];
     private Set<String> environments = new HashSet<>();
-    private Package defaultPackage;
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
     private Collection<Map<String,Object>> propertyMaps = new ArrayList<>();
 
@@ -63,7 +60,6 @@ public class ParticleApplication {
     public ApplicationContext start(Class applicationClass) {
         CommandLine commandLine = CommandLine.parse(args);
 
-        environments.addAll( deduceEnvironments() );
         String[] envArray = this.environments.toArray(new String[this.environments.size()]);
         ApplicationContext applicationContext;
         if(applicationClass != null) {
@@ -78,10 +74,6 @@ public class ParticleApplication {
         Environment environment = applicationContext.getEnvironment();
         for (Class cls : classes) {
             environment.addPackage(cls.getPackage());
-        }
-
-        if(defaultPackage != null) {
-            environment.addPackage(defaultPackage);
         }
 
         for (Package aPackage : packages) {
@@ -106,15 +98,15 @@ public class ParticleApplication {
                     if(LOG.isInfoEnabled()) {
                         long end = System.currentTimeMillis();
                         long took = end - start;
-                        LOG.info("Startup completed in {}ms. Server Running: ", took, embeddedServer.getURL());
+                        LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
                     }
                 } catch (Throwable e) {
-                    handleStartupException(this.environments, e);
+                    handleStartupException(applicationContext.getEnvironment(), e);
                 }
             }));
             return applicationContext;
         } catch (Throwable e) {
-            handleStartupException(this.environments, e);
+            handleStartupException(applicationContext.getEnvironment(), e);
             return null;
         }
     }
@@ -292,15 +284,15 @@ public class ParticleApplication {
 
     /**
      * Default handling of startup exceptions.
-     * @param environments The environment
+     * @param environment The environment
      * @param exception The exception
      * @throws ApplicationStartupException If the server cannot be shutdown with an appropriate exist code
      */
-    protected void handleStartupException(Set<String> environments, Throwable exception)  {
+    protected void handleStartupException(Environment environment, Throwable exception)  {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         Integer code = exitCodeMapper.apply(exception);
         if(code > 0) {
-            if(!environments.contains( Environment.TEST)) {
+            if(!environment.getActiveNames().contains( Environment.TEST)) {
                 if(LOG.isErrorEnabled()) {
                     LOG.error("Error starting Particle server: " + exception.getMessage(), exception);
                 }
@@ -310,29 +302,5 @@ public class ParticleApplication {
         throw new ApplicationStartupException("Error starting Particle server: " + exception.getMessage(), exception);
     }
 
-    private Set<String> deduceEnvironments() {
-        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-        for (StackTraceElement stackTraceElement : stackTrace) {
-            String methodName = stackTraceElement.getMethodName();
-            if(methodName.contains("$spock_")) {
-                String className = stackTraceElement.getClassName();
-                String packageName = NameUtils.getPackageName(className);
-                defaultPackage = Package.getPackage(packageName);
-                return CollectionUtils.setOf(Environment.TEST);
-            }
-            else if("main".equals(methodName)) {
-                String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
-                defaultPackage = Package.getPackage(packageName);
-            }
-            else {
-                String className = stackTraceElement.getClassName();
-                if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                    return CollectionUtils.setOf(Environment.TEST);
-                }
-            }
-        }
-
-        return Collections.emptySet();
-    }
 
 }

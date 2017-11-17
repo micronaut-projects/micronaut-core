@@ -777,22 +777,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         proxyBeanDefinitionWriter.accept(visitor);
         try (OutputStream out = visitor.visitClass(proxyFullName)) {
             out.write(classWriter.toByteArray());
-            proxiedMethods.forEach((writer) -> {
-                try {
-                    AnnotationMetadataWriter annotationMetadataWriter = writer.getAnnotationMetadataWriter();
-                    if(annotationMetadataWriter != null) {
-                        try (OutputStream outputStream = visitor.visitClass(annotationMetadataWriter.getClassName())) {
-                            annotationMetadataWriter.writeTo(outputStream);
-                        }
-                    }
-                    try (OutputStream outputStream = visitor.visitClass(writer.getClassName())) {
-                        outputStream.write(writer.getClassWriter().toByteArray());
-                    }
-                } catch (Throwable e) {
-                    throw new ClassGenerationException("Error generating class: " + writer.getClassName(), e);
-                }
-            });
-
+            for (ExecutableMethodWriter method : proxiedMethods) {
+                method.accept(visitor);
+            }
         }
     }
 

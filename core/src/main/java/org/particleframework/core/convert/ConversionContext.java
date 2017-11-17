@@ -139,7 +139,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      * @param argument The argument
      * @return The conversion context
      */
-    static <T> ArgumentConversionContext of(Argument<T> argument) {
+    static <T> ArgumentConversionContext<T> of(Argument<T> argument) {
         return of(argument, null,null);
     }
 
@@ -162,10 +162,10 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      * @param charset The charset
      * @return The conversion context
      */
-    static <T> ArgumentConversionContext of(Argument<T> argument, @Nullable Locale locale, @Nullable Charset charset) {
+    static <T> ArgumentConversionContext<T> of(Argument<T> argument, @Nullable Locale locale, @Nullable Charset charset) {
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
         Locale finalLocale = locale != null ? locale : Locale.ENGLISH;
-        return new DefaultArgumentConversionContext(argument, finalLocale, finalCharset);
+        return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);
     }
 
 }

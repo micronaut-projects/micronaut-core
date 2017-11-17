@@ -4,6 +4,7 @@ import org.particleframework.core.annotation.AnnotationSource;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -18,4 +19,12 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
      * @return The type of the argument
      */
     Class<T> getType();
+
+    /**
+     * @return The return type as an argument
+     */
+    default Argument<T> asArgument() {
+        Collection<Argument<?>> values = getTypeVariables().values();
+        return Argument.of(getType(), values.toArray(new Argument[values.size()]));
+    }
 }

@@ -57,6 +57,25 @@ class Test {
         metadata.getValue(Requires, "property").get() == 'value'
     }
 
+
+    void "test read lists simple"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+import org.particleframework.context.annotation.*;
+
+@Requires(env=['foo'])
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getValue(Requires, "env").isPresent()
+        metadata.getValue(Requires, "env").get() == ['foo']
+    }
+
+
     void "test read constants"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test', '''\

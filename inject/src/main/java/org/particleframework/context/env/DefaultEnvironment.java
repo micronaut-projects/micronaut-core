@@ -2,6 +2,8 @@ package org.particleframework.context.env;
 
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
+import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.MapPropertyResolver;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.annotation.Nullable;
@@ -49,7 +51,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
         super(conversionService);
-        this.names = names == null ? Collections.emptySet() : Collections.unmodifiableSet(new HashSet<>(Arrays.asList(names)));
+        Set<String> specifiedNames = new HashSet<>(3);
+        specifiedNames.addAll(CollectionUtils.setOf(names));
+        EnvironmentsAndPackage environmentsAndPackage = deduceEnvironments();
+        specifiedNames.addAll(environmentsAndPackage.enviroments);
+        Package aPackage = environmentsAndPackage.aPackage;
+        if(aPackage != null) {
+            packages.add(aPackage.getName());
+        }
+        this.names = specifiedNames;
         conversionService.addConverter(
                 CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
@@ -196,6 +206,33 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
         return new CachingClassPathAnnotationScanner(classLoader);
     }
+    private EnvironmentsAndPackage deduceEnvironments() {
+        EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        for (StackTraceElement stackTraceElement : stackTrace) {
+            String methodName = stackTraceElement.getMethodName();
+            if(methodName.contains("$spock_")) {
+                String className = stackTraceElement.getClassName();
+                String packageName = NameUtils.getPackageName(className);
+                environmentsAndPackage.aPackage = Package.getPackage(packageName);
+                environmentsAndPackage.enviroments.add(Environment.TEST);
+            }
+            else if("main".equals(methodName)) {
+                String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
+                if(environmentsAndPackage.aPackage == null) {
+                    environmentsAndPackage.aPackage = Package.getPackage(packageName);
+                }
+            }
+            else {
+                String className = stackTraceElement.getClassName();
+                if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
+                    environmentsAndPackage.enviroments.add(Environment.TEST);
+                }
+            }
+        }
+
+        return environmentsAndPackage;
+    }
 
     private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
@@ -252,5 +289,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         }
         return newCatalog;
+    }
+
+    private class EnvironmentsAndPackage {
+        Package aPackage;
+        Set<String> enviroments = new HashSet<>(1);
     }
 }

@@ -4,6 +4,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.particleframework.core.annotation.AnnotationSource;
+import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.ArrayUtils;
 
@@ -483,7 +484,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
             @Override
             public Optional<File> visitServiceDescriptor(String classname) {
-                return Optional.ofNullable(compilationDir);
+                return Optional.ofNullable(compilationDir).map(root ->
+                        new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
+                );
             }
         };
     }
@@ -564,6 +567,22 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         generator.returnValue();
         return generator;
     }
+
+    /**
+     * Write the class to the target directory
+     *
+     * @param targetDir The target directory
+     */
+    public void writeTo(File targetDir) throws IOException {
+        accept(newClassWriterOutputVisitor(targetDir));
+    }
+
+    /**
+     * Accept a ClassWriterOutputVisitor to write this writer to disk
+     *
+     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
+     */
+    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
     /**
      * Represents a method {@link AnnotationSource} reference

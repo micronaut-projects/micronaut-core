@@ -20,20 +20,35 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.cache.AsyncCacheErrorHandler
+import org.particleframework.cache.CacheErrorHandler
+import org.particleframework.cache.CacheManager
+import org.particleframework.cache.interceptor.CacheInterceptor
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.BeanContext
+import org.particleframework.core.order.OrderUtil
 import org.particleframework.http.HttpStatus
-import org.particleframework.runtime.ParticleApplication
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
+import java.util.concurrent.ExecutorService
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 class ValidatedSpec extends Specification {
+
+    def "test order"() {
+        given:
+        def list = [new CacheInterceptor(Mock(CacheManager),Mock(CacheErrorHandler),Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(Optional.empty())]
+        OrderUtil.sort(list)
+
+        expect:
+        list[0] instanceof ValidatingInterceptor
+        list[1] instanceof CacheInterceptor
+    }
 
     def "test validated annotation validates beans"() {
         given:
