@@ -16,30 +16,31 @@
 package org.particleframework.http.server.greenlightning;
 
 import com.ociweb.gl.api.GreenRuntime;
-import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.runtime.server.EmbeddedServer;
+import org.particleframework.web.router.Router;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URL;
+import java.util.Optional;
 
 @Singleton
 public class GreenLightningHttpServer implements EmbeddedServer {
 
     private final HttpServerConfiguration serverConfiguration;
-    private final ApplicationContext applicationContext;
     private ParticleGreenLightningApp app;
     private final int serverPort;
+    private final Optional<Router> router;
 
     @Inject
     public GreenLightningHttpServer(
         HttpServerConfiguration serverConfiguration,
-        ApplicationContext applicationContext
+        Optional<Router> router
     ) {
         this.serverConfiguration = serverConfiguration;
-        this.applicationContext = applicationContext;
+        this.router = router;
         int port = serverConfiguration.getPort();
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
 
@@ -52,7 +53,8 @@ public class GreenLightningHttpServer implements EmbeddedServer {
 
     @Override
     public EmbeddedServer start() {
-        app = new ParticleGreenLightningApp(applicationContext,
+        app = new ParticleGreenLightningApp(
+                router,
                 getHost(),
                 getPort());
         GreenRuntime.run(app);

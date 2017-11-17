@@ -17,7 +17,6 @@ package org.particleframework.http.server.greenlightning;
 
 import com.ociweb.gl.api.*;
 import com.ociweb.pronghorn.network.config.HTTPContentTypeDefaults;
-import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
@@ -28,11 +27,11 @@ import java.util.Optional;
 class GreenLightningParticleDispatcher implements RestListener {
 
     protected final GreenCommandChannel greenCommandChannel;
-    protected final ApplicationContext applicationContext;
+    protected final Optional<Router> router;
 
-    public GreenLightningParticleDispatcher(final GreenRuntime runtime, final ApplicationContext applicationContext) {
+    public GreenLightningParticleDispatcher(final GreenRuntime runtime, final Optional<Router> router) {
         greenCommandChannel = runtime.newCommandChannel(NET_RESPONDER);
-        this.applicationContext = applicationContext;
+        this.router = router;
     }
 
     @Override
@@ -40,9 +39,7 @@ class GreenLightningParticleDispatcher implements RestListener {
         final Appendable routePath = new StringBuilder();
         request.getRoutePath(routePath);
 
-        final Optional<Router> routerBean = applicationContext.findBean(Router.class);
-
-        final Optional<UriRouteMatch<Object>> routeMatch = routerBean.flatMap((router) -> {
+        final Optional<UriRouteMatch<Object>> routeMatch = router.flatMap((router) -> {
                     return router.find(HttpMethod.GET, routePath.toString())
 //                            .filter((match) -> match.test( ?? ))
                             .findFirst();
