@@ -16,9 +16,11 @@
 package org.particleframework.cache
 
 import org.particleframework.cache.annotation.CacheConfig
-import org.particleframework.cache.annotation.CacheEvict
+import org.particleframework.cache.annotation.CacheInvalidate
 import org.particleframework.cache.annotation.CachePut
 import org.particleframework.cache.annotation.Cacheable
+import org.particleframework.cache.annotation.InvalidateOperations
+import org.particleframework.cache.annotation.PutOperations
 import org.particleframework.context.ApplicationContext
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -35,7 +37,9 @@ class SyncCacheSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'particle.caches.counter.initialCapacity':10,
-                'particle.caches.counter.maximumSize':20
+                'particle.caches.counter.maximumSize':20,
+                'particle.caches.counter2.initialCapacity':10,
+                'particle.caches.counter2.maximumSize':20
         )
 
         when:
@@ -60,11 +64,42 @@ class SyncCacheSpec extends Specification {
         counterService.getValue("test") == 0
 
         when:
+        counterService.set("test", 3)
+
+        then:
+        counterService.getValue("test") == 3
+
+        when:
         result = counterService.increment("test")
 
         then:
-        result == 1
+        result == 4
+        counterService.getValue("test") == 4
+
+        when:
+        counterService.reset()
+
+        then:
+        !counterService.getOptionalValue("test").isPresent()
+        counterService.getValue("test") == 0
+        counterService.getOptionalValue("test").isPresent()
+        counterService.getValue2("test") == 0
+
+        when:
+        counterService.increment("test")
+        counterService.increment("test")
+
+        then:
+        counterService.getValue("test") == 2
+        counterService.getValue2("test") == 0
+
+        when:
+        counterService.increment2("test")
+
+        then:
         counterService.getValue("test") == 1
+        counterService.getValue2("test") == 1
+
 
     }
 
@@ -109,6 +144,7 @@ class SyncCacheSpec extends Specification {
         syncCache.invalidateAll()
 
         then:
+
         !syncCache.get("one", Integer).isPresent()
         !syncCache.get("two", Integer).isPresent()
         !syncCache.get("three", Integer).isPresent()
@@ -119,9 +155,10 @@ class SyncCacheSpec extends Specification {
     }
 
     @Singleton
-    @CacheConfig(cacheNames = ['counter'])
+    @CacheConfig('counter')
     static class CounterService {
         Map<String, Integer> counters = new LinkedHashMap<>()
+        Map<String, Integer> counters2 = new LinkedHashMap<>()
 
         int incrementNoCache(String name) {
             int value = counters.computeIfAbsent(name, { 0 })
@@ -136,22 +173,51 @@ class SyncCacheSpec extends Specification {
             return value
         }
 
+        @PutOperations([
+                @CachePut('counter'),
+                @CachePut('counter2')
+
+        ])
+        int increment2(String name) {
+            int value = counters2.computeIfAbsent(name, { 0 })
+            counters2.put(name, ++value)
+            return value
+        }
+
         @Cacheable
         int getValue(String name) {
             return counters.computeIfAbsent(name, { 0 })
         }
 
+        @Cacheable('counter2')
+        int getValue2(String name) {
+            return counters2.computeIfAbsent(name, { 0 })
+        }
 
-        @CacheEvict(all = true)
+        @Cacheable
+        Optional<Integer> getOptionalValue(String name) {
+            return Optional.ofNullable(counters.get(name))
+        }
+
+        @CacheInvalidate(all = true)
         void reset() {
             counters.clear()
         }
 
-        @CacheEvict()
+        @CacheInvalidate
         void reset(String name) {
             counters.remove(name)
         }
-        @CacheEvict
+
+        @InvalidateOperations([
+                @CacheInvalidate('counter'),
+                @CacheInvalidate('counter2')
+        ])
+        void reset2(String name) {
+            counters.remove(name)
+        }
+
+        @CacheInvalidate(parameters = 'name')
         void set(String name, int val) {
             counters.put(name, val)
         }

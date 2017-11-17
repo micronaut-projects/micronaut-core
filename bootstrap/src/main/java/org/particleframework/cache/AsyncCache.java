@@ -60,4 +60,25 @@ public interface AsyncCache<C> extends Cache<C> {
      */
     <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value);
 
+    /**
+     * <p>Cache the specified value using the specified key</p>
+     *
+     * @param key the key with which the specified value is to be associated
+     * @param value the value to be associated with the specified key
+     * @return A future with a boolean indicating whether the operation was succesful or not
+     */
+    CompletableFuture<Boolean> put(Object key, Object value);
+
+    /**
+     * Invalidate the value for the given key
+     * @param key The key to invalid
+     * @return A future with a boolean indicating whether the operation was succesful or not
+     */
+    CompletableFuture<Boolean> invalidate(Object key);
+
+    /**
+     * Invalidate all cached values within this cache
+     * @return A future with a boolean indicating whether the operation was succesful or not
+     */
+    CompletableFuture<Boolean> invalidateAll();
 }

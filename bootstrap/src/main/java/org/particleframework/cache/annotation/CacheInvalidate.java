@@ -15,7 +15,7 @@
  */
 package org.particleframework.cache.annotation;
 
-import org.particleframework.cache.interceptor.CachingInterceptor;
+import org.particleframework.cache.interceptor.CacheInterceptor;
 import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
 import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.AliasFor;
@@ -34,12 +34,13 @@ import java.lang.annotation.*;
 @Inherited
 @Documented
 @CacheConfig
-@Type(CachingInterceptor.class)
-public @interface CacheEvict {
+@Type(CacheInterceptor.class)
+@Repeatable(InvalidateOperations.class)
+public @interface CacheInvalidate {
     /**
      * Alias for {@link CacheConfig#cacheNames}.
      */
-    @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
+    @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
@@ -56,12 +57,22 @@ public @interface CacheEvict {
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
 
     /**
+     * Limit the automatic {@link CacheKeyGenerator} to the given parameter names. Mutually exclusive with {@link #keyGenerator()}
+     *
+     * @return The parameter names that make up the key.
+     */
+    String[] parameters() default {};
+
+    /**
      * @return Whether all values within the cache should be evicted or only those for the generated key
      */
     boolean all() default false;
 
     /**
-     * Whether the cache operation should be performed asynchronously and not blocking the returning value
+     * Whether the cache operation should be performed asynchronously and not block the returning value. Note that when set to <tt>true</tt>
+     * then any cache errors will not be propagated back to the client and will simply be logged by default unless the return value itself is a non-blocking type
+     * such as {@link java.util.concurrent.CompletableFuture}.
+     *
      * @return True if should be done asynchronously
      */
     boolean async() default false;

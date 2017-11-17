@@ -74,7 +74,7 @@ public class DefaultSyncCache implements SyncCache<Cache> {
                     new IllegalArgumentException("Cache supplier returned a value that cannot be converted to type: " + requiredType.getName())
             );
         }
-        throw new IllegalArgumentException("Cache supplier returned null");
+        return (T) value;
     }
 
     @Override
@@ -89,7 +89,13 @@ public class DefaultSyncCache implements SyncCache<Cache> {
 
     @Override
     public void put(Object key, Object value) {
-        cache.put(key, value);
+        if(value == null) {
+            // null is the same as removal
+            cache.invalidate(key);
+        }
+        else {
+            cache.put(key, value);
+        }
     }
 
     @SuppressWarnings("unchecked")

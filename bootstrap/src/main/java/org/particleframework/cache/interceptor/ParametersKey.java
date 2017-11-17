@@ -20,7 +20,6 @@ import org.particleframework.core.util.ArrayUtils;
 
 import java.io.Serializable;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 
 /**
  * A key that uses the parameters of a method
@@ -28,16 +27,16 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class MethodParameterKey implements Serializable {
+public class ParametersKey implements Serializable {
 
-    public static final MethodParameterKey ZERO_ARG_KEY = new MethodParameterKey();
+    public static final ParametersKey ZERO_ARG_KEY = new ParametersKey();
 
     private final Object[] params;
     private final int hashCode;
 
-    public MethodParameterKey(Object... params) {
+    public ParametersKey(Object... params) {
         if(ArrayUtils.isEmpty(params)) {
-            this.params = ClassUtils.EMPTY_OBJECT_ARRAY;
+            this.params = ArrayUtils.EMPTY_OBJECT_ARRAY;
             this.hashCode = ClassUtils.EMPTY_OBJECT_ARRAY_HASH_CODE;
         }
         else {
@@ -50,7 +49,7 @@ public class MethodParameterKey implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        return o instanceof MethodParameterKey && Arrays.deepEquals(params, ((MethodParameterKey) o).params);
+        return o instanceof ParametersKey && Arrays.deepEquals(params, ((ParametersKey) o).params);
     }
 
     @Override
@@ -60,6 +59,6 @@ public class MethodParameterKey implements Serializable {
 
     @Override
     public String toString() {
-        return MethodParameterKey.class.getSimpleName() + ": " + ArrayUtils.toString(params);
+        return ParametersKey.class.getSimpleName() + ": " + ArrayUtils.toString(params);
     }
 }

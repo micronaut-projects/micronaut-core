@@ -16,9 +16,10 @@
 package org.particleframework.cache.annotation;
 
 import org.particleframework.aop.Around;
-import org.particleframework.cache.interceptor.CachingInterceptor;
+import org.particleframework.cache.interceptor.CacheInterceptor;
 import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
 import org.particleframework.cache.interceptor.CacheKeyGenerator;
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.*;
@@ -33,8 +34,13 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Around
-@Type(CachingInterceptor.class)
+@Type(CacheInterceptor.class)
 public @interface CacheConfig {
+    /**
+     * @return Same as {@link #cacheNames()}
+     */
+    @AliasFor(member = "cacheNames")
+    String[] value() default {};
 
     /**
      * Specifies one or many cache names to store cache operation values in. If specified at the type

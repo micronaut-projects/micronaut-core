@@ -15,7 +15,7 @@
  */
 package org.particleframework.cache.annotation;
 
-import org.particleframework.cache.interceptor.CachingInterceptor;
+import org.particleframework.cache.interceptor.CacheInterceptor;
 import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
 import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.AliasFor;
@@ -35,13 +35,14 @@ import java.lang.annotation.*;
 @Inherited
 @Documented
 @CacheConfig
-@Type(CachingInterceptor.class)
+@Type(CacheInterceptor.class)
+@Repeatable(PutOperations.class)
 public @interface CachePut {
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
      */
-    @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
+    @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
@@ -57,6 +58,12 @@ public @interface CachePut {
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
 
+    /**
+     * Limit the automatic {@link CacheKeyGenerator} to the given parameter names. Mutually exclusive with {@link #keyGenerator()}
+     *
+     * @return The parameter names that make up the key.
+     */
+    String[] parameters() default {};
     /**
      * Whether the cache operation should be performed asynchronously and not blocking the returning value
       * @return True if should be done asynchronously

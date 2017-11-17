@@ -27,6 +27,8 @@ import java.util.Iterator;
  */
 public class ArrayUtils {
 
+    public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
+
     /**
      * Concatenate two arrays
      *

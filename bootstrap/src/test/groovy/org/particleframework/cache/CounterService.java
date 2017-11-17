@@ -16,7 +16,7 @@
 package org.particleframework.cache;
 
 import org.particleframework.cache.annotation.CacheConfig;
-import org.particleframework.cache.annotation.CacheEvict;
+import org.particleframework.cache.annotation.CacheInvalidate;
 import org.particleframework.cache.annotation.CachePut;
 import org.particleframework.cache.annotation.Cacheable;
 
@@ -52,16 +52,16 @@ public class CounterService {
     }
 
 
-    @CacheEvict(all = true)
+    @CacheInvalidate(all = true)
     public void reset() {
         counters.clear();
     }
 
-    @CacheEvict()
+    @CacheInvalidate()
     public void reset(String name) {
         counters.remove(name);
     }
-    @CacheEvict
+    @CacheInvalidate
     public void set(String name, int val) {
         counters.put(name, val);
     }

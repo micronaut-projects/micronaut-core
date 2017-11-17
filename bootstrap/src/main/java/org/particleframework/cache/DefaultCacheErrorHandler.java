@@ -15,22 +15,17 @@
  */
 package org.particleframework.cache;
 
+import org.particleframework.context.annotation.Primary;
+
+import javax.inject.Singleton;
+
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}</p>
+ * Default implementation of {@link CacheErrorHandler}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Cache<C> {
-    /**
-     * @return The name of the cache
-     */
-    String getName();
-
-    /**
-     * @return The native cache implementation
-     */
-    C getNativeCache();
-
-
+@Singleton
+@Primary
+public class DefaultCacheErrorHandler implements CacheErrorHandler {
 }

@@ -13,24 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.cache;
+package org.particleframework.cache.interceptor;
 
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}</p>
+ * An exception thrown when the Supplier of a cache value causes an exception
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Cache<C> {
-    /**
-     * @return The name of the cache
-     */
-    String getName();
+class ValueSupplierException extends RuntimeException {
+
+    private final Object key;
+
+
+    ValueSupplierException(Object key, RuntimeException cause) {
+        super(cause);
+        this.key = key;
+    }
+
+    @Override
+    public synchronized RuntimeException getCause() {
+        return (RuntimeException) super.getCause();
+    }
 
     /**
-     * @return The native cache implementation
+     * @return The cache key
      */
-    C getNativeCache();
-
-
+    public Object getKey() {
+        return key;
+    }
 }

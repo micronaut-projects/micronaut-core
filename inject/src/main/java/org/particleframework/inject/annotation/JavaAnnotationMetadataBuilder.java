@@ -92,6 +92,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
     }
 
+
+
     @Override
     protected Map<? extends Element, ?> readAnnotationValues(AnnotationMirror annotationMirror) {
         return annotationMirror.getElementValues();
@@ -407,18 +409,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
                 arrayType = AnnotationValue.class;
-                Map<? extends Element, ?> annotationValues = readAnnotationValues(a);
-                if(annotationValues.isEmpty()) {
-                    values.add(new AnnotationValue(a.getAnnotationType().toString()));
-                }
-                else {
-
-                    Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
-                    for (Map.Entry<? extends Element, ?> entry : annotationValues.entrySet()) {
-                        readAnnotationValues(getAnnotationMemberName(entry.getKey()), entry.getValue(), resolvedValues);
-                    }
-                    values.add(new AnnotationValue(a.getAnnotationType().toString(), resolvedValues));
-                }
+                AnnotationValue annotationValue = readNestedAnnotationValue(a);
+                values.add(annotationValue);
                 return null;
             }
 
@@ -428,6 +420,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             }
         }
     }
+
+
 
 
 }

@@ -15,7 +15,7 @@
  */
 package org.particleframework.cache.annotation;
 
-import org.particleframework.cache.interceptor.CachingInterceptor;
+import org.particleframework.cache.interceptor.CacheInterceptor;
 import org.particleframework.cache.interceptor.DefaultCacheKeyGenerator;
 import org.particleframework.cache.interceptor.CacheKeyGenerator;
 import org.particleframework.context.annotation.AliasFor;
@@ -35,13 +35,13 @@ import java.lang.annotation.*;
 @Inherited
 @Documented
 @CacheConfig
-@Type(CachingInterceptor.class)
+@Type(CacheInterceptor.class)
 public @interface Cacheable {
 
     /**
      * Alias for {@link CacheConfig#cacheNames}.
      */
-    @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
+    @AliasFor(member = "cacheNames")
     String[] value() default {};
 
     /**
@@ -50,7 +50,12 @@ public @interface Cacheable {
     @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
     String[] cacheNames() default {};
 
-
+    /**
+     * Limit the automatic {@link CacheKeyGenerator} to the given parameter names. Mutually exclusive with {@link #keyGenerator()}
+     *
+     * @return The parameter names that make up the key.
+     */
+    String[] parameters() default {};
     /**
      * Alias for {@link CacheConfig#keyGenerator}.
      */

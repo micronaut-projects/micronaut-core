@@ -21,6 +21,8 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.Element;
 import java.util.*;
 
 /**
@@ -130,6 +132,34 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The name
      */
     protected abstract String getAnnotationMemberName(T member);
+
+    protected AnnotationValue readNestedAnnotationValue(A annotationMirror) {
+        AnnotationValue av;
+        Map<? extends T, ?> annotationValues = readAnnotationValues(annotationMirror);
+        if(annotationValues.isEmpty()) {
+            av = new AnnotationValue(getAnnotationTypeName(annotationMirror));
+        }
+        else {
+
+            Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+            for (Map.Entry<? extends T, ?> entry : annotationValues.entrySet()) {
+                T member = entry.getKey();
+                OptionalValues<?> values = getAnnotationValues(member, AliasFor.class);
+                Object annotationValue = entry.getValue();
+                Optional<?> aliasMember = values.get("member");
+                Optional<?> aliasAnnotation = values.get("annotation");
+                if(aliasMember.isPresent() && !aliasAnnotation.isPresent()) {
+                    String aliasedNamed = aliasMember.get().toString();
+                    readAnnotationValues(aliasedNamed, annotationValue, resolvedValues);
+                }
+                String memberName = getAnnotationMemberName(member);
+                readAnnotationValues(memberName, annotationValue, resolvedValues);
+            }
+            av = new AnnotationValue(getAnnotationTypeName(annotationMirror), resolvedValues);
+        }
+
+        return av;
+    }
 
     /**
      * Populate the annotation data for the given annotation

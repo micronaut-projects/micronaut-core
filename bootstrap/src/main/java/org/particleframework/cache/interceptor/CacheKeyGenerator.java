@@ -17,6 +17,8 @@ package org.particleframework.cache.interceptor;
 
 import org.particleframework.aop.MethodInvocationContext;
 
+import java.lang.reflect.AnnotatedElement;
+
 /**
  * <p>An interface for generating keys used by {@link org.particleframework.cache.annotation.Cacheable}</p>
  *
@@ -26,10 +28,11 @@ import org.particleframework.aop.MethodInvocationContext;
 public interface CacheKeyGenerator {
 
     /**
-     * Generate a key for the given {@link MethodInvocationContext}
+     * Generate a key for the given annotated element and parameters
      *
-     * @param invocationContext The invocation context
+     * @param annotatedElement The annotated element
+     * @param params The parameters
      * @return The generated key. Never null.
      */
-    Object generateKey(MethodInvocationContext invocationContext);
+    Object generateKey(AnnotatedElement annotatedElement, Object...params);
 }

@@ -15,21 +15,25 @@
  */
 package org.particleframework.cache.interceptor;
 
-import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.core.util.ArrayUtils;
 
+import java.lang.reflect.AnnotatedElement;
+
 /**
- * A default implementation of the {@link CacheKeyGenerator} interface
+ * <p>A default implementation of the {@link CacheKeyGenerator} interface that uses the paramaters of the method only</p>
+ *
+ * <p>This implementation is appropriate for most common cases but note that collisions can occur for classes that
+ * use the same cache and have overlapping signatures as the default implementation does not use the method itself when generating the key</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class DefaultCacheKeyGenerator implements CacheKeyGenerator {
+
     @Override
-    public Object generateKey(MethodInvocationContext invocationContext) {
-        Object[] params = invocationContext.getParameterValues();
+    public Object generateKey(AnnotatedElement annotatedElement, Object... params) {
         if (ArrayUtils.isEmpty(params)) {
-            return MethodParameterKey.ZERO_ARG_KEY;
+            return ParametersKey.ZERO_ARG_KEY;
         }
         if (params.length == 1) {
             Object param = params[0];
@@ -37,11 +41,11 @@ public class DefaultCacheKeyGenerator implements CacheKeyGenerator {
                 return param;
             }
             else {
-                return new MethodParameterKey(params);
+                return new ParametersKey(params);
             }
         }
         else {
-            return new MethodParameterKey(params);
+            return new ParametersKey(params);
         }
     }
 }

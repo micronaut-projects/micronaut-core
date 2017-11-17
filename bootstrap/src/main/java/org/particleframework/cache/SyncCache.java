@@ -69,10 +69,29 @@ public interface SyncCache<C> extends Cache<C> {
     <T> Optional<T> putIfAbsent(Object key, T value);
 
     /**
+     * <p>Cache the specified value using the specified key</p>
+     *
+     * @param key the key with which the specified value is to be associated
+     * @param value the value to be associated with the specified key
+     */
+    void put(Object key, Object value);
+
+    /**
+     * Invalidate the value for the given key
+     * @param key The key to invalid
+     */
+    void invalidate(Object key);
+
+    /**
+     * Invalidate all cached values within this cache
+     */
+    void invalidateAll();
+
+    /**
      * <p>This method should return an async API version of this this cache interface</p>
      *
-     * <p>The default behaviour assumes the cache implementation is running in-memory and performs no blocking operations.
-     * If I/O operations are required implementors should override this API and provide an API that implements {@link AsyncCache} non-blocking operations.</p>
+     * <p>The default behaviour assumes the cache implementation is running in-memory and performs no blocking operations and hence simply delegates to the {@link SyncCache} implementation.
+     * If I/O operations are required implementors should override this API and provide an API that implements {@link AsyncCache} in a non-blocking manner.</p>
      *
      * @return The {@link AsyncCache} implementation for this cache
      */
@@ -80,17 +99,29 @@ public interface SyncCache<C> extends Cache<C> {
         return new AsyncCache<C>() {
             @Override
             public <T> CompletableFuture<Optional<T>> get(Object key, Class<T> requiredType) {
-                return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType));
+                try {
+                    return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType));
+                } catch (Exception e) {
+                    return handleException(e);
+                }
             }
 
             @Override
             public <T> CompletableFuture<T> get(Object key, Class<T> requiredType, Supplier<T> supplier) {
-                return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType, supplier));
+                try {
+                    return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType, supplier));
+                } catch (Exception e) {
+                    return handleException(e);
+                }
             }
 
             @Override
             public <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value) {
-                return CompletableFuture.completedFuture(SyncCache.this.putIfAbsent(key, value));
+                try {
+                    return CompletableFuture.completedFuture(SyncCache.this.putIfAbsent(key, value));
+                } catch (Exception e) {
+                    return handleException(e);
+                }
             }
 
             @Override
@@ -104,18 +135,39 @@ public interface SyncCache<C> extends Cache<C> {
             }
 
             @Override
-            public void put(Object key, Object value) {
-                SyncCache.this.put(key, value);
+            public CompletableFuture<Boolean> put(Object key, Object value) {
+                try {
+                    SyncCache.this.put(key, value);
+                    return CompletableFuture.completedFuture(true);
+                } catch (Exception e) {
+                    return handleException(e);
+                }
             }
 
             @Override
-            public void invalidate(Object key) {
-                SyncCache.this.invalidate(key);
+            public CompletableFuture<Boolean> invalidate(Object key) {
+                try {
+                    SyncCache.this.invalidate(key);
+                    return CompletableFuture.completedFuture(true);
+                } catch (Exception e) {
+                    return handleException(e);
+                }
             }
 
             @Override
-            public void invalidateAll() {
-                SyncCache.this.invalidateAll();
+            public CompletableFuture<Boolean> invalidateAll() {
+                try {
+                    SyncCache.this.invalidateAll();
+                    return CompletableFuture.completedFuture(true);
+                } catch (Exception e) {
+                    return handleException(e);
+                }
+            }
+
+            private <T> CompletableFuture<T> handleException(Exception e) {
+                CompletableFuture<T> future = new CompletableFuture<>();
+                future.completeExceptionally(e);
+                return future;
             }
         };
     }

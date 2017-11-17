@@ -1,5 +1,7 @@
 package org.particleframework.core.reflect;
 
+import org.particleframework.core.util.ArrayUtils;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,8 +15,7 @@ import java.util.Optional;
  */
 public class ClassUtils {
 
-    public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
-    public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(EMPTY_OBJECT_ARRAY);
+    public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
     public static final String CLASS_EXTENSION = ".class";
 

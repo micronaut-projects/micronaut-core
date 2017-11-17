@@ -13,24 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.cache;
+package org.particleframework.inject.annotation;
 
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Cache<C> {
-    /**
-     * @return The name of the cache
-     */
-    String getName();
 
-    /**
-     * @return The native cache implementation
-     */
-    C getNativeCache();
+import java.lang.annotation.*;
 
-
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@Documented
+public @interface TestCachePuts {
+    TestCachePut[] value();
 }
