@@ -34,23 +34,26 @@ public class AsyncCacheErrorHandler implements CacheErrorHandler {
     private static final Logger LOG = LoggerFactory.getLogger(CacheInterceptor.class);
 
     @Override
-    public void handleInvalidateError(SyncCache cache, Object key, RuntimeException e) {
+    public boolean handleInvalidateError(Cache<?> cache, Object key, RuntimeException e) {
         if(LOG.isErrorEnabled()) {
             LOG.error("Error invalidating cache [" + cache.getName() + "] for key: " + key, e);
         }
+        return false;
     }
 
     @Override
-    public void handleInvalidateError(SyncCache cache, RuntimeException e) {
+    public boolean handleInvalidateError(Cache<?> cache, RuntimeException e) {
         if(LOG.isErrorEnabled()) {
             LOG.error("Error invalidating cache: " + cache.getName(), e);
         }
+        return false;
     }
 
     @Override
-    public void handlePutError(SyncCache cache, Object key, Object result, RuntimeException e) {
+    public boolean handlePutError(Cache<?> cache, Object key, Object result, RuntimeException e) {
         if(LOG.isErrorEnabled()) {
             LOG.error("Error caching value ["+result+"] for key ["+key+"] in cache: " + cache.getName(), e);
         }
+        return false;
     }
 }

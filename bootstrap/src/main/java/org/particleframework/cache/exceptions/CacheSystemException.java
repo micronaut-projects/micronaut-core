@@ -13,24 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.cache.interceptor;
-
-import java.lang.reflect.AnnotatedElement;
+package org.particleframework.cache.exceptions;
 
 /**
- * <p>An interface for generating keys used by {@link org.particleframework.cache.annotation.Cacheable}</p>
+ * An exception that occurs when an internal cache system error occurs
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface CacheKeyGenerator {
+public class CacheSystemException extends RuntimeException {
 
-    /**
-     * Generate a key for the given annotated element and parameters
-     *
-     * @param annotatedElement The annotated element
-     * @param params The parameters
-     * @return The generated key. Never null.
-     */
-    Object generateKey(AnnotatedElement annotatedElement, Object...params);
+    public CacheSystemException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

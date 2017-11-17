@@ -16,6 +16,8 @@
 package org.particleframework.cache;
 
 
+import org.particleframework.core.type.Argument;
+
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -43,8 +45,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T> The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> Optional<T> get(Object key, Class<T> requiredType);
-
+    <T> Optional<T> get(Object key, Argument<T> requiredType);
     /**
      * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
      * be invoked and the return value cached.
@@ -55,7 +56,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T> The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> T get(Object key, Class<T> requiredType, Supplier<T> supplier);
+    <T> T get(Object key, Argument<T> requiredType, Supplier<T> supplier);
 
 
     /**
@@ -67,6 +68,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
     <T> Optional<T> putIfAbsent(Object key, T value);
+
 
     /**
      * <p>Cache the specified value using the specified key</p>
@@ -88,7 +90,32 @@ public interface SyncCache<C> extends Cache<C> {
     void invalidateAll();
 
     /**
-     * <p>This method should return an async API version of this this cache interface</p>
+     * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
+     * be invoked and the return value cached.
+     *
+     * @param key The cache key
+     * @param requiredType The required type
+     * @param supplier The supplier that should be invoked if the value is not found
+     * @param <T> The concrete type
+     * @return An optional containing the value if it exists and is able to be converted to the specified type
+     */
+    default <T> T get(Object key, Class<T> requiredType, Supplier<T> supplier) {
+        return get(key, Argument.of(requiredType), supplier);
+    }
+    /**
+     * Resolve the given value for the given key
+     *
+     * @param key The cache key
+     * @param requiredType The required type
+     * @param <T> The concrete type
+     * @return An optional containing the value if it exists and is able to be converted to the specified type
+     */
+    default <T> Optional<T> get(Object key, Class<T> requiredType) {
+        return get(key, Argument.of(requiredType));
+    }
+
+    /**
+     * <p>This method should return an async API version of this cache interface implementation</p>
      *
      * <p>The default behaviour assumes the cache implementation is running in-memory and performs no blocking operations and hence simply delegates to the {@link SyncCache} implementation.
      * If I/O operations are required implementors should override this API and provide an API that implements {@link AsyncCache} in a non-blocking manner.</p>
@@ -98,7 +125,7 @@ public interface SyncCache<C> extends Cache<C> {
     default AsyncCache<C> async() {
         return new AsyncCache<C>() {
             @Override
-            public <T> CompletableFuture<Optional<T>> get(Object key, Class<T> requiredType) {
+            public <T> CompletableFuture<Optional<T>> get(Object key, Argument<T> requiredType) {
                 try {
                     return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType));
                 } catch (Exception e) {
@@ -107,7 +134,7 @@ public interface SyncCache<C> extends Cache<C> {
             }
 
             @Override
-            public <T> CompletableFuture<T> get(Object key, Class<T> requiredType, Supplier<T> supplier) {
+            public <T> CompletableFuture<T> get(Object key, Argument<T> requiredType, Supplier<T> supplier) {
                 try {
                     return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType, supplier));
                 } catch (Exception e) {

@@ -15,6 +15,8 @@
  */
 package org.particleframework.cache;
 
+import org.particleframework.core.type.Argument;
+
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -27,6 +29,7 @@ import java.util.function.Supplier;
  */
 public interface AsyncCache<C> extends Cache<C> {
 
+
     /**
      * Resolve the given value for the given key
      *
@@ -35,7 +38,7 @@ public interface AsyncCache<C> extends Cache<C> {
      * @param <T> The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> CompletableFuture<Optional<T>> get(Object key, Class<T> requiredType);
+    <T> CompletableFuture<Optional<T>> get(Object key, Argument<T> requiredType);
 
     /**
      * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
@@ -47,7 +50,7 @@ public interface AsyncCache<C> extends Cache<C> {
      * @param <T> The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> CompletableFuture<T> get(Object key, Class<T> requiredType, Supplier<T> supplier);
+    <T> CompletableFuture<T> get(Object key, Argument<T> requiredType, Supplier<T> supplier);
 
 
     /**
@@ -59,6 +62,7 @@ public interface AsyncCache<C> extends Cache<C> {
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
     <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value);
+
 
     /**
      * <p>Cache the specified value using the specified key</p>
@@ -81,4 +85,30 @@ public interface AsyncCache<C> extends Cache<C> {
      * @return A future with a boolean indicating whether the operation was succesful or not
      */
     CompletableFuture<Boolean> invalidateAll();
+
+    /**
+     * Resolve the given value for the given key
+     *
+     * @param key The cache key
+     * @param requiredType The required type
+     * @param <T> The concrete type
+     * @return An optional containing the value if it exists and is able to be converted to the specified type
+     */
+    default <T> CompletableFuture<Optional<T>> get(Object key, Class<T> requiredType) {
+        return get(key, Argument.of(requiredType));
+    }
+
+    /**
+     * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
+     * be invoked and the return value cached.
+     *
+     * @param key The cache key
+     * @param requiredType The required type
+     * @param supplier The supplier that should be invoked if the value is not found
+     * @param <T> The concrete type
+     * @return An optional containing the value if it exists and is able to be converted to the specified type
+     */
+    default <T> CompletableFuture<T> get(Object key, Class<T> requiredType, Supplier<T> supplier) {
+        return get(key, Argument.of(requiredType),supplier);
+    }
 }

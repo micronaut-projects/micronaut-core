@@ -65,8 +65,20 @@ public @interface CachePut {
      */
     String[] parameters() default {};
     /**
-     * Whether the cache operation should be performed asynchronously and not blocking the returning value
-      * @return True if should be done asynchronously
+     * <p>Whether the {@link CachePut} operation should be performed asynchronously and not block the returning value</p>
+     *
+     * <p>The value if <tt>async</tt> impacts behaviour in the following ways:</p>
+     *
+     * <ul>
+     *     <li>For blocking return types when the value is <tt>false</tt> the method will not return until the value has been written and any cache write errors will be propagated back to the client.</li>
+     *     <li>For blocking return types when the value is <tt>true</tt> the method will return prior to cache writes occurring and errors will be logged via the {@link org.particleframework.cache.AsyncCacheErrorHandler}.</li>*
+     *     <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>false</tt> the future will
+     * not complete until the {@link CachePut} operation is complete.</li>
+     *     <li>When the return type is a {@link java.util.concurrent.CompletableFuture} and the value is <tt>true</tt> the future will complete prior to any {@link CachePut} operations completing and the operations will be executing asynchronously with errors logged by {@link org.particleframework.cache.AsyncCacheErrorHandler}.</li>
+     * </ul>
+     *
+     *
+      * @return True if cache writes should be done asynchronously
      */
     boolean async() default false;
 }

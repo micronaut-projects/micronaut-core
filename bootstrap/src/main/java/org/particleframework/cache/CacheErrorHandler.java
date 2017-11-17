@@ -25,45 +25,53 @@ public interface CacheErrorHandler {
 
 
     /**
-     * Handles a cache {@link org.particleframework.cache.annotation.CacheInvalidate} error. Defaults to simplify throwing it
+     * Handles a cache {@link org.particleframework.cache.annotation.CacheInvalidate} error. Defaults to simply rethrowing the error.
+     * By returning <tt>false</tt> cache invalidate errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
      * @param key The key
      * @param e The error
+     * @return Whether the exception should be swallowed or rethrown. A value of true will rethrow he exception.
      */
-    default void handleInvalidateError(SyncCache cache, Object key, RuntimeException e) {
-        throw e;
+    default boolean handleInvalidateError(Cache<?> cache, Object key, RuntimeException e) {
+        return true;
     }
 
     /**
-     * Handles a cache {@link org.particleframework.cache.annotation.CacheInvalidate} error. Defaults to simplify throwing it
+     * Handles a cache {@link org.particleframework.cache.annotation.CacheInvalidate} error. Defaults to simply rethrowing the error.
+     * By returning <tt>false</tt> cache invalidate errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
      * @param e The error
+     * @return Whether the exception should be swallowed or rethrown. A value of true will rethrow he exception.
      */
-    default void handleInvalidateError(SyncCache cache, RuntimeException e) {
-        throw e;
+    default boolean handleInvalidateError(Cache<?> cache, RuntimeException e) {
+        return true;
     }
 
     /**
-     * Handles a cache {@link org.particleframework.cache.annotation.CachePut} error. Defaults to simplify throwing it
+     * Handles a cache {@link org.particleframework.cache.annotation.CachePut} error. Defaults to simply rethrowing the error.
+     * By returning <tt>false</tt> cache write errors will instead to be swallowed and ignored.
      *
      * @param cache The cache
      * @param e The error
+     * @return Whether the exception should be swallowed or rethrown. A value of true will rethrow he exception.
      */
-    default void handlePutError(SyncCache cache, Object key, Object result, RuntimeException e) {
-        throw e;
+    default boolean handlePutError(Cache<?> cache, Object key, Object result, RuntimeException e) {
+        return true;
     }
 
     /**
-     * Handles a load error caused by the cache when invoking the cache value {@link java.util.function.Supplier}
+     * Handles an error loading a value from the cache via {@link org.particleframework.cache.annotation.Cacheable}. Note that
+     * by returning <tt>false</tt> the behaviour can be customized such that cache related exceptions are ignored and the original
+     * method invoked.
      *
      * @param cache The cache
      * @param key The key
      * @param e The error
-     * @return The error that will be rethrown to the client
+     * @return Whether the exception should be swallowed or rethrown. A value of true will rethrow he exception.
      */
-    default RuntimeException handleLoadError(SyncCache cache, Object key, RuntimeException e) {
-        return e;
+    default boolean handleLoadError(Cache<?> cache, Object key, RuntimeException e) {
+        return true;
     }
 }

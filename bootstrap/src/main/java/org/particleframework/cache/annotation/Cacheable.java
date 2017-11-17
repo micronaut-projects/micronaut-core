@@ -22,6 +22,7 @@ import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.*;
+import java.util.function.Supplier;
 
 /**
  * <p>An annotation that can be applied at the type or method level to indicate that the return value of the method should be cached for
@@ -61,4 +62,15 @@ public @interface Cacheable {
      */
     @AliasFor(annotation = CacheConfig.class, member = "keyGenerator")
     Class<? extends CacheKeyGenerator> keyGenerator() default DefaultCacheKeyGenerator.class;
+
+    /**
+     * <p>Whether an atomic operation should be attempted to retrieve the cache value. This will call
+     * {@link org.particleframework.cache.SyncCache#get(Object, Class, Supplier)} if set to <tt>true</tt> otherwise
+     * {@link org.particleframework.cache.SyncCache#get(Object, Class)} will be called which is non-atomic</p>
+     *
+     * <p>Note that atomic operations will pick the first cache name specified and ignore the remaining.</p>
+     *
+     * @return True if an atomic operation should be attempted
+     */
+    boolean atomic() default false;
 }

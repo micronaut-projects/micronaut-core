@@ -41,7 +41,6 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
             this.cacheMap = Collections.emptyMap();
         }
         else {
-
             this.cacheMap = new LinkedHashMap<>(caches.length);
             for (SyncCache<C> cache : caches) {
                 this.cacheMap.put(cache.getName(), cache);
