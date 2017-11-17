@@ -1,9 +1,25 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.jdbc;
 
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.StringUtils;
 
+import java.util.Optional;
 
 public class CalculatedSettings {
 
@@ -11,12 +27,13 @@ public class CalculatedSettings {
     private String calculatedUrl;
     private String calculatedUsername;
     private String calculatedPassword;
-    private EmbeddedDatabaseConnection embeddedDatabaseConnection = EmbeddedDatabaseConnection.NONE;
+    private String calculatedValidationQuery;
+    private Optional<JdbcDatabaseManager.EmbeddedJdbcDatabase> embeddedDatabaseConnection;
     private BasicConfiguration basicConfiguration;
 
     public CalculatedSettings(BasicConfiguration basicConfiguration) {
         this.basicConfiguration = basicConfiguration;
-        embeddedDatabaseConnection = EmbeddedDatabaseConnection.get(this.getClass().getClassLoader());
+        embeddedDatabaseConnection = JdbcDatabaseManager.get(this.getClass().getClassLoader());
     }
 
     public String getDriverClassName() {
@@ -30,11 +47,12 @@ public class CalculatedSettings {
             } else {
                 final String url = basicConfiguration.getUrl();
                 if (StringUtils.hasText(url)) {
-                    calculatedDriverClassName = DatabaseDriver.fromJdbcUrl(url).getDriverClassName();
+                    JdbcDatabaseManager.findDatabase(url).ifPresent(db ->
+                            calculatedDriverClassName = db.getDriverClassName());
                 }
 
-                if (!StringUtils.hasText(calculatedDriverClassName)) {
-                    calculatedDriverClassName = this.embeddedDatabaseConnection.getDriverClassName();
+                if (!StringUtils.hasText(calculatedDriverClassName) && embeddedDatabaseConnection.isPresent()) {
+                    calculatedDriverClassName = this.embeddedDatabaseConnection.get().getDriverClassName();
                 }
 
                 if (!StringUtils.hasText(calculatedDriverClassName)) {
@@ -56,8 +74,8 @@ public class CalculatedSettings {
         final String url = basicConfiguration.getConfiguredUrl();
         if (calculatedUrl == null || StringUtils.hasText(url)) {
             calculatedUrl = url;
-            if (!StringUtils.hasText(calculatedUrl)) {
-                calculatedUrl = this.embeddedDatabaseConnection.getUrl(basicConfiguration.getName());
+            if (!StringUtils.hasText(calculatedUrl) && embeddedDatabaseConnection.isPresent()) {
+                calculatedUrl = embeddedDatabaseConnection.get().getUrl(basicConfiguration.getName());
                 if (!StringUtils.hasText(calculatedUrl)) {
                     throw new ConfigurationException(String.format("Error configuring data source '%s'. No URL specified", basicConfiguration.getName()));
                 }
@@ -71,7 +89,7 @@ public class CalculatedSettings {
         final String username = basicConfiguration.getConfiguredUsername();
         if (calculatedUsername == null || StringUtils.hasText(username)) {
             calculatedUsername = username;
-            if (!StringUtils.hasText(calculatedUsername) && EmbeddedDatabaseConnection.isEmbedded(basicConfiguration.getDriverClassName())) {
+            if (!StringUtils.hasText(calculatedUsername) && JdbcDatabaseManager.isEmbedded(basicConfiguration.getDriverClassName())) {
                 calculatedUsername = "sa";
             }
         }
@@ -83,12 +101,25 @@ public class CalculatedSettings {
         final String password = basicConfiguration.getConfiguredPassword();
         if (calculatedPassword == null || StringUtils.hasText(password)) {
             calculatedPassword = password;
-            if (!StringUtils.hasText(calculatedPassword) && EmbeddedDatabaseConnection.isEmbedded(basicConfiguration.getDriverClassName())) {
+            if (!StringUtils.hasText(calculatedPassword) && JdbcDatabaseManager.isEmbedded(basicConfiguration.getDriverClassName())) {
                 calculatedPassword = "";
             }
         }
 
         return calculatedPassword;
+    }
+
+    public String getValidationQuery() {
+        final String validationQuery = basicConfiguration.getConfiguredValidationQuery();
+        if (calculatedValidationQuery == null || StringUtils.hasText(validationQuery)) {
+            calculatedValidationQuery = validationQuery;
+            if (!StringUtils.hasText(calculatedValidationQuery)) {
+                JdbcDatabaseManager.findDatabase(getUrl()).ifPresent(db ->
+                    calculatedValidationQuery = db.getValidationQuery());
+            }
+        }
+
+        return calculatedValidationQuery;
     }
 
 }

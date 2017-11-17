@@ -21,13 +21,16 @@ import org.particleframework.context.annotation.ForEach;
 import org.particleframework.jdbc.BasicConfiguration;
 import org.particleframework.jdbc.CalculatedSettings;
 
+import javax.annotation.PostConstruct;
+
 /**
  * Allows the configuration of Tomcat JDBC data sources. All properties on
  * {@link PoolProperties} are available to be configured.
  *
  * If the url, driver class, username, or password are missing, sensible defaults
  * will be provided when possible. If no configuration beyond the datasource name
- * is provided, an in memory H2 datastore will be configured.
+ * is provided, an in memory datastore will be configured based on the available
+ * drivers on the classpath.
  *
  * @author James Kleeh
  * @since 1.0
@@ -41,6 +44,15 @@ public class DatasourceConfiguration extends PoolProperties implements BasicConf
         super();
         this.setName(name);
         this.calculatedSettings = new CalculatedSettings(this);
+    }
+
+    @PostConstruct
+    void postConstruct() {
+        getDriverClassName();
+        getUrl();
+        getUsername();
+        getPassword();
+        getValidationQuery();
     }
 
     @Override
@@ -81,6 +93,16 @@ public class DatasourceConfiguration extends PoolProperties implements BasicConf
     @Override
     public String getConfiguredPassword() {
         return super.getPassword();
+    }
+
+    @Override
+    public String getValidationQuery() {
+        return calculatedSettings.getValidationQuery();
+    }
+
+    @Override
+    public String getConfiguredValidationQuery() {
+        return super.getValidationQuery();
     }
 
     public String getJndiName() {
