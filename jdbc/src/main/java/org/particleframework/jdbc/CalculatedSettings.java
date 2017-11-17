@@ -36,12 +36,17 @@ public class CalculatedSettings {
         embeddedDatabaseConnection = JdbcDatabaseManager.get(this.getClass().getClassLoader());
     }
 
+    public CalculatedSettings(BasicConfiguration basicConfiguration, ClassLoader classLoader) {
+        this.basicConfiguration = basicConfiguration;
+        embeddedDatabaseConnection = JdbcDatabaseManager.get(classLoader);
+    }
+
     public String getDriverClassName() {
         final String driverClassName = basicConfiguration.getConfiguredDriverClassName();
         if (calculatedDriverClassName == null || StringUtils.hasText(driverClassName)) {
             if (StringUtils.hasText(driverClassName)) {
                 if (!driverClassIsLoadable(driverClassName)) {
-                    throw new ConfigurationException(String.format("Error configuring data source '%s'. The driver class was not found on the classpath", basicConfiguration.getName()));
+                    throw new ConfigurationException(String.format("Error configuring data source '%s'. The driver class '%s' was not found on the classpath", basicConfiguration.getName(), driverClassName));
                 }
                 calculatedDriverClassName = driverClassName;
             } else {
@@ -70,15 +75,15 @@ public class CalculatedSettings {
         return ClassUtils.isPresent(className, null);
     }
 
-    public String getUrl() throws ConfigurationException {
+    public String getUrl() {
         final String url = basicConfiguration.getConfiguredUrl();
         if (calculatedUrl == null || StringUtils.hasText(url)) {
             calculatedUrl = url;
             if (!StringUtils.hasText(calculatedUrl) && embeddedDatabaseConnection.isPresent()) {
                 calculatedUrl = embeddedDatabaseConnection.get().getUrl(basicConfiguration.getName());
-                if (!StringUtils.hasText(calculatedUrl)) {
-                    throw new ConfigurationException(String.format("Error configuring data source '%s'. No URL specified", basicConfiguration.getName()));
-                }
+            }
+            if (!StringUtils.hasText(calculatedUrl)) {
+                throw new ConfigurationException(String.format("Error configuring data source '%s'. No URL specified", basicConfiguration.getName()));
             }
         }
 
