@@ -16,34 +16,20 @@
 package org.particleframework.http.server.greenlightning;
 
 import com.ociweb.gl.api.GreenRuntime;
-import org.particleframework.core.io.socket.SocketUtils;
-import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.runtime.server.EmbeddedServer;
-import org.particleframework.web.router.Router;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URL;
-import java.util.Optional;
 
 @Singleton
 public class GreenLightningHttpServer implements EmbeddedServer {
 
-    private final HttpServerConfiguration serverConfiguration;
-    private ParticleGreenLightningApp app;
-    private final int serverPort;
-    private final Optional<Router> router;
+    private final ParticleGreenLightningApp particleGreenLightningApp;
 
     @Inject
-    public GreenLightningHttpServer(
-        HttpServerConfiguration serverConfiguration,
-        Optional<Router> router
-    ) {
-        this.serverConfiguration = serverConfiguration;
-        this.router = router;
-        int port = serverConfiguration.getPort();
-        this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
-
+    public GreenLightningHttpServer(ParticleGreenLightningApp particleGreenLightningApp) {
+        this.particleGreenLightningApp = particleGreenLightningApp;
     }
 
     @Override
@@ -53,28 +39,24 @@ public class GreenLightningHttpServer implements EmbeddedServer {
 
     @Override
     public EmbeddedServer start() {
-        app = new ParticleGreenLightningApp(
-                router,
-                getHost(),
-                getPort());
-        GreenRuntime.run(app);
+        GreenRuntime.run(particleGreenLightningApp);
         return this;
     }
 
     @Override
     public EmbeddedServer stop() {
-        app.stop();
+        particleGreenLightningApp.stop();
         return this;
     }
 
     @Override
     public int getPort() {
-        return serverPort;
+        return particleGreenLightningApp.getPort();
     }
 
     @Override
     public String getHost() {
-        return serverConfiguration.getHost().orElse("localhost");
+        return particleGreenLightningApp.getHost();
     }
 
     @Override
