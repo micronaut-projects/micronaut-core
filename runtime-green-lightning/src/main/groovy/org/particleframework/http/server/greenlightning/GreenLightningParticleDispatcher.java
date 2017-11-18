@@ -18,7 +18,7 @@ package org.particleframework.http.server.greenlightning;
 import com.ociweb.gl.api.*;
 import com.ociweb.pronghorn.network.config.HTTPContentTypeDefaults;
 import org.particleframework.http.HttpMethod;
-import org.particleframework.web.router.RouteMatch;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.web.router.Router;
 import org.particleframework.web.router.UriRouteMatch;
 
@@ -46,14 +46,16 @@ class GreenLightningParticleDispatcher implements RestListener {
                 }
         );
 
-        routeMatch.ifPresent((RouteMatch route) -> {
+        if(routeMatch.isPresent()) {
+            UriRouteMatch<Object> route = routeMatch.get();
             final Object result = route.execute();
             final Writable responseWritable = writer -> writer.writeUTF8Text(result.toString());
-            greenCommandChannel.publishHTTPResponse(request, 200,
-//                    request.getRequestContext() | HTTPFieldReader.END_OF_RESPONSE,
+            greenCommandChannel.publishHTTPResponse(request, HttpStatus.OK.getCode(),
                     HTTPContentTypeDefaults.TXT,
                     responseWritable);
-        });
+        } else {
+            greenCommandChannel.publishHTTPResponse(request, HttpStatus.NOT_FOUND.getCode(), HTTPContentTypeDefaults.UNKNOWN, Writable.NO_OP);
+        }
 
         return true;
     }
