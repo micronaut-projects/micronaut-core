@@ -46,7 +46,7 @@ public class ParticleGreenLightningApp implements GreenApp {
 
     @Override
     public void declareConfiguration(final Builder builder) {
-        builder.enableServer(false, false, host, port);
+        builder.useHTTP1xServer(port).setHost(host).useInsecureServer();
     }
 
     public void declareBehavior(final GreenRuntime runtime) {
