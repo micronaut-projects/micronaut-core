@@ -12,13 +12,20 @@ jar {
 repositories {
     mavenLocal()
     mavenCentral()
+
+    // required if using runtime-green-lightning below
+//    maven { url 'https://repository-pronghorn.forge.cloudbees.com/release' }
 }
 dependencies {
     Properties props = new Properties()
     new File("../../gradle.properties").withReader { props.load(it) }
     compileOnly "org.particleframework:inject-groovy:${props.projectVersion}"
     compile "org.codehaus.groovy:groovy:$props.groovyVersion"
+
+    // use one of these servers, not both...
     compile "org.particleframework:http-server-netty:${props.projectVersion}"
+//    compile "org.particleframework:runtime-green-lightning:${props.projectVersion}"
+
     compile "org.particleframework.configuration:jackson:${props.projectVersion}"
     compile "org.particleframework.configuration:hibernate-gorm:${props.projectVersion}"
 

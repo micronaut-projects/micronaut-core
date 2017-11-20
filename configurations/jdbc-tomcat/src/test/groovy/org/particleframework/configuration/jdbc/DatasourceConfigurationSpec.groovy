@@ -5,7 +5,6 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.sql.ResultSet
