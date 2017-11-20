@@ -15,18 +15,19 @@
  */
 package org.particleframework.context;
 
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
-import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.ReturnType;
-import org.particleframework.context.annotation.Executable;
+import org.particleframework.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 

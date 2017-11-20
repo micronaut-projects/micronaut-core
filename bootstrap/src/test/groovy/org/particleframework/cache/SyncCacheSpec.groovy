@@ -15,6 +15,8 @@
  */
 package org.particleframework.cache
 
+import io.reactivex.Flowable
+import io.reactivex.Single
 import org.particleframework.cache.annotation.CacheConfig
 import org.particleframework.cache.annotation.CacheInvalidate
 import org.particleframework.cache.annotation.CachePut
@@ -45,11 +47,20 @@ class SyncCacheSpec extends Specification {
 
         when:
         CounterService counterService = applicationContext.getBean(CounterService)
+
+        then:
+        counterService.flowableValue("test").blockingFirst() == 0
+        counterService.singleValue("test").blockingGet() == 0
+
+        when:
+        counterService.reset()
         def result =counterService.increment("test")
 
         then:
         result == 1
+        counterService.flowableValue("test").blockingFirst() == 1
         counterService.futureValue("test").get() == 1
+        counterService.singleValue("test").blockingGet() == 1
         counterService.getValue("test") == 1
         counterService.getValue("test") == 1
 
@@ -58,6 +69,7 @@ class SyncCacheSpec extends Specification {
 
         then:
         result == 2
+        counterService.flowableValue("test").blockingFirst() == 1
         counterService.futureValue("test").get() == 1
         counterService.getValue("test") == 1
 
@@ -70,6 +82,8 @@ class SyncCacheSpec extends Specification {
         counterService.reset("test")
         then:
         counterService.futureValue("test").get() == 0
+
+
 
         when:
         counterService.set("test", 3)
@@ -205,6 +219,16 @@ class SyncCacheSpec extends Specification {
         @Cacheable
         CompletableFuture<Integer> futureValue(String name) {
             return CompletableFuture.completedFuture(counters.computeIfAbsent(name, { 0 }))
+        }
+
+        @Cacheable
+        Flowable<Integer> flowableValue(String name) {
+            return Flowable.just(counters.computeIfAbsent(name, { 0 }))
+        }
+
+        @Cacheable
+        Single<Integer> singleValue(String name) {
+            return Single.just(counters.computeIfAbsent(name, { 0 }))
         }
 
         @CachePut
