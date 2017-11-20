@@ -1,0 +1,7 @@
+dependencies {
+    compile project(":jdbc")
+    compile project(":inject")
+    compileOnly project(":inject-java")
+
+    compile 'org.apache.commons:commons-dbcp2:2.1.1'
+}
