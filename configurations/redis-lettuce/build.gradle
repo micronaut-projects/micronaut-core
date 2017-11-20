@@ -1,4 +1,7 @@
 dependencies {
+    compile project(":inject")
     compileOnly project(":inject-java")
     compile "io.lettuce:lettuce-core:5.0.1.RELEASE"
+
+    testCompile "com.github.kstyrc:embedded-redis:0.6"
 }

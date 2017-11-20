@@ -40,10 +40,6 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     boolean isIterable();
 
     /**
-     * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
-     */
-    boolean isPrimary();
-    /**
      * @return The component type
      */
     @Override

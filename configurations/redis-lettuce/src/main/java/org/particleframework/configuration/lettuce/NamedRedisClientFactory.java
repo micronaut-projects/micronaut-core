@@ -13,31 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.configuration.lettuce;
 
-import org.particleframework.core.annotation.AnnotationMetadataProvider;
+import io.lettuce.core.RedisClient;
+import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.Factory;
+import org.particleframework.context.annotation.ForEach;
+
 
 /**
- * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}
+ * A factory bean for constructing {@link RedisClient} instances from {@link NamedRedisURI} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanType<T> extends AnnotationMetadataProvider {
-    /**
-     * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
-     */
-    boolean isPrimary();
+@Factory
+public class NamedRedisClientFactory {
 
-    /**
-     * @return The underlying bean type
-     */
-    Class<T> getBeanType();
-
-    /**
-     * @return The class name
-     */
-    default String getName() {
-        return getBeanType().getName();
+    @Bean(preDestroy = "shutdown")
+    @ForEach(NamedRedisURI.class)
+    public RedisClient redisClient(NamedRedisURI redisURI) {
+        return RedisClient.create(redisURI);
     }
 }

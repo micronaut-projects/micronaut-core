@@ -13,31 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.inject;
+package org.particleframework.configuration.lettuce;
 
-import org.particleframework.core.annotation.AnnotationMetadataProvider;
+import io.lettuce.core.RedisURI;
+import org.particleframework.context.annotation.Argument;
+import org.particleframework.context.annotation.ForEach;
 
 /**
- * A reference to a bean. Implemented by bother {@link BeanDefinitionReference} and {@link BeanDefinition}
+ * Allows the configuration of multiple redis servers
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanType<T> extends AnnotationMetadataProvider {
-    /**
-     * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
-     */
-    boolean isPrimary();
+@ForEach(property = "particle.redis.servers")
+public class RedisServersConfiguration extends NamedRedisURI {
 
-    /**
-     * @return The underlying bean type
-     */
-    Class<T> getBeanType();
-
-    /**
-     * @return The class name
-     */
-    default String getName() {
-        return getBeanType().getName();
+    public RedisServersConfiguration(@Argument String name) {
+        super(name);
     }
 }

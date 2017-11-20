@@ -11,6 +11,7 @@ import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
@@ -108,15 +109,12 @@ public class RequiresCondition implements Condition {
             BeanContext beanContext = context.getBeanContext();
             if(beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
-                Optional<String> resolved = propertyResolver.getProperty(property, String.class);
-                if(!resolved.isPresent()) {
+                if(!propertyResolver.containsProperties(property)) {
                     return false;
                 }
-                else if(value.length()>0) {
-                    String resolvedValue = resolved.get();
-                    if(!resolvedValue.equals(value)) {
-                        return false;
-                    }
+                else if(StringUtils.isNotEmpty(value)) {
+                    Optional<String> resolved = propertyResolver.getProperty(property, String.class);
+                    return resolved.map(val -> val.equals(value)).orElse(false);
                 }
             }
         }
