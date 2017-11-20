@@ -22,6 +22,8 @@ import org.particleframework.jdbc.BasicConfiguration;
 import org.particleframework.jdbc.CalculatedSettings;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import java.sql.SQLException;
 
 /**
  * Allows the configuration of Apache DBCP JDBC data sources. All properties on
@@ -54,6 +56,11 @@ public class DatasourceConfiguration extends BasicDataSource implements BasicCon
         getUsername();
         getPassword();
         getValidationQuery();
+    }
+
+    @PreDestroy
+    void preDestroy() throws SQLException {
+        this.close();
     }
 
     public String getName() {
