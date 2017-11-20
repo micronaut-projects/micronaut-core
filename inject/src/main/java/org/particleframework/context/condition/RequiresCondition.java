@@ -129,7 +129,7 @@ public class RequiresCondition implements Condition {
             BeanContext beanContext = context.getBeanContext();
             if(beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
-                if(propertyResolver.containsProperty(property)) {
+                if(propertyResolver.containsProperties(property)) {
                     return false;
                 }
             }

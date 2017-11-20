@@ -24,5 +24,6 @@ include "jdbc"
 // configurations
 include "configurations/hibernate-validator"
 include "configurations/hibernate-gorm"
+include "configurations/redis-lettuce"
 include "configurations/jackson"
 include "configurations/jdbc-tomcat"

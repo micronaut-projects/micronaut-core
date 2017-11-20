@@ -3,6 +3,7 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.event.BeanInitializedEventListener;
@@ -53,6 +54,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     private final Class<T> type;
     private final boolean singleton;
     private final boolean isProvided;
+    private final boolean isConfigurationProperties;
     private final Class<?> declaringType;
     private boolean hasPreDestroyMethods = false;
     private boolean hasPostConstructMethods = false;
@@ -85,6 +87,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 method,
                 Modifier.isPrivate(method.getModifiers()),
                 arguments);
+        this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
     }
 
     @Internal
@@ -99,6 +102,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.singleton = singleton;
         this.declaringType = type;
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
+        this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
     }
 
 
@@ -591,10 +595,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             Argument argument = injectionPoint.getArguments()[argIndex];
             String argumentName = argument.getName();
             Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
+            Class beanType = injectionPoint.getDeclaringBean().getBeanType();
             Value valAnn = argument.getAnnotation(Value.class);
-            String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
+            String valString = resolveValueString(resolutionContext, context, declaringClass, beanType, argumentName, valAnn);
             ApplicationContext applicationContext = (ApplicationContext) context;
-            boolean result = applicationContext.containsProperty(valString);
+            Class type = argument.getType();
+            boolean isConfigProps = type.getAnnotation(ConfigurationProperties.class) != null;
+            boolean result = isConfigProps || Map.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if(!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
                 if(cliOption != null) {
@@ -959,7 +966,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                     valueAnn
             );
             ApplicationContext applicationContext = (ApplicationContext) context;
-            boolean result = applicationContext.containsProperty(valString);
+            Class fieldType = injectionPoint.getType();
+            boolean isConfigProps = fieldType.getAnnotation(ConfigurationProperties.class) != null;
+            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if(!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(injectionPoint.getName());
                 if(cliOption != null) {
@@ -967,6 +976,41 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 }
             }
             return result;
+        }
+        return false;
+    }
+
+    /**
+     * Return whether the context contains the given properties
+     *
+     * @param resolutionContext the resolution context
+     * @param context The context
+     * @return True if it does
+     */
+    @Internal
+    protected boolean containsProperties(BeanResolutionContext resolutionContext, BeanContext context) {
+        if(context instanceof ApplicationContext) {
+            ApplicationContext appCtx = (ApplicationContext) context;
+            Class<?> beanType = getBeanType();
+            ConfigurationProperties annotation = beanType.getAnnotation(ConfigurationProperties.class);
+            while(annotation != null) {
+                if( ArrayUtils.isNotEmpty(annotation.cliPrefix()) ) {
+                    // little bit of a hack this, would be nice if we had a better way to acknowledge CLI properties
+                    return true;
+                }
+
+                String prefix = resolvePrefix(resolutionContext, context, beanType, beanType);
+                if(appCtx.containsProperties(prefix) ) {
+                    return true;
+                }
+                beanType = beanType.getSuperclass();
+                if(beanType == null) {
+                    break;
+                }
+                else {
+                    annotation = beanType.getAnnotation(ConfigurationProperties.class);
+                }
+            }
         }
         return false;
     }
@@ -1338,7 +1382,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     private boolean isConfigurationProperties() {
-        return hasStereotype(ConfigurationReader.class) || isIterable();
+        return isConfigurationProperties;
     }
 
     private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {

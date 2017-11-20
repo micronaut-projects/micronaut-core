@@ -106,21 +106,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 return false;
             }
             else {
+                name = trimIndex(name);
+                return entries.containsKey(name);
+            }
+        }
+    }
+
+    @Override
+    public boolean containsProperties(@Nullable String name) {
+        if(StringUtils.isEmpty(name)) {
+            return false;
+        }
+        else {
+            Map<String, Object> entries = resolveEntriesForKey(name, false);
+            if(entries == null) {
+                return false;
+            }
+            else {
+                name = trimIndex(name);
                 if(entries.containsKey(name)) {
                     return true;
                 }
                 else {
-                    int i = name.indexOf('[');
-                    if(i > -1 && name.endsWith("]")) {
-                        name = name.substring(0, i);
-                    }
                     String finalName = name;
                     return entries.keySet().stream().anyMatch(key -> key.startsWith(finalName));
                 }
             }
         }
     }
-
 
     @Override
     public <T> Optional<T> getProperty(@Nullable String name, Class<T> requiredType, ConversionContext context) {
@@ -294,5 +307,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return entries;
+    }
+
+    private String trimIndex( String name) {
+        int i = name.indexOf('[');
+        if(i > -1 && name.endsWith("]")) {
+            name = name.substring(0, i);
+        }
+        return name;
     }
 }
