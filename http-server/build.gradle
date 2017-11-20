@@ -1,5 +1,4 @@
 dependencies {
-    compile project(":reactive")
     compile project(":bootstrap")
     compile project(":http")
     compileOnly project(":inject-java")

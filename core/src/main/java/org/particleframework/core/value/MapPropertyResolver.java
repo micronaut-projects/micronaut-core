@@ -32,6 +32,11 @@ public class MapPropertyResolver implements PropertyResolver {
     }
 
     @Override
+    public boolean containsProperties(String name) {
+        return map.keySet().stream().anyMatch(k -> k.startsWith(name));
+    }
+
+    @Override
     public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         Object value = map.get(name);
         return conversionService.convert(value, requiredType, context);

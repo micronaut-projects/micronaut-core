@@ -16,44 +16,51 @@
 package org.particleframework.http.server.greenlightning;
 
 import com.ociweb.gl.api.GreenRuntime;
-import org.particleframework.context.ApplicationContext;
-import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.net.URL;
 
+@Singleton
 public class GreenLightningHttpServer implements EmbeddedServer {
 
-    private final HttpServerConfiguration serverConfiguration;
-    private final ApplicationContext applicationContext;
-    private ParticleGreenLightningApp app;
+    private final ParticleGreenLightningApp particleGreenLightningApp;
 
     @Inject
-    public GreenLightningHttpServer(
-        HttpServerConfiguration serverConfiguration,
-        ApplicationContext applicationContext
-    ) {
-        this.serverConfiguration = serverConfiguration;
-        this.applicationContext = applicationContext;
+    public GreenLightningHttpServer(ParticleGreenLightningApp particleGreenLightningApp) {
+        this.particleGreenLightningApp = particleGreenLightningApp;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return false;
     }
 
     @Override
     public EmbeddedServer start() {
-        app = new ParticleGreenLightningApp(applicationContext,
-                serverConfiguration.getHost(),
-                serverConfiguration.getPort());
-        GreenRuntime.run(app);
+        GreenRuntime.run(particleGreenLightningApp);
         return this;
     }
 
     @Override
     public EmbeddedServer stop() {
-        app.stop();
+        particleGreenLightningApp.stop();
         return this;
     }
 
     @Override
     public int getPort() {
-        return serverConfiguration.getPort();
+        return particleGreenLightningApp.getPort();
+    }
+
+    @Override
+    public String getHost() {
+        return particleGreenLightningApp.getHost();
+    }
+
+    @Override
+    public URL getURL() {
+        return null;
     }
 }

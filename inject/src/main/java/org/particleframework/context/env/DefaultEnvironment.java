@@ -186,6 +186,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
+        return conversionService.canConvert(sourceType, targetType);
+    }
+
+    @Override
     public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         conversionService.addConverter(sourceType, targetType, typeConverter);
         return this;

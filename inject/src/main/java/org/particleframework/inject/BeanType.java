@@ -25,6 +25,11 @@ import org.particleframework.core.annotation.AnnotationMetadataProvider;
  */
 public interface BeanType<T> extends AnnotationMetadataProvider {
     /**
+     * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
+     */
+    boolean isPrimary();
+
+    /**
      * @return The underlying bean type
      */
     Class<T> getBeanType();

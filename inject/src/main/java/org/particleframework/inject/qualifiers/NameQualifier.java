@@ -2,6 +2,7 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.inject.BeanDefinition;
@@ -77,6 +78,9 @@ class NameQualifier<T> implements Qualifier<T>, org.particleframework.core.namin
     protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName) {
         return candidates.filter(candidate -> {
                     String candidateName;
+                    if(candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
+                        return true;
+                    }
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {

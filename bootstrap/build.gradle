@@ -3,10 +3,14 @@ dependencies {
     compile project(":http")
     compile project(":aop")
     compile "javax.validation:validation-api:$validationVersion"
+    compileOnly 'io.reactivex.rxjava2:rxjava:2.1.5'
+
 
     compileOnly project(":inject-java")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
+    testCompile 'io.reactivex.rxjava2:rxjava:2.1.5'
+
     testCompile "org.grails:grails-datastore-gorm:6.1.7.RELEASE"
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

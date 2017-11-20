@@ -5,6 +5,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
+import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameUtils;
@@ -128,6 +129,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method CONTAINS_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
+    private static final Method CONTAINS_PROPERTIES_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsProperties", BeanResolutionContext.class, BeanContext.class);
+
     private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getBeanForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
 
     private static final Method GET_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
@@ -161,9 +164,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final String beanSimpleClassName;
     private final Type beanDefinitionType;
     private final boolean isInterface;
+    private final boolean isConfigurationProperties;
     private GeneratorAdapter constructorVisitor;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
+    private Label injectEnd = null;
     private GeneratorAdapter preDestroyMethodVisitor;
     private GeneratorAdapter postConstructMethodVisitor;
     private int methodExecutorIndex = 0;
@@ -265,6 +270,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isSingleton = isSingleton;
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
+        this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
     }
 
     /**
@@ -1254,7 +1260,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     null,
                     null), ACC_PROTECTED, "injectBean", desc);
 
-            MethodVisitor injectMethodVisitor = this.injectMethodVisitor;
+            GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
+            if(isConfigurationProperties) {
+                injectMethodVisitor.loadThis();
+                injectMethodVisitor.loadArg(0);
+                injectMethodVisitor.loadArg(1);
+                injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(CONTAINS_PROPERTIES_METHOD));
+                injectMethodVisitor.push(false);
+                injectEnd = new Label();
+                injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, injectEnd );
+                // add the true condition
+                injectMethodVisitor.visitLabel(new Label());
+            }
             // The object being injected is argument 3 of the inject method
             injectMethodVisitor.visitVarInsn(ALOAD, 3);
             // store it in a local variable
@@ -1354,6 +1371,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void finalizeInjectMethod() {
+        if(injectEnd != null) {
+            injectMethodVisitor.visitLabel(injectEnd);
+        }
 
         invokeSuperInjectMethod(injectMethodVisitor, INJECT_BEAN_METHOD);
         injectMethodVisitor.visitInsn(ARETURN);

@@ -4,7 +4,9 @@ plugins {
     id "application"
 }
 mainClassName = "example.Application"
-applicationDefaultJvmArgs = [""]
+
+// TODO: Why does this prevent "gradle run" from working?...
+//applicationDefaultJvmArgs = [""]
 jar {
     manifest {
         attributes 'Main-Class': "example.Application"

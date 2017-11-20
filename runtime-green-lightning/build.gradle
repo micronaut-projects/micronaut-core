@@ -1,14 +1,17 @@
+apply plugin: 'groovy'
+
 repositories {
     maven { url 'https://repository-pronghorn.forge.cloudbees.com/release' }
 }
 
 dependencies {
-    compile project(':runtime')
-    compile project(':runtime-http')
-    compile project(':router')
-    compile project(':java-inject')
-
-    testCompile project(':ast')
-
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
     compile 'com.ociweb:GreenLightning:0.0.6-SNAPSHOT'
+
+    compile project(':http-server')
+    compile project(':router')
+
+    compileOnly project(":inject-java")
+
+    testCompile project(":inject-groovy")
 }

@@ -15,11 +15,26 @@ public interface PropertyResolver extends ValueResolver {
 
 
     /**
-     * Whether the given property is contained within this resolved
+     * <p>Whether the given property is contained within this resolver.</p>
+     *
+     * <p>Note that this method will return false for nested properties. In other words given a key of <tt>foo.bar</tt> this method will
+     * return <tt>false</tt> for: <code>resolver.containsProperty("foo")</code></p>
+     *
+     * <p>To check for nested properties using {@link #containsProperties(String)} instead.</p>
+     *
      * @param name The name of the property
      * @return True if it is
      */
     boolean containsProperty(String name);
+
+    /**
+     * Whether the given property or any nested properties exist for the key given key within this resolver
+     *
+     * @param name The name of the property
+     * @return True if it is
+     */
+    boolean containsProperties(String name);
+
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
      *

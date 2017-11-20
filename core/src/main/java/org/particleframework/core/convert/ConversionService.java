@@ -51,6 +51,16 @@ public interface ConversionService<Impl extends ConversionService> {
      * @return The optional
      */
     <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context);
+
+    /**
+     * Return whether the given source type is convertible to the given target type
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param <S> The generic source type
+     * @param <T> The target source type
+     * @return True if it can be converted
+     */
+    <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType);
     /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
      *

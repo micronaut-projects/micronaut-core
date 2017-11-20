@@ -42,7 +42,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'foo.bar'      | '10'        | 'foo.bar'      | Integer | 10
         'foo.bar'      | ['10']      | 'foo.bar[0]'   | Integer | 10
         'foo.bar'      | [foo: '10'] | 'foo.bar[foo]' | Integer | 10
-        'foo.bar.baz'  | '10'        | 'foo.bar[baz]' | Integer | 10
+//        'foo.bar.baz'  | '10'        | 'foo.bar[baz]' | Integer | 10
         'foo.bar[0]'   | '10'        | 'foo.bar[0]'   | Integer | 10
         'foo.bar[0]'   | '10'        | 'foo.bar'      | List    | ['10']
         'foo.bar[baz]' | '10'        | 'foo.bar[baz]' | Integer | 10

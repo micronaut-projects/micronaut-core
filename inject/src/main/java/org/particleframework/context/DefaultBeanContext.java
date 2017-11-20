@@ -666,7 +666,7 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for type: {}", beanType);
         }
-        Collection<BeanDefinition> candidates = new ArrayList<>();
+        Collection<BeanDefinition> candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
 
         if (!beanDefinitionsClasses.isEmpty()) {
@@ -699,7 +699,8 @@ public class DefaultBeanContext implements BeanContext {
 
 
         for (BeanDefinition beanDefinition: beanDefinitions) {
-            if (!candidates.contains(beanDefinition) && beanType.isAssignableFrom(beanDefinition.getBeanType())) {
+            Class beanDefinitionBeanType = beanDefinition.getBeanType();
+            if (beanDefinitionBeanType == beanType || beanType.isAssignableFrom(beanDefinitionBeanType)) {
                 candidates.add(beanDefinition);
             }
         }

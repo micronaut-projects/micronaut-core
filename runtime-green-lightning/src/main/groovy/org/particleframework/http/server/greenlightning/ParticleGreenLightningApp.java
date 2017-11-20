@@ -19,33 +19,51 @@ import com.ociweb.gl.api.Builder;
 import com.ociweb.gl.api.GreenApp;
 import com.ociweb.gl.api.GreenRuntime;
 import com.ociweb.gl.api.RestListener;
-import org.particleframework.context.ApplicationContext;
+import org.particleframework.core.io.socket.SocketUtils;
+import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.web.router.Router;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.util.Optional;
 
+@Singleton
 public class ParticleGreenLightningApp implements GreenApp {
-    protected final ApplicationContext applicationContext;
     protected final int port;
     protected final String host;
     protected GreenRuntime runtime;
+    protected final Optional<Router> router;
 
-    public ParticleGreenLightningApp(ApplicationContext applicationContext, String host, int port) {
-        this.applicationContext = applicationContext;
-        this.port = port;
-        this.host = host;
+    @Inject
+    public ParticleGreenLightningApp(HttpServerConfiguration serverConfiguration, Optional<Router> router) {
+        this.router = router;
+
+        int serverPort = serverConfiguration.getPort();
+        this.port = serverPort == -1 ? SocketUtils.findAvailableTcpPort() : serverPort;
+
+        this.host = serverConfiguration.getHost().orElse("localhost");
     }
 
     @Override
     public void declareConfiguration(final Builder builder) {
-        builder.enableServer(false, false, host, port);
+        builder.useHTTP1xServer(port).setHost(host).useInsecureServer();
     }
 
     public void declareBehavior(final GreenRuntime runtime) {
-        final RestListener adder = new GreenLightningParticleDispatcher(runtime, applicationContext);
+        final RestListener adder = new GreenLightningParticleDispatcher(runtime, router);
         runtime.addRestListener(adder).includeAllRoutes();
         this.runtime = runtime;
     }
 
     public void stop() {
         runtime.shutdownRuntime();
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public String getHost() {
+        return host;
     }
 }
