@@ -72,7 +72,7 @@ public class CalculatedSettings {
 
 
     private boolean driverClassIsLoadable(String className) {
-        return ClassUtils.isPresent(className, null);
+        return ClassUtils.isPresent(className, this.getClass().getClassLoader());
     }
 
     public String getUrl() {

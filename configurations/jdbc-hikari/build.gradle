@@ -4,4 +4,6 @@ dependencies {
     compileOnly project(":inject-java")
 
     compile "com.zaxxer:HikariCP:2.7.3"
+
+    testCompile "com.h2database:h2:1.4.196"
 }

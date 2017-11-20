@@ -47,13 +47,28 @@ public class DatasourceConfiguration extends HikariConfig implements BasicConfig
         this.calculatedSettings = new CalculatedSettings(this);
     }
 
+    /**
+     *  Hikari validates against the fields instead of using getters so
+     *  the following is required to populate the calculated values into
+     *  the fields.
+     */
     @PostConstruct
     void postConstruct() {
-        getDriverClassName();
-        getUrl();
-        getUsername();
-        getPassword();
-        getValidationQuery();
+        if (getConfiguredUrl() == null) {
+            setUrl(getUrl());
+        }
+        if (getConfiguredDriverClassName() == null) {
+            setDriverClassName(getDriverClassName());
+        }
+        if (getConfiguredUsername() == null) {
+            setUsername(getUsername());
+        }
+        if (getConfiguredPassword() == null) {
+            setPassword(getPassword());
+        }
+        if (getConfiguredValidationQuery() == null) {
+            setValidationQuery(getValidationQuery());
+        }
     }
 
     @Override
