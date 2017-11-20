@@ -1,5 +1,0 @@
-dependencies {
-    compile project(":inject")
-    compileOnly project(":inject-java")
-    compile 'biz.paluch.redis:lettuce:4.4.1.Final'
-}

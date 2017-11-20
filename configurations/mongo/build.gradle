@@ -1,6 +1,0 @@
-dependencies {
-    compile project(":inject")
-    compileOnly project(":inject-java")
-    compile 'org.mongodb:mongodb-driver:3.5.0'
-    compile 'org.mongodb:mongodb-driver-reactivestreams:1.6.0'
-}
