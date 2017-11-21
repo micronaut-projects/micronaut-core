@@ -50,6 +50,15 @@ public class JdbcDatabaseManager {
         databases.add(new JdbcDatabase("com.informix.jdbc.IfxDriver", "select count(*) from systables", new String[] { "informix" }));
     }
 
+    /**
+     * Searches defined database where the URL prefix matches one of the prefixes
+     * defined in a {@link JdbcDatabase}. The prefix is determined by:
+     *
+     * jdbc:<prefix>:...
+     *
+     * @param jdbcUrl The connection URL
+     * @return An optional {@link JdbcDatabase}
+     */
     public static Optional<JdbcDatabase> findDatabase(String jdbcUrl) {
         if (StringUtils.isNotEmpty(jdbcUrl)) {
             if (!jdbcUrl.startsWith("jdbc")) {
@@ -63,6 +72,12 @@ public class JdbcDatabaseManager {
         return Optional.empty();
     }
 
+    /**
+     * Searches the provided classloader for an embedded database driver.
+     *
+     * @param classLoader The classloader to search
+     * @return An optional {@link EmbeddedJdbcDatabase}
+     */
     public static Optional<EmbeddedJdbcDatabase> get(ClassLoader classLoader) {
         return databases.stream()
                 .filter(JdbcDatabase::isEmbedded)
@@ -71,6 +86,12 @@ public class JdbcDatabaseManager {
                 .findFirst();
     }
 
+    /**
+     * Searches embedded databases where the driver matches the argument
+     *
+     * @param driverClassName The driver class name to search on
+     * @return True if the driver matches an embedded database type
+     */
     public static boolean isEmbedded(String driverClassName) {
         return databases.stream()
                 .filter(JdbcDatabase::isEmbedded)
