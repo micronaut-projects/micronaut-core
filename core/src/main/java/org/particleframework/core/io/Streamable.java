@@ -22,29 +22,21 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * <p>An interface for classes to implement that are capable of writing themselves to a {@link Writer}</p>
+ * Interface for types that can be written to an {@link java.io.OutputStream}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Writable extends Streamable {
-    /**
-     * Writes this object to the given writer.
-     *
-     * @param out the Writer to which this Writable should output its data.
-     * @throws IOException if an error occurred while outputting data to the writer
-     */
-    void writeTo(Writer out) throws IOException;
+public interface Streamable {
 
     /**
      * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
      *
      * @param outputStream The output stream
+     * @param charset The charset to use. Defaults to {@link StandardCharsets#UTF_8}
      * @throws IOException if an error occurred while outputting data to the writer
      */
-    default void writeTo(OutputStream outputStream) throws IOException {
-        writeTo(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-    }
+    void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException;
 
     /**
      * Write this {@link Writable} to the given {@link File}
@@ -56,14 +48,13 @@ public interface Writable extends Streamable {
             writeTo(outputStream);
         }
     }
-     /**
+    /**
      * Write this object to the given {@link OutputStream} using {@link StandardCharsets#UTF_8} by default
      *
      * @param outputStream The output stream
-     * @param charset The charset to use. Defaults to {@link StandardCharsets#UTF_8}
      * @throws IOException if an error occurred while outputting data to the writer
      */
-    default void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException {
-        writeTo(new OutputStreamWriter(outputStream, charset == null ? StandardCharsets.UTF_8 : charset));
+    default void writeTo(OutputStream outputStream) throws IOException {
+        writeTo(outputStream, StandardCharsets.UTF_8);
     }
 }

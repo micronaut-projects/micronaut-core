@@ -86,7 +86,18 @@ public class ArrayUtils {
             StringBuilder builder = new StringBuilder("[");
             Iterator<Object> i = Arrays.asList(array).iterator();
             while(i.hasNext()) {
-                builder.append(i.next());
+                Object o = i.next();
+                if(o == null) {
+                    continue;
+                }
+                else {
+                    if(o.getClass().isArray()) {
+                        builder.append( toString((Object[])o) );
+                    }
+                    else {
+                        builder.append(o);
+                    }
+                }
                 if(i.hasNext()) {
                     builder.append(",");
                 }

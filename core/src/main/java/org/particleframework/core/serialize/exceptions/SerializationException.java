@@ -13,29 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.lettuce;
-
-import io.lettuce.core.RedisURI;
+package org.particleframework.core.serialize.exceptions;
 
 /**
- * A named {@link RedisURI} configuration used to configure multiple Redis server
+ * A generic exception that occurs during serialization or deserialization
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NamedRedisURI extends RedisURI {
-    private final String serverName;
+public class SerializationException extends RuntimeException {
 
-    public NamedRedisURI(String serverName) {
-        setHost("localhost"); // default to localhost
-        setPort(RedisURI.DEFAULT_REDIS_PORT);
-        this.serverName = serverName;
-    }
-
-    /**
-     * @return The name of the server
-     */
-    public String getServerName() {
-        return serverName;
+    public SerializationException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

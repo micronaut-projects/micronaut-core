@@ -31,6 +31,7 @@ import org.particleframework.context.annotation.Requires;
 @Requires(missingProperty = "particle.redis.uri")
 public class DefaultRedisConfiguration extends RedisURI {
     public DefaultRedisConfiguration() {
+        setPort(RedisURI.DEFAULT_REDIS_PORT);
         setHost("localhost"); // localhost by default
     }
 }
