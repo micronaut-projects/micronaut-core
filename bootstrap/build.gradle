@@ -4,7 +4,7 @@ dependencies {
     compile project(":aop")
     compile "javax.validation:validation-api:$validationVersion"
     compileOnly 'io.reactivex.rxjava2:rxjava:2.1.5'
-
+    compileOnly 'io.projectreactor:reactor-core:3.1.2.RELEASE'
 
     compileOnly project(":inject-java")
     testCompile project(":inject-java")
