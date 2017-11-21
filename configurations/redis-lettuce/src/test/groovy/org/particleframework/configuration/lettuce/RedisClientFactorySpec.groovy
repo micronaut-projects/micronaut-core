@@ -16,6 +16,7 @@
 package org.particleframework.configuration.lettuce
 
 import io.lettuce.core.RedisClient
+import io.lettuce.core.api.StatefulRedisConnection
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import redis.embedded.RedisServer
@@ -35,9 +36,9 @@ class RedisClientFactorySpec extends Specification{
 
         when:
         ApplicationContext applicationContext = ApplicationContext.run('particle.redis.port':port)
-        RedisClient client = applicationContext.getBean(RedisClient)
+        StatefulRedisConnection connection = applicationContext.getBean(StatefulRedisConnection)
 
-        def command = client.connect().sync()
+        def command = connection.sync()
         then:
         command.set("foo", "bar")
         command.get("foo") == "bar"
@@ -53,8 +54,8 @@ class RedisClientFactorySpec extends Specification{
 
         when:
         ApplicationContext applicationContext = ApplicationContext.run('particle.redis.uri':"redis://localhost:$port")
-        RedisClient client = applicationContext.getBean(RedisClient)
-        def command = client.connect().sync()
+        StatefulRedisConnection client = applicationContext.getBean(StatefulRedisConnection)
+        def command = client.sync()
         then:
         command.set("foo", "bar")
         command.get("foo") == "bar"

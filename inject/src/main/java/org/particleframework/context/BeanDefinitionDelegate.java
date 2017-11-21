@@ -147,22 +147,28 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         resolutionContext.putAll(attributes);
-        if(this.definition instanceof ParametrizedBeanFactory) {
-            ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory) this.definition;
-            Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-            Object named = attributes.get(Named.class.getName());
-            if(named != null) {
-                Map<String, Object> fulfilled = new LinkedHashMap<>();
-                for (Argument argument : requiredArguments) {
-                    Optional result = ConversionService.SHARED.convert(named, argument.getType());
-                    if(result.isPresent()) {
-                        fulfilled.put(argument.getName(), result.get());
+        try {
+            if(this.definition instanceof ParametrizedBeanFactory) {
+                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory) this.definition;
+                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                Object named = attributes.get(Named.class.getName());
+                if(named != null) {
+                    Map<String, Object> fulfilled = new LinkedHashMap<>();
+                    for (Argument argument : requiredArguments) {
+                        Optional result = ConversionService.SHARED.convert(named, argument.getType());
+                        if(result.isPresent()) {
+                            fulfilled.put(argument.getName(), result.get());
+                        }
                     }
+                    return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
                 }
-                return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
+            }
+            return ((BeanFactory<T>)this.definition).build(resolutionContext, context, definition);
+        } finally {
+            for (String key : attributes.keySet()) {
+                resolutionContext.remove(key);
             }
         }
-        return ((BeanFactory<T>)this.definition).build(resolutionContext, context, definition);
     }
 
 

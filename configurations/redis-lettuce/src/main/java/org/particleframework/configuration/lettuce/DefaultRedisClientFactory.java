@@ -17,6 +17,7 @@ package org.particleframework.configuration.lettuce;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
+import io.lettuce.core.api.StatefulRedisConnection;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
@@ -40,5 +41,12 @@ public class DefaultRedisClientFactory {
     @Primary
     public RedisClient redisClient(@Primary RedisURI redisURI) {
         return RedisClient.create(redisURI);
+    }
+
+    @Bean(preDestroy = "close")
+    @Singleton
+    @Primary
+    public StatefulRedisConnection<String, String> redisConnection(@Primary RedisClient redisClient) {
+        return redisClient.connect();
     }
 }

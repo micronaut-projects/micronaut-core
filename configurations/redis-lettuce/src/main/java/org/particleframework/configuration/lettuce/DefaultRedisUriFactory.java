@@ -28,7 +28,7 @@ import javax.inject.Singleton;
  */
 @Factory
 @Requires(property = "particle.redis.uri")
-public class RedisUriFactory {
+public class DefaultRedisUriFactory {
 
     @Bean
     @Primary

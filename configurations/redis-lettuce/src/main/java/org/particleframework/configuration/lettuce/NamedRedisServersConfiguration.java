@@ -15,27 +15,19 @@
  */
 package org.particleframework.configuration.lettuce;
 
-import io.lettuce.core.RedisURI;
+import org.particleframework.context.annotation.Argument;
+import org.particleframework.context.annotation.ForEach;
 
 /**
- * A named {@link RedisURI} configuration used to configure multiple Redis server
+ * Allows the configuration of multiple redis servers
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NamedRedisURI extends RedisURI {
-    private final String serverName;
+@ForEach(property = "particle.redis.servers")
+public class NamedRedisServersConfiguration extends NamedRedisURI {
 
-    public NamedRedisURI(String serverName) {
-        setHost("localhost"); // default to localhost
-        setPort(RedisURI.DEFAULT_REDIS_PORT);
-        this.serverName = serverName;
-    }
-
-    /**
-     * @return The name of the server
-     */
-    public String getServerName() {
-        return serverName;
+    public NamedRedisServersConfiguration(@Argument String name) {
+        super(name);
     }
 }

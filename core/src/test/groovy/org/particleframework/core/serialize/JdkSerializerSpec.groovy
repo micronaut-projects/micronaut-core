@@ -13,22 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.lettuce;
+package org.particleframework.core.serialize
 
-import io.lettuce.core.RedisURI;
-import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.ForEach;
+import spock.lang.Specification
 
 /**
- * Allows the configuration of multiple redis servers
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "particle.redis.servers")
-public class RedisServersConfiguration extends NamedRedisURI {
+class JdkSerializerSpec extends Specification {
 
-    public RedisServersConfiguration(@Argument String name) {
-        super(name);
+    void 'test serialize object'() {
+        when:
+        def bytes = ObjectSerializer.JDK.serialize(new Foo(name: "test")).get()
+        Foo foo = ObjectSerializer.JDK.deserialize(bytes, Foo).get()
+
+        then:
+        foo.name == "test"
+    }
+
+    static class Foo implements Serializable {
+        String name
     }
 }
