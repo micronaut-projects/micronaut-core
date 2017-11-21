@@ -21,6 +21,13 @@ import org.particleframework.core.util.StringUtils;
 
 import java.util.Optional;
 
+/**
+ * A class used to fill in the missing gaps of information needed
+ * to successfully configure a data source.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 public class CalculatedSettings {
 
     private String calculatedDriverClassName;
@@ -41,6 +48,14 @@ public class CalculatedSettings {
         embeddedDatabaseConnection = JdbcDatabaseManager.get(classLoader);
     }
 
+    /**
+     * Determines the driver class name based on the configured value. If not
+     * configured, determine the driver class name based on the URL. If the
+     * URL is not configured, look for an embedded database driver on the
+     * classpath.
+     *
+     * @return The calculated driver class name
+     */
     public String getDriverClassName() {
         final String driverClassName = basicConfiguration.getConfiguredDriverClassName();
         if (calculatedDriverClassName == null || StringUtils.hasText(driverClassName)) {
@@ -75,6 +90,13 @@ public class CalculatedSettings {
         return ClassUtils.isPresent(className, this.getClass().getClassLoader());
     }
 
+    /**
+     * Determines the URL based on the configured value. If the URL is
+     * not configured, search for an embedded database driver on the
+     * classpath and retrieve a default URL for it.
+     *
+     * @return The calculated URL
+     */
     public String getUrl() {
         final String url = basicConfiguration.getConfiguredUrl();
         if (calculatedUrl == null || StringUtils.hasText(url)) {
@@ -90,6 +112,13 @@ public class CalculatedSettings {
         return calculatedUrl;
     }
 
+    /**
+     * Determines the username based on the configured value. If the
+     * username is not configured and an embedded database driver is
+     * on the classpath, return 'sa'.
+     *
+     * @return The calculated username
+     */
     public String getUsername() {
         final String username = basicConfiguration.getConfiguredUsername();
         if (calculatedUsername == null || StringUtils.hasText(username)) {
@@ -102,6 +131,13 @@ public class CalculatedSettings {
         return calculatedUsername;
     }
 
+    /**
+     * Determines the password based on the configured value. If the
+     * password is not configured and an embedded database driver is
+     * on the classpath, return an empty string.
+     *
+     * @return The calculated password
+     */
     public String getPassword() {
         final String password = basicConfiguration.getConfiguredPassword();
         if (calculatedPassword == null || StringUtils.hasText(password)) {
@@ -114,6 +150,14 @@ public class CalculatedSettings {
         return calculatedPassword;
     }
 
+    /**
+     * Determines the validation query based on the configured value. If the
+     * validation query is not configured, search pre-defined databases for
+     * a match based on the URL. If a match is found, return the defined
+     * validation query for that database.
+     *
+     * @return The calculated validation query
+     */
     public String getValidationQuery() {
         final String validationQuery = basicConfiguration.getConfiguredValidationQuery();
         if (calculatedValidationQuery == null || StringUtils.hasText(validationQuery)) {

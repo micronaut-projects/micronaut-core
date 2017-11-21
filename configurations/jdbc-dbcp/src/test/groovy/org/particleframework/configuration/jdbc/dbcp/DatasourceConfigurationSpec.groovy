@@ -1,4 +1,4 @@
-package org.particleframework.configuration.jdbc
+package org.particleframework.configuration.jdbc.dbcp
 
 import org.apache.commons.dbcp2.BasicDataSource
 import org.particleframework.context.ApplicationContext

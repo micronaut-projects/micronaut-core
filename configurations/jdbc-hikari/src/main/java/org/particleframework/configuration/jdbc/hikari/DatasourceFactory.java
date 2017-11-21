@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.configuration.jdbc;
+package org.particleframework.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.particleframework.context.annotation.Bean;

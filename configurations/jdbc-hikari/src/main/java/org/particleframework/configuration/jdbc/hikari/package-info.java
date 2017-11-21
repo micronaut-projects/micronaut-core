@@ -3,7 +3,7 @@
  */
 @Configuration
 @Requires(classes = HikariDataSource.class)
-package org.particleframework.configuration.jdbc;
+package org.particleframework.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.particleframework.context.annotation.Configuration;

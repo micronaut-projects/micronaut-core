@@ -27,23 +27,53 @@ public interface BasicConfiguration {
 
     String getName();
 
+    /**
+     * @return The URL supplied via configuration
+     */
     String getConfiguredUrl();
 
+    /**
+     * @return The URL to be used by the data source
+     */
     String getUrl();
 
+    /**
+     * @return The driver class name supplied via configuration
+     */
     String getConfiguredDriverClassName();
 
+    /**
+     * @return The driver class name to be used by the data source
+     */
     String getDriverClassName();
 
+    /**
+     * @return The username supplied via configuration
+     */
     String getConfiguredUsername();
 
+    /**
+     * @return The username to be used by the data source
+     */
     String getUsername();
 
+    /**
+     * @return The password supplied via configuration
+     */
     String getConfiguredPassword();
 
+    /**
+     * @return The password to be used by the data source
+     */
     String getPassword();
 
+    /**
+     * @return The validation query supplied via configuration
+     */
     String getConfiguredValidationQuery();
 
+    /**
+     * @return The validation query to be used by the data source
+     */
     String getValidationQuery();
 }

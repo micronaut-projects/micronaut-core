@@ -3,7 +3,7 @@
  */
 @Configuration
 @Requires(classes = DataSource.class)
-package org.particleframework.configuration.jdbc;
+package org.particleframework.configuration.jdbc.tomcat;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.particleframework.context.annotation.Configuration;

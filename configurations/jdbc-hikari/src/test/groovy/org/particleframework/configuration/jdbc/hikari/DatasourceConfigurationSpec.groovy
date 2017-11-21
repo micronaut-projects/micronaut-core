@@ -1,6 +1,6 @@
-package org.particleframework.configuration.jdbc
+package org.particleframework.configuration.jdbc.hikari
 
-import org.apache.tomcat.jdbc.pool.DataSource
+import com.zaxxer.hikari.HikariDataSource
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
@@ -17,7 +17,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect: "No beans are created"
-        !applicationContext.containsBean(DataSource)
+        !applicationContext.containsBean(HikariDataSource)
         !applicationContext.containsBean(DatasourceConfiguration)
 
         cleanup:
@@ -33,21 +33,17 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(DataSource)
+        applicationContext.containsBean(HikariDataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
 
         then: //The default configuration is supplied because H2 is on the classpath
-        dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
         dataSource.username == 'sa'
-        dataSource.poolProperties.password == ''
-        dataSource.name == 'default'
+        dataSource.password == ''
         dataSource.driverClassName == 'org.h2.Driver'
-        dataSource.abandonWhenPercentageFull == 0
-        dataSource.accessToUnderlyingConnectionAllowed
-
 
         cleanup:
         applicationContext.close()
@@ -62,11 +58,11 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(DataSource)
+        applicationContext.containsBean(HikariDataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
         ResultSet resultSet = dataSource.getConnection().prepareStatement("SELECT H2VERSION() FROM DUAL").executeQuery()
         resultSet.next()
         String version = resultSet.getString(1)
@@ -82,37 +78,33 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default.abandonWhenPercentageFull': 99,
-                'datasources.default.accessToUnderlyingConnectionAllowed': false,
-                'datasources.default.alternateUsernameAllowed': true,
-                'datasources.default.commitOnReturn': true,
-                'datasources.default.connectionProperties': 'prop1=value1;prop2=value2',
+                'datasources.default.connectionTimeout': 500,
+                'datasources.default.idleTimeout': 20000,
+                'datasources.default.catalog': 'foo',
+                'datasources.default.autoCommit': true,
+                'datasources.default.healthCheckProperties.foo': 'bar',
                 'datasources.default.jndiName': 'java:comp/env/FooBarPool',
-                'datasources.default.dbProperties.DB_CLOSE_ON_EXIT': true,
-                'datasources.default.dbProperties.DB_CLOSE_DELAY': 1,
-                'datasources.default.defaultAutoCommit': true,
-                'datasources.default.defaultCatalog': 'catalog',
+                'datasources.default.url': 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+                'datasources.default.validationQuery': 'select 3'
         ))
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(DataSource)
+        applicationContext.containsBean(HikariDataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
 
         then:
-        dataSource.abandonWhenPercentageFull == 99
-        dataSource.accessToUnderlyingConnectionAllowed //Currently no-oped
-        dataSource.alternateUsernameAllowed
-        dataSource.commitOnReturn
-        dataSource.connectionProperties == 'prop1=value1;prop2=value2'
+        dataSource.connectionTimeout == 500
+        dataSource.idleTimeout == 20000
+        dataSource.catalog == 'foo'
+        dataSource.autoCommit
+        dataSource.healthCheckProperties.getProperty('foo') == 'bar'
         dataSource.dataSourceJNDI == 'java:comp/env/FooBarPool'
-        dataSource.dbProperties.get('DB_CLOSE_ON_EXIT') == 'true'
-        dataSource.dbProperties.get('DB_CLOSE_DELAY') == '1'
-        dataSource.defaultAutoCommit
-        dataSource.defaultCatalog == 'catalog'
+        dataSource.jdbcUrl == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.connectionTestQuery == 'select 3'
 
         cleanup:
         applicationContext.close()
@@ -128,27 +120,25 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(DataSource)
+        applicationContext.containsBean(HikariDataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
 
         then: //The default configuration is supplied because H2 is on the classpath
-        dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
         dataSource.username == 'sa'
-        dataSource.poolProperties.password == ''
-        dataSource.name == 'default'
+        dataSource.password == ''
         dataSource.driverClassName == 'org.h2.Driver'
 
         when:
-        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo"))
+        dataSource = applicationContext.getBean(HikariDataSource, Qualifiers.byName("foo"))
 
         then: //The default configuration is supplied because H2 is on the classpath
-        dataSource.url == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.jdbcUrl == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
         dataSource.username == 'sa'
-        dataSource.poolProperties.password == ''
-        dataSource.name == 'foo'
+        dataSource.password == ''
         dataSource.driverClassName == 'org.h2.Driver'
 
         cleanup:

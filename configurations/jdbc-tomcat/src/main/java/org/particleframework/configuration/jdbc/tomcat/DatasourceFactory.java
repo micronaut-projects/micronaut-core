@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.configuration.jdbc;
+package org.particleframework.configuration.jdbc.tomcat;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.particleframework.context.annotation.Bean;
