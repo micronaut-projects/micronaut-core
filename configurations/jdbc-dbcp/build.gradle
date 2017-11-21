@@ -1,0 +1,9 @@
+dependencies {
+    compile project(":jdbc")
+    compile project(":inject")
+    compileOnly project(":inject-java")
+
+    compile 'org.apache.commons:commons-dbcp2:2.1.1'
+
+    testCompile "com.h2database:h2:1.4.196"
+}
