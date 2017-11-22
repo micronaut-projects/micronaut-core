@@ -24,6 +24,9 @@ dependencies {
     compile "org.particleframework.configuration:jackson:${projectVersion}"
     compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+
+    testCompile "junit:junit:4.12"
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }
 shadowJar {
     mergeServiceFiles()
