@@ -17,7 +17,7 @@ package org.particleframework.core.util;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
-import java.util.Iterator;
+import java.util.List;
 
 /**
  * Utility methods for working with arrays
@@ -78,31 +78,25 @@ public class ArrayUtils {
      * @return The string representation
      */
     public static String toString(Object...array) {
+        String delimiter = ",";
+        return toString(delimiter, array);
+    }
 
+    /**
+     * Produce a string representation of the given array
+     *
+     * @param delimiter The delimiter
+     * @param array The array
+     * @return The string representation
+     */
+    public static String toString(String delimiter, Object... array) {
         if(isEmpty(array)) {
-            return "[]";
+            return "";
         }
         else {
-            StringBuilder builder = new StringBuilder("[");
-            Iterator<Object> i = Arrays.asList(array).iterator();
-            while(i.hasNext()) {
-                Object o = i.next();
-                if(o == null) {
-                    continue;
-                }
-                else {
-                    if(o.getClass().isArray()) {
-                        builder.append( toString((Object[])o) );
-                    }
-                    else {
-                        builder.append(o);
-                    }
-                }
-                if(i.hasNext()) {
-                    builder.append(",");
-                }
-            }
-            return builder.toString();
+            List<Object> list = Arrays.asList(array);
+            return CollectionUtils.toString(delimiter, list);
         }
     }
+
 }

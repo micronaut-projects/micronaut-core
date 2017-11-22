@@ -12,6 +12,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.CollectionUtils;
 
 import java.io.*;
@@ -428,14 +429,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((Object[]) newArray);
         });
 
-        addConverter(Object[].class, String.class, (Object[] object, Class<String> targetType, ConversionContext context) -> {
-            if(object.length == 0) {
-                return Optional.empty();
-            }
-            else {
-                return Optional.of( Arrays.stream(object).map(Object::toString).collect(Collectors.joining("")));
-            }
-        });
 
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
@@ -541,7 +534,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return converted.map(longValue -> Optional.of(OptionalLong.of(longValue))).orElseGet(() -> Optional.of(OptionalLong.empty()));
         });
 
-
+        // Iterable -> String
+        addConverter(Iterable.class, String.class, (object, targetType, context) -> Optional.of(CollectionUtils.toString(object)));
 
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {
@@ -580,6 +574,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // Object[] -> String
+        addConverter(Object[].class, String.class, (object, targetType, context) -> Optional.of(ArrayUtils.toString(object)));
 
         // Object[] -> Object[] (inner type conversion)
         addConverter(Object[].class, Object[].class, (object, targetType, context) -> {
@@ -594,6 +590,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(results.toArray((Object[]) Array.newInstance(targetComponentType, results.size())));
         });
 
+        // Iterable -> Object[]
         addConverter(Iterable.class, Object[].class, (object, targetType, context) -> {
             Class<?> targetComponentType = targetType.getComponentType();
             List results = new ArrayList();

@@ -16,6 +16,7 @@
 package org.particleframework.core.util;
 
 import org.particleframework.core.annotation.Nullable;
+import org.particleframework.core.convert.ConversionService;
 
 import java.lang.reflect.Constructor;
 import java.util.*;
@@ -141,5 +142,42 @@ public class CollectionUtils {
             return Collections.emptySet();
         }
         return new HashSet<>(Arrays.asList(objects));
+    }
+
+
+    /**
+     * Produce a string representation of the given iterable
+     *
+     * @param iterable The iterable
+     * @return The string representation
+     */
+    public static String toString(Iterable<?> iterable) {
+        return toString(",", iterable);
+    }
+
+    /**
+     * Produce a string representation of the given iterable
+     *
+     * @param delimiter The delimiter
+     * @param iterable The iterable
+     * @return The string representation
+     */
+    public static String toString(String delimiter, Iterable<?> iterable) {
+        StringBuilder builder = new StringBuilder();
+        Iterator<?> i = iterable.iterator();
+        while(i.hasNext()) {
+            Object o = i.next();
+            if(o == null) {
+                continue;
+            }
+            else {
+                Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
+                converted.ifPresent(builder::append);
+            }
+            if(i.hasNext()) {
+                builder.append(delimiter);
+            }
+        }
+        return builder.toString();
     }
 }

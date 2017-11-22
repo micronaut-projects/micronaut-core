@@ -89,7 +89,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
                 serializer = InstantiationUtils.instantiate(type);
             }
             return serializer;
-        }).orElseGet(() -> new DefaultKeySerializer(redisCacheConfiguration));
+        }).orElseGet(() -> new DefaultKeySerializer(redisCacheConfiguration, conversionService));
 
         this.valueSerializer = redisCacheConfiguration.getValueSerializer().map(type -> {
             ObjectSerializer serializer;

@@ -15,6 +15,7 @@
  */
 package org.particleframework.configuration.lettuce.cache;
 
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.serialize.exceptions.SerializationException;
 
@@ -34,19 +35,32 @@ import java.util.Optional;
  */
 public class DefaultKeySerializer implements ObjectSerializer {
     private final RedisCacheConfiguration redisCacheConfiguration;
+    private final ConversionService<?> conversionService;
 
-    public DefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration) {
+    public DefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
         this.redisCacheConfiguration = redisCacheConfiguration;
+        this.conversionService = conversionService;
+    }
+
+    @Override
+    public Optional<byte[]> serialize(Object object) throws SerializationException {
+        if(object == null) return Optional.empty();
+        return Optional.of(toByteArray(object));
     }
 
     @Override
     public void serialize(Object object, OutputStream outputStream) throws SerializationException {
-        String str = redisCacheConfiguration.getCacheName() + ":" + (object instanceof CharSequence ? object.toString() : object.hashCode());
+        byte[] bytes = toByteArray(object);
         try {
-            outputStream.write(str.getBytes(redisCacheConfiguration.getCharset()));
+            outputStream.write(bytes);
         } catch (IOException e) {
             throw new SerializationException("Error serializing object [" + object + "]: " + e.getMessage(), e);
         }
+    }
+
+    private byte[] toByteArray(Object object) {
+        String str = redisCacheConfiguration.getCacheName() + ":" + conversionService.convert(object, String.class).orElse(String.valueOf(object.hashCode()));
+        return str.getBytes(redisCacheConfiguration.getCharset());
     }
 
     @Override

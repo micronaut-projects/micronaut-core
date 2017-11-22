@@ -1232,13 +1232,19 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
             prependSuperClasses(prefix, declaringClass, beanContext);
             if (!isInner) {
-
-                Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);
-                named.ifPresent(val -> prefix.append('.').append(val));
+                boolean isForEach = isForEachBean(resolutionContext, beanType);
+                if(isForEach) {
+                    Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);
+                    named.ifPresent(val -> prefix.append('.').append(val));
+                }
             }
             return prefix.toString();
         });
 
+    }
+
+    private Boolean isForEachBean(BeanResolutionContext resolutionContext, Class<?> beanType) {
+        return resolutionContext.get(ForEach.class.getName(), Class.class).map(type -> type.equals(beanType)).orElse(false);
     }
 
     private void prependSuperClasses(StringBuilder prefix, Class<?> nestedType, BeanContext beanContext) {

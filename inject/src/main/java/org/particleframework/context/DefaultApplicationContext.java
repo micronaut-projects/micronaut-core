@@ -77,15 +77,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return new DefaultEnvironment(getClassLoader(), conversionService, environmentNames);
     }
 
-    @Override
-    public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
-        if (ApplicationContext.class == beanType) {
-            return (T) this;
-        } else {
-            return super.getBean(resolutionContext, beanType, qualifier);
-        }
-    }
-
     /**
      * Creates the default conversion service
      *
@@ -184,6 +175,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
                                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                 }
+                                delegate.put(ForEach.class.getName(), delegate.getBeanType());
                                 delegate.put(Named.class.getName(), key.toString());
                                 transformedCandidates.add(delegate);
                             }
@@ -203,7 +195,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                         BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                         optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
                                         parentDelegate.get(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, Boolean.class).ifPresent(isPrimary -> delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, isPrimary));
-                                        delegate.put(ForEach.class.getName(), true);
+                                        delegate.put(ForEach.class.getName(), dependentType);
                                     } else {
                                         Optional<String> qualiferName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
                                         optional = qualiferName.map( name -> Qualifiers.byAnnotation(dependentCandidate, name));
@@ -245,13 +237,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
-        if (candidates.stream().allMatch( c -> {
-            if (c instanceof BeanDefinitionDelegate) {
-                return ((BeanDefinitionDelegate) c).get(ForEach.class.getName(), Boolean.class, false) || c.hasDeclaredAnnotation(ForEach.class);
-            } else {
-                return false;
-            }
-        })) {
+        if (candidates.stream().allMatch(BeanDefinition::isIterable)) {
             if (qualifier == null) {
                 Optional<BeanDefinition<T>> first = candidates.stream().findFirst();
                 return first.orElse(null);

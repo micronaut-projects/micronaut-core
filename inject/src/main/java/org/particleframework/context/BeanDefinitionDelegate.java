@@ -15,6 +15,7 @@
  */
 package org.particleframework.context;
 
+import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionService;
@@ -71,7 +72,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isIterable() {
-        return definition.isIterable();
+        return get(ForEach.class.getName(), Class.class) != null ||  definition.isIterable();
     }
 
     @Override
@@ -149,7 +150,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         resolutionContext.putAll(attributes);
         try {
             if(this.definition instanceof ParametrizedBeanFactory) {
-                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory) this.definition;
+                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
                 Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
                 Object named = attributes.get(Named.class.getName());
                 if(named != null) {

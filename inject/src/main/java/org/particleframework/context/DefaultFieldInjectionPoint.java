@@ -113,4 +113,9 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     public Annotation[] getDeclaredAnnotations() {
         return field.getDeclaredAnnotations();
     }
+
+    @Override
+    public String toString() {
+        return field.toString();
+    }
 }
