@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.configuration.lettuce.cache;
+package org.particleframework.cache.serialize;
 
+import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.serialize.exceptions.SerializationException;
@@ -25,7 +26,7 @@ import java.io.OutputStream;
 import java.util.Optional;
 
 /**
- * <p>The default key serializer used by {@link RedisCache}. Builds a key from the configured cache name and the object hash code.</p>
+ * <p>The default key serializer used by caches that require serializing the keys as strings. Builds a key from the configured cache name and String conversion of the object as dictated by {@link ConversionService}.</p>
  *
  * <p>Note this implementation does not support deserialization</p>
  *
@@ -33,12 +34,12 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultKeySerializer implements ObjectSerializer {
-    private final RedisCacheConfiguration redisCacheConfiguration;
+public class DefaultStringKeySerializer implements ObjectSerializer {
+    private final CacheConfiguration cacheConfiguration;
     private final ConversionService<?> conversionService;
 
-    public DefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
-        this.redisCacheConfiguration = redisCacheConfiguration;
+    public DefaultStringKeySerializer(CacheConfiguration cacheConfiguration, ConversionService<?> conversionService) {
+        this.cacheConfiguration = cacheConfiguration;
         this.conversionService = conversionService;
     }
 
@@ -59,8 +60,8 @@ public class DefaultKeySerializer implements ObjectSerializer {
     }
 
     private byte[] toByteArray(Object object) {
-        String str = redisCacheConfiguration.getCacheName() + ":" + conversionService.convert(object, String.class).orElse(String.valueOf(object.hashCode()));
-        return str.getBytes(redisCacheConfiguration.getCharset());
+        String str = cacheConfiguration.getCacheName() + ":" + conversionService.convert(object, String.class).orElse(String.valueOf(object.hashCode()));
+        return str.getBytes(cacheConfiguration.getCharset());
     }
 
     @Override

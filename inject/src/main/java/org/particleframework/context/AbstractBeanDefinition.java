@@ -116,16 +116,17 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         return hasDeclaredStereotype(Primary.class);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Optional<ExecutableMethod<T, ?>> findMethod(String name, Class... argumentTypes) {
+    public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
         MethodKey methodKey = new MethodKey(name, argumentTypes);
-        ExecutableMethod<T, ?> invocableMethod = executableMethodMap.get(methodKey);
+        ExecutableMethod<T, R> invocableMethod = (ExecutableMethod<T, R>) executableMethodMap.get(methodKey);
         if (invocableMethod != null) {
             return Optional.of(invocableMethod);
         } else {
             Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
             return method.map(theMethod -> {
-                        ReflectionExecutableMethod<T, Object> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
+                        ReflectionExecutableMethod<T, R> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
                         executableMethodMap.put(methodKey, reflectionMethod);
                         return reflectionMethod;
                     }

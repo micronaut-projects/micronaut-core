@@ -13,18 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
+package org.particleframework.session.event;
+
+import org.particleframework.context.event.ApplicationEvent;
+import org.particleframework.session.Session;
 
 /**
- * Configuration group for Lettuce
+ * Fired when a session is created
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Configuration
-@Requires(classes = RedisURI.class)
-@Requires(property = "particle.redis")
-package org.particleframework.configuration.lettuce;
+public class SessionCreatedEvent extends ApplicationEvent {
+    /**
+     * Constructs a prototypical Event.
+     *
+     * @param source The object on which the Event initially occurred.
+     * @throws IllegalArgumentException if source is null.
+     */
+    public SessionCreatedEvent(Session source) {
+        super(source);
+    }
 
-import io.lettuce.core.RedisURI;
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;
+    @Override
+    public Session getSource() {
+        return (Session) super.getSource();
+    }
+
+}

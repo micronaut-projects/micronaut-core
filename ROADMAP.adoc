@@ -34,7 +34,6 @@ We need to implement AOP annotations for:
 
 - Retry
 - Hystrix
-- Caching
 - Scheduled
 
 #### Configuration Sharing

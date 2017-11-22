@@ -43,6 +43,7 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
     /**
      * @return The concrete type of the value
      */
+    @SuppressWarnings("unchecked")
     default Class<V> getValueType() {
         Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
         return type.orElse(Object.class);
@@ -84,6 +85,7 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
      * @param valueType The value type
      * @return The submap
      */
+    @SuppressWarnings("unchecked")
     default Map<String, V> subMap(String prefix, Class<V> valueType) {
         // special handling for maps for resolving sub keys
         return (Map<String, V>)get(prefix, Map.class).orElseGet(() ->{
@@ -96,6 +98,7 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
         );
     }
 
+    @SuppressWarnings("NullableProblems")
     @Override
     default Iterator<Map.Entry<String, V>> iterator() {
         Iterator<String> names = getNames().iterator();

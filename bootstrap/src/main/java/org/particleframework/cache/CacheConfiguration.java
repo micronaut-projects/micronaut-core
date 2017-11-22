@@ -18,6 +18,8 @@ package org.particleframework.cache;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.ForEach;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -39,6 +41,7 @@ public class CacheConfiguration {
     protected Duration expireAfterAccess;
 
     private final String cacheName;
+    protected Charset charset = StandardCharsets.UTF_8;
 
     public CacheConfiguration(@Argument String cacheName) {
         this.cacheName = cacheName;
@@ -89,5 +92,12 @@ public class CacheConfiguration {
      */
     public Optional<Duration> getExpireAfterAccess() {
         return Optional.ofNullable(expireAfterAccess);
+    }
+
+    /**
+     * @return The charset used to serialize and deserialize values
+     */
+    public Charset getCharset() {
+        return charset;
     }
 }

@@ -39,8 +39,6 @@ public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected String server;
 
-    protected Charset charset = StandardCharsets.UTF_8;
-
     protected Class<? extends ObjectSerializer> keySerializer;
 
     protected Class<? extends ObjectSerializer> valueSerializer = JdkSerializer.class;
@@ -71,13 +69,6 @@ public class RedisCacheConfiguration extends CacheConfiguration {
         else {
             return Optional.empty();
         }
-    }
-
-    /**
-     * @return The charset used to serialize and deserialize values
-     */
-    public Charset getCharset() {
-        return charset;
     }
 
     /**

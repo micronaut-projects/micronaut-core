@@ -24,6 +24,7 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import org.particleframework.cache.AsyncCache;
 import org.particleframework.cache.SyncCache;
+import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.annotation.Primary;
@@ -89,7 +90,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
                 serializer = InstantiationUtils.instantiate(type);
             }
             return serializer;
-        }).orElseGet(() -> new DefaultKeySerializer(redisCacheConfiguration, conversionService));
+        }).orElseGet(() -> new DefaultStringKeySerializer(redisCacheConfiguration, conversionService));
 
         this.valueSerializer = redisCacheConfiguration.getValueSerializer().map(type -> {
             ObjectSerializer serializer;
