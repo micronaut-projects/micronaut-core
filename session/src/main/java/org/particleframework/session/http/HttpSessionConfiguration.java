@@ -98,35 +98,35 @@ public class HttpSessionConfiguration extends SessionConfiguration {
         return rememberMe;
     }
 
-    public void setRememberMe(boolean rememberMe) {
+    void setRememberMe(boolean rememberMe) {
         this.rememberMe = rememberMe;
     }
 
-    public void setBase64Encode(boolean base64Encode) {
+    void setBase64Encode(boolean base64Encode) {
         this.base64Encode = base64Encode;
     }
 
-    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+    void setCookieMaxAge(TemporalAmount cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 
-    public void setCookiePath(String cookiePath) {
+    void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;
     }
 
-    public void setDomainName(String domainName) {
+    void setDomainName(String domainName) {
         this.domainName = domainName;
     }
 
-    public void setCookieName(String cookieName) {
+    void setCookieName(String cookieName) {
         this.cookieName = cookieName;
     }
 
-    public void setPrefix(String prefix) {
+    void setPrefix(String prefix) {
         this.prefix = prefix;
     }
 
-    public void setHeaderNames(String[] headerNames) {
+   void setHeaderNames(String[] headerNames) {
         this.headerNames = headerNames;
     }
 }

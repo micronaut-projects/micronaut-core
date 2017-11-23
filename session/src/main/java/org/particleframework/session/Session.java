@@ -19,6 +19,7 @@ import org.particleframework.core.convert.value.MutableConvertibleValues;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * <p>An interface representing a user session.</p>
@@ -47,7 +48,6 @@ public interface Session extends MutableConvertibleValues<Object> {
      */
     String getId();
 
-
     /**
      *
      * Returns the last time the client sent a request associated with
@@ -57,11 +57,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      * a value associated with the session, do not affect the access
      * time.
      *
-     * @return				a <code>long</code>
-     *					representing the last time
-     *					the client sent a request associated
-     *					with this session, expressed in
-     *					milliseconds since 1/1/1970 GMT
+     * @return	An {@link Instant} representing the time the session was last accessed
      *
      * @exception IllegalStateException	if this method is called on an
      *					invalidated session
@@ -96,4 +92,13 @@ public interface Session extends MutableConvertibleValues<Object> {
      * @return Whether the session has expired
      */
     boolean isExpired();
+
+    /**
+     * Retrieve an attribute for the given name
+     * @param attr The attribute name
+     * @return An {@link Optional} of the attribute
+     */
+    default Optional<Object> get(CharSequence attr) {
+        return get(attr, Object.class);
+    }
 }

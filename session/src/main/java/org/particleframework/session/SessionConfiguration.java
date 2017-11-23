@@ -17,6 +17,9 @@ package org.particleframework.session;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
 
+import java.time.Duration;
+import java.util.OptionalInt;
+
 /**
  * <p>Base configuration properties for session handling</p>
  *
@@ -26,4 +29,41 @@ import org.particleframework.context.annotation.ConfigurationProperties;
 @ConfigurationProperties("particle.session")
 public class SessionConfiguration {
 
+    private Duration maxInactiveInternal = Duration.ofMinutes(30);
+    private Integer maxActiveSessions;
+
+
+    /**
+     * @return The maximum number of active sessions
+     */
+    public OptionalInt getMaxActiveSessions() {
+        return maxActiveSessions != null ? OptionalInt.of(maxActiveSessions) : OptionalInt.empty();
+    }
+
+    /**
+     * @return The default max inactive interval
+     */
+    public Duration getMaxInactiveInternal() {
+        return maxInactiveInternal;
+    }
+
+    /**
+     * Sets the maximum number of active sessions
+     *
+     * @param maxActiveSessions The max active sessions
+     */
+    void setMaxActiveSessions(Integer maxActiveSessions) {
+        this.maxActiveSessions = maxActiveSessions;
+    }
+
+    /**
+     * Set the max active sessions
+     *
+     * @param maxInactiveInternal
+     */
+    void setMaxInactiveInternal(Duration maxInactiveInternal) {
+        if(maxInactiveInternal != null) {
+            this.maxInactiveInternal = maxInactiveInternal;
+        }
+    }
 }

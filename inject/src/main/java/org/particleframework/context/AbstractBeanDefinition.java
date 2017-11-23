@@ -65,7 +65,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap = new LinkedHashMap<>(3);
-    private final Map<Class, String> valuePrefixes;
+    private Map<Class, String> valuePrefixes;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type
@@ -381,7 +381,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         try {
             return bean;
         } finally {
-            valuePrefixes.clear();
+            if(valuePrefixes != null) {
+                valuePrefixes.clear();
+            }
         }
     }
 

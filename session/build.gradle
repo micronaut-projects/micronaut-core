@@ -3,5 +3,6 @@ dependencies {
     compile project(":bootstrap")
     compile project(":http")
 
+    testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
 }

@@ -16,6 +16,7 @@
 package org.particleframework.session.event;
 
 import org.particleframework.context.event.ApplicationEvent;
+import org.particleframework.session.Session;
 
 /**
  * Fired when a {@link org.particleframework.session.Session} expires
@@ -24,7 +25,7 @@ import org.particleframework.context.event.ApplicationEvent;
  * @since 1.0
  */
 public class SessionExpiredEvent extends ApplicationEvent {
-    public SessionExpiredEvent(Object source) {
+    public SessionExpiredEvent(Session source) {
         super(source);
     }
 }
