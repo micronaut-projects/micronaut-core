@@ -25,4 +25,5 @@ import org.particleframework.core.convert.value.ConvertibleMultiValues;
  * @since 1.0
  */
 public interface HttpParameters extends ConvertibleMultiValues<String> {
+
 }

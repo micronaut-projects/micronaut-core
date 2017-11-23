@@ -16,6 +16,7 @@
 package org.particleframework.http;
 
 import org.particleframework.core.convert.value.MutableConvertibleValues;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.value.OptionalValues;
 
 import java.util.Collection;
@@ -49,6 +50,55 @@ public interface HttpMessage<B> extends OptionalValues<Object> {
      */
     MutableConvertibleValues<Object> getAttributes();
 
+    /**
+     * @return The request body
+     */
+    Optional<B> getBody();
+
+    /**
+     * Return the body as the given type
+     * @param type The type of the body
+     * @param <T> The generic type
+     * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
+     */
+    <T> Optional<T> getBody(Class<T> type);
+
+    /**
+     * Return the body as the given type
+     * @param type The type of the body
+     * @param <T> The generic type
+     * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
+     */
+    <T> Optional<T> getBody(Argument<T> type);
+
+    /**
+     * @return The locale of the message
+     */
+    default Optional<Locale> getLocale() {
+        return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
+                .map(Locale::new);
+    }
+
+    /**
+     * @return The value of the Content-Length header or -1L if none specified
+     */
+    default long getContentLength() {
+        return getHeaders()
+                .contentLength()
+                .orElse(-1L);
+    }
+
+    /**
+     * The request or response content type
+     * @return The content type
+     */
+    // TODO: should return Optional
+    default MediaType getContentType() {
+        return getHeaders()
+                .contentType()
+                .orElse(null);
+    }
+
     @Override
     default Optional<Object> get(CharSequence name) {
         return getAttributes().get(name, Object.class);
@@ -73,47 +123,6 @@ public interface HttpMessage<B> extends OptionalValues<Object> {
                 return i.next();
             }
         };
-    }
-
-    /**
-     * @return The request body
-     */
-    // TODO: should return Optional
-    B getBody();
-
-    /**
-     * Return the body as the given type
-     * @param type The type of the body
-     * @param <T> The generic type
-     * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
-     */
-    <T> Optional<T> getBody(Class<T> type);
-
-    /**
-     * @return The locale of the message
-     */
-    default Optional<Locale> getLocale() {
-        return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
-                .map(Locale::new);
-    }
-
-    /**
-     * @return The value of the Content-Length header or -1L if none specified
-     */
-    default long getContentLength() {
-        return getHeaders()
-                .contentLength()
-                .orElse(-1L);
-    }
-    /**
-     * The request or response content type
-     * @return The content type
-     */
-    // TODO: should return Optional
-    default MediaType getContentType() {
-        return getHeaders()
-                .contentType()
-                .orElse(null);
     }
 
 }

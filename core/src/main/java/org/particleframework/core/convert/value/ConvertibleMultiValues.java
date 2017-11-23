@@ -29,7 +29,7 @@ import java.util.function.BiConsumer;
  */
 public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     /**
-     * Get all the values for the given header name
+     * Get all the values for the given name without applying conversion
      *
      * @param name The header name
      * @return All the values
@@ -40,7 +40,8 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * Get a value without applying any conversion
      *
      * @param name The name of the value
-     * @return The raw value
+     * @return The raw value or null
+     * @see #getFirst(CharSequence)
      */
     V get(CharSequence name);
 
@@ -105,10 +106,9 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @param name The header name
      * @return The first value or null if it is present
      */
-    default V getFirst(CharSequence name) {
+    default Optional<V> getFirst(CharSequence name) {
         Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleMultiValues.class);
-        Optional<V> value = getFirst(name, type.orElse(Object.class));
-        return value.orElse(null);
+        return getFirst(name, type.orElse(Object.class));
     }
 
 
@@ -124,6 +124,18 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
         return get(name, requiredType);
     }
 
+    /**
+     * Find a header and convert it to the given type
+     *
+     * @param name The name of the header
+     * @param requiredType The required type
+     * @param defaultValue The default value
+     * @param <T> The generic type
+     * @return The first value of the default supplied value if it is isn't present
+     */
+    default <T> T getFirst(CharSequence name, Class<T> requiredType, T defaultValue) {
+        return get(name, requiredType).orElse(defaultValue);
+    }
     /**
      * Creates a new {@link OptionalValues} for the given type and values
      *

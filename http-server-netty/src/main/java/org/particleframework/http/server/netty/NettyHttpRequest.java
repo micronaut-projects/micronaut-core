@@ -27,9 +27,11 @@ import io.netty.util.AttributeKey;
 import io.netty.util.DefaultAttributeMap;
 import io.netty.util.ReferenceCounted;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.http.server.HttpServerConfiguration;
@@ -240,12 +242,12 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     }
 
     @Override
-    public T getBody() {
+    public Optional<T> getBody() {
         Object body = this.body;
         if (body == null && !receivedContent.isEmpty()) {
             this.body = body = buildBody();
         }
-        return (T) body;
+        return Optional.ofNullable((T) body);
     }
 
     protected CompositeByteBuf buildBody() {
@@ -261,11 +263,15 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
-        T body = getBody();
-        if (body == null) {
-            return Optional.empty();
-        }
-        return convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(body, aClass));
+        Optional<T> body = getBody();
+        return body.flatMap(t -> convertedBodies.computeIfAbsent(type, aClass -> conversionService.convert(t, aClass)));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T1> Optional<T1> getBody(Argument<T1> type) {
+        Optional<T> body = getBody();
+        return body.flatMap(t -> convertedBodies.computeIfAbsent(type.getType(), aClass -> conversionService.convert(t, ConversionContext.of(type))));
     }
 
     /**

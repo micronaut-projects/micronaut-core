@@ -26,6 +26,7 @@ import org.particleframework.http.server.netty.NettyHttpResponse;
 
 import javax.inject.Singleton;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Encodes an {@link HttpResponse} to it's body.
@@ -55,9 +56,9 @@ public class HttpBodyEncoder extends MessageToMessageEncoder<HttpResponse> imple
         NettyHttpResponse res = (NettyHttpResponse) msg;
         NettyHttpResponse.set(NettyHttpRequest.current(ctx), res);
 
-        Object body = res.getBody();
-        if(body != null) {
-            out.add(body);
+        Optional body = res.getBody();
+        if(body.isPresent()) {
+            out.add(body.get());
         }
         else {
             out.add(res);

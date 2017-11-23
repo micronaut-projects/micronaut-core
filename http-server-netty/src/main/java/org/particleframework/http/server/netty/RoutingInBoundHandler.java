@@ -453,12 +453,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 Argument<?> argument = bodyArgument.get();
                                 String bodyArgumentName = argument.getName();
                                 if(routeMatch.isRequiredInput(bodyArgumentName)) {
-                                    routeMatch = routeMatch.fulfill(
-                                            Collections.singletonMap(
-                                                    bodyArgumentName,
-                                                    request.getBody()
-                                            )
-                                    );
+                                    Optional body = request.getBody();
+                                    if(body.isPresent()) {
+                                        routeMatch = routeMatch.fulfill(
+                                                Collections.singletonMap(
+                                                        bodyArgumentName,
+                                                        body.get()
+                                                )
+                                        );
+                                    }
                                 }
                             }
                         }

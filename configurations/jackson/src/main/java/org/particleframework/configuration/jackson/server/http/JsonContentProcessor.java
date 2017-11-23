@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.particleframework.configuration.jackson.parser.JacksonProcessor;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
@@ -78,18 +79,12 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     @Override
     protected void onData(ByteBufHolder message) {
         ByteBuf content = message.content();
-        byte[] bytes;
         try {
-            if (content.hasArray()) {
-                bytes = content.array();
-            } else {
-                bytes = new byte[content.readableBytes()];
-                content.readBytes(bytes);
-            }
+            byte[] bytes = ByteBufUtil.getBytes(content);
+            jacksonProcessor.onNext(bytes);
         } finally {
             ReferenceCountUtil.release(content);
         }
-        jacksonProcessor.onNext(bytes);
     }
 
     @Override

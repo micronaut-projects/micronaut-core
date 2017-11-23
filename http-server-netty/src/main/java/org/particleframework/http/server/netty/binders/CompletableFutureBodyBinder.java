@@ -87,18 +87,24 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                     @Override
                     protected void doOnComplete() {
                         Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                        Object body = nettyHttpRequest.getBody();
-                        if (firstTypeParameter.isPresent()) {
-                            Argument<?> arg = firstTypeParameter.get();
-                            Class targetType = arg.getType();
-                            Optional converted = conversionService.convert(body, targetType, context.with(arg));
-                            if (converted.isPresent()) {
-                                future.complete(converted.get());
+                        Optional body = nettyHttpRequest.getBody();
+                        if(body.isPresent()) {
+
+                            if (firstTypeParameter.isPresent()) {
+                                Argument<?> arg = firstTypeParameter.get();
+                                Class targetType = arg.getType();
+                                Optional converted = conversionService.convert(body.get(), context.with(arg));
+                                if (converted.isPresent()) {
+                                    future.complete(converted.get());
+                                } else {
+                                    future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
+                                }
                             } else {
-                                future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
+                                future.complete(body.get());
                             }
-                        } else {
-                            future.complete(body);
+                        }
+                        else {
+                            future.complete(null);
                         }
                     }
                 });
