@@ -30,6 +30,11 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 public interface MutableHttpResponse<B> extends HttpResponse<B> {
+    /**
+     * @return The headers for the response
+     */
+    @Override
+    MutableHttpHeaders getHeaders();
 
     /**
      * Adds the specified cookie to the response.  This method can be called

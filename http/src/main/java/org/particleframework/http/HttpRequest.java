@@ -49,6 +49,19 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     InetSocketAddress getRemoteAddress();
 
     /**
+     * @return Obtain the server address
+     */
+    InetSocketAddress getServerAddress();
+    /**
+     * @return The server host name
+     */
+    String getServerName();
+
+    /**
+     * @return Is the request an HTTPS request
+     */
+    boolean isSecure();
+    /**
      * @return The protocol in use
      */
     default String getProtocol() {
@@ -75,11 +88,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * @return The request character encoding
+     * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
      */
-    // TODO: should return Optional
     default Charset getCharacterEncoding() {
-        return HttpUtil.resolveCharset(this).orElse(null);
+        return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
     }
 
 }

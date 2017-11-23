@@ -22,6 +22,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.DefaultAttributeMap;
 import io.netty.util.ReferenceCounted;
@@ -158,7 +159,7 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
             synchronized (this) { // double check
                 cookies = this.nettyCookies;
                 if (cookies == null) {
-                    this.nettyCookies = cookies = new NettyCookies(headers.nettyHeaders, headers.conversionService);
+                    this.nettyCookies = cookies = new NettyCookies(getPath(), headers.nettyHeaders, headers.conversionService);
                 }
             }
         }
@@ -189,6 +190,24 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
         return (InetSocketAddress) getChannelHandlerContext()
                 .channel()
                 .remoteAddress();
+    }
+
+    @Override
+    public InetSocketAddress getServerAddress() {
+        return (InetSocketAddress) getChannelHandlerContext()
+                .channel()
+                .localAddress();
+    }
+
+    @Override
+    public String getServerName() {
+        return getServerAddress().getHostName();
+    }
+
+    @Override
+    public boolean isSecure() {
+        ChannelHandlerContext channelHandlerContext = getChannelHandlerContext();
+        return channelHandlerContext.pipeline().get(SslHandler.class) != null;
     }
 
     @Override

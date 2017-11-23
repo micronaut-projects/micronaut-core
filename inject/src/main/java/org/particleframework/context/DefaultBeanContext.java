@@ -338,8 +338,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public boolean containsBean(Class beanType, Qualifier qualifier) {
-        BeanKey beanKey = new BeanKey(beanType, qualifier);
+    public <T> boolean containsBean(Class<T> beanType, Qualifier<T> qualifier) {
+        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         return singletonObjects.containsKey(beanKey) || findConcreteCandidate(beanType, qualifier, false, false).isPresent();
     }
 
@@ -669,8 +669,9 @@ public class DefaultBeanContext implements BeanContext {
         Collection<BeanDefinition> candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
 
+        Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
         if (!beanDefinitionsClasses.isEmpty()) {
-            synchronized (beanDefinitionsClasses) {
+            synchronized (this.beanDefinitionsClasses) {
 
                 Collection<BeanDefinitionReference> candidateClasses = new HashSet<>();
                 for (BeanDefinitionReference beanClass : beanDefinitionsClasses) {

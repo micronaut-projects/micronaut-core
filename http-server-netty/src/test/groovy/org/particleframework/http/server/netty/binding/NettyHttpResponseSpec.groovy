@@ -28,7 +28,6 @@ import org.particleframework.http.server.netty.NettyHttpResponse
 import spock.lang.Specification
 
 import java.time.Duration
-import java.time.Period
 
 /**
  * @author Graeme Rocher
@@ -77,7 +76,7 @@ class NettyHttpResponseSpec extends Specification {
         MutableHttpResponse response = new NettyHttpResponse(nettyResponse, new DefaultConversionService())
 
         response.status(HttpStatus."$status")
-        response.cookie(Cookie.of("foo", "bar").setMaxAge(Duration.ofHours(2)))
+        response.cookie(Cookie.of("foo", "bar").maxAge(Duration.ofHours(2)))
 
         expect:
         response.status == HttpStatus."$status"

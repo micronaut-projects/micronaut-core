@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.cookie;
 
+import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 
@@ -24,7 +25,7 @@ import java.time.temporal.TemporalAmount;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Cookie extends Comparable<Cookie> {
+public interface Cookie extends Comparable<Cookie>, Serializable {
 
     /**
      * @return The name of the cookie
@@ -78,48 +79,48 @@ public interface Cookie extends Comparable<Cookie> {
      * @param maxAge The max age
      * @return This cookie
      */
-    Cookie setMaxAge(long maxAge);
+    Cookie maxAge(long maxAge);
     /**
      * Sets the value
      * @param value The value of the cookie
      * @return This cookie
      */
-    Cookie setValue(String value);
+    Cookie value(String value);
 
     /**
      * Sets the domain of the cookie
      * @param domain The domain of the cookie
      * @return This cookie
      */
-    Cookie setDomain(String domain);
+    Cookie domain(String domain);
 
     /**
      * Sets the path of the cookie
      * @param path The path of the cookie
      * @return This cookie
      */
-    Cookie setPath(String path);
+    Cookie path(String path);
     /**
      * Sets whether the cookie is secure
      * @param secure Is the cookie secure
      * @return This cookie
      */
-    Cookie setSecure(boolean secure);
+    Cookie secure(boolean secure);
 
     /**
      * Sets whether the cookie is HTTP-Only
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
      */
-    Cookie setHttpOnly(boolean httpOnly);
+    Cookie httpOnly(boolean httpOnly);
 
     /**
      * Sets the max age of the cookie in seconds
      * @param maxAge The max age
      * @return This cookie
      */
-    default Cookie setMaxAge(TemporalAmount maxAge) {
-        return setMaxAge(maxAge.get(ChronoUnit.SECONDS));
+    default Cookie maxAge(TemporalAmount maxAge) {
+        return maxAge(maxAge.get(ChronoUnit.SECONDS));
     }
 
     /**

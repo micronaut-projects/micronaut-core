@@ -17,7 +17,6 @@ package org.particleframework.http.server.netty.cookies;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.cookie.DefaultCookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -25,6 +24,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 
+import java.net.URI;
 import java.util.*;
 
 /**
@@ -38,14 +38,24 @@ public class NettyCookies implements Cookies {
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
 
-    public NettyCookies(HttpHeaders nettyHeaders, ConversionService conversionService) {
+    public NettyCookies(URI path, HttpHeaders nettyHeaders, ConversionService conversionService) {
+
         this.conversionService = conversionService;
         String value = nettyHeaders.get(HttpHeaderNames.COOKIE);
         if(value != null) {
             cookies = new LinkedHashMap<>();
+            String pathStr = path.toString();
             Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.LAX.decode(value);
             for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
-                cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                String cookiePath = nettyCookie.path();
+                if(cookiePath != null) {
+                    if( pathStr.startsWith(cookiePath) ) {
+                        cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                    }
+                }
+                else {
+                    cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
+                }
             }
         }
         else {
@@ -66,12 +76,17 @@ public class NettyCookies implements Cookies {
 
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType)));
+        if(requiredType == Cookie.class || requiredType == Object.class) {
+            return (Optional<T>) findCookie(name);
+        }
+        else {
+            return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType)));
+        }
     }
 
     @Override
     public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), requiredType.getType(), ConversionContext.of(requiredType))));
+        return findCookie(name).flatMap((cookie -> conversionService.convert(cookie.getValue(), ConversionContext.of(requiredType))));
     }
 
     @Override
@@ -79,98 +94,4 @@ public class NettyCookies implements Cookies {
         return Collections.unmodifiableCollection(cookies.values());
     }
 
-    public static class NettyCookie implements Cookie {
-        private final io.netty.handler.codec.http.cookie.Cookie nettyCookie;
-        public NettyCookie(io.netty.handler.codec.http.cookie.Cookie nettyCookie) {
-            this.nettyCookie = nettyCookie;
-        }
-
-        public NettyCookie(String name, String value) {
-            Objects.requireNonNull(name, "Argument name cannot be null");
-            Objects.requireNonNull(value, "Argument value cannot be null");
-
-            this.nettyCookie = new DefaultCookie(name,value);
-        }
-
-        public io.netty.handler.codec.http.cookie.Cookie getNettyCookie() {
-            return nettyCookie;
-        }
-
-        @Override
-        public String getName() {
-            return nettyCookie.name();
-        }
-
-        @Override
-        public String getValue() {
-            return nettyCookie.value();
-        }
-
-        @Override
-        public String getDomain() {
-            return nettyCookie.domain();
-        }
-
-        @Override
-        public String getPath() {
-            return nettyCookie.path();
-        }
-
-        @Override
-        public boolean isHttpOnly() {
-            return nettyCookie.isHttpOnly();
-        }
-
-        @Override
-        public boolean isSecure() {
-            return nettyCookie.isSecure();
-        }
-
-        @Override
-        public long getMaxAge() {
-            return nettyCookie.maxAge();
-        }
-
-        @Override
-        public Cookie setMaxAge(long maxAge) {
-            nettyCookie.setMaxAge(maxAge);
-            return this;
-        }
-
-        @Override
-        public Cookie setValue(String value) {
-            nettyCookie.setValue(value);
-            return this;
-        }
-
-        @Override
-        public Cookie setDomain(String domain) {
-            nettyCookie.setDomain(domain);
-            return this;
-        }
-
-        @Override
-        public Cookie setPath(String path) {
-            nettyCookie.setPath(path);
-            return this;
-        }
-
-        @Override
-        public Cookie setSecure(boolean secure) {
-            nettyCookie.setSecure(secure);
-            return this;
-        }
-
-        @Override
-        public Cookie setHttpOnly(boolean httpOnly) {
-            nettyCookie.setHttpOnly(httpOnly);
-            return this;
-        }
-
-        @Override
-        public int compareTo(Cookie o) {
-            NettyCookie nettyCookie = (NettyCookie) o;
-            return nettyCookie.nettyCookie.compareTo(this.nettyCookie);
-        }
-    }
 }

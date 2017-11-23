@@ -13,31 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.session.annotation;
+package org.particleframework.session.http;
 
-import org.particleframework.core.bind.annotation.Bindable;
+import org.particleframework.http.HttpRequest;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.util.List;
 
 /**
- * Used to bind value from a {@link org.particleframework.session.Session}
+ * Strategy interface for resolving {@link org.particleframework.session.Session} IDs
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface SessionValue {
-    /**
-     * @return The name of value from the session
-     */
-    String value() default "";
+public interface HttpSessionIdResolver {
 
+    /**
+     * Resolve the Session ID from the given HTTP message
+     *
+     * @param message The session ID
+     * @return An {@link java.util.Optional}
+     */
+    List<String> resolveIds(HttpRequest<?> message);
 }

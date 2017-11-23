@@ -13,31 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.session.annotation;
-
-import org.particleframework.core.bind.annotation.Bindable;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+package org.particleframework.session;
 
 /**
- * Used to bind value from a {@link org.particleframework.session.Session}
- *
+ * Strategy interface for generating {@link Session} IDs
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface SessionValue {
-    /**
-     * @return The name of value from the session
-     */
-    String value() default "";
+public interface SessionIdGenerator {
 
+    /**
+     * @return The generated ID
+     */
+    String generateId();
 }

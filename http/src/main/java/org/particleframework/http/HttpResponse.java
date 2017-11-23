@@ -14,11 +14,6 @@ import java.util.Set;
  * @since 1.0
  */
 public interface HttpResponse<B> extends HttpMessage<B> {
-    /**
-     * @return The headers for the response
-     */
-    @Override
-    MutableHttpHeaders getHeaders();
 
     /**
      * @return The current status

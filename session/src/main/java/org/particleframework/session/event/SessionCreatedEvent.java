@@ -15,7 +15,6 @@
  */
 package org.particleframework.session.event;
 
-import org.particleframework.context.event.ApplicationEvent;
 import org.particleframework.session.Session;
 
 /**
@@ -24,20 +23,8 @@ import org.particleframework.session.Session;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SessionCreatedEvent extends ApplicationEvent {
-    /**
-     * Constructs a prototypical Event.
-     *
-     * @param source The object on which the Event initially occurred.
-     * @throws IllegalArgumentException if source is null.
-     */
+public class SessionCreatedEvent extends AbstractSessionEvent {
     public SessionCreatedEvent(Session source) {
         super(source);
     }
-
-    @Override
-    public Session getSource() {
-        return (Session) super.getSource();
-    }
-
 }

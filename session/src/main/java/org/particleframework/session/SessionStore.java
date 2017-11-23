@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface SessionService<S extends Session> {
+public interface SessionStore<S extends Session> {
 
     /**
      * Create a new unsaved session
@@ -41,6 +41,14 @@ public interface SessionService<S extends Session> {
      */
     CompletableFuture<Optional<S>> findSession(String id);
 
+
+    /**
+     * Delete a session for the given ID
+     *
+     * @param id The ID of the session
+     * @return A future that outputs <tt>true</tt> if the session was successfully deleted
+     */
+    CompletableFuture<Boolean> deleteSession(String id);
 
     /**
      * Save the given session

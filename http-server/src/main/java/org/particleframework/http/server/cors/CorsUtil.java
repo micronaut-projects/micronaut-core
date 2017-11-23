@@ -29,7 +29,7 @@ import static org.particleframework.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METH
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CorsUtil {
+class CorsUtil {
 
     /**
      * @return Return whether this request is a pre-flight request

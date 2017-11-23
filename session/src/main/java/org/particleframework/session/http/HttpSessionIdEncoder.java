@@ -13,18 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.session.event;
+package org.particleframework.session.http;
 
+import org.particleframework.http.HttpRequest;
+import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.session.Session;
 
 /**
- * Fired when a session is destroyed
+ * Strategy interface for encoding {@link Session} IDs so they are represented in the response
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SessionDestroyedEvent extends AbstractSessionEvent {
-    public SessionDestroyedEvent(Session source) {
-        super(source);
-    }
+public interface HttpSessionIdEncoder {
+
+    /**
+     * Encode the given Session into the response. The strategy can choose to use headers, cookies or whatever strategy suites the use case
+     *
+     * @param request The request
+     * @param response The response
+     * @param session The session
+     */
+    void encodeId(HttpRequest<?> request,
+                  MutableHttpResponse<?> response,
+                  Session session);
 }

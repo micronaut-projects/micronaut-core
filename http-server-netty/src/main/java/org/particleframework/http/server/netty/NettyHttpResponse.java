@@ -16,7 +16,6 @@
 package org.particleframework.http.server.netty;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.Attribute;
@@ -28,13 +27,12 @@ import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.cookie.Cookie;
-import org.particleframework.http.server.netty.cookies.NettyCookies;
+import org.particleframework.http.server.netty.cookies.NettyCookie;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 
 /**
  * Delegates to Netty's {@link DefaultFullHttpResponse}
@@ -85,8 +83,8 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookies.NettyCookie) {
-            NettyCookies.NettyCookie nettyCookie = (NettyCookies.NettyCookie) cookie;
+        if (cookie instanceof NettyCookie) {
+            NettyCookie nettyCookie = (NettyCookie) cookie;
             String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
         } else {

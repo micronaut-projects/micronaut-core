@@ -13,31 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.session.annotation;
+package org.particleframework.session;
 
-import org.particleframework.core.bind.annotation.Bindable;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import org.particleframework.context.annotation.ConfigurationProperties;
 
 /**
- * Used to bind value from a {@link org.particleframework.session.Session}
+ * <p>Base configuration properties for session handling</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@Target({ElementType.PARAMETER})
-@Bindable
-public @interface SessionValue {
-    /**
-     * @return The name of value from the session
-     */
-    String value() default "";
+@ConfigurationProperties("particle.session")
+public class SessionConfiguration {
 
 }

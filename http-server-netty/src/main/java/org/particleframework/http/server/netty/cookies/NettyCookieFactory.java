@@ -27,6 +27,6 @@ import org.particleframework.http.cookie.CookieFactory;
 public class NettyCookieFactory implements CookieFactory {
     @Override
     public Cookie create(String name, String value) {
-        return new NettyCookies.NettyCookie(name, value);
+        return new NettyCookie(name, value);
     }
 }

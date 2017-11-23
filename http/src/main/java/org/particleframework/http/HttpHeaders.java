@@ -102,6 +102,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      * {@code "Authorization"}
      */
     String AUTHORIZATION = "Authorization";
+
+    /**
+     * {@code "Authorization"}
+     */
+    String AUTHORIZATION_INFO = "Authorization-Info";
     /**
      * {@code "Cache-Control"}
      */
@@ -326,6 +331,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      * {@code "WWW-Authenticate"}
      */
     String WWW_AUTHENTICATE = "WWW-Authenticate";
+
+    /**
+     * {@code "X-Auth-Token"}
+     */
+    String X_AUTH_TOKEN  = "X-Auth-Token";
 
     /**
      * Obtain the date header

@@ -37,7 +37,7 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier for the bean
      * @return True if it is
      */
-    boolean containsBean(Class beanType, Qualifier qualifier);
+    <T> boolean containsBean(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
@@ -87,6 +87,19 @@ public interface BeanDefinitionRegistry {
     <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
+     * Get all of the {@link BeanDefinition} for the given qualifier
+     * @param qualifier The qualifer
+     * @return The bean definitions
+     */
+    Collection<BeanDefinition<?>> getBeanDefinitions(Qualifier<Object> qualifier);
+
+    /**
+     * Find active {@link javax.inject.Singleton} beans for the given qualifier
+     * @param qualifier The qualifier
+     * @return The beans
+     */
+    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link org.particleframework.inject.ProxyBeanDefinition}
      *
      * @param beanType The type
@@ -96,6 +109,7 @@ public interface BeanDefinitionRegistry {
      * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
     <T> Optional<BeanDefinition<T>> findProxiedBeanDefinition(Class<T> beanType, Qualifier<T> qualifier);
+
     /**
      * Obtain a {@link BeanDefinition} for the given type
      *
@@ -123,7 +137,6 @@ public interface BeanDefinitionRegistry {
     default <T> BeanDefinition<T> getProxiedBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
         return findProxiedBeanDefinition(beanType, qualifier).orElseThrow(()-> new NoSuchBeanException(beanType, qualifier));
     }
-
     /**
      * Obtain a {@link BeanDefinition} for the given type
      *
@@ -147,6 +160,7 @@ public interface BeanDefinitionRegistry {
     default <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
         return findBeanDefinition(beanType, null);
     }
+
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been compiled ahead of time.</p>
      *
@@ -172,18 +186,4 @@ public interface BeanDefinitionRegistry {
     default boolean containsBean(Class beanType) {
         return containsBean(beanType, null);
     }
-
-    /**
-     * Get all of the {@link BeanDefinition} for the given qualifier
-     * @param qualifier The qualifer
-     * @return The bean definitions
-     */
-    Collection<BeanDefinition<?>> getBeanDefinitions(Qualifier<Object> qualifier);
-
-    /**
-     * Find active {@link javax.inject.Singleton} beans for the given qualifier
-     * @param qualifier The qualifier
-     * @return The beans
-     */
-    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
 }
