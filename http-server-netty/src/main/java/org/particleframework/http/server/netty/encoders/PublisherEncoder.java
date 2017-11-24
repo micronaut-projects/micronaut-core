@@ -16,6 +16,7 @@
 package org.particleframework.http.server.netty.encoders;
 
 import io.netty.channel.*;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.server.netty.handler.ChannelOutboundHandlerFactory;
 import org.reactivestreams.Publisher;
@@ -46,41 +47,36 @@ public class PublisherEncoder extends ChannelOutboundHandlerAdapter implements O
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         if (msg instanceof Publisher) {
             Publisher<?> publisher = (Publisher) msg;
-            publisher.subscribe(new Subscriber<Object>() {
-                Subscription subscription;
-                AtomicBoolean complete = new AtomicBoolean(false);
+            publisher.subscribe(new CompletionAwareSubscriber<Object>() {
+
 
                 @Override
-                public void onSubscribe(Subscription s) {
-                    subscription = s;
-                    s.request(1);
+                protected void doOnSubscribe(Subscription subscription) {
+                    subscription.request(1);
                 }
 
                 @Override
-                public void onNext(Object o) {
-                    if (!complete.get()) {
-                        ctx.pipeline().write(o, promise).addListener(future -> {
-                                    if (future.isSuccess() && !complete.get()) {
-                                        subscription.request(1);
-                                    }
+                protected void doOnNext(Object message) {
+                    ctx.pipeline().write(message, promise).addListener(future -> {
+                                if (future.isSuccess()) {
+                                    subscription.request(1);
                                 }
-                        );
-                    }
+                                else {
+                                    Throwable cause = future.cause();
+                                    onError(cause);
+                                }
+                            }
+                    );
                 }
 
                 @Override
-                public void onError(Throwable t) {
-                    if(complete.compareAndSet(false, true)) {
-                        subscription.cancel();
-                        ctx.pipeline().fireExceptionCaught(t);
-                    }
+                protected void doOnError(Throwable t) {
+                    ctx.pipeline().fireExceptionCaught(t);
                 }
 
                 @Override
-                public void onComplete() {
-                    if (complete.compareAndSet(false, true)) {
-                        ctx.flush();
-                    }
+                protected void doOnComplete() {
+                    ctx.flush();
                 }
             });
         } else {

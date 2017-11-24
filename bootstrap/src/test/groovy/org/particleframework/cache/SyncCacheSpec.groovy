@@ -153,6 +153,7 @@ class SyncCacheSpec extends Specification {
         syncCache.put("two", 2)
         syncCache.put("three", 3)
         syncCache.put("four", 4)
+        syncCache.nativeCache.cleanUp()
         sleep(1000)
 
         then:
