@@ -94,11 +94,11 @@ public abstract class AbstractResource<Impl extends AbstractResource> implements
 
     @Override
     public OptionalMultiValues<Link> getLinks() {
-        return OptionalMultiValues.of(Link.class, links);
+        return OptionalMultiValues.of( links);
     }
 
     @Override
     public OptionalMultiValues<Resource> getEmbedded() {
-        return OptionalMultiValues.of(Resource.class, embedded);
+        return OptionalMultiValues.of(embedded);
     }
 }

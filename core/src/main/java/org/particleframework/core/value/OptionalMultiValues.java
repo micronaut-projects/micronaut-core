@@ -29,25 +29,25 @@ public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
     /**
      * Constant for empty values
      */
-    OptionalMultiValues EMPTY_VALUES = of(Object.class, Collections.EMPTY_MAP);
+    OptionalMultiValues EMPTY_VALUES = of(Collections.emptyMap());
     /**
      * An empty {@link OptionalValues}
      *
      * @param <T> The generic type
      * @return The empty values
      */
+    @SuppressWarnings("unchecked")
     static <T> OptionalMultiValues<T> empty() {
         return EMPTY_VALUES;
     }
     /**
      * Creates a new {@link OptionalValues} for the given type and values
      *
-     * @param type The target type
      * @param values A map of values
      * @param <T> The target generic type
      * @return The values
      */
-    static <T> OptionalMultiValues<T> of(Class<T> type, Map<CharSequence, List<T>> values ) {
+    static <T> OptionalMultiValues<T> of(Map<CharSequence, List<T>> values ) {
         return new MapOptionalMultiValues<>(List.class, values);
     }
 }
