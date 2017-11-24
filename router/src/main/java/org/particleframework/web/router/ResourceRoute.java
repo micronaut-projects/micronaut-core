@@ -62,5 +62,5 @@ public interface ResourceRoute extends Route {
     ResourceRoute exclude(HttpMethod... methods);
 
     @Override
-    ResourceRoute where(Predicate<HttpRequest> condition);
+    ResourceRoute where(Predicate<HttpRequest<?>> condition);
 }

@@ -38,9 +38,13 @@ public class HttpUtil {
      * @param request The request
      * @return True if it is form data
      */
-    public static boolean isFormData(HttpRequest request) {
-        MediaType contentType = request.getContentType();
-        return contentType != null && (contentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+    public static boolean isFormData(HttpRequest<?> request) {
+        Optional<MediaType> opt = request.getContentType();
+        if(opt.isPresent()) {
+            MediaType contentType = opt.get();
+            return (contentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
+        }
+        return false;
     }
 
     /**
@@ -49,18 +53,16 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
-    public static Optional<Charset> resolveCharset(HttpRequest request) {
+    public static Optional<Charset> resolveCharset(HttpRequest<?> request) {
         try {
-            MediaType contentType = request.getContentType();
-            Optional<Charset> optional = Optional.empty();
-            if(contentType != null) {
-                optional = contentType
-                        .getParameters()
-                        .get(MediaType.CHARSET_PARAMETER)
-                        .map(Charset::forName);
-            }
-            if(optional.isPresent()) {
-                return optional;
+            Optional<Charset> contentTypeCharset = request.getContentType().flatMap(contentType ->
+                    contentType.getParameters()
+                            .get(MediaType.CHARSET_PARAMETER)
+                            .map(Charset::forName)
+            );
+
+            if(contentTypeCharset.isPresent()) {
+                return contentTypeCharset;
             }
             else {
                 return request

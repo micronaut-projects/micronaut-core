@@ -70,21 +70,14 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
-                HttpContentProcessor processor;
-                MediaType contentType = source.getContentType();
-                if (contentType != null) {
-
-                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                            new ConsumesMediaTypeQualifier<>(contentType));
-
-
-                    processor = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
-                            .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration ));
-                } else {
-                    processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
-                }
-
-                return Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber() {
+                Optional<MediaType> contentType = source.getContentType();
+                HttpContentProcessor<?> processor = contentType.flatMap(type ->
+                        beanLocator.findBean(HttpContentSubscriberFactory.class,
+                                new ConsumesMediaTypeQualifier<>(type))
+                ).map(factory ->
+                        factory.build(nettyHttpRequest)
+                ).orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+                return Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {

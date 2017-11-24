@@ -61,5 +61,5 @@ public interface ErrorRoute extends Route {
     ErrorRoute nest(Runnable nested);
 
     @Override
-    ErrorRoute where(Predicate<HttpRequest> condition);
+    ErrorRoute where(Predicate<HttpRequest<?>> condition);
 }

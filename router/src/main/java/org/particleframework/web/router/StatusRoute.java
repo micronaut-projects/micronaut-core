@@ -50,5 +50,5 @@ public interface StatusRoute extends Route {
     StatusRoute nest(Runnable nested);
 
     @Override
-    StatusRoute where(Predicate<HttpRequest> condition);
+    StatusRoute where(Predicate<HttpRequest<?>> condition);
 }

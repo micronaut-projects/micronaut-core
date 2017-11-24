@@ -90,7 +90,9 @@ public class RouteBuilderTests {
         @Inject
         void someRoutes(BookController controller, AuthorController authorController) {
             GET("/conditional{/message}", controller, "hello", String.class)
-                    .where((request)-> request.getContentType().equals(MediaType.APPLICATION_JSON_TYPE));
+                    .where((request)->
+                            request.getContentType().map(type->type.equals(MediaType.APPLICATION_JSON_TYPE)).orElse(false)
+                    );
 
             GET("/message{/message}", controller, "hello", String.class).accept(APPLICATION_JSON_TYPE);
             GET("/books{/id}", controller, "show").nest(() ->

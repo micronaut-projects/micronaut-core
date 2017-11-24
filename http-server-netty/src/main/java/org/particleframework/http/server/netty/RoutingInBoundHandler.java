@@ -194,9 +194,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         else {
             routeMatch.ifPresent((route -> {
                 // Check that the route is an accepted content type
-                if (!route.accept(request.getContentType())) {
+                MediaType contentType = request.getContentType().orElse(null);
+                if (!route.accept(contentType)) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Matched route is not a supported media type: {}", request.getContentType());
+                        LOG.debug("Matched route is not a supported media type: {}", contentType);
                     }
 
                     // if the content type is not accepted send by 415 - UNSUPPORTED MEDIA TYPE
@@ -342,27 +343,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 // The request body is required, so at this point we must have a StreamedHttpRequest
                 io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
                 if (nativeRequest instanceof StreamedHttpRequest) {
-                    MediaType contentType = request.getContentType();
-                    ConsumesMediaTypeQualifier<HttpContentSubscriberFactory> qualifier = new ConsumesMediaTypeQualifier<>(contentType);
-                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,qualifier);
+                    Optional<MediaType> contentType = request.getContentType();
+                    HttpContentProcessor<?> processor = contentType.flatMap(type ->
+                            beanLocator.findBean(HttpContentSubscriberFactory.class,
+                                    new ConsumesMediaTypeQualifier<>(type))
+                    ).map(factory ->
+                            factory.build(request)
+                    ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
 
-                    if (subscriberBean.isPresent()) {
-                        HttpContentSubscriberFactory factory = subscriberBean.get();
-                        HttpContentProcessor processor = factory.build(request);
-                        if (processor.isEnabled()) {
-                            processor.subscribe(buildSubscriber(request, context, route));
-                        } else {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Request body parsing not enabled for content type: {}", contentType );
-                            }
-                            context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                                    .addListener(createCloseListener(nativeRequest));
-
-                        }
-                    } else {
-                        HttpContentProcessor defaultProcessor = new DefaultHttpContentProcessor(request, serverConfiguration);
-                        defaultProcessor.subscribe(buildSubscriber(request, context, route));
-                    }
+                    processor.subscribe(buildSubscriber(request, context, route));
 
                 } else {
                     if (LOG.isDebugEnabled()) {

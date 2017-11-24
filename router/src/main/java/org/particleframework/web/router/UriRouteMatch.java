@@ -15,6 +15,7 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.annotation.Nullable;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.uri.UriMatchInfo;
@@ -64,5 +65,5 @@ public interface UriRouteMatch<R> extends UriMatchInfo, RouteMatch<R> {
      * @param contentType The content type
      * @return True if it is
      */
-    boolean accept(MediaType contentType);
+    boolean accept(@Nullable MediaType contentType);
 }

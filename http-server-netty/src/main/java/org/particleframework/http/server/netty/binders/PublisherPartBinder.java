@@ -66,7 +66,8 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
     @SuppressWarnings("unchecked")
     @Override
     public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
-        if(MediaType.MULTIPART_FORM_DATA_TYPE.equals(source.getContentType())) {
+        Optional<MediaType> contentType = source.getContentType();
+        if(contentType.isPresent() && MediaType.MULTIPART_FORM_DATA_TYPE.equals(contentType.get())) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             Argument<Publisher> argument = context.getArgument();
             String argumentName = argument.getName();

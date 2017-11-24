@@ -44,7 +44,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
         factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
-        this.enabled = nettyHttpRequest.getContentType() == MediaType.APPLICATION_FORM_URLENCODED_TYPE ||
+        this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
                                 configuration.getMultipart().isEnabled();
     }
 

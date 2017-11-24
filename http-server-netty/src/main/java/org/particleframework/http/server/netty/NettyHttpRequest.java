@@ -127,17 +127,17 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     }
 
     @Override
-    public MediaType getContentType() {
+    public Optional<MediaType> getContentType() {
         MediaType contentType = this.mediaType;
         if (contentType == null) {
             synchronized (this) { // double check
                 contentType = this.mediaType;
                 if (contentType == null) {
-                    this.mediaType = contentType = HttpRequest.super.getContentType();
+                    this.mediaType = contentType = HttpRequest.super.getContentType().orElse(null);
                 }
             }
         }
-        return contentType;
+        return Optional.ofNullable(contentType);
     }
 
     @Override

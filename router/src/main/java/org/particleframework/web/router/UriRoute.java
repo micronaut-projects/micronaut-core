@@ -71,7 +71,7 @@ public interface UriRoute extends Route, UriMatcher {
     UriRoute acceptAll();
 
     @Override
-    UriRoute where(Predicate<HttpRequest> condition);
+    UriRoute where(Predicate<HttpRequest<?>> condition);
 
     @Override
     UriRoute body(String argument);

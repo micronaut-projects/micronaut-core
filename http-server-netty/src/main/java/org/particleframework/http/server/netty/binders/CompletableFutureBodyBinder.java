@@ -52,22 +52,16 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
 
-                MediaType contentType = source.getContentType();
                 CompletableFuture future = new CompletableFuture();
-                HttpContentProcessor processor;
-                if (contentType != null) {
+                Optional<MediaType> contentType = source.getContentType();
+                HttpContentProcessor<?> processor = contentType.flatMap(type ->
+                        beanLocator.findBean(HttpContentSubscriberFactory.class,
+                                new ConsumesMediaTypeQualifier<>(type))
+                ).map(factory ->
+                    factory.build(nettyHttpRequest)
+                ).orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
 
-                    Optional<HttpContentSubscriberFactory> subscriberBean = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                            new ConsumesMediaTypeQualifier<>(contentType));
-
-
-                    processor = subscriberBean.map(factory -> factory.build(nettyHttpRequest))
-                                               .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration ));
-                } else {
-                    processor = new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration);
-                }
-
-                processor.subscribe(new CompletionAwareSubscriber() {
+                processor.subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
                         subscription.request(1);

@@ -266,7 +266,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     abstract class AbstractRoute implements Route {
 
-        protected final List<Predicate<HttpRequest>> conditions = new ArrayList<>();
+        protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle targetMethod;
         protected final ConversionService<?> conversionService;
         protected Set<MediaType> acceptedMediaTypes;
@@ -293,7 +293,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route where(Predicate<HttpRequest> condition) {
+        public Route where(Predicate<HttpRequest<?>> condition) {
             if (condition != null) {
                 conditions.add(condition);
             }
@@ -365,7 +365,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public ErrorRoute where(Predicate<HttpRequest> condition) {
+        public ErrorRoute where(Predicate<HttpRequest<?>> condition) {
             return (ErrorRoute) super.where(condition);
         }
 
@@ -449,7 +449,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public StatusRoute where(Predicate<HttpRequest> condition) {
+        public StatusRoute where(Predicate<HttpRequest<?>> condition) {
             return (StatusRoute) super.where(condition);
         }
 
@@ -550,7 +550,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute where(Predicate<HttpRequest> condition) {
+        public UriRoute where(Predicate<HttpRequest<?>> condition) {
             return (UriRoute) super.where(condition);
         }
 
@@ -669,7 +669,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public ResourceRoute where(Predicate<HttpRequest> condition) {
+        public ResourceRoute where(Predicate<HttpRequest<?>> condition) {
             for (Route route : resourceRoutes.values()) {
                 route.where(condition);
             }

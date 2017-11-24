@@ -59,7 +59,7 @@ public interface Route {
      * @param condition The condition which accepts a {@link HttpRequest}
      * @return This route
      */
-    Route where(Predicate<HttpRequest> condition);
+    Route where(Predicate<HttpRequest<?>> condition);
 
     /**
      * The name of the argument to the route that is the request body

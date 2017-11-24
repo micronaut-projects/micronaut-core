@@ -41,9 +41,9 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * multiple times to set more than one cookie.
      *
      * @param cookie the Cookie to return to the client
-     *
      */
     MutableHttpResponse<B> cookie(Cookie cookie);
+
     /**
      * Sets the body
      *
@@ -76,14 +76,14 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param encoding The encoding to use
      */
     default MutableHttpResponse<B> characterEncoding(CharSequence encoding) {
-        if(encoding != null) {
-            MediaType mediaType = getContentType();
-            if(mediaType != null) {
-                contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())));
-            }
+        if (encoding != null) {
+            getContentType().ifPresent(mediaType ->
+                    contentType(new MediaType(mediaType.toString(), Collections.singletonMap(MediaType.CHARSET_PARAMETER, encoding.toString())))
+            );
         }
         return this;
     }
+
     /**
      * Sets the response encoding
      *
@@ -96,7 +96,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
     /**
      * Set a response header
      *
-     * @param name The name of the header
+     * @param name  The name of the header
      * @param value The value of the header
      */
     default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
@@ -109,7 +109,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      *
      * @param namesAndValues The names and values
      */
-    default MutableHttpResponse<B> headers(Map<CharSequence,CharSequence> namesAndValues) {
+    default MutableHttpResponse<B> headers(Map<CharSequence, CharSequence> namesAndValues) {
         MutableHttpHeaders headers = getHeaders();
         namesAndValues.forEach(headers::add);
         return this;
@@ -135,6 +135,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
         return this;
     }
+
     /**
      * Set the response content type
      *

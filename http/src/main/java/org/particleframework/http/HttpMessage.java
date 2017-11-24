@@ -92,11 +92,9 @@ public interface HttpMessage<B> extends OptionalValues<Object> {
      * The request or response content type
      * @return The content type
      */
-    // TODO: should return Optional
-    default MediaType getContentType() {
+    default Optional<MediaType> getContentType() {
         return getHeaders()
-                .contentType()
-                .orElse(null);
+                .contentType();
     }
 
     @Override

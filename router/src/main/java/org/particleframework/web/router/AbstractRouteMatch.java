@@ -124,7 +124,7 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
 
     @Override
     public boolean test(HttpRequest request) {
-        for (Predicate<HttpRequest> condition : abstractRoute.conditions) {
+        for (Predicate<HttpRequest<?>> condition : abstractRoute.conditions) {
             if (!condition.test(request)) {
                 return false;
             }
