@@ -40,7 +40,7 @@ public class ExecutorFactory {
             case FIXED:
                 return executorConfiguration.getThreadFactoryClass()
                             .flatMap(InstantiationUtils::tryInstantiate)
-                            .map(factory -> Executors.newFixedThreadPool(executorConfiguration.getParallelism(), factory))
+                            .map(factory -> Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads(), factory))
                             .orElse(Executors.newFixedThreadPool(executorConfiguration.getNumberOfThreads()));
             case CACHED:
                 return executorConfiguration.getThreadFactoryClass()
@@ -50,7 +50,7 @@ public class ExecutorFactory {
             case SCHEDULED:
                 return executorConfiguration.getThreadFactoryClass()
                         .flatMap(InstantiationUtils::tryInstantiate)
-                        .map(factory -> Executors.newScheduledThreadPool(executorConfiguration.getParallelism(), factory))
+                        .map(factory -> Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), factory))
                         .orElse(Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize()));
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());

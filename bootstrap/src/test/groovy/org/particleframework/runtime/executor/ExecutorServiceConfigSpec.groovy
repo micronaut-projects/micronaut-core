@@ -117,7 +117,7 @@ class ExecutorServiceConfigSpec extends Specification {
         then:
         executorServices.size() == 3
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) instanceof ScheduledExecutorService
+        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) instanceof ThreadPoolExecutor
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 

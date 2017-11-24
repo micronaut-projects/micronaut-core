@@ -41,6 +41,6 @@ public class IOExecutorService {
     @Bean
     @Named(IOExecutorService.NAME)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
+        return UserExecutorConfiguration.of(ExecutorType.CACHED);
     }
 }
