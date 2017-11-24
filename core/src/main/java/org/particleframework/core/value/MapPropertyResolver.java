@@ -1,5 +1,6 @@
 package org.particleframework.core.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 
@@ -14,7 +15,7 @@ import java.util.Optional;
  */
 public class MapPropertyResolver implements PropertyResolver {
     private final Map<String, Object> map;
-    private final ConversionService conversionService;
+    private final ConversionService<?> conversionService;
 
     public MapPropertyResolver(Map<String, Object> map) {
         this.map = map;
@@ -37,8 +38,8 @@ public class MapPropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
+    public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         Object value = map.get(name);
-        return conversionService.convert(value, requiredType, context);
+        return conversionService.convert(value, conversionContext);
     }
 }

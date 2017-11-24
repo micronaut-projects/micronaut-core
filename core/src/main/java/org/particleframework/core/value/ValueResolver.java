@@ -15,6 +15,8 @@
  */
 package org.particleframework.core.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.type.Argument;
 
@@ -28,7 +30,17 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ValueResolver {
+public interface ValueResolver<K extends CharSequence> {
+
+    /**
+     * Resolve the given property for the given name
+     *
+     * @param name The name
+     * @param conversionContext The conversion context
+     * @param <T> The concrete type
+     * @return An optional containing the property value if it exists and is able to be converted
+     */
+    <T> Optional<T> get(K name, ArgumentConversionContext<T> conversionContext);
 
     /**
      * Resolve the given property for the given name
@@ -38,7 +50,9 @@ public interface ValueResolver {
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists and is able to be converted
      */
-    <T> Optional<T> get(CharSequence name, Class<T> requiredType);
+    default <T> Optional<T> get(K name, Class<T> requiredType) {
+        return get(name, ConversionContext.of(Argument.of(requiredType)));
+    }
 
     /**
      * Resolve the given property for the given name
@@ -48,8 +62,8 @@ public interface ValueResolver {
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists and is able to be converted
      */
-    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        return get(name, requiredType.getType());
+    default <T> Optional<T> get(K name, Argument<T> requiredType) {
+        return get(name, ConversionContext.of(requiredType));
     }
     /**
      * Resolve the given property for the given name
@@ -60,17 +74,8 @@ public interface ValueResolver {
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists
      */
-    default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
+    default <T> T get(K name, Class<T> requiredType, T defaultValue) {
         return get(name, requiredType).orElse(defaultValue);
     }
 
-    /**
-     * Create a new {@link ValueResolver} for the given map
-     *
-     * @param map The map
-     * @return The {@link ValueResolver}
-     */
-    static ValueResolver of(Map<CharSequence, ?> map) {
-        return new MapValueResolver(map);
-    }
 }

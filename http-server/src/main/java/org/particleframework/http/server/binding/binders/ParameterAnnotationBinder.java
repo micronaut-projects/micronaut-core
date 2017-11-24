@@ -55,18 +55,15 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         boolean hasAnnotation = annotation != null;
         String parameterName = hasAnnotation ? annotation.value() : argument.getName();
 
-        Locale locale = source.getLocale().orElse(null);
-        Charset characterEncoding = source.getCharacterEncoding();
-
-        Optional<T> result = doBind(context, parameters, parameterName, locale, characterEncoding);
+        Optional<T> result = doBind(context, parameters, parameterName);
         if(!result.isPresent() && !hasAnnotation) {
             // try attribute
-            result = doBind(context, source.getAttributes(), parameterName, locale, characterEncoding);
+            result = doBind(context, source.getAttributes(), parameterName);
         }
         if(!result.isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
-                result = doBind(context, body.get(), parameterName, locale, characterEncoding);
+                result = doBind(context, body.get(), parameterName);
                 if(!result.isPresent()) {
                     return source.getBody(argument.getType());
                 }

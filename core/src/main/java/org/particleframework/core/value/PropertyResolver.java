@@ -1,5 +1,6 @@
 package org.particleframework.core.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.type.Argument;
 
@@ -11,7 +12,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface PropertyResolver extends ValueResolver {
+public interface PropertyResolver extends ValueResolver<String> {
 
 
     /**
@@ -42,36 +43,31 @@ public interface PropertyResolver extends ValueResolver {
      *
      *
      * @param name The name
+     * @param conversionContext The conversion context
+     * @param <T> The concrete type
+     * @return An optional containing the property value if it exists
+     */
+    <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext);
+
+    /**
+     * <p>Resolve the given property for the given name, type and generic type arguments.</p>
+     *
+     * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
+     *
+     *
+     * @param name The name
      * @param requiredType The required type
      * @param context The {@link ConversionContext} to apply  to any conversion
      * @param <T> The concrete type
      * @return An optional containing the property value if it exists
      */
-    <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context);
-
-
-    /**
-     * @see ValueResolver#get(CharSequence, Class)
-     */
-    @Override
-    default <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        return getProperty(name.toString(), requiredType);
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
+        return getProperty(name, context.with(Argument.of(requiredType)));
     }
 
-    /**
-     * @see ValueResolver#get(CharSequence, Class)
-     */
     @Override
-    default <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
-        return getProperty(name.toString(), requiredType, defaultValue);
-    }
-
-    /**
-     * @see ValueResolver#get(CharSequence, Argument)
-     */
-    @Override
-    default <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        return getProperty(name.toString(), requiredType.getType(), ConversionContext.of(requiredType));
+    default <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
+        return getProperty(name, conversionContext);
     }
 
     /**

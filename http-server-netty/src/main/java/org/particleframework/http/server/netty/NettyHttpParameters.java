@@ -15,8 +15,11 @@
  */
 package org.particleframework.http.server.netty;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleMultiValuesMap;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpParameters;
 
@@ -30,60 +33,39 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class NettyHttpParameters implements HttpParameters {
-    private final Map<String, List<String>> parameters;
-    private final ConversionService conversionService;
+    private final ConvertibleMultiValues<String> values;
 
     NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
-        this.parameters = new LinkedHashMap<>(parameters.size());
+        LinkedHashMap<CharSequence, List<String>> values = new LinkedHashMap<>(parameters.size());
+        this.values = new ConvertibleMultiValuesMap<>(values, conversionService);
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
-            this.parameters.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+            values.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
         }
-        this.conversionService = conversionService;
     }
 
-    @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        List<String> values = getAll(name);
-        if(!values.isEmpty()) {
-            String value = values.get(0);
-            return conversionService.convert(value, requiredType);
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        List<String> values = getAll(name);
-        if(!values.isEmpty()) {
-            String value = values.get(0);
-            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
-        }
-        return Optional.empty();
-    }
 
     @Override
     public Set<String> getNames() {
-        return Collections.unmodifiableSet(parameters.keySet());
+        return values.getNames();
     }
 
     @Override
     public Collection<List<String>> values() {
-        return Collections.unmodifiableCollection(parameters.values());
+        return values.values();
     }
 
     @Override
     public List<String> getAll(CharSequence name) {
-        String key = name.toString();
-        return parameters.computeIfAbsent(key, s -> Collections.emptyList());
+        return values.getAll(name);
     }
 
     @Override
     public String get(CharSequence name) {
-        List<String> all = getAll(name);
-        if(all.isEmpty()) {
-            return null;
-        }
-        return all.get(0);
+        return values.get(name);
     }
 
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return values.get(name, conversionContext);
+    }
 }

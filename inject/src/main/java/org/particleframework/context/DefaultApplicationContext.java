@@ -3,6 +3,7 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
@@ -118,8 +119,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
-        return getEnvironment().getProperty(name, requiredType, context);
+    public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
+        return getEnvironment().getProperty(name, conversionContext);
     }
 
     @Override

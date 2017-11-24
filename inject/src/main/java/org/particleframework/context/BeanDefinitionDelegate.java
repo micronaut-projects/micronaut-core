@@ -18,6 +18,7 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
@@ -38,7 +39,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver {
+class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver<String> {
     protected final BeanDefinition<T> definition;
     protected final Map<String, Object> attributes = new HashMap<>();
 
@@ -212,15 +213,6 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return get(Named.class.getName(), String.class);
     }
 
-    @Override
-    public <V> Optional<V> get(CharSequence name, Class<V> requiredType) {
-        Object value = attributes.get(name);
-        if(value != null && requiredType.isInstance(value)) {
-            return Optional.of((V) value);
-        }
-        return Optional.empty();
-    }
-
     public void put(String name, Object value) {
         this.attributes.put(name, value);
     }
@@ -283,6 +275,15 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public Annotation[] getDeclaredAnnotations() {
         return getTarget().getDeclaredAnnotations();
+    }
+
+    @Override
+    public <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
+        Object value = attributes.get(name);
+        if(value != null && conversionContext.getArgument().getType().isInstance(value)) {
+            return Optional.of((T) value);
+        }
+        return Optional.empty();
     }
 
     interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {

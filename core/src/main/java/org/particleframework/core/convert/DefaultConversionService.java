@@ -603,6 +603,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(results.toArray((Object[]) Array.newInstance(targetComponentType, results.size())));
         });
 
+
         addConverter(Object.class, Object[].class, (object, targetType, context) -> {
             Class<?> targetComponentType = targetType.getComponentType();
             Optional<?> converted = convert(object, targetComponentType);

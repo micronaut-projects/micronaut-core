@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.convert.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
@@ -58,24 +59,47 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<V> values = getAll(name);
         if(!values.isEmpty()) {
-            V value = values.get(0);
-            return conversionService.convert(value, requiredType);
+            Optional<T> converted = conversionService.convert(values, conversionContext);
+            boolean hasValue = converted.isPresent();
+            boolean hasSingleEntry = values.size() == 1;
+            if(!hasValue && hasSingleEntry) {
+                return conversionService.convert(values.get(0), conversionContext);
+            }
+            else if(hasValue && hasSingleEntry) {
+                T result = converted.get();
+                if(result instanceof List && ((List)result).isEmpty()) {
+                    return conversionService.convert(values.get(0), conversionContext);
+                }
+                else if(result instanceof Optional && !((Optional)result).isPresent()) {
+                    return conversionService.convert(values.get(0), conversionContext);
+                }
+                else {
+                    return converted;
+                }
+            }
+            else {
+                return converted;
+            }
+        }
+        else {
+            Argument<T> argument = conversionContext.getArgument();
+            if(Map.class.isAssignableFrom(argument.getType())) {
+                Argument valueType = argument.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+                Map map = subMap(name.toString(), valueType);
+                if( map.isEmpty() ) {
+                    return Optional.empty();
+                }
+                else {
+                    return Optional.of((T) map);
+                }
+            }
         }
         return Optional.empty();
     }
 
-    @Override
-    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        List<V> values = getAll(name);
-        if(!values.isEmpty()) {
-            V value = values.get(0);
-            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
-        }
-        return Optional.empty();
-    }
 
     @Override
     public List<V> getAll(CharSequence name) {

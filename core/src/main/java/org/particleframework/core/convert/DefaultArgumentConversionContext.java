@@ -103,4 +103,9 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     public Argument<T> getArgument() {
         return argument;
     }
+
+    @Override
+    public String toString() {
+        return argument.toString();
+    }
 }

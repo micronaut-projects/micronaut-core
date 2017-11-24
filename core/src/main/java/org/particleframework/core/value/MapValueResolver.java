@@ -15,7 +15,9 @@
  */
 package org.particleframework.core.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.Argument;
 
 import java.util.Map;
 import java.util.Optional;
@@ -26,22 +28,23 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class MapValueResolver implements ValueResolver {
-    final Map<CharSequence, ?> map;
+class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
+    private final Map<K, ?> map;
 
-    MapValueResolver(Map<CharSequence, ?> map) {
+    MapValueResolver(Map<K, ?> map) {
         this.map = map;
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+    public <T> Optional<T> get(K name, ArgumentConversionContext<T> conversionContext) {
         Object v = map.get(name);
         if(v == null) return Optional.empty();
 
-        if(requiredType.isInstance(v)) {
+        Argument<T> argument = conversionContext.getArgument();
+        if(argument.getType().isInstance(v)) {
             return Optional.of((T) v);
         }
-        return ConversionService.SHARED.convert(v, requiredType);
+        return ConversionService.SHARED.convert(v, conversionContext);
     }
 
     @Override

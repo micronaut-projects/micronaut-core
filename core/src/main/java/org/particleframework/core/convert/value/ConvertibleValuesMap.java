@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.convert.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
@@ -49,26 +50,10 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        if(name == null || requiredType == null) {
-            return Optional.empty();
-        }
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
         if(value != null) {
-            return conversionService.convert(value, requiredType);
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
-        if(name == null || requiredType == null) {
-            return Optional.empty();
-        }
-
-        V value = map.get(name);
-        if(value != null) {
-            return conversionService.convert(value, requiredType.getType(), ConversionContext.of(requiredType));
+            return conversionService.convert(value, conversionContext);
         }
         return Optional.empty();
     }

@@ -15,6 +15,7 @@
  */
 package org.particleframework.session;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 
 import java.time.Duration;
@@ -113,8 +114,8 @@ public class InMemorySession implements Session {
 
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
-        return attributes.get(name, requiredType);
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return attributes.get(name, conversionContext);
     }
 
 }

@@ -2,6 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.exceptions.CircularDependencyException;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.type.Argument;
 import org.particleframework.inject.*;
 
@@ -43,9 +44,9 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         Object value = get(name);
-        if(value != null && requiredType.isInstance(value)) {
+        if(value != null && conversionContext.getArgument().getType().isInstance(value)) {
             return Optional.of((T) value);
         }
         return Optional.empty();

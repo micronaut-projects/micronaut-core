@@ -13,7 +13,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanResolutionContext extends Map<String, Object>, ValueResolver {
+public interface BeanResolutionContext extends Map<String, Object>, ValueResolver<CharSequence> {
 
     /**
      * @return The context

@@ -39,18 +39,19 @@ class ParameterBindingSpec extends AbstractParticleSpec {
         where:
         uri                                             | result                      | httpStatus
         '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
+        '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+        '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
+        '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+        '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
         '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
         '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
-        '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
-        '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-        '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
+
     }
 
     @Controller

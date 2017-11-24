@@ -16,6 +16,7 @@
 package org.particleframework.context.env;
 
 import org.particleframework.core.annotation.Nullable;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.util.CollectionUtils;
@@ -136,7 +137,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(@Nullable String name, Class<T> requiredType, ConversionContext context) {
+    public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
         if(StringUtils.isEmpty(name)) {
             return Optional.empty();
         }
@@ -179,12 +180,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }                    }
 
                 }
+                Class<T> requiredType = conversionContext.getArgument().getType();
                 if(value != null) {
-                    return conversionService.convert(value, requiredType, context);
+                    return conversionService.convert(value, conversionContext);
                 }
                 else if(Map.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return conversionService.convert(subMap, requiredType, context);
+                    return conversionService.convert(subMap, requiredType, conversionContext);
                 }
                 else if(Properties.class.isAssignableFrom(requiredType)) {
                     Properties properties = resolveSubProperties(name, entries);

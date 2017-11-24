@@ -34,7 +34,7 @@ class MapOptionalValues<T> implements OptionalValues<T> {
     public MapOptionalValues(Class<?> type, Map<CharSequence, ?> values) {
         this.type = type;
         this.values = values;
-        this.resolver = ValueResolver.of(values);
+        this.resolver = new MapValueResolver<>(values);
     }
 
     @Override

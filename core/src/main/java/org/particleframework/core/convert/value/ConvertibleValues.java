@@ -15,7 +15,10 @@
  */
 package org.particleframework.core.convert.value;
 
+import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.value.ValueResolver;
 
 import java.util.*;
@@ -28,7 +31,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<String, V>> {
+public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Iterable<Map.Entry<String, V>> {
 
     /**
      * @return The names of the values
@@ -50,12 +53,12 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
     }
 
     /**
-     * Finds a header
+     * Whether the given key is contained within these values
      *
-     * @param name The header name
-     * @return True if it does
+     * @param name The key name
+     * @return True if it is
      */
-    default boolean contains(CharSequence name) {
+    default boolean contains(String name) {
         return get(name, Object.class).isPresent();
     }
 
@@ -87,15 +90,35 @@ public interface ConvertibleValues<V> extends ValueResolver, Iterable<Map.Entry<
      */
     @SuppressWarnings("unchecked")
     default Map<String, V> subMap(String prefix, Class<V> valueType) {
-        // special handling for maps for resolving sub keys
-        return (Map<String, V>)get(prefix, Map.class).orElseGet(() ->{
-                    String finalPrefix = prefix + '.';
-                    return getNames().stream()
-                            .filter(name-> name.startsWith(finalPrefix))
-                            .collect(Collectors.toMap((name)->name.substring(finalPrefix.length()), (name) -> get(name, valueType, null)));
+        return subMap(prefix, Argument.of(valueType));
+    }
 
-                }
-        );
+    /**
+     * Returns a submap for all the keys with the given prefix
+     *
+     * @param prefix The prefix
+     * @param valueType The value type
+     * @return The submap
+     */
+    @SuppressWarnings("unchecked")
+    default Map<String, V> subMap(String prefix, Argument<V> valueType) {
+        return subMap(prefix, ConversionContext.of(valueType));
+    }
+
+    /**
+     * Returns a submap for all the keys with the given prefix
+     *
+     * @param prefix The prefix
+     * @param valueType The value type
+     * @return The submap
+     */
+    @SuppressWarnings("unchecked")
+    default Map<String, V> subMap(String prefix, ArgumentConversionContext<V> valueType) {
+        // special handling for maps for resolving sub keys
+        String finalPrefix = prefix + '.';
+        return getNames().stream()
+                .filter(name-> name.startsWith(finalPrefix))
+                .collect(Collectors.toMap((name)->name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
     }
 
     @SuppressWarnings("NullableProblems")

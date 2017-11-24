@@ -2,6 +2,7 @@ package org.particleframework.context.env;
 
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.MapPropertyResolver;
@@ -295,6 +296,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         return newCatalog;
     }
+
+
 
     private class EnvironmentsAndPackage {
         Package aPackage;

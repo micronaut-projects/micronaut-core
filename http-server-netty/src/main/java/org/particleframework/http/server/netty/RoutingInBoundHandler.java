@@ -595,7 +595,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if (registeredBinder.isPresent()) {
                     ArgumentBinder argumentBinder = registeredBinder.get();
                     String argumentName = argument.getName();
-                    ArgumentConversionContext conversionContext = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
+                    ArgumentConversionContext conversionContext = ConversionContext.of(
+                            argument,
+                            request.getLocale().orElse(null),
+                            request.getCharacterEncoding()
+                    );
 
                     if (argumentBinder instanceof BodyArgumentBinder) {
                         if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
