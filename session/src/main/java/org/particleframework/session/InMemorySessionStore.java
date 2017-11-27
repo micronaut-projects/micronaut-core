@@ -65,8 +65,9 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
 
     @Override
     public CompletableFuture<Optional<InMemorySession>> findSession(String id) {
+        InMemorySession session = sessions.getIfPresent(id);
         return CompletableFuture.completedFuture(
-                Optional.ofNullable(sessions.getIfPresent(id))
+                Optional.ofNullable(session != null && !session.isExpired() ? session : null)
         );
     }
 
@@ -81,6 +82,8 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
         if(session == null) throw new IllegalArgumentException("Session cannot be null");
         String id = session.getId();
         InMemorySession existing = sessions.getIfPresent(id);
+        // if the instance is the same then merely accessing it as above will
+        // result in the expiry interval being reset so nothing else needs to be done
         if(session != existing) {
             sessions.put(id, session);
             if(existing == null) {

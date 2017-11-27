@@ -14,6 +14,7 @@ dependencies {
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
+    testCompile 'org.mongodb:mongo-java-driver:3.6.0-rc0'
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 

@@ -28,6 +28,8 @@ import java.util.regex.Pattern;
  */
 public class StringUtils {
 
+    public static final String TRUE = "true";
+    public static final String FALSE = "false";
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
