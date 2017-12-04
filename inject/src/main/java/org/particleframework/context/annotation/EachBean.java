@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.annotation;
 
+
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -24,12 +25,13 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * <p>This annotation allows driving the production of {@link Bean} definitions from either configuration or the presence of another bean definition</p>
+ * <p>This annotation allows driving the production of {@link Bean} definitions from presence of other bean definitions. Typically used in conjunction with
+ * {@link EachProperty}</p>
  *
  * <p>For example:</p>
  *
  * <pre><code>
- *  {@literal @}ForEach(property="foo.bar")
+ *  {@literal @}EachProperty(property="foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>
@@ -39,7 +41,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>One can then drive the configuration of other beans with the same annotation:</p>
  *
  * <pre><code>
- *  {@literal @}ForEach(ExampleConfiguration)
+ *  {@literal @}EachBean(ExampleConfiguration)
  *  {@literal @}Singleton
  *   public class ExampleBean {
  *      ExampleBean(ExampleConfiguration config) {
@@ -57,21 +59,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Singleton
-@ConfigurationReader
-public @interface ForEach {
+public @interface EachBean {
     /**
      * @return The bean type that this bean is driven by
      */
-    Class[] value() default {};
-
-    /**
-     * @return The property that this bean is driven by
-     */
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
-    String property() default "";
-
-    /**
-     * @return The name of the key returned by {@link #property()} that should be regarded as the {@link Primary} bean
-     */
-    String primary() default "";
+    Class value();
 }

@@ -23,13 +23,10 @@ import org.particleframework.inject.annotation.AnnotationMetadataReference;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalValues;
-import org.particleframework.core.io.service.ServiceDescriptorGenerator;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
-import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
-import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
@@ -48,12 +45,8 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
-import javax.tools.JavaFileObject;
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
@@ -877,7 +870,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || (annotationMetadata.hasDeclaredStereotype(ForEach.class) && annotationMetadata.getValue(ForEach.class, "property").isPresent());
+            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || annotationMetadata.hasDeclaredStereotype(EachProperty.class);
         }
 
         private DynamicName createProxyKey(String beanName) {

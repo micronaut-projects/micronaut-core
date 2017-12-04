@@ -110,23 +110,24 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
         return new Expiry<String, InMemorySession>() {
             @Override
             public long expireAfterCreate(String key, InMemorySession value, long currentTime) {
-                return interval(value, currentTime);
+                return newExpiry(value);
             }
 
             @Override
             public long expireAfterUpdate(String key, InMemorySession value, long currentTime, long currentDuration) {
-                return interval(value, currentTime);
+                return newExpiry(value);
             }
 
             @Override
             public long expireAfterRead(String key, InMemorySession value, long currentTime, long currentDuration) {
-                return interval(value, currentTime);
+                return newExpiry(value);
             }
 
-            private long interval(InMemorySession value, long currentTime) {
-                Instant current = Instant.ofEpochMilli(TimeUnit.NANOSECONDS.toMillis(currentTime));
+            private long newExpiry(InMemorySession value) {
+                Instant current = Instant.now();
                 value.setLastAccessTime(current);
-                return TimeUnit.MILLISECONDS.toNanos( current.plus(value.getMaxInactiveInterval()).toEpochMilli() );
+                long newExpiry = current.plus(value.getMaxInactiveInterval()).toEpochMilli();
+                return TimeUnit.MILLISECONDS.toNanos(newExpiry);
             }
         };
     }

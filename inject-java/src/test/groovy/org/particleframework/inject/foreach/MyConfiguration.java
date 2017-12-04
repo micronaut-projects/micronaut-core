@@ -1,14 +1,14 @@
 package org.particleframework.inject.foreach;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@ForEach(property = "foo.bar")
+@EachProperty("foo.bar")
 public class MyConfiguration {
     int port;
     Integer defaultValue = 9999;

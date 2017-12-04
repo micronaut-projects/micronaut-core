@@ -17,8 +17,9 @@ package org.particleframework.configuration.jdbc.tomcat;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.EachBean;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.ForEach;
 
 /**
  * Creates a tomcat data source for each configuration bean
@@ -29,7 +30,7 @@ import org.particleframework.context.annotation.ForEach;
 @Factory
 public class DatasourceFactory {
 
-    @ForEach(value = DatasourceConfiguration.class)
+    @EachBean(DatasourceConfiguration.class)
     @Bean(preDestroy = "close")
     public DataSource dataSource(DatasourceConfiguration datasourceConfiguration) {
         return new DataSource(datasourceConfiguration);

@@ -17,18 +17,16 @@ package org.particleframework.inject.foreach
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
-import org.particleframework.context.annotation.ConfigurationProperties
-import org.particleframework.context.annotation.Factory
-import org.particleframework.context.annotation.ForEach
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
+import spock.lang.Ignore
 import spock.lang.Specification
-
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class ForEachSpec extends Specification {
+class EachPropertySpec extends Specification {
+
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
@@ -94,6 +92,9 @@ class ForEachSpec extends Specification {
         bean2.primitiveDefaultValue == 9999
         bean2.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test configuration properties binding by bean type"() {
@@ -162,6 +163,9 @@ class ForEachSpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test configuration properties binding by a non bean type"() {
@@ -251,6 +255,9 @@ class ForEachSpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test configuration properties binding by non bean type with primary"() {
@@ -288,124 +295,8 @@ class ForEachSpec extends Specification {
         applicationContext.getBeansOfType(MyConfiguration).size() == 0
         applicationContext.streamOfType(MyBean).count() == 0
         applicationContext.streamOfType(MyConfiguration).count() == 0
-    }
 
-}
-
-@ForEach(MyConfiguration)
-class MyBean {
-    final MyConfiguration configuration
-
-    MyBean(MyConfiguration configuration) {
-        this.configuration = configuration
-    }
-}
-
-@ForEach(property = 'foo.bar')
-class MyConfiguration {
-    int port
-    Integer defaultValue = 9999
-    int primitiveDefaultValue = 9999
-    protected int defaultPort = 9999
-    protected Integer anotherPort
-    List<String> stringList
-    List<Integer> intList
-    List<URL> urlList
-    List<URL> urlList2
-    List<URL> emptyList
-    Map<String,Integer> flags
-    Optional<URL> url
-    Optional<URL> anotherUrl = Optional.empty()
-    Inner inner
-
-    Integer getAnotherPort() {
-        return anotherPort
-    }
-
-    int getDefaultPort() {
-        return defaultPort
-    }
-
-    @ConfigurationProperties("inner")
-    static class Inner {
-        String enabled
-    }
-}
-
-@ForEach(MyConfigurationWithPrimary)
-class MyBeanWithPrimary {
-    final MyConfigurationWithPrimary configuration
-
-    MyBeanWithPrimary(MyConfigurationWithPrimary configuration) {
-        this.configuration = configuration
-    }
-}
-
-@ForEach(property = 'foo.bar', primary = 'two')
-class MyConfigurationWithPrimary {
-    int port
-    Integer defaultValue = 9999
-    int primitiveDefaultValue = 9999
-    protected int defaultPort = 9999
-    protected Integer anotherPort
-    List<String> stringList
-    List<Integer> intList
-    List<URL> urlList
-    List<URL> urlList2
-    List<URL> emptyList
-    Map<String,Integer> flags
-    Optional<URL> url
-    Optional<URL> anotherUrl = Optional.empty()
-    Inner inner
-
-    Integer getAnotherPort() {
-        return anotherPort
-    }
-
-    int getDefaultPort() {
-        return defaultPort
-    }
-
-    @ConfigurationProperties("inner")
-    static class Inner {
-        String enabled
-    }
-}
-
-@Factory
-class MyNonBean {
-
-    @ForEach(MyConfiguration.class)
-    NonBeanClass nonBeanClass(MyConfiguration myConfiguration) {
-        new NonBeanClass(myConfiguration.port)
-    }
-
-}
-
-@Factory
-class MyNonBeanWithPrimary {
-
-    @ForEach(MyConfigurationWithPrimary.class)
-    NonBeanClassWithPrimary nonBeanClassWithPrimary(MyConfigurationWithPrimary myConfiguration) {
-        new NonBeanClassWithPrimary(myConfiguration.port)
-    }
-}
-
-
-class NonBeanClass {
-
-    int port
-
-    NonBeanClass(int port) {
-        this.port = port
-    }
-}
-
-class NonBeanClassWithPrimary {
-
-    int port
-
-    NonBeanClassWithPrimary(int port) {
-        this.port = port
+        cleanup:
+        applicationContext.close()
     }
 }

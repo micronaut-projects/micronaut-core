@@ -1,16 +1,13 @@
 package org.particleframework.inject.foreach;
 
-import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.ForEach;
-import org.particleframework.context.annotation.Primary;
-
-import javax.inject.Singleton;
+import org.particleframework.context.annotation.EachProperty;
 
 @Factory
 public class MyNonBean {
 
-    @ForEach(MyConfiguration.class)
+    @EachBean(MyConfiguration.class)
     public NonBeanClass nonBeanClass(MyConfiguration myConfiguration) {
         return new NonBeanClass(myConfiguration.getPort());
     }

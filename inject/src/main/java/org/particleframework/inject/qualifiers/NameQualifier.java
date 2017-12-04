@@ -1,11 +1,9 @@
 package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
-import org.particleframework.context.annotation.ForEach;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameResolver;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanType;
 
 import javax.inject.Named;

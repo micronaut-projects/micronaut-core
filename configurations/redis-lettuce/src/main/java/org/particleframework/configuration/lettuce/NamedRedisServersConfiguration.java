@@ -16,7 +16,7 @@
 package org.particleframework.configuration.lettuce;
 
 import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 
 /**
  * Allows the configuration of multiple redis servers
@@ -24,7 +24,7 @@ import org.particleframework.context.annotation.ForEach;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "particle.redis.servers")
+@EachProperty(value = "particle.redis.servers")
 public class NamedRedisServersConfiguration extends NamedRedisURI {
 
     public NamedRedisServersConfiguration(@Argument String name) {

@@ -26,7 +26,8 @@ import org.particleframework.cache.AsyncCache;
 import org.particleframework.cache.SyncCache;
 import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.BeanContext;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachBean;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ConversionService;
@@ -52,7 +53,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(RedisCacheConfiguration.class)
+@EachBean(RedisCacheConfiguration.class)
 public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoCloseable {
     private final RedisCacheConfiguration redisCacheConfiguration;
     private final ObjectSerializer keySerializer;

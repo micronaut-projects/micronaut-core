@@ -15,7 +15,7 @@
  */
 package org.particleframework.context;
 
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
@@ -73,7 +73,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
 
     @Override
     public boolean isIterable() {
-        return get(ForEach.class.getName(), Class.class) != null ||  definition.isIterable();
+        return get(EachProperty.class.getName(), Class.class) != null ||  definition.isIterable();
     }
 
     @Override

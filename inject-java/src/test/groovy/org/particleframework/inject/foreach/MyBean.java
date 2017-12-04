@@ -1,8 +1,9 @@
 package org.particleframework.inject.foreach;
 
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachBean;
+import org.particleframework.context.annotation.EachProperty;
 
-@ForEach(MyConfiguration.class)
+@EachBean(MyConfiguration.class)
 public class MyBean {
     final MyConfiguration configuration;
 

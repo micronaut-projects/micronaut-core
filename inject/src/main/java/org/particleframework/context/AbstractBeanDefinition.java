@@ -32,7 +32,6 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 /**
@@ -110,7 +109,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @Override
     public boolean isIterable() {
-        return hasDeclaredStereotype(ForEach.class);
+        return hasDeclaredStereotype(EachProperty.class) || hasDeclaredStereotype(EachBean.class);
     }
 
     @Override
@@ -1249,7 +1248,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     private Boolean isForEachBean(BeanResolutionContext resolutionContext, Class<?> beanType) {
-        return resolutionContext.get(ForEach.class.getName(), Class.class).map(type -> type.equals(beanType)).orElse(false);
+        return resolutionContext.get(EachProperty.class.getName(), Class.class).map(type -> type.equals(beanType)).orElse(false);
     }
 
     private void prependSuperClasses(StringBuilder prefix, Class<?> nestedType, BeanContext beanContext) {

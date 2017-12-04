@@ -15,7 +15,7 @@
  */
 package org.particleframework.runtime.executor;
 
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.util.ArgumentUtils;
 
 import javax.annotation.Nullable;
@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "particle.server.executors")
+@EachProperty(value = "particle.server.executors")
 public class UserExecutorConfiguration implements ExecutorConfiguration{
 
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();

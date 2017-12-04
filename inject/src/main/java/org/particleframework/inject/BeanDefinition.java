@@ -2,6 +2,7 @@ package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.annotation.AnnotationMetadataDelegate;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -35,7 +36,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     boolean isProvided();
 
     /**
-     * @return Whether the bean declared {@link org.particleframework.context.annotation.ForEach}
+     * @return Whether the bean declared {@link EachProperty}
      */
     boolean isIterable();
 

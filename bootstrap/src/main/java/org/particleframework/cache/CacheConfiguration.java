@@ -16,7 +16,7 @@
 package org.particleframework.cache;
 
 import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +31,7 @@ import java.util.OptionalLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "particle.caches")
+@EachProperty("particle.caches")
 public class CacheConfiguration {
 
     protected Integer initialCapacity;

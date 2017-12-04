@@ -17,7 +17,7 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.event.BeanCreatedEvent;
@@ -1170,7 +1170,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
         } else {
-            if (!beanDefinition.hasDeclaredAnnotation(ForEach.class)) {
+            if (!beanDefinition.isIterable()) {
                 BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                 singletonObjects.put(primaryBeanKey, registration);
             }

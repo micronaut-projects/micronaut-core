@@ -16,8 +16,9 @@
 package org.particleframework.runtime.executor;
 
 import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.reflect.InstantiationUtils;
 
 import java.util.concurrent.ExecutorService;
@@ -32,7 +33,7 @@ import java.util.concurrent.Executors;
 @Factory
 public class ExecutorFactory {
 
-    @ForEach(ExecutorConfiguration.class)
+    @EachBean(ExecutorConfiguration.class)
     @Bean(preDestroy = "shutdown")
     public ExecutorService executorService(ExecutorConfiguration executorConfiguration) {
         ExecutorType executorType = executorConfiguration.getType();

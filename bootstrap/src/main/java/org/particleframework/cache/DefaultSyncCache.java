@@ -17,8 +17,8 @@ package org.particleframework.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.particleframework.context.annotation.ForEach;
-import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.context.annotation.EachBean;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
@@ -36,7 +36,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(CacheConfiguration.class)
+@EachBean(CacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<Cache> {
 
     private final CacheConfiguration cacheConfiguration;

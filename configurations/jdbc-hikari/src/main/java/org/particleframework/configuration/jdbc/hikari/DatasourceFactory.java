@@ -17,8 +17,9 @@ package org.particleframework.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 
 /**
  * Creates a Hikari data source for each configuration bean
@@ -29,7 +30,7 @@ import org.particleframework.context.annotation.ForEach;
 @Factory
 public class DatasourceFactory {
 
-    @ForEach(value = DatasourceConfiguration.class)
+    @EachBean(DatasourceConfiguration.class)
     @Bean(preDestroy = "close")
     public HikariDataSource dataSource(DatasourceConfiguration datasourceConfiguration) {
         return new HikariDataSource(datasourceConfiguration);

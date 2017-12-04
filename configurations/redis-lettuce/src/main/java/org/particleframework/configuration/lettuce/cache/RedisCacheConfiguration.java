@@ -18,12 +18,10 @@ package org.particleframework.configuration.lettuce.cache;
 import io.lettuce.core.RedisURI;
 import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -32,7 +30,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ForEach(property = "particle.redis.caches")
+@EachProperty(value = "particle.redis.caches")
 public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected String uri;

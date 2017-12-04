@@ -16,8 +16,9 @@
 package org.particleframework.inject.annotation
 
 import org.particleframework.context.annotation.Bean
+import org.particleframework.context.annotation.EachBean
 import org.particleframework.context.annotation.Executable
-import org.particleframework.context.annotation.ForEach
+import org.particleframework.context.annotation.EachProperty
 import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
@@ -165,7 +166,7 @@ import java.util.concurrent.*;
 @Factory
 class Test {
 
-    @ForEach(Test.class)
+    @EachBean(Test.class)
     @Bean(preDestroy = "shutdown")
     public ExecutorService executorService(Test test) {
         return null;
@@ -178,6 +179,6 @@ class Test {
         definition != null
         !definition.hasDeclaredAnnotation(Singleton)
         definition.hasDeclaredAnnotation(Bean)
-        definition.hasDeclaredAnnotation(ForEach)
+        definition.hasDeclaredAnnotation(EachBean)
     }
 }

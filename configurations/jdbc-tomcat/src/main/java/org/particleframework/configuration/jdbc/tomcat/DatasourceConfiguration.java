@@ -17,7 +17,7 @@ package org.particleframework.configuration.jdbc.tomcat;
 
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.ForEach;
+import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.jdbc.BasicJdbcConfiguration;
 import org.particleframework.jdbc.CalculatedSettings;
 
@@ -35,7 +35,7 @@ import javax.annotation.PostConstruct;
  * @author James Kleeh
  * @since 1.0
  */
-@ForEach(property = "datasources", primary = "default")
+@EachProperty(value = "datasources", primary = "default")
 public class DatasourceConfiguration extends PoolProperties implements BasicJdbcConfiguration {
 
     private CalculatedSettings calculatedSettings;
