@@ -98,6 +98,9 @@ public class JdbcDatabaseManager {
                 .anyMatch(db -> db.driverClassName.equals(driverClassName));
     }
 
+    /**
+     * Provides the required information in order to connect toa JDBC database, including the necessary driver and validation query
+     */
     public static class JdbcDatabase {
 
         private String driverClassName;
@@ -118,14 +121,24 @@ public class JdbcDatabaseManager {
             this(driverClassName, "SELECT 1", new String[]{ urlPrefix });
         }
 
+        /**
+         * @return Whether the database is embedded
+         */
         boolean isEmbedded() {
             return Boolean.FALSE;
         }
+
+        /**
+         * @return The name of the driver class
+         */
 
         public String getDriverClassName() {
             return driverClassName;
         }
 
+        /**
+         * @return The query to run to the validate the connection
+         */
         public String getValidationQuery() {
             return validationQuery;
         }
@@ -135,6 +148,9 @@ public class JdbcDatabaseManager {
         }
     }
 
+    /**
+     * Extends {@link JdbcDatabase} with additional defaults for the use of embedded databases such as H2
+     */
     public static class EmbeddedJdbcDatabase extends JdbcDatabase {
 
         private String defaultUrl;
@@ -155,6 +171,12 @@ public class JdbcDatabaseManager {
             this.defaultUrl = defaultUrl;
         }
 
+        /**
+         * Obtain an embedded database URL for the given database name
+         *
+         * @param databaseName The database name
+         * @return The URL
+         */
         public String getUrl(String databaseName) {
             if (databaseName == null) {
                 databaseName = defaultName;

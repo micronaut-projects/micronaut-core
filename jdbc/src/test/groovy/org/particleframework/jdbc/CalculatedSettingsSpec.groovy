@@ -7,7 +7,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getDriverClassName can't be found"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredDriverClassName() >> "foo"
             1 * getName() >> "bar"
         }
@@ -23,7 +23,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getDriverClassName is calculated from the URL"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredDriverClassName() >> null
             1 * getUrl() >> "jdbc:as400:asdfasdf"
         }
@@ -38,7 +38,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getDriverClassName will search for an embedded database on the classpath"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredDriverClassName() >> null
             1 * getUrl() >> null
         }
@@ -54,7 +54,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getDriverClassName will throw an exception if no driver is found"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredDriverClassName() >> null
             1 * getUrl() >> null
             1 * getName() >> "bar"
@@ -72,7 +72,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getUrl will return the configured url"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUrl() >> "foo"
         }
         CalculatedSettings settings = new CalculatedSettings(basicConfiguration)
@@ -86,7 +86,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getUrl will look for an embedded database is found on the classpath"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUrl() >> null
             1 * getName() >> "bar"
         }
@@ -102,7 +102,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getUrl will use a default name"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUrl() >> null
             1 * getName() >> null
         }
@@ -118,7 +118,7 @@ class CalculatedSettingsSpec extends Specification {
 
     void "test getUrl will throw an exception if its not configured and a driver can't be found"() {
         given:
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUrl() >> null
             1 * getName() >> "bar"
         }
@@ -133,7 +133,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getUsername returns the configured username"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUsername() >> "user"
         }
         CalculatedSettings settings = new CalculatedSettings(basicConfiguration)
@@ -146,7 +146,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getUsername returns 'sa' if the driver is embedded"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredUsername() >> null
             1 * getDriverClassName() >> driver
         }
@@ -166,7 +166,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getPassword returns the configured password"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredPassword() >> "pw"
         }
         CalculatedSettings settings = new CalculatedSettings(basicConfiguration)
@@ -179,7 +179,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getPassword returns an empty string if the driver is embedded"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredPassword() >> null
             1 * getDriverClassName() >> driver
         }
@@ -199,7 +199,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getValidationQuery returns the configured value"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredValidationQuery() >> "x"
         }
         CalculatedSettings settings = new CalculatedSettings(basicConfiguration)
@@ -212,7 +212,7 @@ class CalculatedSettingsSpec extends Specification {
     }
 
     void "test getValidationQuery searches databases based on the url"() {
-        BasicConfiguration basicConfiguration = Mock(BasicConfiguration) {
+        BasicJdbcConfiguration basicConfiguration = Mock(BasicJdbcConfiguration) {
             1 * getConfiguredValidationQuery() >> null
             1 * getConfiguredUrl() >> url
         }

@@ -18,7 +18,7 @@ package org.particleframework.configuration.jdbc.dbcp;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.ForEach;
-import org.particleframework.jdbc.BasicConfiguration;
+import org.particleframework.jdbc.BasicJdbcConfiguration;
 import org.particleframework.jdbc.CalculatedSettings;
 
 import javax.annotation.PostConstruct;
@@ -38,10 +38,10 @@ import java.sql.SQLException;
  * @since 1.0
  */
 @ForEach(property = "datasources", primary = "default")
-public class DatasourceConfiguration extends BasicDataSource implements BasicConfiguration {
+public class DatasourceConfiguration extends BasicDataSource implements BasicJdbcConfiguration {
 
-    private CalculatedSettings calculatedSettings;
-    private String name;
+    private final CalculatedSettings calculatedSettings;
+    private final String name;
 
     public DatasourceConfiguration(@Argument String name) {
         super();

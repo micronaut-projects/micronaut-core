@@ -26,7 +26,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * <p>An interface implemented at compile time by Particle that allows the inspection of annotation metadata and stereotypes</p>
+ * <p>An interface implemented at compile time by Particle that allows the inspection of annotation metadata and stereotypes (meta-annotations)</p>
  *
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective tricks to read
  * the annotation metadata</p>

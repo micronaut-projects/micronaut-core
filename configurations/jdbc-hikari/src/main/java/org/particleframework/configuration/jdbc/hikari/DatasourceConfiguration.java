@@ -18,7 +18,7 @@ package org.particleframework.configuration.jdbc.hikari;
 import com.zaxxer.hikari.HikariConfig;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.ForEach;
-import org.particleframework.jdbc.BasicConfiguration;
+import org.particleframework.jdbc.BasicJdbcConfiguration;
 import org.particleframework.jdbc.CalculatedSettings;
 
 import javax.annotation.PostConstruct;
@@ -36,7 +36,7 @@ import javax.annotation.PostConstruct;
  * @since 1.0
  */
 @ForEach(property = "datasources", primary = "default")
-public class DatasourceConfiguration extends HikariConfig implements BasicConfiguration {
+public class DatasourceConfiguration extends HikariConfig implements BasicJdbcConfiguration {
 
     private CalculatedSettings calculatedSettings;
     private String name;

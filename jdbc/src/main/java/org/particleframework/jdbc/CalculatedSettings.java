@@ -36,15 +36,15 @@ public class CalculatedSettings {
     private String calculatedPassword;
     private String calculatedValidationQuery;
     private Optional<JdbcDatabaseManager.EmbeddedJdbcDatabase> embeddedDatabaseConnection;
-    private BasicConfiguration basicConfiguration;
+    private BasicJdbcConfiguration basicJdbcConfiguration;
 
-    public CalculatedSettings(BasicConfiguration basicConfiguration) {
-        this.basicConfiguration = basicConfiguration;
+    public CalculatedSettings(BasicJdbcConfiguration basicJdbcConfiguration) {
+        this.basicJdbcConfiguration = basicJdbcConfiguration;
         embeddedDatabaseConnection = JdbcDatabaseManager.get(this.getClass().getClassLoader());
     }
 
-    public CalculatedSettings(BasicConfiguration basicConfiguration, ClassLoader classLoader) {
-        this.basicConfiguration = basicConfiguration;
+    public CalculatedSettings(BasicJdbcConfiguration basicJdbcConfiguration, ClassLoader classLoader) {
+        this.basicJdbcConfiguration = basicJdbcConfiguration;
         embeddedDatabaseConnection = JdbcDatabaseManager.get(classLoader);
     }
 
@@ -57,15 +57,15 @@ public class CalculatedSettings {
      * @return The calculated driver class name
      */
     public String getDriverClassName() {
-        final String driverClassName = basicConfiguration.getConfiguredDriverClassName();
+        final String driverClassName = basicJdbcConfiguration.getConfiguredDriverClassName();
         if (calculatedDriverClassName == null || StringUtils.hasText(driverClassName)) {
             if (StringUtils.hasText(driverClassName)) {
-                if (!driverClassIsLoadable(driverClassName)) {
-                    throw new ConfigurationException(String.format("Error configuring data source '%s'. The driver class '%s' was not found on the classpath", basicConfiguration.getName(), driverClassName));
+                if (!driverClassIsPresent(driverClassName)) {
+                    throw new ConfigurationException(String.format("Error configuring data source '%s'. The driver class '%s' was not found on the classpath", basicJdbcConfiguration.getName(), driverClassName));
                 }
                 calculatedDriverClassName = driverClassName;
             } else {
-                final String url = basicConfiguration.getUrl();
+                final String url = basicJdbcConfiguration.getUrl();
                 if (StringUtils.hasText(url)) {
                     JdbcDatabaseManager.findDatabase(url).ifPresent(db ->
                             calculatedDriverClassName = db.getDriverClassName());
@@ -76,7 +76,7 @@ public class CalculatedSettings {
                 }
 
                 if (!StringUtils.hasText(calculatedDriverClassName)) {
-                    throw new ConfigurationException(String.format("Error configuring data source '%s'. No driver class name specified", basicConfiguration.getName()));
+                    throw new ConfigurationException(String.format("Error configuring data source '%s'. No driver class name specified", basicJdbcConfiguration.getName()));
                 }
 
             }
@@ -86,10 +86,6 @@ public class CalculatedSettings {
     }
 
 
-    private boolean driverClassIsLoadable(String className) {
-        return ClassUtils.isPresent(className, this.getClass().getClassLoader());
-    }
-
     /**
      * Determines the URL based on the configured value. If the URL is
      * not configured, search for an embedded database driver on the
@@ -98,14 +94,14 @@ public class CalculatedSettings {
      * @return The calculated URL
      */
     public String getUrl() {
-        final String url = basicConfiguration.getConfiguredUrl();
+        final String url = basicJdbcConfiguration.getConfiguredUrl();
         if (calculatedUrl == null || StringUtils.hasText(url)) {
             calculatedUrl = url;
             if (!StringUtils.hasText(calculatedUrl) && embeddedDatabaseConnection.isPresent()) {
-                calculatedUrl = embeddedDatabaseConnection.get().getUrl(basicConfiguration.getName());
+                calculatedUrl = embeddedDatabaseConnection.get().getUrl(basicJdbcConfiguration.getName());
             }
             if (!StringUtils.hasText(calculatedUrl)) {
-                throw new ConfigurationException(String.format("Error configuring data source '%s'. No URL specified", basicConfiguration.getName()));
+                throw new ConfigurationException(String.format("Error configuring data source '%s'. No URL specified", basicJdbcConfiguration.getName()));
             }
         }
 
@@ -120,10 +116,10 @@ public class CalculatedSettings {
      * @return The calculated username
      */
     public String getUsername() {
-        final String username = basicConfiguration.getConfiguredUsername();
+        final String username = basicJdbcConfiguration.getConfiguredUsername();
         if (calculatedUsername == null || StringUtils.hasText(username)) {
             calculatedUsername = username;
-            if (!StringUtils.hasText(calculatedUsername) && JdbcDatabaseManager.isEmbedded(basicConfiguration.getDriverClassName())) {
+            if (!StringUtils.hasText(calculatedUsername) && JdbcDatabaseManager.isEmbedded(basicJdbcConfiguration.getDriverClassName())) {
                 calculatedUsername = "sa";
             }
         }
@@ -139,10 +135,10 @@ public class CalculatedSettings {
      * @return The calculated password
      */
     public String getPassword() {
-        final String password = basicConfiguration.getConfiguredPassword();
+        final String password = basicJdbcConfiguration.getConfiguredPassword();
         if (calculatedPassword == null || StringUtils.hasText(password)) {
             calculatedPassword = password;
-            if (!StringUtils.hasText(calculatedPassword) && JdbcDatabaseManager.isEmbedded(basicConfiguration.getDriverClassName())) {
+            if (!StringUtils.hasText(calculatedPassword) && JdbcDatabaseManager.isEmbedded(basicJdbcConfiguration.getDriverClassName())) {
                 calculatedPassword = "";
             }
         }
@@ -159,7 +155,7 @@ public class CalculatedSettings {
      * @return The calculated validation query
      */
     public String getValidationQuery() {
-        final String validationQuery = basicConfiguration.getConfiguredValidationQuery();
+        final String validationQuery = basicJdbcConfiguration.getConfiguredValidationQuery();
         if (calculatedValidationQuery == null || StringUtils.hasText(validationQuery)) {
             calculatedValidationQuery = validationQuery;
             if (!StringUtils.hasText(calculatedValidationQuery)) {
@@ -169,6 +165,10 @@ public class CalculatedSettings {
         }
 
         return calculatedValidationQuery;
+    }
+
+    private boolean driverClassIsPresent(String className) {
+        return ClassUtils.isPresent(className, this.getClass().getClassLoader());
     }
 
 }

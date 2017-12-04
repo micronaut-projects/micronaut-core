@@ -23,8 +23,11 @@ package org.particleframework.jdbc;
  * @author James Kleeh
  * @since 1.0
  */
-public interface BasicConfiguration {
+public interface BasicJdbcConfiguration {
 
+    /**
+     * @return A user provided name to identify the datasource
+     */
     String getName();
 
     /**
