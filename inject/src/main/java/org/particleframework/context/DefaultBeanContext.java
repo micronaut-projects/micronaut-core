@@ -534,7 +534,6 @@ public class DefaultBeanContext implements BeanContext {
                             } catch (Throwable e) {
                                 throw new BeanInstantiationException(reference, e);
                             }
-                            candidates.add(definition);
                         }
                 );
             }
