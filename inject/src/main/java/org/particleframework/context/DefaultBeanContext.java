@@ -519,7 +519,7 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for qualifier: {}", qualifier);
         }
-        Collection candidates = new ArrayList<>();
+        Collection candidates = new HashSet<>();
         // first traverse component definition classes and load candidates
 
         if (!beanDefinitionsClasses.isEmpty()) {
@@ -531,6 +531,7 @@ public class DefaultBeanContext implements BeanContext {
                             try {
                                 definition = reference.load();
                                 beanDefinitions.add(definition);
+                                candidates.add(definition);
                             } catch (Throwable e) {
                                 throw new BeanInstantiationException(reference, e);
                             }
