@@ -18,7 +18,7 @@ package org.particleframework.http.hateos;
 import org.particleframework.core.value.OptionalMultiValues;
 
 /**
- * Represents a REST resource in a HATEOS
+ * Represents a REST resource in a HATEOS architecture
  *
  * @author Graeme Rocher
  * @since 1.0

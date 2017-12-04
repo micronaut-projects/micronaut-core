@@ -6,6 +6,7 @@ import java.lang.annotation.*;
 /**
  * <p>Allows configuration injection from the environment on a per property, field, method/constructor parameter basis.</p>
  *
+ * @see ConfigurationProperties
  * @author Graeme Rocher
  * @since 1.0
  */

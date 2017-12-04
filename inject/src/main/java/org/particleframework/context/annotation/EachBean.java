@@ -31,12 +31,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>For example:</p>
  *
  * <pre><code>
- *  {@literal @}EachProperty(property="foo.bar")
+ *  {@literal @}EachProperty("foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>
  *
- * <p>In the above example a new {@code Example} bean will be created for each item under the {@code foo.bar} key in application configuration</p>
+ * <p>In the above example a new {@code ExampleConfiguration} bean will be created for each item under the {@code foo.bar} key in application configuration</p>
  *
  * <p>One can then drive the configuration of other beans with the same annotation:</p>
  *
@@ -51,6 +51,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * </code></pre>
  *
  *
+ * @see EachProperty
  * @see ConfigurationProperties
  * @author Graeme Rocher
  * @since 1.0

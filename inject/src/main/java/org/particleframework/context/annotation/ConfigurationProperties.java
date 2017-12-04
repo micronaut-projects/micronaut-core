@@ -15,11 +15,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>The {@link PropertyResolver} is typically the Particle {@link org.particleframework.context.env.Environment}.</p>
  *
- * <p>The value of the annotation is used to indicate the prefix where the configuration properties are located.
+ * <p>The {@link #value()} of the annotation is used to indicate the prefix where the configuration properties are located.
  * The class can define properties or fields which will have the configuration properties to them at runtime.
  * </p>
  *
- * <p>Complex nested properties are supported via classes that are public static inner classes.</p>
+ * <p>Complex nested properties are supported via classes that are public static inner classes and are also annotated with {@link ConfigurationProperties}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

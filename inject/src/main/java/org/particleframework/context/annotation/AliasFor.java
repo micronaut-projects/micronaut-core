@@ -20,10 +20,11 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import java.lang.annotation.*;
 
 /**
- * <p>Allows specifying an annotation member alias. That is a member of an annotation can be used to represent the value of annotation</p>
+ * <p>Allows specifying an annotation member alias. In other words, a value of an annotation member can be used to represent the value of another annotation's member or a another member within the same annotation.</p>
  *
  * <p>The representation is constructed via the {@link AnnotationMetadata} interface</p>
  *
+ * @see AnnotationMetadata
  * @author Graeme Rocher
  * @since 1.0
  */

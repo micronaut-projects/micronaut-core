@@ -12,6 +12,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * it is provided by another bean. This scope is used when, for example, you have a factory bean that returns a bean
  * that also requires dependency injection.</p>
  *
+ * @see Bean
+ * @see Factory
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -29,12 +29,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>For example:</p>
  *
  * <pre><code>
- *  {@literal @}EachProperty(property="foo.bar")
+ *  {@literal @}EachProperty("foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>
  *
- * <p>In the above example a new {@code Example} bean will be created for each item under the {@code foo.bar} key in application configuration</p>
+ * <p>In the above example a new {@code ExampleConfiguration} bean will be created for each item under the {@code foo.bar} key in application configuration</p>
  *
  * <p>A reference to the configuration entry name can be obtained with the {@link Argument} annotation applied to a constructor argument:</p>
  *
@@ -49,7 +49,15 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>In the above example for a configuration property of {@code foo.bar.test}, the value of the {@code name} argument will be {@code "test"}</p>
  *
- * <p>One can then drive the configuration of other beans with the {@link EachBean} annotation:</p>
+ * <p>The bean is created as a singleton with a {@link javax.inject.Named} qualifier matching the configuration entry name, thus allowing retrieval with:</p>
+ *
+ * <pre><code>
+ *  ExampleConfiguration exampleConfiguration = applicationContext.getBean(ExampleConfiguration.class, Qualifiers.byName("test"));
+ * </code></pre>
+ *
+ * <p>Or alternatively dependency injection via the {@link javax.inject.Named} qualifier.</p>
+ *
+ * <p>This annotation is typically used in conjunction with {@link EachBean}. For example, one can drive the configuration of other beans with the {@link EachBean} annotation:</p>
  *
  * <pre><code>
  *  {@literal @}EachBean(ExampleConfiguration)
@@ -61,8 +69,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *   }
  * </code></pre>
  *
- *
+ * @see EachBean
  * @see ConfigurationProperties
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
