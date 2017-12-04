@@ -15,9 +15,9 @@
  */
 package org.particleframework.core.serialize;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.serialize.exceptions.SerializationException;
 
+import javax.annotation.Nullable;
 import java.io.*;
 import java.util.Optional;
 

@@ -15,9 +15,9 @@
  */
 package org.particleframework.http.hateos;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.http.MediaType;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.Optional;
 

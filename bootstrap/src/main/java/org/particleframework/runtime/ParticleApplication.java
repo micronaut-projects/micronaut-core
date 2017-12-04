@@ -18,9 +18,7 @@ package org.particleframework.runtime;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.cli.CommandLine;
-import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.runtime.context.env.CommandLinePropertySource;
@@ -29,9 +27,9 @@ import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 /**
  * <p>Main entry point for running a Particle application.</p>
@@ -119,7 +117,7 @@ public class ParticleApplication {
      * @param classes The application
      * @return The classes
      */
-    public ParticleApplication classes(@Nullable  Class... classes) {
+    public ParticleApplication classes(@Nullable Class... classes) {
         if(classes != null) {
             this.classes.addAll(Arrays.asList(classes));
         }

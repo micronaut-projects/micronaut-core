@@ -15,10 +15,10 @@
  */
 package org.particleframework.http.hateos;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalMultiValues;
 
+import javax.annotation.Nullable;
 import java.util.*;
 
 /**

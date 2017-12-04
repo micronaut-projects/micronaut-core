@@ -2,25 +2,20 @@ package org.particleframework.context.env;
 
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
-import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.naming.NameUtils;
-import org.particleframework.core.util.CollectionUtils;
-import org.particleframework.core.value.MapPropertyResolver;
-import org.particleframework.core.value.PropertyResolver;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.service.SoftServiceLoader;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.order.OrderUtil;
-import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanConfiguration;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;

@@ -19,6 +19,7 @@ import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.value.OptionalValues;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;

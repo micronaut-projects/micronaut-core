@@ -17,10 +17,10 @@ package org.particleframework.core.type;
 
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.Named;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;

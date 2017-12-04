@@ -17,9 +17,9 @@ package org.particleframework.inject.qualifiers;
 
 import org.particleframework.context.Qualifier;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.inject.BeanType;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

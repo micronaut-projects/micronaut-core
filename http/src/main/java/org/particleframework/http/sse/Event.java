@@ -15,9 +15,9 @@
  */
 package org.particleframework.http.sse;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.util.ArgumentUtils;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 
 /**

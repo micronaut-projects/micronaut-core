@@ -16,9 +16,9 @@
 package org.particleframework.runtime.executor;
 
 import org.particleframework.context.annotation.ForEach;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.util.ArgumentUtils;
 
+import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
 import java.util.Optional;
 import java.util.OptionalInt;

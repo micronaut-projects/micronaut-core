@@ -15,8 +15,8 @@
  */
 package org.particleframework.core.util;
 
-import org.particleframework.core.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.regex.Pattern;
 

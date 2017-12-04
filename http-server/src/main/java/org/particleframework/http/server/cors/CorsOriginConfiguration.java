@@ -15,9 +15,9 @@
  */
 package org.particleframework.http.server.cors;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.http.HttpMethod;
 
+import javax.annotation.Nullable;
 import java.util.*;
 
 /**

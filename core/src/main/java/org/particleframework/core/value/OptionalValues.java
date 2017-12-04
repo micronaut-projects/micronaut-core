@@ -15,8 +15,8 @@
  */
 package org.particleframework.core.value;
 
-import org.particleframework.core.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.BiConsumer;
 

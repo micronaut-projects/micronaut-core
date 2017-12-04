@@ -1,6 +1,5 @@
 package org.particleframework.context.env;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
@@ -10,6 +9,7 @@ import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.inject.BeanConfiguration;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;

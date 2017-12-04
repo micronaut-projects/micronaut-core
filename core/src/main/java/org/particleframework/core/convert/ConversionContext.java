@@ -17,11 +17,11 @@ package org.particleframework.core.convert;
 
 import org.particleframework.core.annotation.AnnotationSource;
 import org.particleframework.core.annotation.AnnotationUtil;
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.TypeVariableResolver;
 import org.particleframework.core.util.ArrayUtils;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;

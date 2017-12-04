@@ -15,13 +15,11 @@
  */
 package org.particleframework.http.hateos;
 
-import org.particleframework.core.annotation.Nullable;
-import org.particleframework.core.util.StringUtils;
-import org.particleframework.core.value.OptionalMultiValues;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Produces;
 
-import java.util.*;
+import javax.annotation.Nullable;
+import java.util.Optional;
 
 /**
  * See https://github.com/blongden/vnd.error

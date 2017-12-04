@@ -15,8 +15,8 @@
  */
 package org.particleframework.core.io;
 
-import org.particleframework.core.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

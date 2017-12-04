@@ -15,15 +15,14 @@
  */
 package org.particleframework.context.env;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.MapPropertyResolver;
 import org.particleframework.core.value.PropertyResolver;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 

@@ -15,9 +15,9 @@
  */
 package org.particleframework.core.util;
 
-import org.particleframework.core.annotation.Nullable;
 import org.particleframework.core.convert.ConversionService;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.*;
 
