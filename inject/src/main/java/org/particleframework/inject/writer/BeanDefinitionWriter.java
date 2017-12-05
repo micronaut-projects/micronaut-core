@@ -127,9 +127,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method GET_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
+    private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String[].class);
+
     private static final Method CONTAINS_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
     private static final Method CONTAINS_PROPERTIES_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsProperties", BeanResolutionContext.class, BeanContext.class);
+
+    private static final Method CONTAINS_SUB_PROPERTIES_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsProperties", BeanResolutionContext.class, BeanContext.class, String.class);
 
     private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getBeanForMethodArgument", BeanResolutionContext.class, BeanContext.class, int.class, int.class);
 
@@ -198,6 +202,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
     private final AnnotationMetadata annotationMetadata;
+    private String currentConfigBuilderField;
+    private Type currentConfigBuilderType;
+    private int optionalInstanceIndex;
+
 
     /**
      * Creates a bean definition writer
@@ -770,6 +778,100 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return this.annotationMetadata;
     }
 
+    @Override
+    public void visitConfigBuilderFieldStart(Object fieldType, String fieldName) {
+        this.currentConfigBuilderField = fieldName;
+        this.currentConfigBuilderType = getTypeReference(fieldType);
+
+    }
+
+    @Override
+    public void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
+        if(currentConfigBuilderField != null) {
+            GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
+
+            String propertyName = NameUtils.decapitalize( methodName.substring(prefix.length()) );
+
+            injectMethodVisitor.loadThis();
+            injectMethodVisitor.loadArg(0); // the resolution context
+            injectMethodVisitor.loadArg(1); // the bean context
+            boolean zeroArgs = paramType == null;
+            if(zeroArgs) {
+                // if the parameter type is null this is a zero args method that expects a boolean flag
+                buildArgument(
+                        injectMethodVisitor,
+                        propertyName,
+                        Boolean.class
+                );
+            }
+            else {
+                buildArgumentWithGenerics(
+                        injectMethodVisitor,
+                        propertyName,
+                        Collections.singletonMap(paramType, generics)
+                );
+            }
+            // at some point we may want to support nested builders, hence the arrays and property path resolution
+            pushNewArray(injectMethodVisitor, String.class, 1);
+            String[] propertyPath = {propertyName};
+            for (int i = 0; i < propertyPath.length; i++) {
+                pushStoreStringInArray(injectMethodVisitor, i, 1, propertyPath[i]);
+            }
+            // Optional optional = AbstractBeanDefinition.getValueForPath(...)
+            injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
+            injectMethodVisitor.visitVarInsn(ASTORE, optionalInstanceIndex);
+            injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+            Label ifEnd = new Label();
+            // if(optional.isPresent())
+            injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Optional.class, "isPresent" )
+            ));
+            injectMethodVisitor.push(false);
+            injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, ifEnd);
+            injectMethodVisitor.visitLabel(new Label());
+
+            // get the value: optional.get()
+
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex); // the instance to be injected
+            injectMethodVisitor.getField(beanType, currentConfigBuilderField, currentConfigBuilderType);
+            Type returnTypeRef = getTypeReference(returnType);
+            Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
+            String desc = returnTypeRef.getClassName() + " " + methodName + "(" + (!zeroArgs ? paramTypeRef.getClassName() : "") + ")";
+            injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+            injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
+                    ReflectionUtils.getRequiredMethod(Optional.class, "get" )
+            ));
+            pushCastToType(injectMethodVisitor, !zeroArgs ? paramType : boolean.class);
+            if(zeroArgs) {
+                Label zeroArgsEnd = new Label();
+                injectMethodVisitor.push(false);
+                injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, zeroArgsEnd);
+                injectMethodVisitor.visitLabel(new Label());
+                injectMethodVisitor.invokeVirtual(
+                        currentConfigBuilderType,
+                        org.objectweb.asm.commons.Method.getMethod(desc)
+                );
+
+                injectMethodVisitor.visitLabel(zeroArgsEnd);
+            }
+            else {
+                injectMethodVisitor.invokeVirtual(
+                        currentConfigBuilderType,
+                        org.objectweb.asm.commons.Method.getMethod(desc)
+                );
+            }
+            injectMethodVisitor.pop();
+
+            injectMethodVisitor.visitLabel(ifEnd);
+        }
+    }
+
+    @Override
+    public void visitConfigBuilderFieldEnd() {
+        currentConfigBuilderField = null;
+        currentConfigBuilderType =null;
+    }
+
     /**
      * Visits a field injection point
      *
@@ -1263,8 +1365,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
             if(isConfigurationProperties) {
                 injectMethodVisitor.loadThis();
-                injectMethodVisitor.loadArg(0);
-                injectMethodVisitor.loadArg(1);
+                injectMethodVisitor.loadArg(0); // the resolution context
+                injectMethodVisitor.loadArg(1); // the bean context
+                // invoke AbstractBeanDefinition.containsProperties(..)
                 injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(CONTAINS_PROPERTIES_METHOD));
                 injectMethodVisitor.push(false);
                 injectEnd = new Label();
@@ -1277,7 +1380,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // store it in a local variable
             injectMethodVisitor.visitTypeInsn(CHECKCAST, beanType.getInternalName());
             injectInstanceIndex = pushNewInjectLocalVariable();
-
+            injectMethodVisitor.visitInsn(ACONST_NULL);
+            optionalInstanceIndex = pushNewInjectLocalVariable();
         }
     }
 
@@ -1773,37 +1877,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             generatorAdapter.push(i);
             String typeParameterName = entry.getKey();
             Object value = entry.getValue();
-            Map nestedTypes = null;
             if(value instanceof Map) {
-                Map nestedTypeData = (Map)value;
-                Optional<Map.Entry> nestedEntry = nestedTypeData.entrySet().stream().findFirst();
-                if(nestedEntry.isPresent()) {
-                    Map.Entry data = nestedEntry.get();
-                    Object key = data.getKey();
-                    Object map = data.getValue();
-                    value = key;
-                    if(map instanceof Map) {
-                        nestedTypes = (Map) map;
-                    }
-                }
+                buildArgumentWithGenerics(generatorAdapter, typeParameterName, (Map)value);
             }
-
-            // 1st argument: the type
-            generatorAdapter.push(getTypeReference(value));
-            // 2nd argument: the name
-            generatorAdapter.push(typeParameterName);
-
-            // 3rd argument: generic types
-            boolean hasGenerics = nestedTypes != null;
-            if(hasGenerics) {
-                buildTypeArguments(generatorAdapter, nestedTypes);
+            else {
+                buildArgument(generatorAdapter, typeParameterName, value);
             }
-
-            // Argument.create( .. )
-            generatorAdapter.invokeStatic(
-                    Type.getType(Argument.class),
-                    hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
-            );
 
             // store the type reference
             generatorAdapter.visitInsn(AASTORE);
@@ -1813,6 +1892,56 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             i++;
         }
+    }
+
+    private static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Object objectType) {
+
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(objectType));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+
+
+        // Argument.create( .. )
+        generatorAdapter.invokeStatic(
+                Type.getType(Argument.class),
+                METHOD_CREATE_ARGUMENT_SIMPLE
+        );
+    }
+
+    private static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
+        Map nestedTypes = null;
+        Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
+        Object objectType;
+        if(nestedEntry.isPresent()) {
+            Map.Entry data = nestedEntry.get();
+            Object key = data.getKey();
+            Object map = data.getValue();
+            objectType = key;
+            if(map instanceof Map) {
+                nestedTypes = (Map) map;
+            }
+        }
+        else {
+            throw new IllegalArgumentException("Must be a map with a single key containing the argument type and a map of generics as the value");
+        }
+
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(objectType));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+
+        // 3rd argument: generic types
+        boolean hasGenerics = nestedTypes != null;
+        if(hasGenerics) {
+            buildTypeArguments(generatorAdapter, nestedTypes);
+        }
+
+        // Argument.create( .. )
+        generatorAdapter.invokeStatic(
+                Type.getType(Argument.class),
+                hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
+        );
     }
 
 

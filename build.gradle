@@ -85,6 +85,9 @@ subprojects { subproject ->
                 if(group == 'org.codehaus.groovy') {
                     details.useVersion(groovyVersion)
                 }
+                if(group == 'org.ow2.asm') {
+                    details.useVersion(asmVersion)
+                }
             }
         }
     }
@@ -105,6 +108,8 @@ subprojects { subproject ->
         testCompile "org.ow2.asm:asm:$asmVersion"
         testCompile "org.ow2.asm:asm-commons:$asmVersion"
     }
+
+    task allDeps(type: DependencyReportTask) {}
 }
 
 apply from:"${commonBuild}/common-docs.gradle"

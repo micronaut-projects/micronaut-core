@@ -21,7 +21,6 @@ import org.particleframework.inject.BeanDefinition;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -317,4 +316,31 @@ public interface BeanDefinitionVisitor {
      */
     AnnotationMetadata getAnnotationMetadata();
 
+    /**
+     * Begin defining a configuration builder
+     *
+     * @param fieldType The builder type
+     * @param fieldName The name of the field
+     * @see org.particleframework.context.annotation.ConfigurationBuilder
+     */
+    void visitConfigBuilderFieldStart(Object fieldType, String fieldName);
+
+    /**
+     * Visit a configuration builder method
+     *
+     * @param prefix The prefix used for the method
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param paramType The method type
+     * @param generics
+     * @see org.particleframework.context.annotation.ConfigurationBuilder
+     */
+    void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics);
+
+    /**
+     * Finalize a configuration builder field
+     *
+     * @see org.particleframework.context.annotation.ConfigurationBuilder
+     */
+    void visitConfigBuilderFieldEnd();
 }

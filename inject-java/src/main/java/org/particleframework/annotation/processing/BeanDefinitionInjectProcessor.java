@@ -258,9 +258,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
 
                     @Override
-                    protected boolean isAcceptable(Element enclosedElement) {
-                        Set<Modifier> modifiers = enclosedElement.getModifiers();
-                        return modelUtils.isAbstract(enclosedElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
+                    protected boolean isAcceptable(ExecutableElement executableElement) {
+                        Set<Modifier> modifiers = executableElement.getModifiers();
+                        return modelUtils.isAbstract(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
                     }
                 }, aopProxyWriter);
                 return null;
@@ -318,16 +318,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         ElementFilter.fieldsIn(members).forEach(
                                 field -> {
                                     if (!modelUtils.isStatic(field) && !modelUtils.isFinal(field)) {
-                                        visitConfigurationProperty(field, o);
+                                        visitConfigurationProperty(field);
                                     }
                                 }
                         );
                         ElementFilter.methodsIn(members).forEach(method -> {
-                            if(!modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString())) {
+                            boolean isCandidateMethod = !modelUtils.isStatic(method) &&
+                                                            !modelUtils.isPrivate(method) &&
+                                                            !modelUtils.isAbstract(method) &&
+                                                            NameUtils.isSetterName(method.getSimpleName().toString());
+                            if(isCandidateMethod) {
                                 Element e = method.getEnclosingElement();
                                 if(e instanceof TypeElement && !e.equals(classElement)) {
                                     if(!annotationUtils.hasStereotype(e, ConfigurationProperties.class)) {
-                                        visitExecutable(method, null);
+                                        visitConfigurationPropertySetter(method);
                                     }
                                 }
                             }
@@ -388,36 +392,37 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
             }
-            else {
-                if(isConfigurationPropertiesType && modelUtils.isPublic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
-                    BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
-                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
-                        writer.setValidated(true);
-                    }
-                    String qualifierRef = annotationUtils.resolveQualifier(method);
-                    TypeMirror valueType = method.getParameters().get(0).asType();
-                    Object fieldType = modelUtils.resolveTypeReference(valueType);
-                    Map<String, Object> genericTypes = Collections.emptyMap();
-                    TypeKind typeKind = valueType.getKind();
-                    if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
-                        genericTypes = genericUtils.resolveGenericTypes(valueType);
-                    }
-
-                    TypeElement declaringClass = modelUtils.classElementFor(method);
-
-                    writer.visitSetterValue(
-                            modelUtils.resolveTypeReference(declaringClass),
-                            qualifierRef,
-                            modelUtils.requiresReflection(method),
-                            fieldType,
-                            method.getSimpleName().toString(),
-                            genericTypes,
-                            isConfigurationPropertiesType);
-
-                }
+            else if(isConfigurationPropertiesType && modelUtils.isPublic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
+                visitConfigurationPropertySetter(method);
             }
 
             return null;
+        }
+
+        private void visitConfigurationPropertySetter(ExecutableElement method) {
+            BeanDefinitionVisitor writer = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
+            if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
+                writer.setValidated(true);
+            }
+            String qualifierRef = annotationUtils.resolveQualifier(method);
+            TypeMirror valueType = method.getParameters().get(0).asType();
+            Object fieldType = modelUtils.resolveTypeReference(valueType);
+            Map<String, Object> genericTypes = Collections.emptyMap();
+            TypeKind typeKind = valueType.getKind();
+            if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
+                genericTypes = genericUtils.resolveGenericTypes(valueType);
+            }
+
+            TypeElement declaringClass = modelUtils.classElementFor(method);
+
+            writer.visitSetterValue(
+                    modelUtils.resolveTypeReference(declaringClass),
+                    qualifierRef,
+                    modelUtils.requiresReflection(method),
+                    fieldType,
+                    method.getSimpleName().toString(),
+                    genericTypes,
+                    true);
         }
 
         void visitBeanFactoryMethod(ExecutableElement beanMethod) {
@@ -767,7 +772,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return null;
         }
 
-        public Object visitConfigurationProperty(VariableElement field, Object o) {
+        public Object visitConfigurationProperty(VariableElement field) {
             Optional<ExecutableElement> setterMethod = modelUtils.findSetterMethodFor(field);
             boolean isInjected = annotationUtils.hasStereotype(field, Inject.class);
             boolean isValue = annotationUtils.hasStereotype(field, Value.class);
@@ -780,45 +785,60 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     writer.setValidated(true);
                 }
                 String qualifierRef = annotationUtils.resolveQualifier(field);
-                Object fieldType = modelUtils.resolveTypeReference(field.asType());
+                TypeMirror fieldTypeMirror = field.asType();
+                Object fieldType = modelUtils.resolveTypeReference(fieldTypeMirror);
                 Map<String, Object> genericTypes = Collections.emptyMap();
-                TypeKind typeKind = field.asType().getKind();
+                TypeKind typeKind = fieldTypeMirror.getKind();
 
                 if (!(typeKind.isPrimitive() || typeKind == ARRAY)) {
-                    genericTypes = genericUtils.resolveGenericTypes(field.asType());
+                    genericTypes = genericUtils.resolveGenericTypes(fieldTypeMirror);
                 }
 
                 TypeElement declaringClass = modelUtils.classElementFor(field);
 
 
-                if (setterMethod.isPresent()) {
-                    ExecutableElement method = setterMethod.get();
-                    writer.visitSetterValue(
-                            modelUtils.resolveTypeReference(declaringClass),
-                            qualifierRef,
-                            modelUtils.requiresReflection(method),
-                            fieldType,
-                            field.getSimpleName().toString(),
-                            method.getSimpleName().toString(),
-                            genericTypes,
-                            isConfigurationPropertiesType);
-                } else {
-                    boolean isPrivate = modelUtils.isPrivate(field);
-                    boolean requiresReflection = isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());
+                if(annotationUtils.hasStereotype(field, ConfigurationBuilder.class)) {
+                    String fieldName = field.getSimpleName().toString();
+                    writer.visitConfigBuilderFieldStart(fieldType, fieldName);
 
-                    if(!isPrivate) {
-                        Object declaringType = modelUtils.resolveTypeReference(declaringClass);
-                        String fieldName = field.getSimpleName().toString();
-                        writer.visitFieldValue(
-                                declaringType,
-                                qualifierRef,
-                                requiresReflection,
-                                fieldType,
-                                fieldName,
-                                isConfigurationPropertiesType);
-
+                    try {
+                        visitConfigurationBuilder(field, fieldTypeMirror, writer);
+                    } finally {
+                        writer.visitConfigBuilderFieldEnd();
                     }
                 }
+                else {
+
+                    if (setterMethod.isPresent()) {
+                        ExecutableElement method = setterMethod.get();
+                        writer.visitSetterValue(
+                                modelUtils.resolveTypeReference(declaringClass),
+                                qualifierRef,
+                                modelUtils.requiresReflection(method),
+                                fieldType,
+                                field.getSimpleName().toString(),
+                                method.getSimpleName().toString(),
+                                genericTypes,
+                                isConfigurationPropertiesType);
+                    } else {
+                        boolean isPrivate = modelUtils.isPrivate(field);
+                        boolean requiresReflection = isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());
+
+                        if(!isPrivate) {
+                            Object declaringType = modelUtils.resolveTypeReference(declaringClass);
+                            String fieldName = field.getSimpleName().toString();
+                            writer.visitFieldValue(
+                                    declaringType,
+                                    qualifierRef,
+                                    requiresReflection,
+                                    fieldType,
+                                    fieldName,
+                                    isConfigurationPropertiesType);
+
+                        }
+                    }
+                }
+
             }
 
             return null;
@@ -842,6 +862,54 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return !declaringClass.equals(concreteClass) &&
                     !declaringPackage.equals(concretePackage) &&
                     !(modifiers.contains(Modifier.PUBLIC));
+        }
+
+        private void visitConfigurationBuilder(Element builderElement, TypeMirror builderType, BeanDefinitionVisitor writer) {
+            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(builderElement);
+            Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false);
+            List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(new String[]{"set"}));
+            PublicMethodVisitor visitor = new PublicMethodVisitor() {
+                @Override
+                protected void accept(ExecutableElement method, Object o) {
+                    List<? extends VariableElement> params = method.getParameters();
+                    String methodName = method.getSimpleName().toString();
+                    String prefix = getMethodPrefix(prefixes, methodName);
+                    VariableElement paramType = params.size() == 1 ? params.get(0) : null;
+                    Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
+                    writer.visitConfigBuilderMethod(
+                            prefix,
+                            modelUtils.resolveTypeReference(method.getReturnType()),
+                            methodName,
+                            expectedType,
+                            paramType != null ? genericUtils.resolveGenericTypes(paramType.asType()) : null
+                    );
+                }
+
+                @Override
+                protected boolean isAcceptable(ExecutableElement executableElement) {
+                    int paramCount = executableElement.getParameters().size();
+                    return (paramCount == 1 || allowZeroArgs && paramCount == 0) && super.isAcceptable(executableElement) && isPrefixedWith(executableElement, prefixes);
+                }
+
+                private boolean isPrefixedWith(Element enclosedElement, List<String> prefixes) {
+                    String name = enclosedElement.getSimpleName().toString();
+                    for (String prefix : prefixes) {
+                        if (name.startsWith(prefix)) return true;
+                    }
+                    return false;
+                }
+
+                private String getMethodPrefix(List<String> prefixes, String methodName) {
+                    for (String prefix : prefixes) {
+                        if(methodName.startsWith(prefix)) {
+                            return prefix;
+                        }
+                    }
+                    return methodName;
+                }
+            };
+
+            builderType.accept(visitor, null);
         }
 
         private BeanDefinitionWriter createBeanDefinitionWriterFor(TypeElement typeElement) {

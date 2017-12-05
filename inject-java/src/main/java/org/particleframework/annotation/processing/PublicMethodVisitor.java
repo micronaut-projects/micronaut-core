@@ -60,7 +60,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
             List<? extends Element> enclosedElements = typeElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {
                 if(enclosedElement.getKind() == ElementKind.METHOD) {
-                    boolean isAcceptable = isAcceptable(enclosedElement);
+                    boolean isAcceptable = isAcceptable((ExecutableElement) enclosedElement);
                     ExecutableElement theMethod = (ExecutableElement) enclosedElement;
                     if(isAcceptable) {
                         String qualifiedName = theMethod.toString();
@@ -93,8 +93,8 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
         return null;
     }
 
-    protected boolean isAcceptable(Element enclosedElement) {
-        Set<Modifier> modifiers = enclosedElement.getModifiers();
+    protected boolean isAcceptable( ExecutableElement executableElement) {
+        Set<Modifier> modifiers = executableElement.getModifiers();
         return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL);
     }
 

@@ -36,6 +36,7 @@ public @interface ConfigurationProperties {
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
     String value();
 
+
     /**
      * <p>If the properties of this configuration can also be resolved from the CLI a prefix can be specified.</p>
      *

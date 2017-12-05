@@ -112,12 +112,6 @@ class ModelUtils {
         return requiresReflection;
     }
 
-    TypeMirror wrapperForPrimitiveType(TypeMirror primitive) {
-        return primitive.getKind().isPrimitive()
-            ? typeUtils.boxedClass((PrimitiveType)primitive).asType()
-            : primitive;
-    }
-
     // for cases where Element.getKind() == FIELD
     // and field.asType().toString() is something like
     // "int" return Integer.TYPE
@@ -182,17 +176,6 @@ class ModelUtils {
         return (TypeElement) kind.asElement();
     }
 
-    List<TypeElement> superClassesFor(TypeElement classElement) {
-        List<TypeElement> superClasses = new ArrayList<>();
-        TypeElement superclass = superClassFor(classElement);
-                while (superclass != null) {
-            superClasses.add(superclass);
-            superclass = superClassFor(superclass);
-        }
-                Collections.reverse(superClasses);
-        return superClasses;
-    }
-
     Object resolveTypeReference(TypeElement typeElement) {
         TypeMirror type = typeElement.asType();
         if(type != null) {
@@ -219,7 +202,7 @@ class ModelUtils {
             } else {
                 result = typeUtils.erasure(type).toString();
             }
-        } else if (type.getKind() != VOID) {
+        } else if (type.getKind() != VOID && type.getKind() != ERROR) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
             result = resolveTypeReferenceForTypeElement(typeElement);
         }

@@ -32,6 +32,7 @@ import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -277,7 +278,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      */
     @Internal
     protected AbstractBeanDefinition addInjectionPoint(Field field, Annotation qualifier, boolean requiresReflection) {
-        requiredComponents.add(field.getType());
+        if (field.getAnnotation(Inject.class) != null) {
+            requiredComponents.add(field.getType());
+        }
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this, field, qualifier, requiresReflection));
         return this;
     }
@@ -290,7 +293,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      */
     @Internal
     protected AbstractBeanDefinition addInjectionPoint(Field field, boolean requiresReflection) {
-        requiredComponents.add(field.getType());
+        if (field.getAnnotation(Inject.class) != null) {
+            requiredComponents.add(field.getType());
+        }
         fieldInjectionPoints.add(new DefaultFieldInjectionPoint(this, field, null, requiresReflection));
         return this;
     }
@@ -332,7 +337,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 requiresReflection,
                 argument
         );
-        requiredComponents.add(field.getType());
+        if (field.getAnnotation(Inject.class) != null || setter.getAnnotation(Inject.class) != null) {
+            requiredComponents.add(field.getType());
+        }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
     }
@@ -380,7 +387,8 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         try {
             return bean;
         } finally {
-            if(valuePrefixes != null) {
+            if (valuePrefixes != null && isSingleton()) {
+                // free up memory by clearing the value prefixes after injection completes
                 valuePrefixes.clear();
             }
         }
@@ -542,18 +550,16 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, argument, argumentType, valString);
+                    Optional value = resolveValue(applicationContext, argument, valString);
                     if (argumentType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
-                        if(value.isPresent()) {
+                        if (value.isPresent()) {
                             return value.get();
-                        }
-                        else if(!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
+                        } else if (!Iterable.class.isAssignableFrom(argumentType) && !Map.class.isAssignableFrom(argumentType)) {
                             throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Property doesn't exist");
-                        }
-                        else {
-                            return null;
+                        } else {
+                            throw new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + valString + "]. Unable to convert value to required type.");
                         }
 
                     }
@@ -568,15 +574,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     private Object resolveOptionalObject(Optional value) {
-        if(!value.isPresent()) {
+        if (!value.isPresent()) {
             return value;
-        }
-        else {
+        } else {
             Object convertedOptional = value.get();
-            if(convertedOptional instanceof Optional) {
+            if (convertedOptional instanceof Optional) {
                 return convertedOptional;
-            }
-            else {
+            } else {
                 return value;
             }
         }
@@ -594,7 +598,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
      */
     @Internal
     protected boolean containsValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) throws Throwable {
-        if(context instanceof ApplicationContext) {
+        if (context instanceof ApplicationContext) {
             MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
             Argument argument = injectionPoint.getArguments()[argIndex];
             String argumentName = argument.getName();
@@ -606,9 +610,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             Class type = argument.getType();
             boolean isConfigProps = type.getAnnotation(ConfigurationProperties.class) != null;
             boolean result = isConfigProps || Map.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
-            if(!result && isConfigurationProperties()) {
+            if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
-                if(cliOption != null) {
+                if (cliOption != null) {
                     return applicationContext.containsProperty(cliOption);
                 }
             }
@@ -924,15 +928,11 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                             valueAnn
                     );
                     Argument fieldArgument = injectionPoint.asArgument();
-                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, fieldType, valString);
+                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, valString);
                     if (fieldType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
-                        if (value.isPresent()) {
-                            return value.get();
-                        } else {
-                            return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist"));
-                        }
+                        return value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist or cannot be converted"));
                     }
                 }
             } else {
@@ -943,18 +943,50 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         }
     }
 
+    /**
+     * Resolve a value for the given field of the given type and path
+     *
+     * @param resolutionContext The resolution context
+     * @param context The bean context
+     * @param propertyType The required property type
+     * @param propertyPath The property path
+     * @param <T1> The generic type
+     * @return An optional value
+     */
+    @Internal
+    protected <T1> Optional<T1> getValueForPath(
+        BeanResolutionContext resolutionContext,
+        BeanContext context,
+        Argument<T1> propertyType,
+        String... propertyPath) {
+        if (context instanceof PropertyResolver) {
+            PropertyResolver propertyResolver = (PropertyResolver) context;
+            Class<?> beanType = getBeanType();
+            String valString = resolveValueString(
+                    resolutionContext,
+                    context,
+                    beanType,
+                    beanType,
+                    Arrays.stream(propertyPath).collect(Collectors.joining(".")),
+                    null
+            );
+
+            return propertyResolver.getProperty(valString, ConversionContext.of(propertyType));
+        }
+        return Optional.empty();
+    }
 
     /**
      * Obtains a value for the given field argument
      *
      * @param resolutionContext The resolution context
      * @param context           The bean context
-     * @param fieldIndex The field index
+     * @param fieldIndex        The field index
      * @return True if it does
      */
     @Internal
     protected boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
-        if(context instanceof ApplicationContext) {
+        if (context instanceof ApplicationContext) {
 
             FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
             Value valueAnn = injectionPoint.getAnnotation(Value.class);
@@ -973,9 +1005,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             Class fieldType = injectionPoint.getType();
             boolean isConfigProps = fieldType.getAnnotation(ConfigurationProperties.class) != null;
             boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
-            if(!result && isConfigurationProperties()) {
+            if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(injectionPoint.getName());
-                if(cliOption != null) {
+                if (cliOption != null) {
                     return applicationContext.containsProperty(cliOption);
                 }
             }
@@ -985,33 +1017,55 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     /**
-     * Return whether the context contains the given properties
+     * If this bean is a {@link ConfigurationProperties} bean return whether any properties for it are configured within the context
      *
      * @param resolutionContext the resolution context
-     * @param context The context
+     * @param context           The context
      * @return True if it does
      */
     @Internal
     protected boolean containsProperties(BeanResolutionContext resolutionContext, BeanContext context) {
-        if(context instanceof ApplicationContext) {
+        return containsProperties(resolutionContext, context, null);
+    }
+
+
+    /**
+     * If this bean is a {@link ConfigurationProperties} bean return whether any properties for it are configured within the context
+     *
+     * @param resolutionContext the resolution context
+     * @param context           The context
+     * @param subProperty       The subproperty to check
+     * @return True if it does
+     */
+    @Internal
+    protected boolean containsProperties(BeanResolutionContext resolutionContext, BeanContext context, String subProperty) {
+        boolean isSubProperty = StringUtils.isNotEmpty(subProperty);
+        if (!isSubProperty && !requiredComponents.isEmpty()) {
+            // if the bean requires dependency injection we disable this optimization
+            return true;
+        }
+        if (isConfigurationProperties && context instanceof ApplicationContext) {
             ApplicationContext appCtx = (ApplicationContext) context;
             Class<?> beanType = getBeanType();
             ConfigurationProperties annotation = beanType.getAnnotation(ConfigurationProperties.class);
-            while(annotation != null) {
-                if( ArrayUtils.isNotEmpty(annotation.cliPrefix()) ) {
+            while (annotation != null) {
+                if (ArrayUtils.isNotEmpty(annotation.cliPrefix())) {
                     // little bit of a hack this, would be nice if we had a better way to acknowledge CLI properties
                     return true;
                 }
 
                 String prefix = resolvePrefix(resolutionContext, context, beanType, beanType);
-                if(appCtx.containsProperties(prefix) ) {
+
+                if (isSubProperty) {
+                    prefix += '.' + subProperty;
+                }
+                if (appCtx.containsProperties(prefix)) {
                     return true;
                 }
                 beanType = beanType.getSuperclass();
-                if(beanType == null) {
+                if (beanType == null) {
                     break;
-                }
-                else {
+                } else {
                     annotation = beanType.getAnnotation(ConfigurationProperties.class);
                 }
             }
@@ -1019,12 +1073,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         return false;
     }
 
+
     /**
      * Resolves a bean for the given {@link FieldInjectionPoint}
      *
      * @param resolutionContext The {@link BeanResolutionContext}
-     * @param context The {@link BeanContext}
-     * @param injectionPoint The {@link FieldInjectionPoint}
+     * @param context           The {@link BeanContext}
+     * @param injectionPoint    The {@link FieldInjectionPoint}
      * @return The resolved bean
      * @throws DependencyInjectionException If the bean cannot be resolved
      */
@@ -1127,21 +1182,20 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, Argument<?> argument, Class argumentType, String valString) {
-        Optional value = resolveValueFromContext(context, argument, argumentType, valString);
-        if(!value.isPresent() && isConfigurationProperties()) {
+    private Optional resolveValue(ApplicationContext context, Argument<?> argument, String valString) {
+        Optional value = resolveValueFromContext(context, argument, valString);
+        if (!value.isPresent() && isConfigurationProperties()) {
             String cliOption = resolveCliOption(argument.getName());
             if (cliOption != null) {
                 return resolveValueFromContext(context,
                         argument,
-                        argumentType,
                         cliOption);
             }
         }
         return value;
     }
 
-    private Optional resolveValueFromContext(ApplicationContext context, Argument<?> argument, Class<?> argumentType, String valString) {
+    private Optional resolveValueFromContext(ApplicationContext context, Argument<?> argument, String valString) {
         int i = valString.indexOf(':');
         Object defaultValue = null;
         if (i > -1) {
@@ -1176,7 +1230,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     private String resolveCliOption(String name) {
         String attr = "cliPrefix";
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        if(annotationMetadata.isPresent(ConfigurationProperties.class, attr)) {
+        if (annotationMetadata.isPresent(ConfigurationProperties.class, attr)) {
             return annotationMetadata.getValue(ConfigurationProperties.class, attr, String.class).map(val -> val + name).orElse(null);
         }
         return null;
@@ -1237,7 +1291,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             prependSuperClasses(prefix, declaringClass, beanContext);
             if (!isInner) {
                 boolean isForEach = isForEachBean(resolutionContext, beanType);
-                if(isForEach) {
+                if (isForEach) {
                     Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);
                     named.ifPresent(val -> prefix.append('.').append(val));
                 }
@@ -1268,29 +1322,26 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private String resolveConfigPropertiesValue(Class<?> supertype, BeanContext beanContext) {
         BeanDefinition<?> definition;
-        if(supertype.equals(getBeanType())) {
+        if (supertype.equals(getBeanType())) {
             definition = this;
-        }
-        else {
+        } else {
             definition = beanContext.findBeanDefinition(supertype).orElse(null);
         }
-        if(definition != null) {
+        if (definition != null) {
             Optional<String> opt = definition.getAnnotationNameByStereotype(ConfigurationReader.class);
-            if(opt.isPresent()) {
+            if (opt.isPresent()) {
                 String annotationName = opt.get();
                 Optional<String> val = definition.getValue(ConfigurationReader.class, String.class);
-                return val.map(v-> {
+                return val.map(v -> {
                     Optional<String> prefix = definition.getValue(annotationName, "prefix", String.class);
-                    if(prefix.isPresent()) {
+                    if (prefix.isPresent()) {
                         String p = prefix.get();
-                        if(StringUtils.isNotEmpty(p)) {
+                        if (StringUtils.isNotEmpty(p)) {
                             return p + '.' + v;
-                        }
-                        else {
+                        } else {
                             return v;
                         }
-                    }
-                    else {
+                    } else {
                         return v;
                     }
                 }).orElse(null);
@@ -1304,16 +1355,20 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
             Argument[] arguments,
             boolean requiresReflection,
             Collection<MethodInjectionPoint> methodInjectionPoints) {
-        if (!hasPreDestroyMethods && method.getAnnotation(PreDestroy.class) != null) {
+        boolean isPreDestroy = !hasPreDestroyMethods && method.getAnnotation(PreDestroy.class) != null;
+        if (isPreDestroy) {
             hasPreDestroyMethods = true;
         }
-        if (!hasPostConstructMethods && method.getAnnotation(PostConstruct.class) != null) {
+        boolean isPostConstruct = !hasPostConstructMethods && method.getAnnotation(PostConstruct.class) != null;
+        if (isPostConstruct) {
             hasPostConstructMethods = true;
         }
 
         DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, requiresReflection, arguments);
-        for (Argument argument : methodInjectionPoint.getArguments()) {
-            requiredComponents.add(argument.getType());
+        if (isPreDestroy || isPostConstruct || methodInjectionPoint.getAnnotation(Inject.class) != null) {
+            for (Argument argument : methodInjectionPoint.getArguments()) {
+                requiredComponents.add(argument.getType());
+            }
         }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;

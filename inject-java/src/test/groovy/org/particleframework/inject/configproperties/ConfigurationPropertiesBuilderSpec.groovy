@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject.configproperties
 
+import org.neo4j.driver.v1.Config
 import org.particleframework.context.ApplicationContext
 import org.particleframework.inject.AbstractTypeElementSpec
 import org.particleframework.inject.BeanDefinition
@@ -25,50 +26,50 @@ import spock.lang.Ignore
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
 class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
 
     void "test different inject types for config properties"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MongoProperties', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
 package test;
 
 import org.particleframework.context.annotation.*;
-import com.mongodb.*;
+import org.neo4j.driver.v1.*;
 
-@ConfigurationProperties("foo")
-class MongoProperties {
-    @Bean(factoryMethod="build", 
-          factoryClass=MongoClientOptions.Builder)
-    MongoClientOptions options;
+@ConfigurationProperties("neo4j.test")
+class Neo4jProperties {
+    protected java.net.URI uri;
+    
+    @ConfigurationBuilder(
+        prefixes="with", 
+        allowZeroArgs=true
+    )
+    Config.ConfigBuilder options = Config.build();
+    
+     
 }
 ''')
         then:
         beanDefinition.injectedFields.size() == 1
-        beanDefinition.injectedFields.first().name == 'fieldTest'
-        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedFields.first().name == 'uri'
 
         when:
         BeanFactory factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.build().start()
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'neo4j.test.encryptionLevel':'none',
+                'neo4j.test.maxIdleSessions':2
+        )
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:
         bean != null
-        bean.setter == "unconfigured"
-        bean.@fieldTest == "unconfigured"
+        bean.options != null
 
         when:
-        applicationContext.environment.addPropertySource(
-                'foo.setterTest' :'foo',
-                'foo.fieldTest' :'bar',
-        )
-        bean = factory.build(applicationContext, beanDefinition)
+        Config config = bean.options.toConfig()
 
         then:
-        bean != null
-        bean.setter == "foo"
-        bean.@fieldTest == "bar"
-
+        config.maxIdleConnectionPoolSize() == 2
+        config.encrypted() == false
     }
 }
