@@ -27,6 +27,5 @@ public class Application {
     public static void main(String[] args) {
 //        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
         ParticleApplication.run(Application.class);
-        System.exit(1);
     }
 }
