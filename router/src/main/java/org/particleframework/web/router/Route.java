@@ -18,6 +18,8 @@ package org.particleframework.web.router;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.function.Predicate;
 
 /**
@@ -30,6 +32,11 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface Route {
+
+    /**
+     * The default media type produced by routes
+     */
+    List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
 
     /**
      * Applies the given accepted media type the route
@@ -67,4 +74,12 @@ public interface Route {
      * @return This route
      */
     Route body(String argument);
+
+    /**
+     * The media types able to produced by this route
+     * @return A list of {@link MediaType} that this route can produce
+     */
+    default List<MediaType> getProduces() {
+        return DEFAULT_PRODUCES;
+    }
 }
