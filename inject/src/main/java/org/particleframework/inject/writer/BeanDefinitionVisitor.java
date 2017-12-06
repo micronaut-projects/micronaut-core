@@ -30,6 +30,8 @@ import java.util.Map;
  * @since 1.0
  */
 public interface BeanDefinitionVisitor {
+    String PROXY_SUFFIX = "$Intercepted";
+
     /**
      * Visits a no arguments constructor. Either this method or {@link #visitBeanDefinitionConstructor(Map, Map, Map)} should be called at least once
      */

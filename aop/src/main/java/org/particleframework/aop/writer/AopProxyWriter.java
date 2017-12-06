@@ -32,7 +32,6 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ProxyBeanDefinition;
-import org.particleframework.inject.annotation.AnnotationMetadataWriter;
 import org.particleframework.inject.writer.*;
 
 import java.io.File;
@@ -110,7 +109,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private final BeanDefinitionWriter parentWriter;
     private final boolean isIntroduction;
     private boolean isProxyTarget;
-    private final String parentBeanDefinitionName;
 
 
     private MethodVisitor constructorWriter;
@@ -156,11 +154,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.isInterface = parent.isInterface();
         this.packageName = parent.getPackageName();
         this.targetClassShortName = parent.getBeanSimpleName();
-        this.parentBeanDefinitionName = parent.getBeanDefinitionName();
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
-        this.proxyFullName = parent.getBeanDefinitionName() + "$Intercepted";
+        this.proxyFullName = parent.getBeanDefinitionName() + PROXY_SUFFIX;
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
@@ -206,7 +203,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        this.parentBeanDefinitionName = null;
         String proxyShortName = NameUtils.getSimpleName(proxyFullName);
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),

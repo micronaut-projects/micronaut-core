@@ -101,7 +101,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String name = typeElement.getQualifiedName().toString();
                         if (!beanDefinitionWriters.containsKey(name)) {
                             if (!modelUtils.isAbstract(typeElement)) {
-                                if (!processed.contains(name) && !name.endsWith("$Intercepted")) {
+                                if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
                                     AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
                                     beanDefinitionWriters.put(name, visitor);
                                 }

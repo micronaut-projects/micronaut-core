@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.Context;
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Requirements;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
@@ -34,6 +35,16 @@ public abstract class AbstractBeanDefinitionReference implements BeanDefinitionR
     public AbstractBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return getAnnotationMetadata().hasAnnotation(Primary.class);
+    }
+
+    @Override
+    public String getName() {
+        return getBeanTypeName();
     }
 
     /**

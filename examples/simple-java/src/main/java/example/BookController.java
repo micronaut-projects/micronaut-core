@@ -35,11 +35,11 @@ import java.util.List;
  */
 @Controller
 @Singleton
-//@Validated
+@Validated
 public class BookController {
 
     @Get
-//    @Cacheable("books")
+    @Cacheable("books")
     public List<Book> index() {
         return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
     }

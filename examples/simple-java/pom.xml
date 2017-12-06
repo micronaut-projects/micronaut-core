@@ -33,7 +33,12 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>1.6.0</version>
                 <configuration>
-                    <mainClass>example.Application</mainClass>
+                    <executable>java</executable>
+                    <arguments>
+                        <argument>-classpath</argument>
+                        <classpath />
+                        <argument>example.Application</argument>
+                    </arguments>
                 </configuration>
             </plugin>
             <plugin>

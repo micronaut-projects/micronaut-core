@@ -115,26 +115,14 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 Type.getInternalName(AbstractExecutableMethod.class),
                 null);
 
-        classWriter.visitField(ACC_PRIVATE_STATIC_FINAL, FIELD_METHOD, TYPE_METHOD.getDescriptor() , null, null);
-        GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
-
         // initialize and write the annotation metadata
         if(!(annotationMetadata instanceof AnnotationMetadataReference)) {
-            initializeAnnotationMetadata(staticInit, classWriter);
+            writeAnnotationMetadataStaticInitializer(classWriter);
         }
         writeGetAnnotationMetadataMethod(classWriter);
 
-        pushGetMethodFromTypeCall(staticInit, declaringTypeObject, methodName, argumentTypeClasses);
-        staticInit.putStatic(
-                methodType,
-                FIELD_METHOD,
-                TYPE_METHOD
-        );
-        staticInit.visitInsn(RETURN);
-        staticInit.visitMaxs(1,1);
-        staticInit.visitEnd();
         MethodVisitor executorMethodConstructor;
-        GeneratorAdapter generatorAdapter;
+        GeneratorAdapter constructorWriter;
 
         boolean hasOuter = outerClassName != null && !isStatic;
         String constructorDescriptor;
@@ -146,43 +134,35 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             executorMethodConstructor = startConstructor(classWriter);
             constructorDescriptor = DESCRIPTOR_DEFAULT_CONSTRUCTOR;
         }
-        generatorAdapter = new GeneratorAdapter(executorMethodConstructor,
+        constructorWriter = new GeneratorAdapter(executorMethodConstructor,
                 Opcodes.ACC_PUBLIC,
                 CONSTRUCTOR_NAME,
                 constructorDescriptor);
 
         if(hasOuter) {
-            generatorAdapter.loadThis();
-            generatorAdapter.loadArg(0);
-            generatorAdapter.putField(methodType, FIELD_PARENT, getObjectType(outerClassName));
+            constructorWriter.loadThis();
+            constructorWriter.loadArg(0);
+            constructorWriter.putField(methodType, FIELD_PARENT, getObjectType(outerClassName));
         }
 
         // ALOAD 0
-        generatorAdapter.loadThis();
+        constructorWriter.loadThis();
 
         // load 'this'
-        generatorAdapter.loadThis();
+        constructorWriter.loadThis();
 
         // 1st argument Class.getMethod(..)
-        generatorAdapter.getStatic(
-                methodType,
-                FIELD_METHOD,
-                TYPE_METHOD
-        );
+        pushGetMethodFromTypeCall(constructorWriter, declaringTypeObject, methodName, argumentTypeClasses);
 
         // 2nd argument the return type generics
-        buildTypeArguments(generatorAdapter, returnTypeGenericTypes);
+        buildTypeArguments(constructorWriter, returnTypeGenericTypes);
 
         if (hasArgs) {
 
             // 3rd Argument: Create a call to mapOf from generic types
             pushBuildArgumentsForMethod(
-                    generatorAdapter,
-                    ga -> ga.getStatic(
-                            methodType,
-                            FIELD_METHOD,
-                            TYPE_METHOD
-                    ),
+                    constructorWriter,
+                    ga -> pushGetMethodFromTypeCall(constructorWriter, declaringTypeObject, methodName, argumentTypeClasses),
                     argumentTypes,
                     qualifierTypes,
                     genericTypes
@@ -192,8 +172,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         } else {
             invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class);
         }
-        generatorAdapter.visitInsn(RETURN);
-        generatorAdapter.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
+        constructorWriter.visitInsn(RETURN);
+        constructorWriter.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
 
         // invoke the methods with the passed arguments
         String invokeDescriptor = METHOD_INVOKE_INTERNAL.getDescriptor();
