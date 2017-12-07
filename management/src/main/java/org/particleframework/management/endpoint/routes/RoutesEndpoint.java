@@ -15,6 +15,8 @@
  */
 package org.particleframework.management.endpoint.routes;
 
+import org.particleframework.core.type.Argument;
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.http.MediaType;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.management.endpoint.Endpoint;
@@ -51,9 +53,24 @@ public class RoutesEndpoint {
         return router.uriRoutes().collect(Collectors.toMap(this::getRouteKey, this::getRouteValue));
     }
 
+    protected String getReturnType(Argument<?> argument) {
+        StringBuilder returnType = new StringBuilder(argument.getType().getName());
+        Map<String, Argument<?>> generics = argument.getTypeVariables();
+        if (!generics.isEmpty()) {
+            returnType
+                .append("<")
+                .append(generics.values()
+                    .stream()
+                    .map(this::getReturnType)
+                    .collect(Collectors.joining(", ")))
+                .append(">");
+        }
+        return returnType.toString();
+    }
+
     protected String getMethodString(MethodExecutionHandle targetMethod) {
         return new StringBuilder()
-                .append(targetMethod.getReturnType().getType().getName())
+                .append(getReturnType(targetMethod.getReturnType().asArgument()))
                 .append(" ")
                 .append(targetMethod.getDeclaringType().getName())
                 .append('.')

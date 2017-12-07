@@ -4,6 +4,7 @@ dependencies {
     compileOnly project(":inject-java")
     testRuntime project(":configurations/jackson")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
 }
