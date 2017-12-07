@@ -26,6 +26,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.TypeVariable;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Represents an argument to a method or constructor or type
@@ -284,5 +286,20 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
                 annotations,
                 typeParameters
         );
+    }
+
+    default String getTypeString() {
+        StringBuilder returnType = new StringBuilder(getType().getName());
+        Map<String, Argument<?>> generics = getTypeVariables();
+        if (!generics.isEmpty()) {
+            returnType
+                .append("<")
+                .append(generics.values()
+                    .stream()
+                    .map(Argument::getTypeString)
+                    .collect(Collectors.joining(", ")))
+                .append(">");
+        }
+        return returnType.toString();
     }
 }

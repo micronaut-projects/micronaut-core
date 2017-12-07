@@ -53,24 +53,9 @@ public class RoutesEndpoint {
         return router.uriRoutes().collect(Collectors.toMap(this::getRouteKey, this::getRouteValue));
     }
 
-    protected String getReturnType(Argument<?> argument) {
-        StringBuilder returnType = new StringBuilder(argument.getType().getName());
-        Map<String, Argument<?>> generics = argument.getTypeVariables();
-        if (!generics.isEmpty()) {
-            returnType
-                .append("<")
-                .append(generics.values()
-                    .stream()
-                    .map(this::getReturnType)
-                    .collect(Collectors.joining(", ")))
-                .append(">");
-        }
-        return returnType.toString();
-    }
-
     protected String getMethodString(MethodExecutionHandle targetMethod) {
         return new StringBuilder()
-                .append(getReturnType(targetMethod.getReturnType().asArgument()))
+                .append(targetMethod.getReturnType().asArgument().getTypeString())
                 .append(" ")
                 .append(targetMethod.getDeclaringType().getName())
                 .append('.')
