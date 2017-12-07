@@ -45,7 +45,11 @@ public class InstantiationUtils {
      */
     public static <T> Optional<T> tryInstantiate(Class<T> type) {
         try {
-            return Optional.of(type.newInstance());
+            T bean = type.newInstance();
+            if(type.isInstance(bean)) {
+                return Optional.of(bean);
+            }
+            return Optional.empty();
         } catch (Throwable e) {
             if(LOG.isErrorEnabled()) {
                 LOG.error("Tried, but could not instantiate type: " + type, e);

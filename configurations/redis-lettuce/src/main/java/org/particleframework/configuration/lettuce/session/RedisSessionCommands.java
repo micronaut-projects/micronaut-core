@@ -40,7 +40,7 @@ public interface RedisSessionCommands extends Commands {
      * @return String simple-string-reply
      */
     @Command("HMSET :sessionId :value")
-    RedisFuture<String> hmset(@Param("sessionId") String sessionId, @Param("value") Map<String, byte[]> attributes);
+    RedisFuture<Void> saveSessionData(@Param("sessionId") byte[] sessionId, @Param("value") Map<byte[], byte[]> attributes);
 
     /**
      * Set a single attribute of a session
@@ -50,9 +50,18 @@ public interface RedisSessionCommands extends Commands {
      * @param value The value
      * @return String simple-string-reply
      */
-    @Command("HSET :sessionId :value")
-    RedisFuture<String> hset(@Param("sessionId") String sessionId, String attribute, byte[] value );
+    @Command("HSET :sessionId :attribute :value")
+    RedisFuture<Void> setAttribute(@Param("sessionId") byte[] sessionId, @Param("attribute") byte[] attribute, @Param("value") byte[] value );
 
+    /**
+     * Removes a single attribute of a session
+     *
+     * @param sessionId The session ID
+     * @param attributes The attributes to delete
+     * @return String simple-string-reply
+     */
+    @Command("HDEL :sessionId :attributes")
+    RedisFuture<Void> deleteAttributes(@Param("sessionId") byte[] sessionId, @Param("attributes") byte[]... attributes);
     /**
      * Get all the fields and values in a hash.
      *
@@ -60,6 +69,15 @@ public interface RedisSessionCommands extends Commands {
      * @return Map&lt;K,V&gt; array-reply list of fields and their values stored in the hash, or an empty list when {@code key}
      *         does not exist.
      */
-    @Command("HGETALL :key")
-    RedisFuture<Map<String, byte[]>> hgetall(@Param("key") String sessionId);
+    @Command("HGETALL")
+    RedisFuture<Map<byte[], byte[]>> findSessionData(byte[] sessionId);
+
+    /**
+     * Save an expiry
+     * @param expiryKey The expiry key
+     * @param seconds The seconds until expiration
+     * @return A future
+     */
+    @Command("SET :expiryKey :seconds")
+    RedisFuture<Void> saveExpiry(@Param("expiryKey") byte[] expiryKey, @Param("seconds") byte[] seconds);
 }

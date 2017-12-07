@@ -43,7 +43,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private String[] headerNames = new String[] { HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN };
 
     /**
-     * @return Whether the Base64 encode sessions IDS sent back to clients
+     * @return Whether the Base64 encode sessions IDs sent back to clients
      */
     public boolean isBase64Encode() {
         return base64Encode;

@@ -17,6 +17,7 @@ package org.particleframework.session;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * <p>Interface for locating and saving sessions</p>

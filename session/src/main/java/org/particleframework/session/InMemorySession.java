@@ -20,10 +20,7 @@ import org.particleframework.core.convert.value.MutableConvertibleValues;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A {@link Session} that is help in-memory
@@ -33,17 +30,22 @@ import java.util.Set;
  */
 public class InMemorySession implements Session {
 
-    private final MutableConvertibleValues<Object> attributes = MutableConvertibleValues.of(new LinkedHashMap<>());
-    private final Instant creationTime = Instant.now();
+    protected final Map<CharSequence, Object> attributeMap = new LinkedHashMap<>();
+    protected final MutableConvertibleValues<Object> attributes = MutableConvertibleValues.of(attributeMap);
     private final String id;
+    private final Instant creationTime;
     private Duration maxInactiveInterval;
-    private Instant lastAccessTime = Instant.now();
+    protected Instant lastAccessTime = Instant.now();
 
     protected InMemorySession(String id, Duration maxInactiveInterval) {
-        this.id = id;
-        this.maxInactiveInterval = maxInactiveInterval;
+        this(id, Instant.now(), maxInactiveInterval);
     }
 
+    protected InMemorySession(String id, Instant creationTime, Duration maxInactiveInterval) {
+        this.id = id;
+        this.creationTime = creationTime;
+        this.maxInactiveInterval = maxInactiveInterval;
+    }
     @Override
     public String getId() {
         return id;
@@ -55,10 +57,19 @@ public class InMemorySession implements Session {
     }
 
     @Override
-    public void setMaxInactiveInterval(Duration duration) {
+    public Session setMaxInactiveInterval(Duration duration) {
         if(duration != null) {
             maxInactiveInterval = duration;
         }
+        return this;
+    }
+
+    @Override
+    public Session setLastAccessedTime(Instant instant) {
+        if(instant != null) {
+            this.lastAccessTime = instant;
+        }
+        return this;
     }
 
     @Override
@@ -67,24 +78,8 @@ public class InMemorySession implements Session {
     }
 
     @Override
-    public boolean isExpired() {
-        Duration maxInactiveInterval = getMaxInactiveInterval();
-        if(maxInactiveInterval.isNegative()) {
-            return false;
-        }
-        else {
-            Instant now = Instant.now();
-            return now.minus(maxInactiveInterval).compareTo(lastAccessTime) >= 0;
-        }
-    }
-
-    @Override
     public Instant getCreationTime() {
         return creationTime;
-    }
-
-    void setLastAccessTime(Instant lastAccessTime) {
-        this.lastAccessTime = lastAccessTime;
     }
 
     @Override

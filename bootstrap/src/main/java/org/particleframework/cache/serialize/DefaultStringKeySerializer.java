@@ -15,7 +15,6 @@
  */
 package org.particleframework.cache.serialize;
 
-import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.serialize.exceptions.SerializationException;
@@ -23,6 +22,7 @@ import org.particleframework.core.serialize.exceptions.SerializationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.Optional;
 
 /**
@@ -35,11 +35,13 @@ import java.util.Optional;
  * @since 1.0
  */
 public class DefaultStringKeySerializer implements ObjectSerializer {
-    private final CacheConfiguration cacheConfiguration;
     private final ConversionService<?> conversionService;
+    private final String cacheName;
+    private final Charset charset;
 
-    public DefaultStringKeySerializer(CacheConfiguration cacheConfiguration, ConversionService<?> conversionService) {
-        this.cacheConfiguration = cacheConfiguration;
+    public DefaultStringKeySerializer(String cacheName, Charset charset, ConversionService<?> conversionService) {
+        this.cacheName = cacheName;
+        this.charset = charset;
         this.conversionService = conversionService;
     }
 
@@ -60,8 +62,8 @@ public class DefaultStringKeySerializer implements ObjectSerializer {
     }
 
     private byte[] toByteArray(Object object) {
-        String str = cacheConfiguration.getCacheName() + ":" + conversionService.convert(object, String.class).orElse(String.valueOf(object.hashCode()));
-        return str.getBytes(cacheConfiguration.getCharset());
+        String str = cacheName + ":" + conversionService.convert(object, String.class).orElse(String.valueOf(object.hashCode()));
+        return str.getBytes(charset);
     }
 
     @Override

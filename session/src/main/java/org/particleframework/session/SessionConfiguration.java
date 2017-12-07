@@ -29,7 +29,7 @@ import java.util.OptionalInt;
 @ConfigurationProperties("particle.session")
 public class SessionConfiguration {
 
-    private Duration maxInactiveInternal = Duration.ofMinutes(30);
+    private Duration maxInactiveInterval = Duration.ofMinutes(30);
     private Integer maxActiveSessions;
 
 
@@ -43,8 +43,8 @@ public class SessionConfiguration {
     /**
      * @return The default max inactive interval
      */
-    public Duration getMaxInactiveInternal() {
-        return maxInactiveInternal;
+    public Duration getMaxInactiveInterval() {
+        return maxInactiveInterval;
     }
 
     /**
@@ -59,11 +59,11 @@ public class SessionConfiguration {
     /**
      * Set the max active sessions
      *
-     * @param maxInactiveInternal
+     * @param maxInactiveInterval
      */
-    void setMaxInactiveInternal(Duration maxInactiveInternal) {
-        if(maxInactiveInternal != null) {
-            this.maxInactiveInternal = maxInactiveInternal;
+    void setMaxInactiveInterval(Duration maxInactiveInterval) {
+        if(maxInactiveInterval != null) {
+            this.maxInactiveInterval = maxInactiveInterval;
         }
     }
 }

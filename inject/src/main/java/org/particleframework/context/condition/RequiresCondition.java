@@ -15,6 +15,8 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
@@ -48,8 +50,18 @@ public class RequiresCondition implements Condition {
                     if(!matchesPresenceOfClasses(context, av)) {
                         return false;
                     }
-                    if(!matchesPresenceOfBean(context, av)) {
-                        return false;
+                    // need this check because when this method is called with a BeanDefinitionReference the context
+                    // is not yet initialized so we cannot know if beans are present or not
+                    if(context.getComponent() instanceof BeanDefinition) {
+                        if(!matchesPresenceOfBean(context, av)) {
+                            return false;
+                        }
+                    }
+                    else {
+                        // check only that the classes are present for the beans requirement
+                        if(!matchesPresenceOfClasses(context, av.getConvertibleValues(), "beans")) {
+                            return false;
+                        }
                     }
                 }
 
@@ -200,7 +212,7 @@ public class RequiresCondition implements Condition {
 
     protected boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue requires) {
         ConvertibleValues<Object> convertibleValues = requires.getConvertibleValues();
-        return !matchesPresenceOfClasses(context, convertibleValues);
+        return matchesPresenceOfClasses(context, convertibleValues);
     }
 
     protected boolean matchesPresenceOfBean(ConditionContext context, AnnotationValue requires) {
@@ -209,8 +221,12 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfClasses(ConditionContext context, ConvertibleValues<Object> convertibleValues) {
-        if(convertibleValues.contains("classes")) {
-            Optional<String[]> classNames = convertibleValues.get("classes", String[].class);
+        return matchesPresenceOfClasses(context, convertibleValues, "classes");
+    }
+
+    private boolean matchesPresenceOfClasses(ConditionContext context, ConvertibleValues<Object> convertibleValues, String attr) {
+        if(convertibleValues.contains(attr)) {
+            Optional<String[]> classNames = convertibleValues.get(attr, String[].class);
             if(classNames.isPresent()) {
                 String[] names = classNames.get();
                 ClassLoader classLoader = context.getBeanContext().getClassLoader();

@@ -18,20 +18,16 @@ package org.particleframework.configuration.lettuce.cache;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.async.RedisAsyncCommands;
-import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import org.particleframework.cache.AsyncCache;
 import org.particleframework.cache.SyncCache;
 import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.EachBean;
-import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.type.Argument;
@@ -63,7 +59,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
     private final RedisAsyncCache asyncCache;
     private final SyncCacheCommands commands;
     private final RedisClient redisClient;
-    private final StatefulRedisConnection<String, String> connection;
+    private final StatefulConnection<String, String> connection;
 
     /**
      * Creates a new redis cache for the given arguments
@@ -75,7 +71,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
     public RedisCache(
             RedisCacheConfiguration redisCacheConfiguration,
             ConversionService<?> conversionService,
-            @Primary Optional<StatefulRedisConnection> primaryClient,
+            @Primary Optional<StatefulConnection> primaryClient,
             BeanContext beanContext) {
         if (redisCacheConfiguration == null) {
             throw new IllegalArgumentException("Redis cache configuration cannot be null");
@@ -83,25 +79,15 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         this.redisCacheConfiguration = redisCacheConfiguration;
         this.expireAfterWrite = redisCacheConfiguration.getExpireAfterWrite().map(Duration::toMillis).orElse(null);
         this.expireAfterAccess = redisCacheConfiguration.getExpireAfterAccess().map(Duration::toMillis).orElse(null);
-        this.keySerializer = redisCacheConfiguration.getKeySerializer().map(type -> {
-            ObjectSerializer serializer;
-            if (beanContext.containsBean(type)) {
-                serializer = beanContext.getBean(type);
-            } else {
-                serializer = InstantiationUtils.instantiate(type);
-            }
-            return serializer;
-        }).orElseGet(() -> new DefaultStringKeySerializer(redisCacheConfiguration, conversionService));
+        this.keySerializer = redisCacheConfiguration
+                                    .getKeySerializer()
+                                    .flatMap(beanContext::findOrInstantiateBean)
+                                    .orElse(new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService));
 
-        this.valueSerializer = redisCacheConfiguration.getValueSerializer().map(type -> {
-            ObjectSerializer serializer;
-            if (beanContext.containsBean(type)) {
-                serializer = beanContext.getBean(type);
-            } else {
-                serializer = InstantiationUtils.instantiate(type);
-            }
-            return serializer;
-        }).orElseGet(() -> new JdkSerializer(conversionService));
+        this.valueSerializer = redisCacheConfiguration
+                                    .getValueSerializer()
+                                    .flatMap(beanContext::findOrInstantiateBean)
+                                    .orElse(new JdkSerializer(conversionService));
 
         Optional<RedisURI> redisURI = redisCacheConfiguration
                 .getRedisURI();
@@ -118,7 +104,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
                 if (serverName.equalsIgnoreCase("default")) {
                     this.connection = usePrimaryClient(primaryClient);
                 } else {
-                    this.connection = beanContext.findBean(StatefulRedisConnection.class, Qualifiers.byName(serverName))
+                    this.connection = beanContext.findBean(StatefulConnection.class, Qualifiers.byName(serverName))
                             .orElseThrow(() ->
                                     new ConfigurationException("Cannot create cache. No redis server configured for name: " + serverName)
                             );
@@ -132,10 +118,6 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
 
         this.commands = syncCommands(this.connection);
         this.asyncCache = new RedisAsyncCache();
-    }
-
-    protected StatefulRedisConnection usePrimaryClient(@Primary Optional<StatefulRedisConnection> primaryClient) {
-        return primaryClient.orElseThrow(() -> new ConfigurationException("Cannot create cache. Neither the primary Redis server or a cache specific server is configured"));
     }
 
     @Override
@@ -212,9 +194,8 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
 
     @Override
     public void invalidateAll() {
-        RedisCommands<String, String> sync = connection.sync();
-        List<String> keys = sync.keys(getKeysPattern());
-        sync.del(keys.toArray(new String[keys.size()]));
+        List<byte[]> keys = commands.keys(getKeysPattern().getBytes(redisCacheConfiguration.getCharset()));
+        commands.del(keys.toArray(new byte[keys.size()][]));
     }
 
     @Override
@@ -242,6 +223,10 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         return getName() + ":*";
     }
 
+    protected StatefulConnection usePrimaryClient(@Primary Optional<StatefulConnection> primaryClient) {
+        return primaryClient.orElseThrow(() -> new ConfigurationException("Cannot create cache. Neither the primary Redis server or a cache specific server is configured"));
+    }
+
     protected <T> void putValue(SyncCacheCommands commands, byte[] serializedKey, T value) {
         Optional<byte[]> serialized = valueSerializer.serialize(value);
         if (serialized.isPresent()) {
@@ -261,12 +246,12 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         return keySerializer.serialize(key).orElseThrow(() -> new IllegalArgumentException("Key cannot be null"));
     }
 
-    protected SyncCacheCommands syncCommands(StatefulRedisConnection<String, String> connection) {
+    protected SyncCacheCommands syncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
         return redisCommandFactory.getCommands(SyncCacheCommands.class);
     }
 
-    protected AsyncCacheCommands asyncCommands(StatefulRedisConnection<String, String> connection) {
+    protected AsyncCacheCommands asyncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
         return redisCommandFactory.getCommands(AsyncCacheCommands.class);
     }
@@ -398,12 +383,11 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         @Override
         public CompletableFuture<Boolean> invalidateAll() {
             CompletableFuture<Boolean> result = new CompletableFuture<>();
-            RedisAsyncCommands<String, String> async = connection.async();
-            async.keys(getKeysPattern()).whenComplete((keys, throwable) -> {
+            async.keys(getKeysPattern().getBytes(redisCacheConfiguration.getCharset())).whenComplete((keys, throwable) -> {
                 if (throwable != null) {
                     result.completeExceptionally(throwable);
                 } else {
-                    async.del(keys.toArray(new String[keys.size()])).whenComplete((deleteCount, throwable1) -> {
+                    async.del(keys.toArray(new byte[keys.size()][])).whenComplete((deleteCount, throwable1) -> {
                         if (throwable1 != null) {
                             result.completeExceptionally(throwable1);
                         } else {

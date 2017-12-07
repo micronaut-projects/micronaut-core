@@ -47,11 +47,15 @@ class RedisCacheSpec extends Specification {
         when:
         redisCache.put("test", new Foo(name: "test"))
         redisCache.put("two", new Foo(name: "two"))
+        redisCache.put("three", 3)
+        redisCache.put("four", "four")
         Foo foo = redisCache.get("test", Foo).get()
         then:
         foo != null
         foo.name == 'test'
         redisCache.async().get("two", Foo.class).get().get().name == "two"
+        redisCache.async().get("three", Integer.class).get().get() == 3
+        redisCache.async().get("four", String.class).get().get() == "four"
 
         when:
         redisCache.invalidate("test")

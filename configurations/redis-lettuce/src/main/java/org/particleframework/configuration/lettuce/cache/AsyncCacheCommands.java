@@ -20,6 +20,8 @@ import io.lettuce.core.dynamic.Commands;
 import io.lettuce.core.dynamic.annotation.Command;
 import io.lettuce.core.dynamic.annotation.Param;
 
+import java.util.List;
+
 
 /**
  * The asynchronous operations required by {@link RedisCache}
@@ -74,5 +76,20 @@ public interface AsyncCacheCommands extends Commands{
     @Command("EXPIRE :key :timeout")
     RedisFuture<Void> expire(@Param("key") byte[] key, @Param("timeout") long timeout);
 
+    /**
+     * Find all keys matching the given pattern.
+     *
+     * @param pattern the pattern type: patternkey (pattern)
+     * @return List&lt;K&gt; array-reply list of keys matching {@code pattern}.
+     */
+    RedisFuture<List<byte[]>> keys(byte[] pattern);
+
+    /**
+     * Delete one or more keys.
+     *
+     * @param keys the keys
+     * @return Long integer-reply The number of keys that were removed.
+     */
+    RedisFuture<Long> del(byte[]... keys);
 }
 

@@ -60,7 +60,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
 
     @Override
     public InMemorySession newSession() {
-        return new InMemorySession(sessionIdGenerator.generateId(), sessionConfiguration.getMaxInactiveInternal());
+        return new InMemorySession(sessionIdGenerator.generateId(), sessionConfiguration.getMaxInactiveInterval());
     }
 
     @Override
@@ -125,7 +125,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
 
             private long newExpiry(InMemorySession value) {
                 Instant current = Instant.now();
-                value.setLastAccessTime(current);
+                value.setLastAccessedTime(current);
                 long newExpiry = current.plus(value.getMaxInactiveInterval()).toEpochMilli();
                 return TimeUnit.MILLISECONDS.toNanos(newExpiry);
             }

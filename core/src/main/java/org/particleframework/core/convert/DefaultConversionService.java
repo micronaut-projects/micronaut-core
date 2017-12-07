@@ -429,6 +429,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((Object[]) newArray);
         });
 
+        // String -> Int Array
+        addConverter(CharSequence.class, int[].class, (CharSequence object, Class<int[]> targetType, ConversionContext context) -> {
+            String str = object.toString();
+            String[] strings = str.split(",");
+            Object newArray = Array.newInstance(int.class, strings.length);
+            for (int i = 0; i < strings.length; i++) {
+                String string = strings[i];
+                Optional<?> converted = convert(string, int.class);
+                if (converted.isPresent()) {
+                    Array.set(newArray, i, converted.get());
+                }
+            }
+            return Optional.of((int[]) newArray);
+        });
+
 
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
@@ -745,7 +760,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         }
 
         if (type.isArray()) {
-            hierarchy.add(Object[].class);
+            if(!type.getComponentType().isPrimitive()) {
+                hierarchy.add(Object[].class);
+            }
         } else {
             hierarchy.add(Object.class);
         }

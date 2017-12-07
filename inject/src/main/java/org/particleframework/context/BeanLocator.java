@@ -16,6 +16,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.core.reflect.InstantiationUtils;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -28,18 +29,6 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface BeanLocator {
-    /**
-     * Obtains a Bean for the given type
-     *
-     * @param beanType The bean type
-     * @param <T> The bean type parameter
-     * @return An instanceof said bean
-     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
-     */
-    default <T> T getBean(Class<T> beanType) {
-        return getBean(beanType, null);
-    }
-
     /**
      * Obtains a Bean for the given type and qualifier
      *
@@ -54,18 +43,6 @@ public interface BeanLocator {
     <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
-     * Finds a Bean for the given type
-     *
-     * @param beanType The bean type
-     * @param <T> The bean type parameter
-     * @return An instance of {@link Optional} that is either empty or containing the specified bean
-     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
-     */
-    default <T> Optional<T> findBean(Class<T> beanType) {
-        return findBean(beanType, null);
-    }
-
-    /**
      * Finds a Bean for the given type and qualifier
      *
      * @param beanType The bean type
@@ -77,8 +54,6 @@ public interface BeanLocator {
      * @see org.particleframework.inject.qualifiers.Qualifiers
      */
     <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier);
-
-
     /**
      * Get all beans of the given type
      *
@@ -87,6 +62,7 @@ public interface BeanLocator {
      * @return The found beans
      */
     <T> Collection<T> getBeansOfType(Class<T> beanType);
+
 
     /**
      * Get all beans of the given type
@@ -110,6 +86,16 @@ public interface BeanLocator {
     <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier);
 
     /**
+     * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned
+     *
+     * @param beanType The bean type
+     * @param qualifier The bean qualifier
+     * @param <T> The generic type
+     * @return The proxied instance
+     */
+    <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier);
+
+    /**
      * Obtain a stream of beans of the given type
      *
      * @param beanType The bean type
@@ -122,12 +108,44 @@ public interface BeanLocator {
     }
 
     /**
-     * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned
+     * Obtains a Bean for the given type
      *
      * @param beanType The bean type
-     * @param qualifier The bean qualifier
-     * @param <T> The generic type
-     * @return The proxied instance
+     * @param <T> The bean type parameter
+     * @return An instanceof said bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
      */
-    <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier);
+    default <T> T getBean(Class<T> beanType) {
+        return getBean(beanType, null);
+    }
+
+    /**
+     * Finds a Bean for the given type
+     *
+     * @param beanType The bean type
+     * @param <T> The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
+     */
+    default <T> Optional<T> findBean(Class<T> beanType) {
+        return findBean(beanType, null);
+    }
+
+    /**
+     * Finds a Bean for the given type or attempts to instantiate the given instance
+     *
+     * @param beanType The bean type
+     * @param <T> The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean if it could not be found or instantiated
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
+     */
+    default <T> Optional<T> findOrInstantiateBean(Class<T> beanType) {
+        Optional<T> bean = findBean(beanType, null);
+        if(bean.isPresent()) {
+            return bean;
+        }
+        else {
+            return InstantiationUtils.tryInstantiate(beanType);
+        }
+    }
 }

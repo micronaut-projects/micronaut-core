@@ -17,6 +17,7 @@ package org.particleframework.configuration.lettuce.cache;
 
 import io.lettuce.core.RedisURI;
 import org.particleframework.cache.CacheConfiguration;
+import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.serialize.JdkSerializer;
@@ -37,9 +38,9 @@ public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected String server;
 
-    protected Class<? extends ObjectSerializer> keySerializer;
+    protected Class<ObjectSerializer> keySerializer;
 
-    protected Class<? extends ObjectSerializer> valueSerializer = JdkSerializer.class;
+    protected Class<ObjectSerializer> valueSerializer;
 
     public RedisCacheConfiguration(@Argument String cacheName) {
         super(cacheName);
@@ -72,11 +73,50 @@ public class RedisCacheConfiguration extends CacheConfiguration {
     /**
      * @return The {@link ObjectSerializer} type to use for serializing values
      */
-    public Optional<Class<? extends ObjectSerializer>> getValueSerializer() {
+    public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
     }
 
-    public Optional<Class<? extends ObjectSerializer>> getKeySerializer() {
+    /**
+     * The {@link ObjectSerializer} to use for serializing keys. Defaults to {@link DefaultStringKeySerializer}
+     * @return
+     */
+    public Optional<Class<ObjectSerializer>> getKeySerializer() {
         return Optional.ofNullable(keySerializer);
+    }
+
+    /**
+     * Sets the URI of the Redis server
+     * @param uri The uri of the server
+     */
+    void setUri(String uri) {
+        this.uri = uri;
+    }
+
+    /**
+     * Sets the name of a configured server to use.
+     *
+     * @param server The name of the server
+     * @see org.particleframework.configuration.lettuce.NamedRedisServersConfiguration
+     */
+    void setServer(String server) {
+        this.server = server;
+    }
+
+    /**
+     * The serializer to use for keys
+     *
+     * @param keySerializer The key serializer
+     */
+    void setKeySerializer(Class<ObjectSerializer> keySerializer) {
+        this.keySerializer = keySerializer;
+    }
+
+    /**
+     * The serializer to use for values
+     * @param valueSerializer The value serializer
+     */
+    void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
+        this.valueSerializer = valueSerializer;
     }
 }

@@ -17,6 +17,7 @@ package org.particleframework.session;
 
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 
+import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -38,7 +39,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      * @exception IllegalStateException	if this method is called on an
      *					invalidated session
      */
-    Instant getCreationTime();
+    @Nonnull Instant getCreationTime();
 
 
     /**
@@ -46,7 +47,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      *
      * @return	The id of the session
      */
-    String getId();
+    @Nonnull String getId();
 
     /**
      *
@@ -62,8 +63,15 @@ public interface Session extends MutableConvertibleValues<Object> {
      * @exception IllegalStateException	if this method is called on an
      *					invalidated session
      */
-    Instant getLastAccessedTime();
+    @Nonnull Instant getLastAccessedTime();
 
+
+    /**
+     * Sets the last accessed time on the session
+     *
+     * @param instant The instant that represents the last accessed time
+     */
+    Session setLastAccessedTime(Instant instant);
 
 
     /**
@@ -71,7 +79,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      *
      * @param duration	A duration specifying the max inactive interval
      */
-    void setMaxInactiveInterval(Duration duration);
+    Session setMaxInactiveInterval(Duration duration);
 
 
     /**
@@ -89,16 +97,25 @@ public interface Session extends MutableConvertibleValues<Object> {
     Duration getMaxInactiveInterval();
 
     /**
-     * @return Whether the session has expired
-     */
-    boolean isExpired();
-
-    /**
      * Retrieve an attribute for the given name
      * @param attr The attribute name
      * @return An {@link Optional} of the attribute
      */
     default Optional<Object> get(CharSequence attr) {
         return get(attr, Object.class);
+    }
+
+    /**
+     * @return Whether the session has expired
+     */
+    default boolean isExpired() {
+        Duration maxInactiveInterval = getMaxInactiveInterval();
+        if(maxInactiveInterval == null || maxInactiveInterval.isNegative()) {
+            return false;
+        }
+        else {
+            Instant now = Instant.now();
+            return now.minus(maxInactiveInterval).compareTo(getLastAccessedTime()) >= 0;
+        }
     }
 }
