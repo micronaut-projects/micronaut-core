@@ -55,7 +55,7 @@ public class RoutesEndpoint {
 
     protected String getMethodString(MethodExecutionHandle targetMethod) {
         return new StringBuilder()
-                .append(targetMethod.getReturnType().asArgument().getTypeString())
+                .append(targetMethod.getReturnType().asArgument().getTypeString(false))
                 .append(" ")
                 .append(targetMethod.getDeclaringType().getName())
                 .append('.')

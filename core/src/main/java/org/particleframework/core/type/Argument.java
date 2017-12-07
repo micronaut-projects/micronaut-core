@@ -288,15 +288,23 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         );
     }
 
-    default String getTypeString() {
-        StringBuilder returnType = new StringBuilder(getType().getName());
+    /**
+     * Returns the string representation of the argument
+     * type, including generics
+     *
+     * @param simple If true, output the simple name of types
+     * @return The type string representation
+     */
+    default String getTypeString(boolean simple) {
+        Class<T> type = getType();
+        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
         Map<String, Argument<?>> generics = getTypeVariables();
         if (!generics.isEmpty()) {
             returnType
                 .append("<")
                 .append(generics.values()
                     .stream()
-                    .map(Argument::getTypeString)
+                    .map(arg -> arg.getTypeString(simple))
                     .collect(Collectors.joining(", ")))
                 .append(">");
         }
