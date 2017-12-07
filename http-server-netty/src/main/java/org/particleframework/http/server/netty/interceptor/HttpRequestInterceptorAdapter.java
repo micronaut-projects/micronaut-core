@@ -47,7 +47,7 @@ public class HttpRequestInterceptorAdapter extends SimpleChannelInboundHandler<H
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> msg) throws Exception {
         if (adapted.matches(msg)) {
             try {
-                adapted.intercept(msg, new HttpRequestInterceptor.RequestInterceptionContext() {
+                adapted. intercept(msg, new HttpRequestInterceptor.RequestInterceptionContext() {
                     @Override
                     public void proceed(HttpRequest<?> request) {
                         ctx.fireChannelRead(request);
