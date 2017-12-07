@@ -45,8 +45,8 @@ public class TestSecurityInterceptor implements HttpRequestInterceptor {
     @Override
     public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
 
-        Assert.that(request.get("first").isPresent());
-        Assert.that(!request.get("second").isPresent());
+        Assert.that(request.getAttributes().contains("first"));
+        Assert.that(!request.getAttributes().contains("second"));
         if(request.getParameters().get("username") == null) {
             context.write(HttpResponse.status(HttpStatus.FORBIDDEN));
         }
