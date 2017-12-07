@@ -26,6 +26,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.TypeVariable;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Represents an argument to a method or constructor or type
@@ -284,5 +286,28 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
                 annotations,
                 typeParameters
         );
+    }
+
+    /**
+     * Returns the string representation of the argument
+     * type, including generics
+     *
+     * @param simple If true, output the simple name of types
+     * @return The type string representation
+     */
+    default String getTypeString(boolean simple) {
+        Class<T> type = getType();
+        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
+        Map<String, Argument<?>> generics = getTypeVariables();
+        if (!generics.isEmpty()) {
+            returnType
+                .append("<")
+                .append(generics.values()
+                    .stream()
+                    .map(arg -> arg.getTypeString(simple))
+                    .collect(Collectors.joining(", ")))
+                .append(">");
+        }
+        return returnType.toString();
     }
 }

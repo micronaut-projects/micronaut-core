@@ -28,7 +28,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface StatusRoute extends Route {
+public interface StatusRoute extends MethodBasedRoute {
 
     /**
      * @return The status
