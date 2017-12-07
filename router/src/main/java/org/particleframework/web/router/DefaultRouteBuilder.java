@@ -22,6 +22,7 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.core.naming.conventions.TypeConvention;
@@ -264,18 +265,25 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return route;
     }
 
-    abstract class AbstractRoute implements Route {
+    abstract class AbstractRoute implements MethodBasedRoute {
 
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle targetMethod;
         protected final ConversionService<?> conversionService;
         protected Set<MediaType> acceptedMediaTypes;
+        protected List<MediaType> producesMediaTypes;
         protected String bodyArgument;
 
         AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, Set<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.acceptedMediaTypes = mediaTypes;
+            Produces produces = targetMethod.getAnnotation(Produces.class);
+            if (produces != null) {
+                this.producesMediaTypes = Arrays.stream(produces.value())
+                        .map(MediaType::new)
+                        .collect(Collectors.toList());
+            }
         }
 
         @Override
@@ -304,6 +312,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public Route body(String argument) {
             this.bodyArgument = argument;
             return this;
+        }
+
+        @Override
+        public List<MediaType> getProduces() {
+            if (producesMediaTypes != null) {
+                return Collections.unmodifiableList(producesMediaTypes);
+            } else {
+                return Route.DEFAULT_PRODUCES;
+            }
+        }
+
+        @Override
+        public MethodExecutionHandle getTargetMethod() {
+            return this.targetMethod;
         }
     }
 
@@ -561,6 +583,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return matchInfo.map((info) -> new DefaultUriRouteMatch(info, this, conversionService));
         }
 
+        @Override
+        public UriMatchTemplate getUriMatchTemplate() {
+            return this.uriMatchTemplate;
+        }
 
     }
 
