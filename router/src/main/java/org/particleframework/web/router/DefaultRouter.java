@@ -49,6 +49,8 @@ public class DefaultRouter implements Router {
         List<UriRoute> optionsRoutes = new ArrayList<>();
         List<UriRoute> headRoutes = new ArrayList<>();
         List<UriRoute> connectRoutes = new ArrayList<>();
+        List<UriRoute> traceRoutes = new ArrayList<>();
+
 
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
@@ -77,6 +79,9 @@ public class DefaultRouter implements Router {
                         break;
                     case CONNECT:
                         connectRoutes.add(route);
+                        break;
+                    case TRACE:
+                        traceRoutes.add(route);
                         break;
                 }
             }
@@ -116,6 +121,9 @@ public class DefaultRouter implements Router {
                 case CONNECT:
                     routesByMethod[method.ordinal()] = connectRoutes.toArray(new UriRoute[connectRoutes.size()]);
                     break;
+                case TRACE:
+                    routesByMethod[method.ordinal()] = traceRoutes.toArray(new UriRoute[traceRoutes.size()]);
+                    break;
             }
         }
     }
@@ -125,8 +133,14 @@ public class DefaultRouter implements Router {
         UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
         return Arrays.stream(routes)
                 .map((route -> route.match(uri.toString())))
-                .filter((Optional::isPresent))
-                .map((Optional::get));
+                .filter(Optional::isPresent)
+                .map(Optional::get);
+    }
+
+    @Override
+    public Stream<UriRoute> uriRoutes() {
+        return Arrays.stream(routesByMethod)
+                .flatMap(Arrays::stream);
     }
 
     @Override

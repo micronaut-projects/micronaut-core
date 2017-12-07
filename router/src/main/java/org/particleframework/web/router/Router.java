@@ -51,6 +51,12 @@ public interface Router {
     <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri);
 
     /**
+     * Returns all UriRoutes
+     * @return A {@link Stream} of all registered {@link UriRoute} instances.
+     */
+    Stream<UriRoute> uriRoutes();
+
+    /**
      * Finds the first possible route for the given HTTP method and URI
      *
      * @param httpMethod The HTTP method

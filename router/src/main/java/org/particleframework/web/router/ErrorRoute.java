@@ -27,7 +27,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ErrorRoute extends Route {
+public interface ErrorRoute extends MethodBasedRoute {
     /**
      * @return The type the exception originates from. Null if the error route is global.
      */
