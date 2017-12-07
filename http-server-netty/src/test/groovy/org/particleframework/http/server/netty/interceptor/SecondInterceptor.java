@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty.interceptor;
 
+import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.interceptor.HttpRequestInterceptor;
 import org.spockframework.util.Assert;
@@ -39,10 +40,11 @@ public class SecondInterceptor implements HttpRequestInterceptor {
 
     @Override
     public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
-        Assert.that(request.get("first").isPresent());
-        Assert.that(!request.get("second").isPresent());
-        Assert.that(request.get("authenticated").isPresent());
-        request.getAttributes().put("second", true);
+        MutableConvertibleValues<Object> attributes = request.getAttributes();
+        Assert.that(attributes.contains("first"));
+        Assert.that(!attributes.contains("second"));
+        Assert.that(attributes.contains("authenticated"));
+        attributes.put("second", true);
         context.proceed(request);
     }
 }

@@ -35,7 +35,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpMessage<B> extends OptionalValues<Object> {
+public interface HttpMessage<B>  {
     /**
      * @return The {@link HttpHeaders} object
      */
@@ -97,30 +97,5 @@ public interface HttpMessage<B> extends OptionalValues<Object> {
                 .contentType();
     }
 
-    @Override
-    default Optional<Object> get(CharSequence name) {
-        return getAttributes().get(name, Object.class);
-    }
-
-    @Override
-    default Collection<Object> values() {
-        return getAttributes().values();
-    }
-
-    @Override
-    default Iterator<CharSequence> iterator() {
-        Iterator<String> i = getAttributes().getNames().iterator();
-        return new Iterator<CharSequence>() {
-            @Override
-            public boolean hasNext() {
-                return i.hasNext();
-            }
-
-            @Override
-            public CharSequence next() {
-                return i.next();
-            }
-        };
-    }
 
 }

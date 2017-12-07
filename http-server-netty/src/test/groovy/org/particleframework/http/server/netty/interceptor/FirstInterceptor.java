@@ -41,7 +41,7 @@ public class FirstInterceptor implements HttpRequestInterceptor {
     @Override
     public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
         request.getAttributes().put("first", true);
-        Assert.that(!request.get("authenticated").isPresent());
+        Assert.that(!request.getAttributes().contains("authenticated"));
         context.proceed(request);
     }
 }
