@@ -31,7 +31,7 @@ import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.reactive.ReactiveTypeUtils;
-import org.particleframework.runtime.executor.IOExecutorService;
+import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -69,7 +69,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     public CacheInterceptor(CacheManager cacheManager,
                             CacheErrorHandler errorHandler,
                             AsyncCacheErrorHandler asyncCacheErrorHandler,
-                            @Named(IOExecutorService.NAME) ExecutorService ioExecutor,
+                            @Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
                             BeanContext beanContext) {
         this.cacheManager = cacheManager;
         this.errorHandler = errorHandler;

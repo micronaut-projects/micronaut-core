@@ -57,7 +57,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
         if( method.hasStereotype(blockingAnnotations) ) {
             return beanLocator.findBean(
                     ExecutorService.class,
-                    Qualifiers.byName(IOExecutorService.NAME)
+                    Qualifiers.byName(IOExecutorServiceConfig.NAME)
             );
         }
         return Optional.empty();

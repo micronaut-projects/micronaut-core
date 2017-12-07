@@ -48,22 +48,23 @@ class ExecutorServiceConfigSpec extends Specification {
         def configs = ctx.getBeansOfType(ExecutorConfiguration)
 
         then:
-        configs.size() == 3
+        configs.size() == 4
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
 
         then:
-        executorServices.size() == 3
+        executorServices.size() == 4
 
         when:
         ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
         ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
 
         then:
-        executorServices.size() == 3
+        executorServices.size() == 4
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) // the default IO executor
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) // the default IO executor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(ScheduledExecutorServiceConfig.NAME)) // the default IO executor
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 
@@ -115,9 +116,10 @@ class ExecutorServiceConfigSpec extends Specification {
         ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
 
         then:
-        executorServices.size() == 3
+        executorServices.size() == 4
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) instanceof ThreadPoolExecutor
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) instanceof ThreadPoolExecutor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(ScheduledExecutorServiceConfig.NAME)) instanceof ScheduledExecutorService
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 
@@ -130,9 +132,9 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices = ctx.getBeansOfType(ExecutorService)
 
         then:
-        executorServices.size() == 3
-        moreConfigs.size() == 3
-        configs.size() == 3
+        executorServices.size() == 4
+        moreConfigs.size() == 4
+        configs.size() == 4
 
         where:
         invalidateCache | environment
@@ -158,8 +160,8 @@ class ExecutorServiceConfigSpec extends Specification {
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
 
         then:
-        executorServices.size() == 2
-        ctx.getBean(ExecutorService.class, Qualifiers.byName("io")) instanceof ThreadPoolExecutor
+        executorServices.size() == 3
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) instanceof ThreadPoolExecutor
 
         when:
         if(invalidateCache) {
@@ -170,9 +172,9 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices = ctx.getBeansOfType(ExecutorService)
 
         then:
-        executorServices.size() == 2
-        moreConfigs.size() == 2
-        configs.size() == 2
+        executorServices.size() == 3
+        moreConfigs.size() == 3
+        configs.size() == 3
 
         where:
         invalidateCache | environment
