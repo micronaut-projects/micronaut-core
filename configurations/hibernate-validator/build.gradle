@@ -6,7 +6,6 @@ dependencies {
     compileOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     compileOnly project(":router")
 
-    runtime group: 'javax.el', name: 'javax.el-api', version: '3.0.0'
     runtime 'org.glassfish:javax.el:3.0.1-b08'
     testCompile project(":inject-groovy")
 }
