@@ -40,7 +40,7 @@ import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
 import org.particleframework.http.server.netty.interceptor.HttpRequestInterceptorAdapter;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
-import org.particleframework.runtime.executor.IOExecutorService;
+import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.Router;
 import org.slf4j.Logger;
@@ -91,7 +91,7 @@ public class NettyHttpServer implements EmbeddedServer {
             ApplicationContext applicationContext,
             Optional<Router> router,
             RequestBinderRegistry binderRegistry,
-            @javax.inject.Named(IOExecutorService.NAME) ExecutorService ioExecutor,
+            @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             HttpRequestInterceptor[] interceptors,
             ChannelOutboundHandler... outboundHandlers

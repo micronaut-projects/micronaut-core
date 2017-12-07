@@ -21,7 +21,7 @@ import org.particleframework.context.annotation.Value
 import org.particleframework.context.env.Environment
 import org.particleframework.inject.qualifiers.Qualifiers
 import org.particleframework.runtime.context.scope.refresh.RefreshEvent
-import org.particleframework.runtime.executor.IOExecutorService
+import org.particleframework.runtime.executor.IOExecutorServiceConfig
 import spock.lang.Specification
 
 import java.util.concurrent.Executor
@@ -43,7 +43,7 @@ class RefreshScopeSpec extends Specification {
             void execute(Runnable command) {
                 command.run()
             }
-        }, Qualifiers.byName(IOExecutorService.NAME))
+        }, Qualifiers.byName(IOExecutorServiceConfig.NAME))
 
         when:
         RefreshBean bean = beanContext.getBean(RefreshBean)
@@ -78,7 +78,7 @@ class RefreshScopeSpec extends Specification {
             void execute(Runnable command) {
                 command.run()
             }
-        }, Qualifiers.byName(IOExecutorService.NAME))
+        }, Qualifiers.byName(IOExecutorServiceConfig.NAME))
 
         when:
         RefreshBean bean = beanContext.getBean(RefreshBean)

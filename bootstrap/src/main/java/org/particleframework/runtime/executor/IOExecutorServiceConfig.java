@@ -30,7 +30,7 @@ import javax.inject.Singleton;
  */
 @Requires(missingProperty = "particle.server.executors.io")
 @Factory
-public class IOExecutorService {
+public class IOExecutorServiceConfig {
 
     /**
      * The name of the default IO executor service
@@ -39,7 +39,7 @@ public class IOExecutorService {
 
     @Singleton
     @Bean
-    @Named(IOExecutorService.NAME)
+    @Named(IOExecutorServiceConfig.NAME)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.CACHED);
     }

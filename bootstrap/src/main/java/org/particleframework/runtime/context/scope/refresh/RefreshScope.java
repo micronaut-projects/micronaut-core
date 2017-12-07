@@ -28,7 +28,7 @@ import org.particleframework.inject.BeanIdentifier;
 import org.particleframework.inject.DisposableBeanDefinition;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.context.scope.Refreshable;
-import org.particleframework.runtime.executor.IOExecutorService;
+import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -56,7 +56,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     private final BeanContext beanContext;
     private final Executor executorService;
 
-    public RefreshScope(BeanContext beanContext, @Named(IOExecutorService.NAME) Executor executorService) {
+    public RefreshScope(BeanContext beanContext, @Named(IOExecutorServiceConfig.NAME) Executor executorService) {
         this.beanContext = beanContext;
         this.executorService = executorService;
     }
