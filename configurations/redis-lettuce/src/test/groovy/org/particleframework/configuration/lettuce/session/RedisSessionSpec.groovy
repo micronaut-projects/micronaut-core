@@ -18,9 +18,11 @@ package org.particleframework.configuration.lettuce.session
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.event.ApplicationEventListener
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.session.Session
 import org.particleframework.session.event.AbstractSessionEvent
 import org.particleframework.session.event.SessionCreatedEvent
 import org.particleframework.session.event.SessionDeletedEvent
+import org.particleframework.session.event.SessionExpiredEvent
 import redis.embedded.RedisServer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -56,21 +58,24 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'particle.redis.port':redisPort,
-                'particle.redis.session.enabled':'true'
+                'particle.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
         TestListener listener = applicationContext.getBean(TestListener)
+        def conditions = new PollingConditions(timeout: 10)
 
         when:"A new session is created and saved"
-        RedisSession session = sessionStore.newSession()
+        Session session = sessionStore.newSession()
         session.put("username", "fred")
         session.put("foo", new Foo(name: "Fred", age: 10))
 
-        RedisSession saved = sessionStore.save(session).get()
+        Session  saved = sessionStore.save(session).get()
 
         then:"The session created event is fired and the session is valid"
-        listener.events.size() == 1
-        listener.events.first() instanceof SessionCreatedEvent
+        conditions.eventually {
+            assert listener.events.size() == 1
+            assert listener.events.first() instanceof SessionCreatedEvent
+        }
         saved != null
         !saved.isExpired()
         saved.maxInactiveInterval
@@ -82,7 +87,7 @@ class RedisSessionSpec extends Specification {
 
         when:"A session is located"
         listener.events.clear()
-        RedisSession retrieved = sessionStore.findSession(saved.id).get().get()
+        Session  retrieved = sessionStore.findSession(saved.id).get().get()
 
         then:"Then the session is valid"
         retrieved != null
@@ -119,14 +124,13 @@ class RedisSessionSpec extends Specification {
 
         when:"A session is deleted"
         boolean result = sessionStore.deleteSession(saved.id).get()
-        def conditions = new PollingConditions(timeout: 10)
 
         then:"A session deleted event is fired"
 
         result
         conditions.eventually {
-            listener.events.size() == 1
-            listener.events.first() instanceof SessionDeletedEvent
+            assert listener.events.size() == 1
+            assert listener.events.first() instanceof SessionDeletedEvent
         }
 
 
@@ -135,6 +139,67 @@ class RedisSessionSpec extends Specification {
 
         then:"It is no longer present"
         !found.isPresent()
+    }
+
+    void "test redis session expiry"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'particle.redis.port':redisPort,
+                'particle.session.http.redis.enabled':'true'
+        )
+        RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
+        TestListener listener = applicationContext.getBean(TestListener)
+        def conditions = new PollingConditions(timeout: 10)
+
+
+        when:"A new session is created and saved"
+        Session  session = sessionStore.newSession()
+        session.put("username", "fred")
+        session.put("foo", new Foo(name: "Fred", age: 10))
+        session.setMaxInactiveInterval(Duration.ofSeconds(2))
+        Session  saved = sessionStore.save(session).get()
+
+        then:
+        saved
+        conditions.eventually {
+            assert listener.events.size() == 2
+            assert listener.events[0] instanceof SessionCreatedEvent
+            assert listener.events[1] instanceof SessionExpiredEvent
+        }
+
+    }
+
+    void "test redis session write behind"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'particle.redis.port':redisPort,
+                'particle.session.http.redis.enabled':'true',
+                'particle.session.http.redis.writeMode':'background',
+        )
+        RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
+        def conditions = new PollingConditions(timeout: 10)
+
+        when:"A new session is created and saved"
+        Session  session = sessionStore.newSession()
+        session.put("username", "fred")
+        session.put("foo", new Foo(name: "Fred", age: 10))
+        Session  saved = sessionStore.save(session).get()
+
+        then:"The session was saved"
+        saved != null
+
+        when:"The session is updated"
+        session.put("username","bob")
+        session.remove("foo")
+
+
+
+        then:"The session was updated in the background"
+        conditions.eventually {
+            Session retrieved = sessionStore.findSession(session.id).get().get()
+            assert !retrieved.contains("foo")
+            assert retrieved.get("username", String).get() == 'bob'
+        }
     }
 
     static class Foo implements Serializable{

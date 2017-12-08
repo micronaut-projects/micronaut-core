@@ -141,14 +141,12 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
                 case SIZE:
                 case EXPIRED:
                     eventPublisher.publishEvent(new SessionExpiredEvent(value));
-                    eventPublisher.publishEvent(new SessionDestroyedEvent(value));
                     break;
                 case EXPLICIT:
                     eventPublisher.publishEvent(new SessionDeletedEvent(value));
-                    eventPublisher.publishEvent(new SessionDestroyedEvent(value));
                     break;
                 case COLLECTED:
-                    throw new IllegalStateException("Session should not be garbage collectable");
+                    throw new IllegalStateException("Session should never be garbage collectable");
             }
         };
     }
