@@ -56,6 +56,7 @@ public class EmbeddedRedisServer {
 
 
     @ConfigurationProperties("particle.redis.embedded")
+    @Requires(classes = RedisServerBuilder.class )
     public static class Configuration {
         @ConfigurationBuilder(
                 prefixes = ""
