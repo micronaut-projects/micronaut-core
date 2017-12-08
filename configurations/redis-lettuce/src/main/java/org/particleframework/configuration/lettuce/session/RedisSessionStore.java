@@ -184,28 +184,8 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         }
     }
 
-    private StatefulConnection findRedisConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
-        Optional<String> serverName = sessionConfiguration.getServerName();
-        return RedisConnectionUtil.findRedisConnection(beanLocator, serverName,"No Redis server configured to store sessions");
-    }
-
-    @SuppressWarnings("unchecked")
-    private StatefulRedisPubSubConnection<String,String> findRedisPubSubConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
-        Optional<String> serverName = sessionConfiguration.getServerName();
-        return (StatefulRedisPubSubConnection<String, String>)
-                serverName.map(name -> beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name))
-                .map(conn -> (StatefulConnection) conn)
-                .orElse(
-                        beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name)).orElseThrow(() ->
-                                new ConfigurationException("No Redis server configured to store sessions")
-                        )
-                )).orElseGet(() -> beanLocator.findBean(StatefulRedisPubSubConnection.class)
-                .map(conn -> (StatefulConnection) conn)
-                .orElse(
-                        beanLocator.findBean(StatefulRedisPubSubConnection.class).orElseThrow(() ->
-                                new ConfigurationException("No Redis server configured to store sessions")
-                        )
-                ));
+    public ObjectSerializer getValueSerializer() {
+        return valueSerializer;
     }
 
     @Override
@@ -418,6 +398,31 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
 
     private byte[] getSessionKey(String id) {
         return (sessionConfiguration.getNamespace() + "sessions:" + id).getBytes();
+    }
+
+
+    private StatefulConnection findRedisConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
+        Optional<String> serverName = sessionConfiguration.getServerName();
+        return RedisConnectionUtil.findRedisConnection(beanLocator, serverName,"No Redis server configured to store sessions");
+    }
+
+    @SuppressWarnings("unchecked")
+    private StatefulRedisPubSubConnection<String,String> findRedisPubSubConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
+        Optional<String> serverName = sessionConfiguration.getServerName();
+        return (StatefulRedisPubSubConnection<String, String>)
+                serverName.map(name -> beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name))
+                        .map(conn -> (StatefulConnection) conn)
+                        .orElse(
+                                beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name)).orElseThrow(() ->
+                                        new ConfigurationException("No Redis server configured to store sessions")
+                                )
+                        )).orElseGet(() -> beanLocator.findBean(StatefulRedisPubSubConnection.class)
+                        .map(conn -> (StatefulConnection) conn)
+                        .orElse(
+                                beanLocator.findBean(StatefulRedisPubSubConnection.class).orElseThrow(() ->
+                                        new ConfigurationException("No Redis server configured to store sessions")
+                                )
+                        ));
     }
 
     class RedisSession extends InMemorySession implements Session {
