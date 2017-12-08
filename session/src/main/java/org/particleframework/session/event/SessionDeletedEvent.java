@@ -23,7 +23,7 @@ import org.particleframework.session.Session;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SessionDeletedEvent extends AbstractSessionEvent {
+public class SessionDeletedEvent extends SessionDestroyedEvent{
     /**
      * Constructs a prototypical Event.
      *

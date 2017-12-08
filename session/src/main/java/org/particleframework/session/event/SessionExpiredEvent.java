@@ -15,7 +15,6 @@
  */
 package org.particleframework.session.event;
 
-import org.particleframework.context.event.ApplicationEvent;
 import org.particleframework.session.Session;
 
 /**
@@ -24,7 +23,7 @@ import org.particleframework.session.Session;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SessionExpiredEvent extends ApplicationEvent {
+public class SessionExpiredEvent extends SessionDestroyedEvent {
     public SessionExpiredEvent(Session source) {
         super(source);
     }

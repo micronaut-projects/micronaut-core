@@ -28,7 +28,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.session.http")
+@ConfigurationProperties("http")
 public class HttpSessionConfiguration extends SessionConfiguration {
 
     public static final String DEFAULT_COOKIE_NAME = "SESSION";

@@ -21,6 +21,7 @@ import io.lettuce.core.dynamic.annotation.Command;
 import io.lettuce.core.dynamic.annotation.Param;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  *
@@ -40,7 +41,7 @@ public interface RedisSessionCommands extends Commands {
      * @return String simple-string-reply
      */
     @Command("HMSET :sessionId :value")
-    RedisFuture<Void> saveSessionData(@Param("sessionId") byte[] sessionId, @Param("value") Map<byte[], byte[]> attributes);
+    CompletableFuture<Void> saveSessionData(@Param("sessionId") byte[] sessionId, @Param("value") Map<byte[], byte[]> attributes);
 
     /**
      * Set a single attribute of a session
@@ -51,7 +52,7 @@ public interface RedisSessionCommands extends Commands {
      * @return String simple-string-reply
      */
     @Command("HSET :sessionId :attribute :value")
-    RedisFuture<Void> setAttribute(@Param("sessionId") byte[] sessionId, @Param("attribute") byte[] attribute, @Param("value") byte[] value );
+    CompletableFuture<Void> setAttribute(@Param("sessionId") byte[] sessionId, @Param("attribute") byte[] attribute, @Param("value") byte[] value );
 
     /**
      * Removes a single attribute of a session
@@ -61,7 +62,7 @@ public interface RedisSessionCommands extends Commands {
      * @return String simple-string-reply
      */
     @Command("HDEL :sessionId :attributes")
-    RedisFuture<Void> deleteAttributes(@Param("sessionId") byte[] sessionId, @Param("attributes") byte[]... attributes);
+    CompletableFuture<Void> deleteAttributes(@Param("sessionId") byte[] sessionId, @Param("attributes") byte[]... attributes);
     /**
      * Get all the fields and values in a hash.
      *
@@ -70,7 +71,7 @@ public interface RedisSessionCommands extends Commands {
      *         does not exist.
      */
     @Command("HGETALL")
-    RedisFuture<Map<byte[], byte[]>> findSessionData(byte[] sessionId);
+    CompletableFuture<Map<byte[], byte[]>> findSessionData(byte[] sessionId);
 
     /**
      * Save an expiry
@@ -78,6 +79,48 @@ public interface RedisSessionCommands extends Commands {
      * @param seconds The seconds until expiration
      * @return A future
      */
-    @Command("SET :expiryKey :seconds")
-    RedisFuture<Void> saveExpiry(@Param("expiryKey") byte[] expiryKey, @Param("seconds") byte[] seconds);
+    @Command("SET :expiryKey :seconds EX :seconds")
+    CompletableFuture<Void> saveExpiry(@Param("expiryKey") byte[] expiryKey, @Param("seconds") byte[] seconds);
+
+    /**
+     * Delete a key
+     * @param key The key to delete
+     * @return the future
+     */
+    CompletableFuture<Void> del(byte[] key);
+
+
+    /**
+     * Remove an item from the given sorted set
+     * @param key The key of the set
+     * @param member The memeber to remove
+     * @return the future
+     */
+    CompletableFuture<Void> zrem(byte[] key, byte[] member);
+
+    /**
+     * Add one or more members to a sorted set, or update its score if it already exists.
+     *
+     * @param key the key
+     * @param score the score
+     * @param member the member
+     *
+     * @return Long integer-reply specifically:
+     *
+     *         The number of elements added to the sorted sets, not including elements already existing for which the score was
+     *         updated.
+     */
+    CompletableFuture<Long> zadd(byte[] key, double score, byte[] member);
+
+    /**
+     * Set a key's time to live in seconds.
+     *
+     * @param key the key
+     * @param seconds the seconds type: long
+     * @return Boolean integer-reply specifically:
+     *
+     *         {@literal true} if the timeout was set. {@literal false} if {@code key} does not exist or the timeout could not
+     *         be set.
+     */
+    CompletableFuture<Boolean> expire(byte[] key, long seconds);
 }
