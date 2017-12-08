@@ -121,20 +121,19 @@ public class RequiresCondition implements Condition {
             BeanContext beanContext = context.getBeanContext();
             if(beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
+                String notEquals = annotation.notEquals();
+                boolean hasNotEquals = StringUtils.isNotEmpty(notEquals);
                 if(!propertyResolver.containsProperties(property)) {
-                    return false;
+                    return hasNotEquals ? true : false;
                 }
                 else if(StringUtils.isNotEmpty(value)) {
                     Optional<String> resolved = propertyResolver.getProperty(property, String.class);
                     return resolved.map(val -> val.equals(value)).orElse(false);
                 }
-                else {
-                    String notEquals = annotation.notEquals();
-                    if(StringUtils.isNotEmpty(notEquals)) {
+                else if(hasNotEquals) {
                         String resolvedValue = propertyResolver.getProperty(property, String.class).orElse(null);
                         return resolvedValue == null || resolvedValue.equals(value);
                     }
-                }
             }
         }
         return true;
