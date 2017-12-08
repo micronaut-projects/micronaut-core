@@ -45,7 +45,14 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
     private Class<ObjectSerializer> valueSerializer;
     private Charset charset = StandardCharsets.UTF_8;
     private Duration expiredSessionCheck = Duration.ofMinutes(1);
-    protected String uri;
+    private String serverName;
+
+    /**
+     * @return The name of the a configured Redis server to use
+     */
+    public Optional<String> getServerName() {
+        return Optional.ofNullable(serverName);
+    }
 
     /**
      * @return The topic to use to publish the creation of new sessions
@@ -74,18 +81,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
-    }
-
-    /**
-     * @return The optional uri of the cache
-     */
-    public Optional<RedisURI> getRedisURI() {
-        if(uri != null) {
-            return Optional.of(RedisURI.create(uri));
-        }
-        else {
-            return Optional.empty();
-        }
     }
 
     /**
@@ -130,6 +125,10 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
 
     void setNamespace(String namespace) {
         this.namespace = namespace;
+    }
+
+    void setServerName(String serverName) {
+        this.serverName = serverName;
     }
 
     void setSessionCreatedTopic(String sessionCreatedTopic) {

@@ -15,11 +15,13 @@
  */
 package org.particleframework.configuration.lettuce.session;
 
+import io.lettuce.core.Range;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.dynamic.Commands;
 import io.lettuce.core.dynamic.annotation.Command;
 import io.lettuce.core.dynamic.annotation.Param;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -98,6 +100,24 @@ public interface RedisSessionCommands extends Commands {
      */
     CompletableFuture<Void> zrem(byte[] key, byte[] member);
 
+
+    /**
+     * Touch one or more keys. Touch sets the last accessed time for a key. Non-exsitent keys wont get created.
+     *
+     * @param key the key to get
+     * @return Long integer-reply the number of found keys.
+     */
+    CompletableFuture<byte[]> get(@Param("keys") byte[] key);
+
+    /**
+     * Return a range of members in a sorted set, by score.
+     *
+     * @param key the key
+     * @param range the range
+     * @return List&lt;V&gt; array-reply list of elements in the specified score range.
+     * @since 4.3
+     */
+    CompletableFuture<List<byte[]>> zrangebyscore(byte[] key, Range<? extends Number> range);
     /**
      * Add one or more members to a sorted set, or update its score if it already exists.
      *
@@ -123,4 +143,23 @@ public interface RedisSessionCommands extends Commands {
      *         be set.
      */
     CompletableFuture<Boolean> expire(byte[] key, long seconds);
+
+    /**
+     * Post a message to a channel.
+     *
+     * @param channel the channel type: key
+     * @param message the message type: value
+     * @return Long integer-reply the number of clients that received the message.
+     */
+    CompletableFuture<Long> publish(byte[] channel, byte[] message);
+
+
+    /**
+     * Set a configuration parameter to the given value.
+     *
+     * @param parameter the parameter name
+     * @param value the parameter value
+     * @return String simple-string-reply: {@code OK} when the configuration was set properly. Otherwise an error is returned.
+     */
+    String configSet(String parameter, String value);
 }
