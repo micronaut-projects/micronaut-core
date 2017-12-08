@@ -19,11 +19,13 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulConnection;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import org.particleframework.cache.AsyncCache;
 import org.particleframework.cache.SyncCache;
 import org.particleframework.cache.serialize.DefaultStringKeySerializer;
-import org.particleframework.context.BeanContext;
+import org.particleframework.configuration.lettuce.RedisConnectionUtil;
+import org.particleframework.context.BeanLocator;
 import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.exceptions.ConfigurationException;
@@ -50,7 +52,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @EachBean(RedisCacheConfiguration.class)
-public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoCloseable {
+public class RedisCache implements SyncCache<StatefulConnection<?,?>> {
     private final RedisCacheConfiguration redisCacheConfiguration;
     private final ObjectSerializer keySerializer;
     private final ObjectSerializer valueSerializer;
@@ -58,21 +60,20 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
     private final Long expireAfterAccess;
     private final RedisAsyncCache asyncCache;
     private final SyncCacheCommands commands;
-    private final RedisClient redisClient;
     private final StatefulConnection<String, String> connection;
 
     /**
      * Creates a new redis cache for the given arguments
      *
      * @param redisCacheConfiguration The configuration
-     * @param primaryClient           The primary Redis client, if present
+     * @param conversionService The conversion service
+     * @param beanLocator The bean locator used to discover the redis connection from the configuration
      */
     @SuppressWarnings("unchecked")
     public RedisCache(
             RedisCacheConfiguration redisCacheConfiguration,
             ConversionService<?> conversionService,
-            @Primary Optional<StatefulConnection> primaryClient,
-            BeanContext beanContext) {
+            BeanLocator beanLocator) {
         if (redisCacheConfiguration == null) {
             throw new IllegalArgumentException("Redis cache configuration cannot be null");
         }
@@ -81,41 +82,16 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         this.expireAfterAccess = redisCacheConfiguration.getExpireAfterAccess().map(Duration::toMillis).orElse(null);
         this.keySerializer = redisCacheConfiguration
                                     .getKeySerializer()
-                                    .flatMap(beanContext::findOrInstantiateBean)
-                                    .orElse(new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService));
+                                    .flatMap(beanLocator::findOrInstantiateBean)
+                                    .orElse(newDefaultKeySerializer(redisCacheConfiguration, conversionService));
 
         this.valueSerializer = redisCacheConfiguration
                                     .getValueSerializer()
-                                    .flatMap(beanContext::findOrInstantiateBean)
+                                    .flatMap(beanLocator::findOrInstantiateBean)
                                     .orElse(new JdkSerializer(conversionService));
 
-        Optional<RedisURI> redisURI = redisCacheConfiguration
-                .getRedisURI();
-        boolean hasURI = redisURI.isPresent();
-
-        if (hasURI) {
-            this.redisClient = RedisClient.create(redisURI.get());
-            this.connection = this.redisClient.connect();
-        } else {
-            this.redisClient = null;
-            Optional<String> server = redisCacheConfiguration.getServer();
-            if (server.isPresent()) {
-                String serverName = server.get();
-                if (serverName.equalsIgnoreCase("default")) {
-                    this.connection = usePrimaryClient(primaryClient);
-                } else {
-                    this.connection = beanContext.findBean(StatefulConnection.class, Qualifiers.byName(serverName))
-                            .orElseThrow(() ->
-                                    new ConfigurationException("Cannot create cache. No redis server configured for name: " + serverName)
-                            );
-                }
-
-            } else {
-                this.connection = usePrimaryClient(primaryClient);
-            }
-        }
-
-
+        Optional<String> server = redisCacheConfiguration.getServer();
+        this.connection = RedisConnectionUtil.findRedisConnection(beanLocator, server,"No Redis server configured to allow caching");
         this.commands = syncCommands(this.connection);
         this.asyncCache = new RedisAsyncCache();
     }
@@ -126,8 +102,8 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
     }
 
     @Override
-    public RedisClient getNativeCache() {
-        return redisClient;
+    public StatefulConnection<?,?> getNativeCache() {
+        return connection;
     }
 
     @Override
@@ -199,21 +175,8 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
     }
 
     @Override
-    public AsyncCache<RedisClient> async() {
+    public AsyncCache<StatefulConnection<?,?>> async() {
         return asyncCache;
-    }
-
-    @Override
-    @PreDestroy
-    public void close() throws IOException {
-        try {
-
-            connection.close();
-        } finally {
-            if (redisClient != null) {
-                redisClient.shutdown();
-            }
-        }
     }
 
     /**
@@ -221,10 +184,6 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
      */
     protected String getKeysPattern() {
         return getName() + ":*";
-    }
-
-    protected StatefulConnection usePrimaryClient(@Primary Optional<StatefulConnection> primaryClient) {
-        return primaryClient.orElseThrow(() -> new ConfigurationException("Cannot create cache. Neither the primary Redis server or a cache specific server is configured"));
     }
 
     protected <T> void putValue(SyncCacheCommands commands, byte[] serializedKey, T value) {
@@ -241,10 +200,10 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         }
     }
 
-
     protected byte[] serializeKey(Object key) {
         return keySerializer.serialize(key).orElseThrow(() -> new IllegalArgumentException("Key cannot be null"));
     }
+
 
     protected SyncCacheCommands syncCommands(StatefulConnection<String, String> connection) {
         RedisCommandFactory redisCommandFactory = new RedisCommandFactory(connection);
@@ -256,7 +215,11 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         return redisCommandFactory.getCommands(AsyncCacheCommands.class);
     }
 
-    protected class RedisAsyncCache implements AsyncCache<RedisClient> {
+    private DefaultStringKeySerializer newDefaultKeySerializer(RedisCacheConfiguration redisCacheConfiguration, ConversionService<?> conversionService) {
+        return new DefaultStringKeySerializer(redisCacheConfiguration.getCacheName(), redisCacheConfiguration.getCharset(), conversionService);
+    }
+
+    protected class RedisAsyncCache implements AsyncCache<StatefulConnection<?,?>> {
 
         private final AsyncCacheCommands async = asyncCommands(connection);
 
@@ -405,7 +368,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
         }
 
         @Override
-        public RedisClient getNativeCache() {
+        public StatefulConnection<?,?> getNativeCache() {
             return RedisCache.this.getNativeCache();
         }
 
@@ -461,5 +424,7 @@ public class RedisCache implements SyncCache<RedisClient>, Closeable, AutoClosea
             }
             return future;
         }
+
     }
+
 }

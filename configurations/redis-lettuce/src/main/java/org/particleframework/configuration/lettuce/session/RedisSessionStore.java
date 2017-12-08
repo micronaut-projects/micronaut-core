@@ -17,14 +17,11 @@ package org.particleframework.configuration.lettuce.session;
 
 import io.lettuce.core.Range;
 import io.lettuce.core.api.StatefulConnection;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.async.RedisKeyAsyncCommands;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import io.lettuce.core.pubsub.RedisPubSubAdapter;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
+import org.particleframework.configuration.lettuce.RedisConnectionUtil;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Replaces;
@@ -189,19 +186,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
 
     private StatefulConnection findRedisConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
         Optional<String> serverName = sessionConfiguration.getServerName();
-        return serverName.map(name -> beanLocator.findBean(StatefulRedisClusterConnection.class, Qualifiers.byName(name))
-                .map(conn -> (StatefulConnection) conn)
-                .orElse(
-                        beanLocator.findBean(StatefulRedisClusterConnection.class, Qualifiers.byName(name)).orElseThrow(() ->
-                                new ConfigurationException("No Redis server configured to store sessions")
-                        )
-                )).orElseGet(() -> beanLocator.findBean(StatefulRedisConnection.class)
-                .map(conn -> (StatefulConnection) conn)
-                .orElse(
-                        beanLocator.findBean(StatefulRedisConnection.class).orElseThrow(() ->
-                                new ConfigurationException("No Redis server configured to store sessions")
-                        )
-                ));
+        return RedisConnectionUtil.findRedisConnection(beanLocator, serverName,"No Redis server configured to store sessions");
     }
 
     @SuppressWarnings("unchecked")

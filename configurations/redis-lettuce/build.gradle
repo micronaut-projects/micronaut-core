@@ -3,6 +3,7 @@ dependencies {
     compileOnly project(":session")
     compileOnly project(":inject-java")
     compile "io.lettuce:lettuce-core:$lettuceVersion"
+    compileOnly "com.github.kstyrc:embedded-redis:0.6"
 
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")

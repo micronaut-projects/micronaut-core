@@ -20,6 +20,8 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.inject.qualifiers.Qualifiers
 import redis.embedded.RedisServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -28,17 +30,13 @@ import spock.lang.Specification
  */
 class RedisCacheSpec extends Specification {
 
-    void "test read/write object from redis sync cache"() {
-        given:
-        def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = new RedisServer(port)
-        redisServer.start()
+    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
+            'particle.redis.type':'embedded',
+            'particle.redis.caches.test.enabled':'true'
+    )
 
+    void "test read/write object from redis sync cache"() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.port':port,
-                'particle.redis.caches.test.server':'default'
-        )
         RedisCache redisCache = applicationContext.getBean(RedisCache, Qualifiers.byName("test"))
 
         then:
@@ -90,7 +88,7 @@ class RedisCacheSpec extends Specification {
         !redisCache.get("two", Foo).isPresent()
 
         cleanup:
-        redisServer.stop()
+        applicationContext.stop()
     }
 
     static class Foo implements Serializable {
