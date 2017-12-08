@@ -20,6 +20,8 @@ import io.lettuce.core.cluster.RedisClusterClient;
 import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import org.particleframework.context.annotation.*;
+import org.particleframework.context.exceptions.ConfigurationException;
+import org.particleframework.core.util.ArrayUtils;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
@@ -40,6 +42,9 @@ public class DefaultRedisClusterClientFactory {
     @Singleton
     @Primary
     public RedisClusterClient redisClient(@Value("particle.redis.uris") String...uris) {
+        if(ArrayUtils.isEmpty(uris)) {
+            throw new ConfigurationException("Redis URIs must be specified");
+        }
         return RedisClusterClient.create(Arrays.stream(uris).map(RedisURI::create).collect(Collectors.toList()));
     }
 
