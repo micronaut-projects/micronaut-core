@@ -24,32 +24,21 @@ import io.netty.handler.codec.http.multipart.HttpData;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
-import org.particleframework.core.bind.ArgumentBinder;
-import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
-import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.exceptions.InternalServerException;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
-import org.particleframework.http.server.binding.binders.BodyArgumentBinder;
-import org.particleframework.http.server.binding.binders.NonBlockingBodyArgumentBinder;
 import org.particleframework.http.server.cors.CorsHandler;
-import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
 import org.particleframework.http.server.netty.encoders.HttpResponseEncoder;
-import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
-import org.particleframework.web.router.UnresolvedArgument;
 import org.particleframework.web.router.UriRouteMatch;
-import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -60,7 +49,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Internal implementation of the {@link ChannelInboundHandler} for Particle
@@ -73,7 +61,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
 
-    private final Optional<Router> router;
+    private final Router router;
     private final ExecutorSelector executorSelector;
     private final ExecutorService ioExecutor;
     private final BeanLocator beanLocator;
@@ -81,11 +69,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private final boolean corsEnabled;
     private final CorsHandler corsHandler;
     private final NettyHttpServerConfiguration serverConfiguration;
-
+    private final RequestArgumentSatisfier requestArgumentSatisfier = new RequestArgumentSatisfier();
+    private final RoutingInBoundErrorHandler routingInBoundErrorHandler;
 
     RoutingInBoundHandler(
             BeanLocator beanLocator,
-            Optional<Router> router,
+            Router router,
             NettyHttpServerConfiguration serverConfiguration,
             RequestBinderRegistry binderRegistry,
             ExecutorSelector executorSelector,
@@ -95,6 +84,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         this.executorSelector = executorSelector;
         this.router = router;
         this.binderRegistry = binderRegistry;
+        this.routingInBoundErrorHandler = new RoutingInBoundErrorHandler(
+                router,
+                binderRegistry,
+                beanLocator,
+                requestArgumentSatisfier
+        );
         this.serverConfiguration = serverConfiguration;
         HttpServerConfiguration.CorsConfiguration corsConfiguration = serverConfiguration.getCors();
         this.corsEnabled = corsConfiguration.isEnabled();
@@ -128,7 +123,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             Optional<MutableHttpResponse<?>> corsResponse = corsHandler.handleRequest(request);
             if (corsResponse.isPresent()) {
                 ctx.writeAndFlush(corsResponse.get())
-                        .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
+                        .addListener(NettyHttpServer.createCloseListener(nettyHttpRequest.getNativeRequest()));
                 return;
             } else {
                 pipeline.addAfter(HttpResponseEncoder.NAME, NettyHttpServer.CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
@@ -150,11 +145,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
         // find a matching route
-        Optional<UriRouteMatch<Object>> routeMatch = router.flatMap((router) ->
-                router.find(request.getMethod(), request.getPath())
+        Optional<UriRouteMatch<Object>> routeMatch = router.find(request.getMethod(), request.getPath())
                         .filter((match) -> match.test(request))
-                        .findFirst()
-        );
+                        .findFirst();
 
         if (!routeMatch.isPresent()) {
             if (LOG.isDebugEnabled()) {
@@ -163,32 +156,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             // if there is no route present try to locate a route that matches a different HTTP method
             Set<HttpMethod> existingRoutes = router
-                    .map(router ->
-                            router.findAny(request.getUri().toString())
-                    ).orElse(Stream.empty())
+                    .findAny(request.getUri().toString())
                     .map(UriRouteMatch::getHttpMethod)
                     .collect(Collectors.toSet());
 
             if (!existingRoutes.isEmpty()) {
-                // if there are other routes that match send back 405 - METHOD_NOT_ALLOWED
-                Object notAllowedResponse =
-                        findStatusRoute(HttpStatus.METHOD_NOT_ALLOWED, request, binderRegistry)
-                                .map(RouteMatch::execute)
-                                .orElse(HttpResponse.notAllowed(
-                                        existingRoutes
-                                ));
+                routingInBoundErrorHandler.handleMethodNotAllowed(ctx, request, existingRoutes);
 
-                ctx.writeAndFlush(notAllowedResponse)
-                        .addListener(ChannelFutureListener.CLOSE);
             } else {
                 // if no alternative route was found send back 404 - NOT_FOUND
-                Object notFoundResponse =
-                        findStatusRoute(HttpStatus.NOT_FOUND, request, binderRegistry)
-                                .map(RouteMatch::execute)
-                                .orElse(HttpResponse.notFound());
-
-                ctx.writeAndFlush(notFoundResponse)
-                        .addListener(ChannelFutureListener.CLOSE);
+                routingInBoundErrorHandler.handleNotFound(ctx, request);
             }
         }
         else {
@@ -196,18 +173,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 // Check that the route is an accepted content type
                 MediaType contentType = request.getContentType().orElse(null);
                 if (!route.accept(contentType)) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Matched route is not a supported media type: {}", contentType);
-                    }
-
-                    // if the content type is not accepted send by 415 - UNSUPPORTED MEDIA TYPE
-                    Object unsupportedResult =
-                            findStatusRoute(HttpStatus.UNSUPPORTED_MEDIA_TYPE, request, binderRegistry)
-                                    .map(RouteMatch::execute)
-                                    .orElse(HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE));
-
-                    ctx.writeAndFlush(unsupportedResult)
-                            .addListener(ChannelFutureListener.CLOSE);
+                    routingInBoundErrorHandler.handleUnsupportedMediaType(ctx, request, contentType);
                 } else {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Matched route {} - {} to controller {}", request.getMethod(), request.getPath(), route.getDeclaringType().getName());
@@ -217,118 +183,29 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 }
             }));
         }
-
-        
-
-
     }
 
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.get(ctx);
-        if (nettyHttpRequest != null) {
-
-            RouteMatch matchedRoute = nettyHttpRequest.getMatchedRoute();
-            Class declaringType = matchedRoute != null ? matchedRoute.getDeclaringType() : null;
-            try {
-                if (declaringType != null) {
-                    Optional<RouteMatch<Object>> match;
-                    if (cause instanceof UnsatisfiedRouteException) {
-                        match = router
-                                .flatMap(router -> router.route(HttpStatus.BAD_REQUEST))
-                                .map(route -> fulfillArgumentRequirements(route, nettyHttpRequest, binderRegistry))
-                                .filter(RouteMatch::isExecutable);
-
-                    } else {
-                        match = router
-                                .flatMap(router -> router.route(declaringType, cause))
-                                .map(route -> fulfillArgumentRequirements(route, nettyHttpRequest, binderRegistry))
-                                .filter(RouteMatch::isExecutable);
-                    }
-
-
-                    if (match.isPresent()) {
-                        RouteMatch finalRoute = match.get();
-                        Object result = finalRoute.execute();
-                        ctx.writeAndFlush(result)
-                                .addListener(createCloseListener(nettyHttpRequest.getNativeRequest()));
-                    } else {
-                        handleWithExceptionHandlers(ctx, nettyHttpRequest, cause);
-                    }
-                } else {
-                    handleWithExceptionHandlers(ctx, nettyHttpRequest, cause);
-                }
-
-            } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
-                }
-                writeServerErrorResponse(ctx, nettyHttpRequest, cause);
-            }
-        } else {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-            }
-
-            writeDefaultErrorResponse(ctx);
-        }
-
+        routingInBoundErrorHandler.handleServerError(ctx, cause);
     }
 
-    protected void handleWithExceptionHandlers(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause) {
-        Optional<ExceptionHandler> exceptionHandler = beanLocator
-                .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
 
-        if (exceptionHandler.isPresent()) {
-            Object result = exceptionHandler
-                    .get()
-                    .handle(nettyHttpRequest, cause);
-            ctx.writeAndFlush(result)
-                    .addListener(ChannelFutureListener.CLOSE);
-        } else {
-            writeServerErrorResponse(ctx, nettyHttpRequest, cause);
-        }
-    }
-
-    void writeServerErrorResponse(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause) {
-        try {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-            }
-
-            Object errorResponse = findStatusRoute(HttpStatus.INTERNAL_SERVER_ERROR, nettyHttpRequest, binderRegistry)
-                    .map(RouteMatch::execute)
-                    .orElse(HttpResponse.serverError());
-            ctx.channel()
-                    .writeAndFlush(errorResponse)
-                    .addListener(ChannelFutureListener.CLOSE);
-
-        } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
-            }
-            writeDefaultErrorResponse(ctx);
-
-        }
-    }
-
-    void writeDefaultErrorResponse(ChannelHandlerContext ctx) {
-        ctx.channel()
-                .writeAndFlush(HttpResponse.serverError())
-                .addListener(ChannelFutureListener.CLOSE);
-    }
-
-    private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
+    private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest<?> request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
         // Set the matched route on the request
         request.setMatchedRoute(route);
 
         // try to fulfill the argument requirements of the route
-        route = fulfillArgumentRequirements(route, request, binderRegistry);
+        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request, binderRegistry);
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
         if (!route.isExecutable() && !request.isBodyRequired()) {
-            badRoute(route, request, binderRegistry, context);
+            routingInBoundErrorHandler.handleBadRequest(
+                    context,
+                    request,
+                    route
+            );
         } else {
 
             // decorate the execution of the route so that it runs an async executor
@@ -354,30 +231,25 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     processor.subscribe(buildSubscriber(request, context, route));
 
                 } else {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Request body expected, but was empty.");
-                    }
-                    context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                            .addListener(ChannelFutureListener.CLOSE);
-
+                    routingInBoundErrorHandler.handleBadRequest(
+                            context,
+                            request,
+                            route
+                    );
                 }
             }
             else {
-                badRoute(route, request, binderRegistry, context);
+                routingInBoundErrorHandler.handleBadRequest(
+                        context,
+                        request,
+                        route
+                );
             }
 
         }
     }
 
 
-
-    private void badRoute(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Bad request: Unsatisfiable route reached: " + route);
-        }
-        context.writeAndFlush(handleBadRequest(request, binderRegistry))
-                .addListener(ChannelFutureListener.CLOSE);
-    }
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request, ChannelHandlerContext context, RouteMatch<Object> finalRoute) {
         return new CompletionAwareSubscriber<Object>() {
@@ -502,7 +374,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         };
     }
 
-    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
+    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest<?> request, RequestBinderRegistry binderRegistry) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
         ExecutorService executor = executorSelector.select(route)
@@ -522,9 +394,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         HttpStatus status = ((HttpResponse) result).getStatus();
                         if (status.getCode() >= 300) {
                             // handle re-mapping of errors
-                            result = findStatusRoute(status, request, binderRegistry)
-                                    .map(RouteMatch::execute)
-                                    .orElse(result);
+                            result = routingInBoundErrorHandler
+                                        .findStatusRoute(status, request)
+                                        .map(RouteMatch::execute)
+                                        .orElse(result);
                         }
                     }
                     ChannelFuture channelFuture = context.writeAndFlush(result);
@@ -561,96 +434,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return route;
     }
 
-    private Optional<RouteMatch<Object>> findStatusRoute(HttpStatus status, HttpRequest<?> request, RequestBinderRegistry binderRegistry) {
-        return this.router.flatMap(router ->
-                router.route(status)
-        ).map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
-                .filter(RouteMatch::isExecutable);
-    }
-
-    private RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request, RequestBinderRegistry binderRegistry) {
-        Collection<Argument> requiredArguments = route.getRequiredArguments();
-        Map<String, Object> argumentValues;
-
-        if (requiredArguments.isEmpty()) {
-            // no required arguments so just execute
-            argumentValues = Collections.emptyMap();
-        } else {
-            argumentValues = new LinkedHashMap<>();
-            // Begin try fulfilling the argument requirements
-            for (Argument argument : requiredArguments) {
-                Optional<ArgumentBinder> registeredBinder =
-                        binderRegistry.findArgumentBinder(argument, request);
-                if (registeredBinder.isPresent()) {
-                    ArgumentBinder argumentBinder = registeredBinder.get();
-                    String argumentName = argument.getName();
-                    ArgumentConversionContext conversionContext = ConversionContext.of(
-                            argument,
-                            request.getLocale().orElse(null),
-                            request.getCharacterEncoding()
-                    );
-
-                    if (argumentBinder instanceof BodyArgumentBinder) {
-                        if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
-                            Optional bindingResult = argumentBinder
-                                    .bind(conversionContext, request);
-
-                            if (bindingResult.isPresent()) {
-                                argumentValues.put(argumentName, bindingResult.get());
-                            }
-
-                        } else {
-                            argumentValues.put(argumentName, (UnresolvedArgument) () ->
-                                    argumentBinder.bind(conversionContext, request)
-                            );
-                            ((NettyHttpRequest)request).setBodyRequired(true);
-                        }
-                    } else {
-
-                        Optional bindingResult = argumentBinder
-                                .bind(conversionContext, request);
-                        if (argument.getType() == Optional.class) {
-                            argumentValues.put(argumentName, bindingResult);
-                        } else if (bindingResult.isPresent()) {
-                            argumentValues.put(argumentName, bindingResult.get());
-                        } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
-                            argumentValues.put(argumentName, (UnresolvedArgument) () -> {
-                                Optional result = argumentBinder.bind(conversionContext, request);
-                                Optional<ConversionError> lastError = conversionContext.getLastError();
-                                if (lastError.isPresent()) {
-                                    return lastError;
-                                }
-                                return result;
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        route = route.fulfill(argumentValues);
-        return route;
-    }
 
 
-    protected Object handleBadRequest(NettyHttpRequest request, RequestBinderRegistry binderRegistry) {
-        try {
-            return this.router.flatMap(router ->
-                    router.route(HttpStatus.BAD_REQUEST)
-                            .map(match -> fulfillArgumentRequirements(match, request, binderRegistry))
-                            .filter(RouteMatch::isExecutable)
-                            .map(RouteMatch::execute)
-            ).orElse(HttpResponse.badRequest());
-        } catch (Exception e) {
-            throw new InternalServerException("Error executing status code 400 handler: " + e.getMessage(), e);
-        }
-    }
 
-    private ChannelFutureListener createCloseListener(io.netty.handler.codec.http.HttpRequest msg) {
-        return future -> {
-            if (!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
-                future.channel().close();
-            }
-        };
-    }
 }
