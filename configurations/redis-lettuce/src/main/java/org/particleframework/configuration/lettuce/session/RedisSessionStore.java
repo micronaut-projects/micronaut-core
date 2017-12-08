@@ -16,10 +16,11 @@
 package org.particleframework.configuration.lettuce.session;
 
 import io.lettuce.core.Range;
-import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.async.RedisAsyncCommands;
-import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.api.async.RedisKeyAsyncCommands;
+import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.dynamic.RedisCommandFactory;
 import io.lettuce.core.pubsub.RedisPubSubAdapter;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
@@ -36,6 +37,7 @@ import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
 import org.particleframework.session.*;
 import org.particleframework.session.event.SessionCreatedEvent;
@@ -44,11 +46,8 @@ import org.particleframework.session.event.SessionExpiredEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PreDestroy;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.io.Closeable;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,13 +57,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.particleframework.configuration.lettuce.session.RedisSessionStore.RedisSession.ATTR_CREATION_TIME;
-import static org.particleframework.configuration.lettuce.session.RedisSessionStore.RedisSession.ATTR_LAST_ACCESSED;
-import static org.particleframework.configuration.lettuce.session.RedisSessionStore.RedisSession.ATTR_MAX_INACTIVE_INTERVAL;
+import static org.particleframework.configuration.lettuce.session.RedisSessionStore.RedisSession.*;
 
 /**
  * <p>An implementation of the {@link SessionStore} interface for Redis. Partially inspired by Spring Session.</p>
@@ -91,10 +87,9 @@ import static org.particleframework.configuration.lettuce.session.RedisSessionSt
  */
 @Singleton
 @Primary
-@Requires(beans = StatefulRedisConnection.class)
 @Requires(property = "particle.session.http.redis.enabled", value = "true")
 @Replaces(InMemorySessionStore.class)
-public class RedisSessionStore extends RedisPubSubAdapter<String, String> implements SessionStore<RedisSessionStore.RedisSession>, Closeable {
+public class RedisSessionStore extends RedisPubSubAdapter<String, String> implements SessionStore<RedisSessionStore.RedisSession> {
 
     private static final Logger LOG  = LoggerFactory.getLogger(RedisSessionStore.class);
     private final RedisSessionCommands sessionCommands;
@@ -102,11 +97,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
     private final SessionIdGenerator sessionIdGenerator;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectSerializer valueSerializer;
-    private final RedisClient redisClient;
-    private final AtomicBoolean shutdownClient = new AtomicBoolean();
-    private final StatefulRedisConnection<byte[], byte[]> redisConnection;
     private final Charset charset;
-    private final StatefulRedisPubSubConnection<String, String> pubSubConnection;
     private final String expiryPrefix;
     private final byte[] sessionCreatedTopic;
     private final byte[] activeSessionsSet;
@@ -118,7 +109,6 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             BeanLocator beanLocator,
             ConversionService<?> conversionService,
             @Named(ScheduledExecutorServiceConfig.NAME) ExecutorService scheduledExecutorService,
-            @Primary Optional<RedisClient> primaryClient,
             ApplicationEventPublisher eventPublisher) {
         this.writeMode = sessionConfiguration.getWriteMode();
         this.sessionIdGenerator = sessionIdGenerator;
@@ -129,17 +119,33 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         this.eventPublisher = eventPublisher;
         this.sessionConfiguration = sessionConfiguration;
         this.charset = sessionConfiguration.getCharset();
-        this.redisClient = sessionConfiguration.getRedisURI().map(uri -> {
-            shutdownClient.set(true);
-            return RedisClient.create(uri);
-        }).orElse(primaryClient.orElseThrow(() ->
-                new ConfigurationException("Neither a specific Redis URI or a primary redis connection configured to store sessions")
-        ));
-        this.redisConnection = redisClient.connect(new ByteArrayCodec());
+        StatefulConnection statefulConnection = findRedisConnection(sessionConfiguration, beanLocator);
+        StatefulRedisPubSubConnection<String,String> pubSubConnection = findRedisPubSubConnection(sessionConfiguration, beanLocator);
+
+
+        this.expiryPrefix = sessionConfiguration.getNamespace() + "expiry:";
+        this.sessionCreatedTopic = sessionConfiguration.getSessionCreatedTopic().getBytes(charset);
+        this.activeSessionsSet = sessionConfiguration.getActiveSessionsKey().getBytes(charset);
+        pubSubConnection.addListener(this);
+        RedisPubSubCommands<String, String> sync = pubSubConnection.sync();
+        try {
+            sync.psubscribe(
+                    "__keyevent@*:del",
+                    "__keyevent@*:expired"
+            );
+            sync.subscribe(sessionConfiguration.getSessionCreatedTopic());
+        } catch (Exception e) {
+            throw new ConfigurationException("Unable to subscribe to session topics: " + e.getMessage(), e);
+        }
+        RedisCommandFactory redisCommandFactory = new RedisCommandFactory(
+                statefulConnection
+        );
+        this.sessionCommands = redisCommandFactory.getCommands(RedisSessionCommands.class);
+
         if(sessionConfiguration.isEnableKeyspaceEvents()) {
 
             try {
-                String result = this.redisConnection.sync().configSet(
+                String result = this.sessionCommands.configSet(
                         "notify-keyspace-events", "Egx"
                 );
                 if(!result.equalsIgnoreCase("ok")) {
@@ -153,25 +159,6 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                 }
             }
         }
-        this.expiryPrefix = sessionConfiguration.getNamespace() + "expiry:";
-        this.sessionCreatedTopic = sessionConfiguration.getSessionCreatedTopic().getBytes(charset);
-        this.activeSessionsSet = sessionConfiguration.getActiveSessionsKey().getBytes(charset);
-        this.pubSubConnection = redisClient.connectPubSub();
-        this.pubSubConnection.addListener(this);
-        RedisPubSubCommands<String, String> sync = this.pubSubConnection.sync();
-        try {
-            sync.psubscribe(
-                    "__keyevent@*:del",
-                    "__keyevent@*:expired"
-            );
-            sync.subscribe(sessionConfiguration.getSessionCreatedTopic());
-        } catch (Exception e) {
-            throw new ConfigurationException("Unable to subscribe to session topics: " + e.getMessage(), e);
-        }
-        RedisCommandFactory redisCommandFactory = new RedisCommandFactory(
-                redisConnection
-        );
-        this.sessionCommands = redisCommandFactory.getCommands(RedisSessionCommands.class);
         if(scheduledExecutorService instanceof ScheduledExecutorService) {
 
             long checkDelayMillis = sessionConfiguration.getExpiredSessionCheck().toMillis();
@@ -179,14 +166,13 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                     ()-> {
                         long oneMinuteFromNow = Instant.now().plus(1, ChronoUnit.MINUTES).toEpochMilli();
                         long oneMinuteAgo = Instant.now().minus(1, ChronoUnit.MINUTES).toEpochMilli();
-                        RedisAsyncCommands<byte[], byte[]> commands = redisConnection.async();
-                        commands.zrangebyscore(
+                        sessionCommands.zrangebyscore(
                                 activeSessionsSet, Range.create(Long.valueOf(oneMinuteAgo).doubleValue(), Long.valueOf(oneMinuteFromNow).doubleValue())
                         ).thenAccept((aboutToExpire) -> {
                             if(aboutToExpire != null) {
                                 for (byte[] bytes : aboutToExpire) {
                                     byte[] expiryKey = getExpiryKey(new String(bytes, charset));
-                                    commands.touch(expiryKey);
+                                    sessionCommands.get(expiryKey);
                                 }
                             }
                         });
@@ -199,6 +185,42 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         else {
             throw new ConfigurationException("Configured scheduled executor service is not an instanceof ScheduledExecutorService");
         }
+    }
+
+    private StatefulConnection findRedisConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
+        Optional<String> serverName = sessionConfiguration.getServerName();
+        return serverName.map(name -> beanLocator.findBean(StatefulRedisClusterConnection.class, Qualifiers.byName(name))
+                .map(conn -> (StatefulConnection) conn)
+                .orElse(
+                        beanLocator.findBean(StatefulRedisClusterConnection.class, Qualifiers.byName(name)).orElseThrow(() ->
+                                new ConfigurationException("No Redis server configured to store sessions")
+                        )
+                )).orElseGet(() -> beanLocator.findBean(StatefulRedisConnection.class)
+                .map(conn -> (StatefulConnection) conn)
+                .orElse(
+                        beanLocator.findBean(StatefulRedisConnection.class).orElseThrow(() ->
+                                new ConfigurationException("No Redis server configured to store sessions")
+                        )
+                ));
+    }
+
+    @SuppressWarnings("unchecked")
+    private StatefulRedisPubSubConnection<String,String> findRedisPubSubConnection(RedisHttpSessionConfiguration sessionConfiguration, BeanLocator beanLocator) {
+        Optional<String> serverName = sessionConfiguration.getServerName();
+        return (StatefulRedisPubSubConnection<String, String>)
+                serverName.map(name -> beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name))
+                .map(conn -> (StatefulConnection) conn)
+                .orElse(
+                        beanLocator.findBean(StatefulRedisPubSubConnection.class, Qualifiers.byName(name)).orElseThrow(() ->
+                                new ConfigurationException("No Redis server configured to store sessions")
+                        )
+                )).orElseGet(() -> beanLocator.findBean(StatefulRedisPubSubConnection.class)
+                .map(conn -> (StatefulConnection) conn)
+                .orElse(
+                        beanLocator.findBean(StatefulRedisPubSubConnection.class).orElseThrow(() ->
+                                new ConfigurationException("No Redis server configured to store sessions")
+                        )
+                ));
     }
 
     @Override
@@ -236,20 +258,6 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         }
     }
 
-
-    @Override
-    @PreDestroy
-    public void close() throws IOException {
-        if (shutdownClient.get()) {
-            redisClient.shutdown();
-        }
-        if(pubSubConnection.isOpen()) {
-            this.pubSubConnection.close();
-        }
-        if (redisConnection.isOpen()) {
-            this.redisConnection.close();
-        }
-    }
 
     @Override
     public RedisSession newSession() {
@@ -347,7 +355,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                         session.clearModifications();
 
 
-                        redisConnection.async().publish(sessionCreatedTopic, sessionIdBytes).whenComplete((aLong, throwable12) -> {
+                        sessionCommands.publish(sessionCreatedTopic, sessionIdBytes).whenComplete((aLong, throwable12) -> {
                             if(throwable12 != null) {
                                 if(LOG.isErrorEnabled()){
                                     LOG.error("Error publishing session creation event: " + throwable12.getMessage(), throwable12);
