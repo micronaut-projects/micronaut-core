@@ -15,12 +15,10 @@
  */
 package org.particleframework.configuration.lettuce.cache;
 
-import io.lettuce.core.RedisURI;
 import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
-import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 
 import java.util.Optional;
@@ -31,10 +29,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "particle.redis.caches")
+@EachProperty("particle.redis.caches")
 public class RedisCacheConfiguration extends CacheConfiguration {
-
-    protected String uri;
 
     protected String server;
 
@@ -46,17 +42,6 @@ public class RedisCacheConfiguration extends CacheConfiguration {
         super(cacheName);
     }
 
-    /**
-     * @return The optional uri of the cache
-     */
-    public Optional<RedisURI> getRedisURI() {
-        if(uri != null) {
-            return Optional.of(RedisURI.create(uri));
-        }
-        else {
-            return Optional.empty();
-        }
-    }
 
     /**
      * @return The name of the server to use
@@ -83,14 +68,6 @@ public class RedisCacheConfiguration extends CacheConfiguration {
      */
     public Optional<Class<ObjectSerializer>> getKeySerializer() {
         return Optional.ofNullable(keySerializer);
-    }
-
-    /**
-     * Sets the URI of the Redis server
-     * @param uri The uri of the server
-     */
-    void setUri(String uri) {
-        this.uri = uri;
     }
 
     /**

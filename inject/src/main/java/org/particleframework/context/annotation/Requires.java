@@ -34,6 +34,11 @@ public @interface Requires {
     String property() default "";
 
     /**
+     * Constraint a property to not equal the given value
+     * @return The value to not equal
+     */
+    String notEquals() default "";
+    /**
      * One ore more custom condition classes
      *
      * @return The condition classes

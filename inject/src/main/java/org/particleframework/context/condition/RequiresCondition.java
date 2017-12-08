@@ -128,6 +128,13 @@ public class RequiresCondition implements Condition {
                     Optional<String> resolved = propertyResolver.getProperty(property, String.class);
                     return resolved.map(val -> val.equals(value)).orElse(false);
                 }
+                else {
+                    String notEquals = annotation.notEquals();
+                    if(StringUtils.isNotEmpty(notEquals)) {
+                        String resolvedValue = propertyResolver.getProperty(property, String.class).orElse(null);
+                        return resolvedValue == null || resolvedValue.equals(value);
+                    }
+                }
             }
         }
         return true;

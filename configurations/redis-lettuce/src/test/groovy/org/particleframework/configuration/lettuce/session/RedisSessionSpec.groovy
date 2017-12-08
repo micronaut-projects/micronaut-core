@@ -24,6 +24,8 @@ import org.particleframework.session.event.SessionCreatedEvent
 import org.particleframework.session.event.SessionDeletedEvent
 import org.particleframework.session.event.SessionExpiredEvent
 import redis.embedded.RedisServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -38,26 +40,11 @@ import java.time.temporal.ChronoUnit
  */
 class RedisSessionSpec extends Specification {
 
-    RedisServer redisServer
-    int redisPort
-    def setup() {
-        redisPort = SocketUtils.findAvailableTcpPort()
-        def builder = RedisServer.builder()
-        // enable keyspace events
-        builder.port(redisPort)
-               .setting("notify-keyspace-events Egx")
-        redisServer = builder.build()
-        redisServer.start()
-    }
-
-    def cleanup() {
-        redisServer?.stop()
-    }
 
     void "test redis session create"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.port':redisPort,
+                'particle.redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -139,12 +126,15 @@ class RedisSessionSpec extends Specification {
 
         then:"It is no longer present"
         !found.isPresent()
+
+        cleanup:
+        applicationContext.stop()
     }
 
     void "test redis session expiry"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.port':redisPort,
+                'particle.redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -167,12 +157,14 @@ class RedisSessionSpec extends Specification {
             assert listener.events[1] instanceof SessionExpiredEvent
         }
 
+        cleanup:
+        applicationContext.stop()
     }
 
     void "test redis session write behind"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.port':redisPort,
+                'particle.redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true',
                 'particle.session.http.redis.writeMode':'background',
         )
@@ -200,6 +192,9 @@ class RedisSessionSpec extends Specification {
             assert !retrieved.contains("foo")
             assert retrieved.get("username", String).get() == 'bob'
         }
+
+        cleanup:
+        applicationContext.stop()
     }
 
     static class Foo implements Serializable{

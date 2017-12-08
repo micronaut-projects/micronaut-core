@@ -20,6 +20,8 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.inject.qualifiers.Qualifiers
 import redis.embedded.RedisServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -28,16 +30,13 @@ import spock.lang.Specification
  */
 class SyncCacheSpec extends Specification{
 
+    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
+            'particle.redis.type':'embedded',
+            'particle.redis.caches.counter.enabled':'true',
+            'particle.redis.caches.counter2.enabled':'true'
+    )
+
     void "test cacheable annotations"() {
-        given:
-        def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = new RedisServer(port)
-        redisServer.start()
-        ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.port':port,
-                'particle.redis.caches.counter.server':'default',
-                'particle.redis.caches.counter2.server':'default'
-        )
 
         when:
         CounterService counterService = applicationContext.getBean(CounterService)
@@ -126,9 +125,6 @@ class SyncCacheSpec extends Specification{
         counterService.getValue("test") == 1
         counterService.getValue2("test") == 1
 
-
-        cleanup:
-        redisServer.stop()
     }
 
 
