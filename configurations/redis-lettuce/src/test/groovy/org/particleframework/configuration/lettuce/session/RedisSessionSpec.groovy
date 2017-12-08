@@ -15,6 +15,7 @@
  */
 package org.particleframework.configuration.lettuce.session
 
+import org.particleframework.configuration.jackson.serialize.JacksonObjectSerializer
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.event.ApplicationEventListener
 import org.particleframework.core.io.socket.SocketUtils
@@ -197,6 +198,53 @@ class RedisSessionSpec extends Specification {
         applicationContext.stop()
     }
 
+    void "test redis JSON sessions"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'particle.redis.type':'embedded',
+                'particle.session.http.redis.valueSerializer':JacksonObjectSerializer.name,
+                'particle.session.http.redis.enabled':'true'
+        )
+        RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
+        TestListener listener = applicationContext.getBean(TestListener)
+        def conditions = new PollingConditions(timeout: 10)
+
+        when:"A new session is created and saved"
+        Session session = sessionStore.newSession()
+        session.put("username", "fred")
+        session.put("foo", new Foo(name: "Fred", age: 10))
+
+        Session  saved = sessionStore.save(session).get()
+
+        then:"The session created event is fired and the session is valid"
+        sessionStore.valueSerializer instanceof JacksonObjectSerializer
+        conditions.eventually {
+            assert listener.events.size() == 1
+            assert listener.events.first() instanceof SessionCreatedEvent
+        }
+        saved != null
+        !saved.isExpired()
+        saved.maxInactiveInterval
+        saved.creationTime
+        saved.id
+        saved.get("username").get() == "fred"
+        saved.get("foo", Foo).get().name == "Fred"
+        saved.get("foo", Foo).get().age == 10
+
+        when:"A session is located"
+        listener.events.clear()
+        Session  retrieved = sessionStore.findSession(saved.id).get().get()
+
+        then:"Then the session is valid"
+        retrieved != null
+        !retrieved.isExpired()
+        retrieved.maxInactiveInterval
+        retrieved.creationTime
+        retrieved.id
+        retrieved.get("username", String).get() == "fred"
+        retrieved.get("foo", Foo).get().name == "Fred"
+        retrieved.get("foo", Foo).get().age == 10
+    }
     static class Foo implements Serializable{
         String name
         Integer age
