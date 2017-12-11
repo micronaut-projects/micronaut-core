@@ -44,13 +44,11 @@ class RoutingInBoundErrorHandler {
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundErrorHandler.class);
 
     private final Router router;
-    private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
 
-    public RoutingInBoundErrorHandler(Router router, RequestBinderRegistry binderRegistry, BeanLocator beanLocator, RequestArgumentSatisfier requestArgumentSatisfier) {
+    RoutingInBoundErrorHandler(Router router, BeanLocator beanLocator, RequestArgumentSatisfier requestArgumentSatisfier) {
         this.router = router;
-        this.binderRegistry = binderRegistry;
         this.beanLocator = beanLocator;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
     }
@@ -73,13 +71,13 @@ class RoutingInBoundErrorHandler {
                     if (cause instanceof UnsatisfiedRouteException) {
                         match = router
                                 .route(HttpStatus.BAD_REQUEST)
-                                .map(route -> requestArgumentSatisfier.fulfillArgumentRequirements(route, nettyHttpRequest, binderRegistry))
+                                .map(route -> requestArgumentSatisfier.fulfillArgumentRequirements(route, nettyHttpRequest))
                                 .filter(RouteMatch::isExecutable);
 
                     } else {
                         match = router
                                 .route(declaringType, cause)
-                                .map(route -> requestArgumentSatisfier.fulfillArgumentRequirements(route, nettyHttpRequest, binderRegistry))
+                                .map(route -> requestArgumentSatisfier.fulfillArgumentRequirements(route, nettyHttpRequest))
                                 .filter(RouteMatch::isExecutable);
                     }
 
@@ -125,7 +123,7 @@ class RoutingInBoundErrorHandler {
 
         try {
             context.writeAndFlush(router.route(HttpStatus.BAD_REQUEST)
-                    .map(match -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, binderRegistry))
+                    .map(match -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
                     .filter(RouteMatch::isExecutable)
                     .map(RouteMatch::execute)
                     .orElse(HttpResponse.badRequest()))
@@ -201,7 +199,7 @@ class RoutingInBoundErrorHandler {
      */
     Optional<RouteMatch<Object>> findStatusRoute(HttpStatus status, HttpRequest<?> request) {
         return router.route(status)
-                .map(match -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, binderRegistry))
+                .map(match -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
                 .filter(RouteMatch::isExecutable);
     }
 
