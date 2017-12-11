@@ -15,49 +15,49 @@
  */
 package org.particleframework.configuration.lettuce;
 
-import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.api.sync.RedisKeyCommands;
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.Primary;
-import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.annotation.*;
+import org.particleframework.context.exceptions.ConfigurationException;
+import org.particleframework.core.util.ArrayUtils;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
- * Factory for the default {@link RedisClient}. Creates the injectable {@link Primary} bean
+ * Allows connecting to a Redis cluster via the the {@code "particle.redis.uris"} setting
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "particle.redis")
-@Requires(missingProperty = "particle.redis.uris")
+@Requires(property = "particle.redis.uris")
 @Singleton
 @Factory
-public class DefaultRedisClientFactory {
+public class DefaultRedisClusterClientFactory {
 
     @Bean(preDestroy = "shutdown")
     @Singleton
     @Primary
-    public RedisClient redisClient(@Primary RedisURI redisURI) {
-        return RedisClient.create(redisURI);
+    public RedisClusterClient redisClient(@Value("particle.redis.uris") String...uris) {
+        if(ArrayUtils.isEmpty(uris)) {
+            throw new ConfigurationException("Redis URIs must be specified");
+        }
+        return RedisClusterClient.create(Arrays.stream(uris).map(RedisURI::create).collect(Collectors.toList()));
     }
 
     @Bean(preDestroy = "close")
     @Singleton
     @Primary
-    public StatefulRedisConnection<String, String> redisConnection(@Primary RedisClient redisClient) {
+    public StatefulRedisClusterConnection<String, String> redisConnection(@Primary RedisClusterClient redisClient) {
         return redisClient.connect();
     }
 
     @Bean(preDestroy = "close")
     @Singleton
-    public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(@Primary RedisClient redisClient) {
+    public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(@Primary RedisClusterClient redisClient) {
         return redisClient.connectPubSub();
     }
 

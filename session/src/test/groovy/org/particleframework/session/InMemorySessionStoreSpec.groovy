@@ -22,6 +22,7 @@ import org.particleframework.session.event.SessionCreatedEvent
 import org.particleframework.session.event.SessionDeletedEvent
 import org.particleframework.session.event.SessionDestroyedEvent
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
 import java.time.Instant
@@ -47,7 +48,6 @@ class InMemorySessionStoreSpec extends Specification {
         !session.expired
         session.creationTime
         session.lastAccessedTime
-        session.creationTime == session.lastAccessedTime
 
         when:
         sessionStore.save(session)
@@ -68,14 +68,14 @@ class InMemorySessionStoreSpec extends Specification {
         when:
         listener.events.clear()
         sessionStore.deleteSession(session.id)
-        ((InMemorySessionStore)sessionStore).cleanUp()
-        sleep 500 // TODO: this is fragile.. find a better way
+        def conditions = new PollingConditions(timeout: 10)
 
         then:
-        listener.events.size() == 2
-        listener.events[0] instanceof SessionDeletedEvent
-        listener.events[1] instanceof SessionDestroyedEvent
-        !sessionStore.findSession(session.id).get().isPresent()
+        conditions.eventually {
+            assert listener.events.size() == 1
+            assert listener.events[0] instanceof SessionDeletedEvent
+            assert !sessionStore.findSession(session.id).get().isPresent()
+        }
 
     }
 
