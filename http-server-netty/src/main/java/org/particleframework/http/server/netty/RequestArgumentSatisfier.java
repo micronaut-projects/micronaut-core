@@ -39,15 +39,20 @@ import java.util.*;
  */
 @Internal
 class RequestArgumentSatisfier {
+    private final RequestBinderRegistry binderRegistry;
+
+    RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
+        this.binderRegistry = requestBinderRegistry;
+    }
+
     /**
      * Attempt to satisfy the arguments of the given route with the data from the given request
      *
      * @param route The route
      * @param request The request
-     * @param binderRegistry The binder registry
      * @return The route
      */
-    RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request, RequestBinderRegistry binderRegistry) {
+    RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 

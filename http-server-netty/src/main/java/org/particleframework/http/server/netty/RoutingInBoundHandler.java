@@ -45,6 +45,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,11 +66,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private final ExecutorSelector executorSelector;
     private final ExecutorService ioExecutor;
     private final BeanLocator beanLocator;
-    private final RequestBinderRegistry binderRegistry;
     private final boolean corsEnabled;
     private final CorsHandler corsHandler;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private final RequestArgumentSatisfier requestArgumentSatisfier = new RequestArgumentSatisfier();
+    private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final RoutingInBoundErrorHandler routingInBoundErrorHandler;
 
     RoutingInBoundHandler(
@@ -83,10 +83,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         this.ioExecutor = ioExecutor;
         this.executorSelector = executorSelector;
         this.router = router;
-        this.binderRegistry = binderRegistry;
+        this.requestArgumentSatisfier = new RequestArgumentSatisfier(binderRegistry);
         this.routingInBoundErrorHandler = new RoutingInBoundErrorHandler(
                 router,
-                binderRegistry,
                 beanLocator,
                 requestArgumentSatisfier
         );
@@ -140,18 +139,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
 
+        HttpMethod httpMethod = request.getMethod();
+        URI requestPath = request.getPath();
+
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Matching route {} - {}", request.getMethod(), request.getPath());
+            LOG.debug("Matching route {} - {}", httpMethod, requestPath);
         }
 
         // find a matching route
-        Optional<UriRouteMatch<Object>> routeMatch = router.find(request.getMethod(), request.getPath())
+        Optional<UriRouteMatch<Object>> routeMatch = router.find(httpMethod, requestPath)
                         .filter((match) -> match.test(request))
                         .findFirst();
 
         if (!routeMatch.isPresent()) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("No matching route found for URI {} and method {}", request.getUri(), request.getMethod());
+                LOG.debug("No matching route found for URI {} and method {}", request.getUri(), httpMethod);
             }
 
             // if there is no route present try to locate a route that matches a different HTTP method
@@ -169,19 +171,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             }
         }
         else {
-            routeMatch.ifPresent((route -> {
-                // Check that the route is an accepted content type
-                MediaType contentType = request.getContentType().orElse(null);
-                if (!route.accept(contentType)) {
-                    routingInBoundErrorHandler.handleUnsupportedMediaType(ctx, request, contentType);
-                } else {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Matched route {} - {} to controller {}", request.getMethod(), request.getPath(), route.getDeclaringType().getName());
-                    }
-                    // all ok proceed to try and execute the route
-                    handleRouteMatch(route, (NettyHttpRequest) request, binderRegistry, ctx);
+            UriRouteMatch<Object> route = routeMatch.get();
+            // Check that the route is an accepted content type
+            MediaType contentType = request.getContentType().orElse(null);
+            if (!route.accept(contentType)) {
+                routingInBoundErrorHandler.handleUnsupportedMediaType(ctx, request, contentType);
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType().getName());
                 }
-            }));
+                // all ok proceed to try and execute the route
+                handleRouteMatch(route, (NettyHttpRequest) request, ctx);
+            }
         }
     }
 
@@ -192,12 +193,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     }
 
 
-    private void handleRouteMatch(RouteMatch<Object> route, NettyHttpRequest<?> request, RequestBinderRegistry binderRegistry, ChannelHandlerContext context) {
+    private void handleRouteMatch(
+            RouteMatch<Object> route,
+            NettyHttpRequest<?> request,
+            ChannelHandlerContext context) {
         // Set the matched route on the request
         request.setMatchedRoute(route);
 
         // try to fulfill the argument requirements of the route
-        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request, binderRegistry);
+        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request);
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
         if (!route.isExecutable() && !request.isBodyRequired()) {
@@ -213,7 +217,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             if (route.isExecutable()) {
                 // The request body is not required so simply execute the route
-                route = prepareRouteForExecution(route, request, binderRegistry);
+                route = prepareRouteForExecution(route, request);
                 route.execute();
             } else if(HttpMethod.permitsRequestBody(request.getMethod())){
 
@@ -363,7 +367,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             protected void doOnComplete() {
                 if(executed.compareAndSet(false, true)) {
                     try {
-                        routeMatch = prepareRouteForExecution(routeMatch, request, binderRegistry);
+                        routeMatch = prepareRouteForExecution(routeMatch, request);
                         routeMatch.execute();
                     } catch (Exception e) {
                         context.pipeline().fireExceptionCaught(e);
@@ -374,7 +378,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         };
     }
 
-    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest<?> request, RequestBinderRegistry binderRegistry) {
+    private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest<?> request) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
         ExecutorService executor = executorSelector.select(route)
@@ -400,10 +404,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                         .orElse(result);
                         }
                     }
-                    ChannelFuture channelFuture = context.writeAndFlush(result);
+                    else {
+                        result = HttpResponse.ok(result);
+                    }
 
                     Object finalResult = result;
-                    channelFuture.addListener((ChannelFuture future) -> {
+                    context.writeAndFlush(result)
+                           .addListener((ChannelFuture future) -> {
                         if (!future.isSuccess()) {
                             Throwable cause = future.cause();
                             if (LOG.isErrorEnabled()) {
