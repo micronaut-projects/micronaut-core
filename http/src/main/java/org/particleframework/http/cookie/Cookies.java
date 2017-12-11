@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 public interface Cookies extends ConvertibleValues<Cookie> {
 
     /**
-     * @return A list of the cookies
+     * @return A set of the cookies
      */
     Set<Cookie> getAll();
 

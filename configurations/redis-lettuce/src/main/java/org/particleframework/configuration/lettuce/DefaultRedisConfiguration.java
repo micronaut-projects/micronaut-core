@@ -29,6 +29,7 @@ import org.particleframework.context.annotation.Requires;
 @ConfigurationProperties("particle.redis")
 @Primary
 @Requires(missingProperty = "particle.redis.uri")
+@Requires(property = "particle.redis.type", notEquals="embedded")
 public class DefaultRedisConfiguration extends RedisURI {
     public DefaultRedisConfiguration() {
         setPort(RedisURI.DEFAULT_REDIS_PORT);

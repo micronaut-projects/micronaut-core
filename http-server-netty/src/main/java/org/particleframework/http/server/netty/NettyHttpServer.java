@@ -80,7 +80,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final Environment environment;
-    private final Optional<Router> router;
+    private final Router router;
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final int serverPort;
@@ -89,7 +89,7 @@ public class NettyHttpServer implements EmbeddedServer {
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             ApplicationContext applicationContext,
-            Optional<Router> router,
+            Router router,
             RequestBinderRegistry binderRegistry,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
@@ -184,7 +184,6 @@ public class NettyHttpServer implements EmbeddedServer {
         return this;
     }
 
-
     @Override
     public EmbeddedServer stop() {
         if (isRunning() && this.serverChannel != null) {
@@ -204,6 +203,7 @@ public class NettyHttpServer implements EmbeddedServer {
         }
         return this;
     }
+
 
     @Override
     public int getPort() {
@@ -232,10 +232,10 @@ public class NettyHttpServer implements EmbeddedServer {
         return newEventLoopGroup(serverConfiguration.getWorker());
     }
 
-
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
     }
+
 
     private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
@@ -261,7 +261,6 @@ public class NettyHttpServer implements EmbeddedServer {
         }
     }
 
-
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
         for (ChannelOption channelOption : options.keySet()) {
             String name = channelOption.name();
@@ -281,6 +280,15 @@ public class NettyHttpServer implements EmbeddedServer {
                 biConsumer.accept(channelOption, value);
             }
         }
+    }
+
+
+    static ChannelFutureListener createCloseListener(io.netty.handler.codec.http.HttpRequest msg) {
+        return future -> {
+            if (!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
+                future.channel().close();
+            }
+        };
     }
 
 }

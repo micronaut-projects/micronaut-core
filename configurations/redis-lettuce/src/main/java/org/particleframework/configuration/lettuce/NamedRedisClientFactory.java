@@ -17,10 +17,10 @@ package org.particleframework.configuration.lettuce;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.EachBean;
-import org.particleframework.context.annotation.EachProperty;
-import org.particleframework.context.annotation.Factory;
+import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import org.particleframework.context.annotation.*;
+
+import javax.inject.Singleton;
 
 
 /**
@@ -42,5 +42,11 @@ public class NamedRedisClientFactory {
     @EachBean(NamedRedisURI.class)
     public StatefulRedisConnection<String, String> redisConnection(RedisClient client) {
         return client.connect();
+    }
+
+    @Bean(preDestroy = "close")
+    @EachBean(NamedRedisURI.class)
+    public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(RedisClient redisClient) {
+        return redisClient.connectPubSub();
     }
 }

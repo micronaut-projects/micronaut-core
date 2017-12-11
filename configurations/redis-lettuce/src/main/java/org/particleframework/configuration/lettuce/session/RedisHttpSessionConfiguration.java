@@ -25,6 +25,7 @@ import org.particleframework.session.http.HttpSessionConfiguration;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -33,20 +34,46 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.redis.session")
+@ConfigurationProperties("redis")
 public class RedisHttpSessionConfiguration extends HttpSessionConfiguration implements Toggleable{
 
-    private WriteMode writeMode;
+    private WriteMode writeMode = WriteMode.BATCH;
     private boolean enableKeyspaceEvents = true;
-    private String keyPrefix = "particle-session:";
+    private String namespace = "particle:session:";
+    private String activeSessionsKey = namespace + "active-sessions";
+    private String sessionCreatedTopic = namespace + "event:session-created";
     private Class<ObjectSerializer> valueSerializer;
     private Charset charset = StandardCharsets.UTF_8;
-    protected String uri;
+    private Duration expiredSessionCheck = Duration.ofMinutes(1);
+    private String serverName;
+
+    /**
+     * @return The name of the a configured Redis server to use
+     */
+    public Optional<String> getServerName() {
+        return Optional.ofNullable(serverName);
+    }
+
+    /**
+     * @return The topic to use to publish the creation of new sessions
+     */
+    public String getSessionCreatedTopic() {
+        return sessionCreatedTopic;
+    }
+
+    /**
+     *
+     * @return The key of the sorted set used to maintain a set of active sessions
+     */
+    public String getActiveSessionsKey() {
+        return activeSessionsKey;
+    }
+
     /**
      * @return The key prefix to use for reading and writing sessions
      */
-    public String getKeyPrefix() {
-        return keyPrefix;
+    public String getNamespace() {
+        return namespace;
     }
 
     /**
@@ -54,18 +81,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
      */
     public Optional<Class<ObjectSerializer>> getValueSerializer() {
         return Optional.ofNullable(valueSerializer);
-    }
-
-    /**
-     * @return The optional uri of the cache
-     */
-    public Optional<RedisURI> getRedisURI() {
-        if(uri != null) {
-            return Optional.of(RedisURI.create(uri));
-        }
-        else {
-            return Optional.empty();
-        }
     }
 
     /**
@@ -89,6 +104,17 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
         return writeMode;
     }
 
+    /**
+     * @return The duration with which to check for expired sessions
+     */
+    public Duration getExpiredSessionCheck() {
+        return expiredSessionCheck;
+    }
+
+    void setExpiredSessionCheck(Duration expiredSessionCheck) {
+        this.expiredSessionCheck = expiredSessionCheck;
+    }
+
     void setWriteMode(WriteMode writeMode) {
         this.writeMode = writeMode;
     }
@@ -97,14 +123,25 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
         this.enableKeyspaceEvents = enableKeyspaceEvents;
     }
 
-    void setKeyPrefix(String keyPrefix) {
-        this.keyPrefix = keyPrefix;
+    void setNamespace(String namespace) {
+        this.namespace = namespace;
+    }
+
+    void setServerName(String serverName) {
+        this.serverName = serverName;
+    }
+
+    void setSessionCreatedTopic(String sessionCreatedTopic) {
+        this.sessionCreatedTopic = sessionCreatedTopic;
+    }
+
+    void setActiveSessionsKey(String activeSessionsKey) {
+        this.activeSessionsKey = activeSessionsKey;
     }
 
     void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
         this.valueSerializer = valueSerializer;
     }
-
     /**
      * The write mode for saving the session data
      */
@@ -120,6 +157,6 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
          *
          * <p>This strategy has the advantage of providing greater consistency at the expense of more network traffic</p>
          */
-        BACKGROUND
+        BACKGROUND;
     }
 }
