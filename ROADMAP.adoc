@@ -48,7 +48,6 @@ We need endpoints for managing and/or exposing information about:
 
 - logging
 - beans
-- routes
 - health checks
 - server stop/start
 
