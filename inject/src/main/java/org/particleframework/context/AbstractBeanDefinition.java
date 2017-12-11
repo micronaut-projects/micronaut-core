@@ -28,7 +28,7 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
-import java.beans.Introspector;
+import com.googlecode.openbeans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;

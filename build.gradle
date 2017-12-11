@@ -46,6 +46,7 @@ subprojects { subproject ->
     repositories {
         mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
+        maven { url 'https://maven.repository.redhat.com/ga/' }
     }
     
     if(subproject.name.startsWith("examples")) {

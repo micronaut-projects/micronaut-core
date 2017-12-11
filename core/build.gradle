@@ -4,6 +4,7 @@ import org.anarres.gradle.plugin.jarjar.JarjarTask
 // Declare all dependencies in this map and not with the dependencies block!
 def deps = [
         compile: [
+                [group: 'com.googlecode', name: 'openbeans', version: '1.0'],
                 [group:'org.reactivestreams', name:'reactive-streams', version:'1.0.1'],
                 [group:'com.github.ben-manes.caffeine',name:'caffeine', version:'2.5.0'],
                 [group:'com.google.code.findbugs',name:'jsr305',version:'3.0.2']
@@ -43,6 +44,9 @@ ext.extraPomInfo = {
     }
 }
 
+repositories {
+    maven { url 'https://maven.repository.redhat.com/ga/' }
+}
 
 dependencies {
     for(entry in deps) {
