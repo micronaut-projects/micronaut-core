@@ -45,6 +45,10 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
                 long size = Long.valueOf(value.substring(0, value.length() - 2)) * 1024 * 1024;
                 return ConversionService.SHARED.convert(size, targetType);
             }
+            if (value.endsWith("GB")) {
+                long size = Long.valueOf(value.substring(0, value.length() - 2)) * 1024 * 1024 * 1024;
+                return ConversionService.SHARED.convert(size, targetType);
+            }
             Long size = Long.valueOf(value);
             return ConversionService.SHARED.convert(size, targetType);
         } catch (NumberFormatException e) {
