@@ -16,7 +16,6 @@
 package org.particleframework.management.endpoint.processors;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
@@ -28,6 +27,7 @@ import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.EndpointConfiguration;
+import org.particleframework.management.endpoint.EndpointDefaultConfiguration;
 import org.particleframework.web.router.DefaultRouteBuilder;
 
 import java.util.Map;
@@ -88,7 +88,7 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
                 }
             }
             else {
-                return Optional.of(new EndpointConfiguration(id));
+                return Optional.of(new EndpointConfiguration(id, new EndpointDefaultConfiguration()));
             }
         }
         return Optional.empty();

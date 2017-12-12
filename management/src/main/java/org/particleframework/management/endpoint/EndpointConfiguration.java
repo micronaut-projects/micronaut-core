@@ -19,33 +19,26 @@ import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.util.Toggleable;
 
+import java.util.Optional;
+
 /**
  * An {@link Endpoint} configuration
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "endpoints", primary = "all")
+@EachProperty(value = "endpoints")
 public class EndpointConfiguration implements Toggleable {
 
-    protected boolean enabled = true;
-    protected boolean sensitive;
     protected String id;
+    protected Optional<Boolean> enabled = Optional.empty();
+    protected Optional<Boolean> sensitive = Optional.empty();
 
-    public EndpointConfiguration(@Argument String id) {
+    private EndpointDefaultConfiguration defaultConfiguration;
+
+    public EndpointConfiguration(@Argument String id, EndpointDefaultConfiguration defaultConfiguration) {
         this.id = id;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
-     * @return Does the endpoint expose sensitive information
-     */
-    public boolean isSensitive() {
-        return sensitive;
+        this.defaultConfiguration = defaultConfiguration;
     }
 
     /**
@@ -55,4 +48,17 @@ public class EndpointConfiguration implements Toggleable {
     public String getId() {
         return id;
     }
+
+    @Override
+    public boolean isEnabled() {
+        return enabled.orElse(defaultConfiguration.enabled);
+    }
+
+    /**
+     * @return Does the endpoint expose sensitive information
+     */
+    public boolean isSensitive() {
+        return sensitive.orElse(defaultConfiguration.sensitive);
+    }
+
 }
