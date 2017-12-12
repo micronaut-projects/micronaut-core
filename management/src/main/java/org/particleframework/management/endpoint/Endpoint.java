@@ -53,6 +53,7 @@ public @interface Endpoint {
      */
     @AliasFor(member = "value")
     String id() default "";
+
     /**
      * @return The default prefix to use
      */
