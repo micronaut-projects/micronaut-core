@@ -15,33 +15,36 @@
  */
 package org.particleframework.http.server.netty.interceptor;
 
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.interceptor.HttpRequestInterceptor;
+import org.particleframework.http.HttpResponse;
+import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.HttpFilter;
+import org.reactivestreams.Publisher;
 import org.spockframework.util.Assert;
 
-import javax.inject.Singleton;
+import java.util.function.Function;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-public class FirstInterceptor implements HttpRequestInterceptor {
+@Filter("/secure**")
+public class FirstFilter implements HttpFilter {
 
     @Override
     public int getOrder() {
-        return TestSecurityInterceptor.POSITION - 100;
+        return TestSecurityFilter.POSITION - 100;
     }
 
-    @Override
-    public boolean matches(HttpRequest<?> request) {
-        return request.getPath().toString().startsWith("/secure");
-    }
 
     @Override
-    public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
+    public Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
         request.getAttributes().put("first", true);
         Assert.that(!request.getAttributes().contains("authenticated"));
-        context.proceed(request);
+        Publisher<? extends HttpResponse<?>> publisher = chain.proceed(request);
+        return Publishers.then(publisher, httpResponse -> {
+            httpResponse.getHeaders();
+        });
     }
 }

@@ -34,11 +34,10 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
-import org.particleframework.http.interceptor.HttpRequestInterceptor;
+import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
-import org.particleframework.http.server.netty.interceptor.HttpRequestInterceptorAdapter;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
@@ -77,7 +76,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ExecutorService ioExecutor;
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
-    private final HttpRequestInterceptor[] interceptors;
+    private final HttpFilter[] interceptors;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
@@ -96,7 +95,7 @@ public class NettyHttpServer implements EmbeddedServer {
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
-            HttpRequestInterceptor[] interceptors,
+            HttpFilter[] interceptors,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -148,9 +147,6 @@ public class NettyHttpServer implements EmbeddedServer {
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                             pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(environment, serverConfiguration));
-                            for (HttpRequestInterceptor interceptor : interceptors) {
-                                pipeline.addLast("particle-interceptor-" + NameUtils.hyphenate(interceptor.getClass().getSimpleName()), new HttpRequestInterceptorAdapter(interceptor));
-                            }
                             pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(
                                     beanLocator,
                                     router,

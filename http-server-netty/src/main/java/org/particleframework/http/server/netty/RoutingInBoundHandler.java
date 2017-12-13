@@ -37,6 +37,8 @@ import org.particleframework.http.*;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
+import org.particleframework.http.filter.HttpFilter;
+import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.codec.TextPlainCodec;
@@ -59,12 +61,11 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -312,30 +313,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         // decorate the execution of the route so that it runs an async executor
         request.setMatchedRoute(route);
 
-        if (route.isExecutable()) {
-            // The request body is not required so simply execute the route
-            route = prepareRouteForExecution(route, request);
-            route.execute();
-        } else if (HttpMethod.permitsRequestBody(request.getMethod())) {
 
-            // The request body is required, so at this point we must have a StreamedHttpRequest
-            io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-            if (nativeRequest instanceof StreamedHttpRequest) {
-                Optional<MediaType> contentType = request.getContentType();
-                HttpContentProcessor<?> processor = contentType.flatMap(type ->
-                        beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                new ConsumesMediaTypeQualifier<>(type))
-                ).map(factory ->
-                        factory.build(request)
-                ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
+        // The request body is required, so at this point we must have a StreamedHttpRequest
+        io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
+        if(!route.isExecutable() && HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
+            Optional<MediaType> contentType = request.getContentType();
+            HttpContentProcessor<?> processor = contentType.flatMap(type ->
+                    beanLocator.findBean(HttpContentSubscriberFactory.class,
+                            new ConsumesMediaTypeQualifier<>(type))
+            ).map(factory ->
+                    factory.build(request)
+            ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
 
-                processor.subscribe(buildSubscriber(request, context, route));
-
-            } else {
-                throw new IllegalStateException("Expected streamed HTTP request");
-            }
+            processor.subscribe(buildSubscriber(request, context, route));
         } else {
-            // execute the invalid route to propagate UnsatisfiedRouteException
+            route = prepareRouteForExecution(route, request);
             route.execute();
         }
     }
@@ -464,45 +456,101 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 .orElse(context.channel().eventLoop());
 
         route = route.decorate(finalRoute -> {
-            executor.submit(() -> {
+            MediaType defaultResponseMediaType = finalRoute
+                    .getProduces()
+                    .stream()
+                    .findFirst()
+                    .orElse(MediaType.APPLICATION_JSON_TYPE);
 
-                HttpResponse<?> response;
-                MediaType defaultResponseMediaType = finalRoute
-                        .getProduces()
-                        .stream()
-                        .findFirst()
-                        .orElse(MediaType.APPLICATION_JSON_TYPE);
-                try {
-                    Object result = finalRoute.execute();
+            Publisher<? extends HttpResponse<?>> finalPublisher;
+            Publisher<MutableHttpResponse<?>> routePublisher = Publishers.fromCompletableFuture(() -> {
+                CompletableFuture<MutableHttpResponse<?>> completableFuture = new CompletableFuture<>();
+                executor.submit(() -> {
 
-                    if (result == null) {
-                        response = NettyHttpResponse.getOr(request, HttpResponse.ok());
-                    } else if (result instanceof HttpResponse) {
-                        HttpStatus status = ((HttpResponse) result).getStatus();
-                        if (status.getCode() >= 300) {
-                            // handle re-mapping of errors
-                            result = router.route(status)
-                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
-                                    .filter(RouteMatch::isExecutable)
-                                    .map(RouteMatch::execute)
-                                    .orElse(result);
-                        }
-                        if (result instanceof HttpResponse) {
-                            response = (HttpResponse<?>) result;
+                    MutableHttpResponse<?> response;
+
+                    try {
+                        Object result = finalRoute.execute();
+
+                        if (result == null) {
+                            response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                        } else if (result instanceof HttpResponse) {
+                            HttpStatus status = ((HttpResponse) result).getStatus();
+                            if (status.getCode() >= 300) {
+                                // handle re-mapping of errors
+                                result = router.route(status)
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
+                                        .filter(RouteMatch::isExecutable)
+                                        .map(RouteMatch::execute)
+                                        .orElse(result);
+                            }
+                            if (result instanceof MutableHttpResponse) {
+                                response = (MutableHttpResponse<?>) result;
+                            } else {
+                                response = HttpResponse.status(status)
+                                        .body(result);
+                            }
                         } else {
-                            response = HttpResponse.status(status)
-                                    .body(result);
+                            response = HttpResponse.ok(result);
                         }
-                    } else {
-                        response = HttpResponse.ok(result);
+
+                        completableFuture.complete(response);
+
+                    } catch (Throwable e) {
+                        completableFuture.completeExceptionally(e);
                     }
+                });
+                return completableFuture;
+            });
 
-                    processResponse(context, request, response, defaultResponseMediaType, finalRoute);
+            List<HttpFilter> filters = new ArrayList<>( router.findFilters(request) );
+            if(!filters.isEmpty()) {
+                // make the action executor the last filter in the chain
+                filters.add((HttpServerFilter) (req, chain) -> routePublisher);
 
-                } catch (Throwable e) {
-                    context.pipeline().fireExceptionCaught(e);
+                AtomicInteger integer = new AtomicInteger();
+                int len = filters.size();
+                HttpServerFilter.ServerFilterChain filterChain = new HttpServerFilter.ServerFilterChain() {
+                    @SuppressWarnings("unchecked")
+                    @Override
+                    public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
+                        int pos = integer.incrementAndGet();
+                        if(pos > len) {
+                            throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                        }
+                        HttpFilter httpFilter = filters.get(pos);
+                        return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this);
+                    }
+                };
+                HttpFilter httpFilter = filters.get(0);
+                finalPublisher = httpFilter.doFilter(request, filterChain);
+            }
+            else {
+                finalPublisher = routePublisher;
+            }
+
+            finalPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    subscription.request(1);
+                }
+
+                @Override
+                protected void doOnNext(HttpResponse<?> message) {
+                    processResponse(context, request, message, defaultResponseMediaType, finalRoute);
+                }
+
+                @Override
+                protected void doOnError(Throwable t) {
+                    context.pipeline().fireExceptionCaught(t);
+                }
+
+                @Override
+                protected void doOnComplete() {
+                    // no-op
                 }
             });
+
             return null;
         });
         return route;

@@ -41,9 +41,9 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
+public class AnnotatedControllerRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
 
-    public AnnotatedControllerDefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    public AnnotatedControllerRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
     }
 

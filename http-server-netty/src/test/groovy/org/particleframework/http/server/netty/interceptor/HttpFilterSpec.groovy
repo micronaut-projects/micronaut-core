@@ -24,8 +24,7 @@ import spock.lang.Ignore
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore // disable for now until interceptor code is rewritten
-class HttpRequestInterceptorSpec extends AbstractParticleSpec {
+class HttpFilterSpec extends AbstractParticleSpec {
 
     void "test interceptor execution and order - write replacement"() {
         when:
@@ -53,6 +52,7 @@ class HttpRequestInterceptorSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.OK.code
+        response.header("X-Test") == "Foo Test"
         response.body().string() == "Authenticated: fred"
     }
 }
