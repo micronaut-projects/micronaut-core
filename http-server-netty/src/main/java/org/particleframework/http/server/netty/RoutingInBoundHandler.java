@@ -44,7 +44,6 @@ import org.particleframework.http.server.cors.CorsHandler;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
-import org.particleframework.core.async.publisher.PublisherUtils;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.web.router.RouteMatch;
@@ -533,7 +532,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             Publisher<Object> publisher;
             MediaTypeCodec codec;
-            if (PublisherUtils.isPublisher(bodyType)) {
+            if (Publishers.isPublisher(bodyType)) {
                 // if the return type is a reactive type we need to subscribe to Publisher in order to emit
                 // an appropriate response
                 bodyType = resolveBodyType(route, bodyType);
@@ -578,7 +577,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             } else {
                 // if the transfer encoding is not chunked then we must send a content length header so subscribe the
                 // publisher, encode the result as a io.netty.handler.codec.http.FullHttpResponse
-                boolean isSingle = PublisherUtils.isSingle(publisher.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
+                boolean isSingle = Publishers.isSingle(publisher.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
                 if (isSingle) {
                     publisher.subscribe(new CompletionAwareSubscriber<Object>() {
                         Subscription s;

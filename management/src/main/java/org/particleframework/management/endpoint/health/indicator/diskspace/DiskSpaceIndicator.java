@@ -18,11 +18,14 @@ package org.particleframework.management.endpoint.health.indicator.diskspace;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.management.endpoint.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.AbstractHealthIndicator;
+import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 /**
  * <p>A {@link org.particleframework.management.endpoint.health.indicator.HealthIndicator} used to display
@@ -40,9 +43,12 @@ import java.util.Map;
 public class DiskSpaceIndicator extends AbstractHealthIndicator {
 
     protected static final String NAME = "diskSpace";
-    private DiskSpaceIndicatorConfiguration configuration;
 
-    DiskSpaceIndicator(DiskSpaceIndicatorConfiguration configuration) {
+    private final DiskSpaceIndicatorConfiguration configuration;
+
+    DiskSpaceIndicator(DiskSpaceIndicatorConfiguration configuration,
+                       @Named(IOExecutorServiceConfig.NAME) ExecutorService executorService) {
+        super(executorService);
         this.configuration = configuration;
     }
 

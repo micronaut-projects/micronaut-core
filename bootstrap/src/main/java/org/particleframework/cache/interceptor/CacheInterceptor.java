@@ -22,6 +22,7 @@ import org.particleframework.cache.*;
 import org.particleframework.cache.annotation.*;
 import org.particleframework.cache.exceptions.CacheSystemException;
 import org.particleframework.context.BeanContext;
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.publisher.SingleSubscriberPublisher;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -30,7 +31,6 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
-import org.particleframework.core.async.publisher.PublisherUtils;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -90,7 +90,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             Class returnType = returnTypeObject.getType();
             if (CompletableFuture.class.isAssignableFrom(returnType)) {
                 return interceptCompletableFuture(context, returnTypeObject, returnType);
-            } else if (PublisherUtils.isPublisher(returnType)) {
+            } else if (Publishers.isPublisher(returnType)) {
                 return interceptPublisher(context, returnTypeObject, returnType);
             } else {
                 return interceptSync(context, returnTypeObject, returnType);
