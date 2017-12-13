@@ -15,10 +15,12 @@
  */
 package org.particleframework.web.router;
 
-import org.particleframework.http.HttpMethod;
-import org.particleframework.http.HttpStatus;
+import org.particleframework.http.*;
+import org.particleframework.http.filter.HttpFilter;
+import org.reactivestreams.Publisher;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -30,16 +32,15 @@ import java.util.stream.Stream;
  */
 public interface Router {
 
+
+
     /**
-     * Finds all of the possible routes for the given HTTP method and URI
+     * Find any {@link RouteMatch} regardless of HTTP method
      *
-     * @param httpMethod The HTTP method
      * @param uri The URI
-     * @return A {@link Stream} of possible {@link Route} instances.
+     * @return A stream of route matches
      */
-    default <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, URI uri) {
-        return find(httpMethod, uri.toString());
-    }
+    <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri);
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI
@@ -91,6 +92,16 @@ public interface Router {
      * @return The {@link RouteMatch}
      */
     <T> Optional<RouteMatch<T>> route(Class originatingClass, Throwable error);
+
+    /**
+     * Build a filtered {@link Publisher} for an action
+     *
+     * @param request The request
+     * @return A new filtered publisher
+     */
+    List<HttpFilter> findFilters(
+            HttpRequest<?> request
+    );
     /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#GET} method and the given URI
      *
@@ -159,14 +170,17 @@ public interface Router {
         return route(HttpMethod.HEAD, uri);
     }
 
+
+
     /**
-     * Find any {@link RouteMatch} regardless of HTTP method
+     * Finds all of the possible routes for the given HTTP method and URI
      *
+     * @param httpMethod The HTTP method
      * @param uri The URI
-     * @return A stream of route matches
+     * @return A {@link Stream} of possible {@link Route} instances.
      */
-    <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri);
-
-
+    default <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, URI uri) {
+        return find(httpMethod, uri.toString());
+    }
 
 }

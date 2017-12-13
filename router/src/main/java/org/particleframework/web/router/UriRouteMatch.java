@@ -29,6 +29,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
+ * A {@link RouteMatch} that matches a URI and {@link HttpMethod}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

@@ -15,20 +15,26 @@
  */
 package org.particleframework.http.server.netty.interceptor;
 
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
-import org.particleframework.http.interceptor.HttpRequestInterceptor;
+import org.particleframework.http.MutableHttpResponse;
+import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.HttpFilter;
+import org.particleframework.http.filter.HttpServerFilter;
+import org.reactivestreams.Publisher;
 import org.spockframework.util.Assert;
 
 import javax.inject.Singleton;
+import java.util.function.Consumer;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-public class TestSecurityInterceptor implements HttpRequestInterceptor {
+@Filter("/secure**")
+public class TestSecurityFilter implements HttpServerFilter {
 
     public static final int POSITION = 0;
 
@@ -38,21 +44,18 @@ public class TestSecurityInterceptor implements HttpRequestInterceptor {
     }
 
     @Override
-    public boolean matches(HttpRequest<?> request) {
-        return request.getPath().toString().startsWith("/secure");
-    }
-
-    @Override
-    public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
-
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Assert.that(request.getAttributes().contains("first"));
         Assert.that(!request.getAttributes().contains("second"));
         if(request.getParameters().get("username") == null) {
-            context.write(HttpResponse.status(HttpStatus.FORBIDDEN));
+            return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
         }
         else {
             request.getAttributes().put("authenticated", true);
-            context.proceed(request);
+            return Publishers.then(
+                    chain.proceed(request),
+                    mutableHttpResponse -> mutableHttpResponse.header("X-Test", "Foo " + request.getAttributes().get("SomeServiceValue", String.class, "none"))
+            );
         }
     }
 }

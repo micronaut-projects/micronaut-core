@@ -15,12 +15,15 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.order.OrderUtil;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.http.filter.HttpFilter;
 
 import javax.inject.Singleton;
+import java.net.URI;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Stream;
 
 /**
@@ -34,7 +37,8 @@ public class DefaultRouter implements Router {
 
     private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];
     private final StatusRoute[] routesByStatus = new StatusRoute[HttpStatus.values().length];
-    private final SortedSet<ErrorRoute> errorRoutes = new ConcurrentSkipListSet<>();
+    private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
+    private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
     /**
      * Construct a new router for the given route builders
      *
@@ -91,8 +95,8 @@ public class DefaultRouter implements Router {
                 this.routesByStatus[status.ordinal()] = statusRoute;
             }
 
-            List<ErrorRoute> errorRoutes = builder.getErrorRoutes();
-            this.errorRoutes.addAll(errorRoutes);
+            this.errorRoutes.addAll(builder.getErrorRoutes());
+            this.filterRoutes.addAll(builder.getFilterRoutes());
         }
 
         for (HttpMethod method : HttpMethod.values()) {
@@ -128,6 +132,7 @@ public class DefaultRouter implements Router {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Stream<UriRouteMatch<T>> find(HttpMethod httpMethod, CharSequence uri) {
         UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
@@ -176,6 +181,26 @@ public class DefaultRouter implements Router {
     }
 
     @Override
+    public List<HttpFilter> findFilters(HttpRequest<?> request) {
+        List<HttpFilter> httpFilters = new ArrayList<>();
+        HttpMethod method = request.getMethod();
+        URI uri = request.getUri();
+        for (FilterRoute filterRoute : filterRoutes) {
+            Optional<HttpFilter> match = filterRoute.match(method, uri);
+            match.ifPresent(httpFilters::add);
+        }
+        if(!httpFilters.isEmpty()) {
+
+            OrderUtil.sort(httpFilters);
+            return Collections.unmodifiableList(httpFilters);
+        }
+        else {
+            return Collections.emptyList();
+        }
+    }
+
+
+    @Override
     public <T> Optional<RouteMatch<T>> route(Throwable error) {
         for (ErrorRoute errorRoute : errorRoutes) {
             if(errorRoute.originatingType() == null) {
@@ -188,6 +213,7 @@ public class DefaultRouter implements Router {
         return Optional.empty();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Stream<UriRouteMatch<T>> findAny(CharSequence uri) {
         return Arrays.stream(routesByMethod)

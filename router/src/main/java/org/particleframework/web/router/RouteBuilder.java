@@ -21,10 +21,12 @@ import org.particleframework.core.naming.conventions.TypeConvention;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.http.annotation.Controller;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.particleframework.core.naming.conventions.MethodConvention.*;
 /**
@@ -39,6 +41,11 @@ public interface RouteBuilder {
      * Used to signify to the route that the ID of the resource is used
      */
     PropertyConvention ID = PropertyConvention.ID;
+
+    /**
+     * @return The filter routes
+     */
+    List<FilterRoute> getFilterRoutes();
 
     /**
      * @return Obtain a list of constructed routes
@@ -59,6 +66,16 @@ public interface RouteBuilder {
      * @return The URI naming strategy
      */
     UriNamingStrategy getUriNamingStrategy();
+
+
+    /**
+     * Add a filter
+     *
+     * @param pathPattern The path pattern for the filter
+     * @param filter The filter itself
+     * @return The {@link FilterRoute}
+     */
+    FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter);
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a REST endpoint. </p>

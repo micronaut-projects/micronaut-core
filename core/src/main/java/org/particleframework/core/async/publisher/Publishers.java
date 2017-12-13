@@ -45,6 +45,7 @@ public class Publishers {
     static {
         ClassLoader classLoader = Publishers.class.getClassLoader();
         Publishers.singleTypes.add(CompletableFuturePublisher.class);
+        Publishers.singleTypes.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
                 "io.reactivex.Maybe",
                 "io.reactivex.Observable",
@@ -72,6 +73,16 @@ public class Publishers {
      */
     public static <T> Publisher<T> fromCompletableFuture(Supplier<CompletableFuture<T>> futureSupplier) {
         return new CompletableFuturePublisher<>(futureSupplier);
+    }
+
+    /**
+     * A {@link Publisher} that emits a fixed single value
+     * @param value The value to emit
+     * @param <T> The value type
+     * @return The {@link Publisher}
+     */
+    public static <T> Publisher<T> just(T value) {
+        return new JustPublisher<>(value);
     }
     /**
      * Map the result from a publisher using the given mapper
@@ -113,6 +124,43 @@ public class Publishers {
         });
     }
 
+    /**
+     * Map the result from a publisher using the given mapper
+     *
+     * @param publisher The publisher
+     * @param consumer The mapper
+     * @param <T> The generic type
+     * @return The mapped publisher
+     */
+    public static <T> Publisher<T> then(Publisher<T> publisher, Consumer<T> consumer) {
+        return actual -> publisher.subscribe(new CompletionAwareSubscriber<T>() {
+            @Override
+            protected void doOnSubscribe(Subscription subscription) {
+                actual.onSubscribe(subscription);
+            }
+
+            @Override
+            protected void doOnNext(T message) {
+                try {
+                    consumer.accept(message);
+                    actual.onNext(message);
+                } catch (Throwable e) {
+                    onError(e);
+                }
+
+            }
+
+            @Override
+            protected void doOnError(Throwable t) {
+                actual.onError(t);
+            }
+
+            @Override
+            protected void doOnComplete() {
+                actual.onComplete();
+            }
+        });
+    }
     /**
      * Allow executing logic on completion of a Publisher
      *
@@ -157,6 +205,11 @@ public class Publishers {
         });
     }
 
+    /**
+     * Is the given type a Publisher or convertible to a publisher
+     * @param type The type to check
+     * @return True if it is
+     */
     public static boolean isPublisher(Class<?> type) {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
@@ -170,6 +223,12 @@ public class Publishers {
         }
     }
 
+    /**
+     * Does the given reactive type emit a single result
+     *
+     * @param type The type
+     * @return True it does
+     */
     public static boolean isSingle(Class<?> type) {
         for (Class<?> reactiveType : singleTypes) {
             if (reactiveType.isAssignableFrom(type)) {
@@ -177,5 +236,31 @@ public class Publishers {
             }
         }
         return false;
+    }
+
+    private static class JustPublisher<T> implements Publisher<T> {
+        private final T value;
+
+        public JustPublisher(T value) {
+            this.value = value;
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            subscriber.onSubscribe(new Subscription() {
+                boolean done;
+                @Override
+                public void request(long n) {
+                    if(done) return;
+                    subscriber.onNext(value);
+                    subscriber.onComplete();
+                }
+
+                @Override
+                public void cancel() {
+                    done = true;
+                }
+            });
+        }
     }
 }

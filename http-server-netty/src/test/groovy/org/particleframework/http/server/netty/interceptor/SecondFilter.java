@@ -17,34 +17,30 @@ package org.particleframework.http.server.netty.interceptor;
 
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.interceptor.HttpRequestInterceptor;
+import org.particleframework.http.HttpResponse;
+import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.HttpFilter;
+import org.reactivestreams.Publisher;
 import org.spockframework.util.Assert;
-
-import javax.inject.Singleton;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-public class SecondInterceptor implements HttpRequestInterceptor {
+@Filter("/secure**")
+public class SecondFilter implements HttpFilter {
     @Override
     public int getOrder() {
-        return TestSecurityInterceptor.POSITION + 100;
+        return TestSecurityFilter.POSITION + 100;
     }
 
     @Override
-    public boolean matches(HttpRequest<?> request) {
-        return request.getPath().toString().startsWith("/secure");
-    }
-
-    @Override
-    public void intercept(HttpRequest<?> request, RequestInterceptionContext context) {
+    public Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
         MutableConvertibleValues<Object> attributes = request.getAttributes();
         Assert.that(attributes.contains("first"));
         Assert.that(!attributes.contains("second"));
         Assert.that(attributes.contains("authenticated"));
         attributes.put("second", true);
-        context.proceed(request);
+        return chain.proceed(request);
     }
 }

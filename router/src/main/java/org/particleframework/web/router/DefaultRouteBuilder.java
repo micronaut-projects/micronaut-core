@@ -24,6 +24,7 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Produces;
+import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.web.router.exceptions.RoutingException;
 import org.particleframework.core.naming.conventions.TypeConvention;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -81,6 +83,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private List<UriRoute> uriRoutes = new ArrayList<>();
     private List<StatusRoute> statusRoutes = new ArrayList<>();
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
+    private List<FilterRoute> filterRoutes = new ArrayList<>();
 
     public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator) {
         this(executionHandleLocator, CAMEL_CASE_NAMING_STRATEGY);
@@ -94,6 +97,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public List<FilterRoute> getFilterRoutes() {
+        return filterRoutes;
+    }
+
+    @Override
+    public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
+        DefaultFilterRoute route = new DefaultFilterRoute(pathPattern, filter);
+        filterRoutes.add(route);
+        return route;
     }
 
     @Override
