@@ -25,6 +25,8 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.exceptions.ConversionErrorException;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.sse.Event;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
@@ -48,6 +50,7 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
     protected final ConversionService<?> conversionService;
     protected final Map<String, Argument> requiredInputs;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
+    protected final List<MediaType> acceptedMediaTypes;
 
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
@@ -66,6 +69,18 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
             }
         }
 
+        this.acceptedMediaTypes = abstractRoute.getConsumes();
+    }
+
+    @Override
+    public List<MediaType> getProduces() {
+        Optional<Argument<?>> firstTypeVariable = executableMethod.getReturnType().getFirstTypeVariable();
+        if(firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
+            return Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
+        }
+        else {
+            return abstractRoute.getProduces();
+        }
     }
 
     @Override
@@ -233,6 +248,11 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                                         .orElseGet(() -> new UnsatisfiedRouteException(argument));
             return routingException;
         });
+    }
+
+    @Override
+    public boolean accept(MediaType contentType) {
+        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(contentType);
     }
 
     @Override

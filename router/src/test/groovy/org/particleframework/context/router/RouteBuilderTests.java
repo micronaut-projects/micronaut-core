@@ -94,7 +94,7 @@ public class RouteBuilderTests {
                             request.getContentType().map(type->type.equals(MediaType.APPLICATION_JSON_TYPE)).orElse(false)
                     );
 
-            GET("/message{/message}", controller, "hello", String.class).accept(APPLICATION_JSON_TYPE);
+            GET("/message{/message}", controller, "hello", String.class).consumes(APPLICATION_JSON_TYPE);
             GET("/books{/id}", controller, "show").nest(() ->
                     GET("/authors", controller)
             );
@@ -109,7 +109,7 @@ public class RouteBuilderTests {
             );
 
             GET("/books", controller);
-            POST("/books", controller, "save").accept(APPLICATION_JSON_TYPE);
+            POST("/books", controller, "save").consumes(APPLICATION_JSON_TYPE);
 
             // handle errors TODO
             error(ClassNotFoundException.class, controller);

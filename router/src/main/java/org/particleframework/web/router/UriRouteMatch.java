@@ -59,11 +59,4 @@ public interface UriRouteMatch<R> extends UriMatchInfo, RouteMatch<R> {
     @Override
     UriRouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
 
-    /**
-     * Whether the specified content type is an accepted type
-     *
-     * @param contentType The content type
-     * @return True if it is
-     */
-    boolean accept(@Nullable MediaType contentType);
 }

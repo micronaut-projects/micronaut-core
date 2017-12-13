@@ -18,24 +18,22 @@ package org.particleframework.http.sse;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Produces;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 
 /**
- * Creates a Server Sent Event (SSE) stream
- *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Produces(MediaType.TEXT_EVENT_STREAM)
-public interface EventStream extends Publisher<Event> {
+class PublisherEventStream implements EventStream{
+    private final Publisher<Event> publisher;
 
-    /**
-     * <p>Create an event stream from a </p>
-     *
-     * @param eventPublisher The event publisher
-     * @return The EventStream
-     */
-    static EventStream of(Publisher<Event> eventPublisher) {
-        return new PublisherEventStream(eventPublisher);
+    public PublisherEventStream(Publisher<Event> publisher) {
+        this.publisher = publisher;
     }
 
+    @Override
+    public void subscribe(Subscriber<? super Event> subscriber) {
+        publisher.subscribe(subscriber);
+    }
 }

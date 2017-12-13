@@ -19,6 +19,7 @@ package org.particleframework.web.router;
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpStatus;
@@ -270,11 +271,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle targetMethod;
         protected final ConversionService<?> conversionService;
-        protected Set<MediaType> acceptedMediaTypes;
+        protected List<MediaType> acceptedMediaTypes;
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgument;
 
-        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, Set<MediaType> mediaTypes) {
+        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.acceptedMediaTypes = mediaTypes;
@@ -287,16 +288,21 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route accept(MediaType... mediaTypes) {
+        public Route consumes(MediaType... mediaTypes) {
             if(mediaTypes != null) {
-                this.acceptedMediaTypes = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(mediaTypes)));
+                this.acceptedMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
             }
             return this;
         }
 
         @Override
+        public List<MediaType> getConsumes() {
+            return acceptedMediaTypes;
+        }
+
+        @Override
         public Route acceptAll() {
-            this.acceptedMediaTypes = Collections.emptySet();
+            this.acceptedMediaTypes = Collections.emptyList();
             return this;
         }
 
@@ -311,6 +317,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route body(String argument) {
             this.bodyArgument = argument;
+            return this;
+        }
+
+        @Override
+        public Route produces(MediaType... mediaType) {
+            if(mediaType != null) {
+                this.producesMediaTypes = Arrays.asList(mediaType);
+            }
             return this;
         }
 
@@ -339,7 +353,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         public DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
-            super(targetMethod, conversionService, Collections.emptySet());
+            super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
         }
@@ -372,7 +386,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public ErrorRoute accept(MediaType... mediaType) {
+        public ErrorRoute consumes(MediaType... mediaType) {
             return this;
         }
 
@@ -436,7 +450,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final HttpStatus status;
 
         public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
-            super(targetMethod, conversionService, Collections.emptySet());
+            super(targetMethod, conversionService, Collections.emptyList());
             this.status = status;
         }
 
@@ -456,7 +470,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
 
         @Override
-        public StatusRoute accept(MediaType... mediaType) {
+        public StatusRoute consumes(MediaType... mediaType) {
             return this;
         }
 
@@ -509,14 +523,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), new HashSet<>(Collections.singletonList(mediaType)), targetMethod);
+            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod);
         }
 
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, new HashSet<>(Collections.singletonList(MediaType.APPLICATION_JSON_TYPE)), targetMethod);
+            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod);
         }
 
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, Set<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
+        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
             super(targetMethod, ConversionService.SHARED, mediaTypes);
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
@@ -550,8 +564,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute accept(MediaType... mediaTypes) {
-            return (UriRoute) super.accept(mediaTypes);
+        public UriRoute consumes(MediaType... mediaTypes) {
+            return (UriRoute) super.consumes(mediaTypes);
+        }
+
+
+        @Override
+        public UriRoute produces(MediaType... mediaType) {
+            return (UriRoute) super.produces(mediaType);
         }
 
         @Override
@@ -654,32 +674,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public ResourceRoute accept(MediaType... mediaTypes) {
-            DefaultRouteBuilder.this.uriRoutes.remove(getRoute);
-            Set<MediaType> newMediaTypes = new HashSet<>(Arrays.asList(mediaTypes));
-            return accept(newMediaTypes);
-        }
-
-        protected ResourceRoute accept(Set<MediaType> newMediaTypes) {
-            DefaultUriRoute getRoute = new DefaultUriRoute(this.getRoute.httpMethod, this.getRoute.uriMatchTemplate, newMediaTypes, this.getRoute.targetMethod);
-            DefaultRouteBuilder.this.uriRoutes.add(getRoute);
-
-            Map<HttpMethod, Route> newMap = new LinkedHashMap<>();
-            this.resourceRoutes.forEach((key, value) -> {
-                if (value != this.getRoute) {
-                    DefaultUriRoute defaultRoute = (DefaultUriRoute) value;
-                    DefaultRouteBuilder.this.uriRoutes.remove(defaultRoute);
-                    DefaultUriRoute newRoute = new DefaultUriRoute(defaultRoute.httpMethod, defaultRoute.uriMatchTemplate, newMediaTypes, this.getRoute.targetMethod);
-                    newMap.put(key, newRoute);
-                    DefaultRouteBuilder.this.uriRoutes.add(defaultRoute);
+        public ResourceRoute consumes(MediaType... mediaTypes) {
+            if(mediaTypes != null) {
+                for (Route route : resourceRoutes.values()) {
+                    route.produces(mediaTypes);
                 }
-            });
-            return newResourceRoute(newMap, getRoute);
+            }
+            return this;
         }
 
         @Override
         public Route acceptAll() {
-            return accept(Collections.emptySet());
+            return consumes(MediaType.EMPTY_ARRAY);
         }
 
         @Override
@@ -698,6 +704,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public ResourceRoute where(Predicate<HttpRequest<?>> condition) {
             for (Route route : resourceRoutes.values()) {
                 route.where(condition);
+            }
+            return this;
+        }
+
+        @Override
+        public ResourceRoute produces(MediaType... mediaType) {
+            if(mediaType != null) {
+                for (Route route : resourceRoutes.values()) {
+                    route.produces(mediaType);
+                }
             }
             return this;
         }

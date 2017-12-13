@@ -13,30 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.encoders
-
-import org.particleframework.core.order.OrderUtil
-import spock.lang.Specification
+package org.particleframework.core.io.buffer;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class EncoderSortSpec extends Specification {
+public interface ReferenceCounted {
+    /**
+     * Retain an additional reference to this object.  All retained references must be released, or there will be a leak.
+     *
+     * @return this
+     */
+    ByteBuffer retain();
 
-    void "test sort order"() {
-        given:
-        def toString = new ObjectToStringFallbackEncoder()
-        def future = new CompletableFutureEncoder()
-        def response = new HttpResponseEncoder()
-        def body = new HttpBodyEncoder()
-
-
-        when:
-        def list = [toString, future, response, body]
-        OrderUtil.sort(list)
-
-        then:
-        list == [body, future, toString, response]
-    }
+    /**
+     * Release a reference to this object.
+     * @throws IllegalStateException if the reference count is already 0
+     */
+    boolean release();
 }

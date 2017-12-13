@@ -31,7 +31,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
+class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> {
 
     private final Supplier<CompletableFuture<T>> futureSupplier;
     private final Queue<BiConsumer<? super T, ? super Throwable>> whenCompletes = new ConcurrentLinkedDeque<>();
@@ -39,7 +39,7 @@ public class CompletableFuturePublisher<T> extends SingleSubscriberPublisher<T> 
     /**
      * @param futureSupplier The function that supplies the future
      */
-    public CompletableFuturePublisher(Supplier<CompletableFuture<T>> futureSupplier) {
+    CompletableFuturePublisher(Supplier<CompletableFuture<T>> futureSupplier) {
         this.futureSupplier = futureSupplier;
     }
 

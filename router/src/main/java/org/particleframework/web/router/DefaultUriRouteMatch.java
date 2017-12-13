@@ -37,7 +37,6 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
 
     private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
-    private final Set<MediaType> acceptedMediaTypes;
     private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
 
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
@@ -48,7 +47,6 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
         this.uriRoute = uriRoute;
         this.matchInfo = matchInfo;
         this.httpMethod = uriRoute.httpMethod;
-        this.acceptedMediaTypes = uriRoute.acceptedMediaTypes;
     }
 
     @Override
@@ -72,11 +70,6 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
                 return variables;
             }
         };
-    }
-
-    @Override
-    public boolean accept(MediaType contentType) {
-        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(contentType);
     }
 
     @Override

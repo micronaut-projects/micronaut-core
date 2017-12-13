@@ -16,6 +16,8 @@
 package org.particleframework.http.sse;
 
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Produces;
 
 import java.time.Duration;
 
@@ -26,6 +28,7 @@ import java.time.Duration;
  * @since 1.0
  */
 @Internal
+@Produces(MediaType.TEXT_EVENT_STREAM)
 class DefaultEvent<T> implements Event<T> {
 
     private final T data;

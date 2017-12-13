@@ -72,7 +72,10 @@ public interface UriRoute extends MethodBasedRoute, UriMatcher {
     Optional<UriRouteMatch> match(String uri);
 
     @Override
-    UriRoute accept(MediaType... mediaType);
+    UriRoute consumes(MediaType... mediaType);
+
+    @Override
+    UriRoute produces(MediaType... mediaType);
 
     @Override
     UriRoute acceptAll();

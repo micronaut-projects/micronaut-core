@@ -128,7 +128,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.FORBIDDEN.code
-        headerNames.empty
+        headerNames == ['connection'] as Set
     }
 
     void "test cors request with invalid header"() {

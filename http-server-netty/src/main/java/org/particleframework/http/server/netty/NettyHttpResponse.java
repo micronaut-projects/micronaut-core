@@ -67,6 +67,20 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
         this.conversionService = conversionService;
     }
 
+    @Override
+    public Optional<MediaType> getContentType() {
+        Optional<MediaType> contentType = MutableHttpResponse.super.getContentType();
+        if(contentType.isPresent()) {
+            return contentType;
+        }
+        else {
+            Optional<B> body = getBody();
+            if(body.isPresent()) {
+                return MediaType.fromType(body.get().getClass());
+            }
+        }
+        return Optional.empty();
+    }
 
     @Override
     public MutableHttpHeaders getHeaders() {

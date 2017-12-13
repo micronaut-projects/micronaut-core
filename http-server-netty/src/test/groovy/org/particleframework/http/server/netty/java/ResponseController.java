@@ -51,7 +51,7 @@ public class ResponseController {
         return HttpResponse.ok();
     }
 
-    @Get
+    @Get(produces = MediaType.TEXT_PLAIN)
     public HttpResponse okWithBody() {
         return HttpResponse.ok("some text");
     }

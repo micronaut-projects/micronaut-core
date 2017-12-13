@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.reactive;
+package org.particleframework.core.async.publisher;
 
 import org.particleframework.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
@@ -29,29 +29,52 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ReactiveTypeUtils {
+public class PublisherUtils {
 
     private static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
+    private static final List<Class<?>> singleTypes = new ArrayList<>(3);
+
     static {
-        ClassLoader classLoader = ReactiveTypeUtils.class.getClassLoader();
-        List<String> typeNames = Arrays.asList("io.reactivex.Single", "io.reactivex.Maybe", "io.reactivex.Observable");
+        ClassLoader classLoader = PublisherUtils.class.getClassLoader();
+        singleTypes.add(CompletableFuturePublisher.class);
+        List<String> typeNames = Arrays.asList(
+                "io.reactivex.Maybe",
+                "io.reactivex.Observable",
+                "reactor.core.publisher.Flux"
+        );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(reactiveTypes::add);
         }
+        for (String name : Arrays.asList("io.reactivex.Single","reactor.core.publisher.Mono")) {
+            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+            aClass.ifPresent(aClass1 -> {
+                singleTypes.add(aClass1);
+                reactiveTypes.add(aClass1);
+            });
+
+        }
     }
 
-    public static boolean isReactiveType(Class<?> type) {
-        if(Publisher.class.isAssignableFrom(type)) {
+    public static boolean isPublisher(Class<?> type) {
+        if (Publisher.class.isAssignableFrom(type)) {
             return true;
-        }
-        else {
+        } else {
             for (Class<?> reactiveType : reactiveTypes) {
-                if(reactiveType.isAssignableFrom(type)) {
+                if (reactiveType.isAssignableFrom(type)) {
                     return true;
                 }
             }
             return false;
         }
+    }
+
+    public static boolean isSingle(Class<?> type) {
+        for (Class<?> reactiveType : singleTypes) {
+            if (reactiveType.isAssignableFrom(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

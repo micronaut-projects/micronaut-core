@@ -15,6 +15,8 @@
  */
 package org.particleframework.http.codec;
 
+import org.particleframework.core.io.buffer.ByteBuffer;
+import org.particleframework.core.io.buffer.ByteBufferAllocator;
 import org.particleframework.http.MediaType;
 
 import java.io.ByteArrayInputStream;
@@ -56,6 +58,27 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be decoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
+
+    /**
+     * Encode the given type returning the object as a byte[]
+     *
+     * @param object The object to encode
+     * @param <T> The generic type
+     * @return The decoded result
+     * @throws CodecException When the result cannot be decoded
+     */
+    <T> byte[] encode(T object) throws CodecException;
+
+    /**
+     * Encode the given type returning the object as a {@link ByteBuffer}
+     *
+     * @param object The object to encode
+     * @param allocator The allocator
+     * @param <T> The generic type
+     * @return The decoded result
+     * @throws CodecException When the result cannot be decoded
+     */
+    <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException;
     /**
      * Decode the given type from the given bytes
      *
@@ -83,4 +106,14 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, String data) throws CodecException {
         return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
     }
+
+    /**
+     * Whether the codec can decode the given type
+     * @param type The type
+     * @return True if it can
+     */
+    default boolean supportsType(Class<?> type) {
+        return true;
+    }
 }
+
