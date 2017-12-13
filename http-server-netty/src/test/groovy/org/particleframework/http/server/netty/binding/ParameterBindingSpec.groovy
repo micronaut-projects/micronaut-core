@@ -3,6 +3,7 @@ package org.particleframework.http.server.netty.binding
 import okhttp3.Request
 import org.particleframework.http.HttpParameters
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Parameter
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
@@ -38,6 +39,8 @@ class ParameterBindingSpec extends AbstractParticleSpec {
 
         where:
         uri                                             | result                      | httpStatus
+        '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
+        '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
         '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
@@ -45,8 +48,6 @@ class ParameterBindingSpec extends AbstractParticleSpec {
         '/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
         '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
-        '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
-        '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
         '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
@@ -54,7 +55,7 @@ class ParameterBindingSpec extends AbstractParticleSpec {
 
     }
 
-    @Controller
+    @Controller(produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
         @Get
         String index(Integer max) {

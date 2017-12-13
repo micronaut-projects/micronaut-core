@@ -44,7 +44,7 @@ public interface StatusRoute extends MethodBasedRoute {
     <T> Optional<RouteMatch<T>> match(HttpStatus status);
 
     @Override
-    StatusRoute accept(MediaType... mediaType);
+    StatusRoute consumes(MediaType... mediaType);
 
     @Override
     StatusRoute nest(Runnable nested);

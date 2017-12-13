@@ -36,6 +36,15 @@ public interface MediaTypeCodecRegistry {
     Optional<MediaTypeCodec> findCodec(MediaType mediaType);
 
     /**
+     * Find a codec for the given media type and target type
+     *
+     * @param mediaType The {@link MediaType}
+     * @param type The type
+     * @return The codec
+     */
+    Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type);
+
+    /**
      * Create a new registry from the given decoders
      *
      * @param decoders The decoders

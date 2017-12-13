@@ -168,4 +168,9 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<Functi
     public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
         return decoderRegistry.findCodec(mediaType);
     }
+
+    @Override
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+        return decoderRegistry.findCodec(mediaType, type);
+    }
 }

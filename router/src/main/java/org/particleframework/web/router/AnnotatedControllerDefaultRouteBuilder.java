@@ -23,6 +23,7 @@ import org.particleframework.core.naming.conventions.PropertyConvention;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.MediaType;
 import org.particleframework.core.type.Argument;
+import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.http.annotation.Controller;
@@ -51,12 +52,14 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
         Class<?> declaringType = method.getDeclaringType();
         if (beanDefinition.hasStereotype(Controller.class) && !method.hasDeclaredStereotype(Action.class)) {
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+            MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
 
             Class[] argumentTypes = method.getArgumentTypes();
             if (argumentTypes.length > 0 && Throwable.class.isAssignableFrom(argumentTypes[argumentTypes.length - 1])) {
                 Class argumentType = argumentTypes[argumentTypes.length-1];
                 ErrorRoute errorRoute = error(method.getDeclaringType(), argumentType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                errorRoute.accept(consumes);
+                errorRoute.consumes(consumes)
+                          .produces(produces);
             }
             else {
                 String annotationValue = beanDefinition.getValue(Controller.class, String.class).orElse("");
@@ -88,7 +91,8 @@ public class AnnotatedControllerDefaultRouteBuilder extends DefaultRouteBuilder 
                             methodName,
                             method.getArgumentTypes()
                     );
-                    uriRoute.accept(consumes);
+                    uriRoute.consumes(consumes)
+                            .produces(produces);
                 });
 
             }

@@ -54,7 +54,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder impl
                 Write annotation = method.getAnnotation(Write.class);
                 UriTemplate template = buildUriTemplate(method, config.getId());
                 POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-                        .accept(MediaType.of(annotation.consumes()));
+                        .consumes(MediaType.of(annotation.consumes()));
             });
         }
     }

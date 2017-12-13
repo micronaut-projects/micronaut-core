@@ -15,7 +15,10 @@
  */
 package org.particleframework.configuration.jackson.server.http.decoders;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.particleframework.core.io.buffer.ByteBuffer;
+import org.particleframework.core.io.buffer.ByteBufferAllocator;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -37,6 +40,11 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
 
     public JsonMediaTypeCodec(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public boolean supportsType(Class<?> type) {
+        return !(CharSequence.class.isAssignableFrom(type));
     }
 
     @Override
@@ -69,5 +77,25 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         } catch (IOException e) {
             throw new CodecException("Error encoding object ["+object+"] to JSON: " + e.getMessage());
         }
+    }
+
+    @Override
+    public <T> byte[] encode(T object) throws CodecException {
+        try {
+            if(object instanceof byte[]) {
+                return (byte[]) object;
+            }
+            else {
+                return objectMapper.writeValueAsBytes(object);
+            }
+        } catch (JsonProcessingException e) {
+            throw new CodecException("Error encoding object ["+object+"] to JSON: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException {
+        byte[] bytes = encode(object);
+        return allocator.copiedBuffer(bytes);
     }
 }

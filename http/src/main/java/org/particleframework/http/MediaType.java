@@ -17,12 +17,10 @@ package org.particleframework.http;
 
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.value.OptionalValues;
+import org.particleframework.http.annotation.Produces;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -39,6 +37,8 @@ public class MediaType implements CharSequence {
                 new MediaType(charSequence.toString())
         );
     }
+
+    public static final MediaType[] EMPTY_ARRAY = new MediaType[0];
 
     /**
      * A wildcard media type representing all types
@@ -111,6 +111,15 @@ public class MediaType implements CharSequence {
      * JSON: text/json
      */
     public static final MediaType TEXT_JSON_TYPE = new MediaType(TEXT_JSON);
+
+    /**
+     * JSON: text/plain
+     */
+    public static final String TEXT_PLAIN = "text/plain";
+    /**
+     * JSON: text/plain
+     */
+    public static final MediaType TEXT_PLAIN_TYPE = new MediaType(TEXT_PLAIN);
     /**
      * HAL JSON: application/hal+json
      */
@@ -372,6 +381,19 @@ public class MediaType implements CharSequence {
      */
     public static MediaType[] of(CharSequence... mediaType) {
         return Arrays.stream(mediaType).map(txt -> new MediaType(txt.toString())).toArray(MediaType[]::new);
+    }
+
+    /**
+     * Resolve the {@link MediaType} produced by the given type based on the {@link Produces} annotation
+     * @param type The type
+     * @return An {@link Optional} {@link MediaType}
+     */
+    public static Optional<MediaType> fromType(Class<?> type) {
+        Produces producesAnn = type.getAnnotation(Produces.class);
+        if(producesAnn != null) {
+            return Arrays.stream(producesAnn.value()).findFirst().map(MediaType::new);
+        }
+        return Optional.empty();
     }
 
     private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {

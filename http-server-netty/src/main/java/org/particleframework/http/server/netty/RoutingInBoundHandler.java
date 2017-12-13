@@ -16,37 +16,54 @@
 package org.particleframework.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.*;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
+import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
-import org.particleframework.http.*;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.*;
+import org.particleframework.http.codec.CodecException;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
+import org.particleframework.http.server.codec.TextPlainCodec;
 import org.particleframework.http.server.cors.CorsHandler;
+import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
-import org.particleframework.http.server.netty.encoders.HttpResponseEncoder;
+import org.particleframework.core.async.publisher.PublisherUtils;
+import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.Router;
 import org.particleframework.web.router.UriRouteMatch;
+import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.*;
+import java.nio.channels.ClosedChannelException;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -58,7 +75,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>>  {
+class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
 
@@ -70,25 +87,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private final CorsHandler corsHandler;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
-    private final RoutingInBoundErrorHandler routingInBoundErrorHandler;
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     RoutingInBoundHandler(
             BeanLocator beanLocator,
             Router router,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyHttpServerConfiguration serverConfiguration,
             RequestBinderRegistry binderRegistry,
             ExecutorSelector executorSelector,
             ExecutorService ioExecutor) {
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.beanLocator = beanLocator;
         this.ioExecutor = ioExecutor;
         this.executorSelector = executorSelector;
         this.router = router;
         this.requestArgumentSatisfier = new RequestArgumentSatisfier(binderRegistry);
-        this.routingInBoundErrorHandler = new RoutingInBoundErrorHandler(
-                router,
-                beanLocator,
-                requestArgumentSatisfier
-        );
         this.serverConfiguration = serverConfiguration;
         HttpServerConfiguration.CorsConfiguration corsConfiguration = serverConfiguration.getCors();
         this.corsEnabled = corsConfiguration.isEnabled();
@@ -99,7 +113,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         super.channelReadComplete(ctx);
         NettyHttpRequest request = NettyHttpRequest.get(ctx);
-        if(request != null) {
+        if (request != null) {
             request.release();
         }
     }
@@ -109,32 +123,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         super.channelInactive(ctx);
         ctx.flush();
         NettyHttpRequest request = NettyHttpRequest.get(ctx);
-        if(request != null) {
+        if (request != null) {
             request.release();
         }
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> request) throws Exception {
-        ChannelPipeline pipeline = ctx.pipeline();
-        NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) request;
         if (corsEnabled && request.getHeaders().getOrigin().isPresent()) {
             Optional<MutableHttpResponse<?>> corsResponse = corsHandler.handleRequest(request);
             if (corsResponse.isPresent()) {
-                ctx.writeAndFlush(corsResponse.get())
-                        .addListener(NettyHttpServer.createCloseListener(nettyHttpRequest.getNativeRequest()));
+                MutableHttpResponse<?> httpResponse = corsResponse.get();
+                writeNettyResponse(
+                        ctx,
+                        request,
+                        ((NettyHttpResponse) httpResponse).getNativeResponse()
+                );
                 return;
-            } else {
-                pipeline.addAfter(HttpResponseEncoder.NAME, NettyHttpServer.CORS_HANDLER, new ChannelOutboundHandlerAdapter() {
-                    @Override
-                    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-                        if (msg instanceof MutableHttpResponse) {
-                            corsHandler.handleResponse(request, (MutableHttpResponse<?>) msg);
-                        }
-                        ctx.pipeline().remove(this);
-                        super.write(ctx, msg, promise);
-                    }
-                });
             }
         }
 
@@ -148,8 +153,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
         // find a matching route
         Optional<UriRouteMatch<Object>> routeMatch = router.find(httpMethod, requestPath)
-                        .filter((match) -> match.test(request))
-                        .findFirst();
+                .filter((match) -> match.test(request))
+                .findFirst();
+
+        RouteMatch<Object> route;
 
         if (!routeMatch.isPresent()) {
             if (LOG.isDebugEnabled()) {
@@ -163,33 +170,131 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     .collect(Collectors.toSet());
 
             if (!existingRoutes.isEmpty()) {
-                routingInBoundErrorHandler.handleMethodNotAllowed(ctx, request, existingRoutes);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), httpMethod);
+                }
+                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.METHOD_NOT_ALLOWED);
+                if (statusRoute.isPresent()) {
+                    route = statusRoute.get();
+                } else {
+                    MutableHttpResponse<Object> res = HttpResponse.notAllowed(existingRoutes);
+                    writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                    return;
+                }
 
             } else {
-                // if no alternative route was found send back 404 - NOT_FOUND
-                routingInBoundErrorHandler.handleNotFound(ctx, request);
-            }
-        }
-        else {
-            UriRouteMatch<Object> route = routeMatch.get();
-            // Check that the route is an accepted content type
-            MediaType contentType = request.getContentType().orElse(null);
-            if (!route.accept(contentType)) {
-                routingInBoundErrorHandler.handleUnsupportedMediaType(ctx, request, contentType);
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType().getName());
+                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
+                if (statusRoute.isPresent()) {
+                    route = statusRoute.get();
+                } else {
+                    MutableHttpResponse<Object> res = HttpResponse.notFound();
+                    writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                    return;
                 }
-                // all ok proceed to try and execute the route
-                handleRouteMatch(route, (NettyHttpRequest) request, ctx);
             }
+        } else {
+            route = routeMatch.get();
         }
+        // Check that the route is an accepted content type
+        MediaType contentType = request.getContentType().orElse(null);
+        if (!route.accept(contentType)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Matched route is not a supported media type: {}", contentType);
+            }
+            Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+            if (statusRoute.isPresent()) {
+                route = statusRoute.get();
+            } else {
+                MutableHttpResponse<Object> res = HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+                writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                return;
+            }
+
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType().getName());
+        }
+        // all ok proceed to try and execute the route
+        handleRouteMatch(route, (NettyHttpRequest) request, ctx);
+
     }
 
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        routingInBoundErrorHandler.handleServerError(ctx, cause);
+        NettyHttpRequest nettyHttpRequest = NettyHttpRequest.get(ctx);
+        RouteMatch<Object> errorRoute = null;
+        boolean hasRequest = nettyHttpRequest != null;
+        if (cause instanceof UnsatisfiedRouteException) {
+            errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
+        }
+        if (errorRoute == null && hasRequest) {
+
+            RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
+            Class declaringType = originalRoute != null ? originalRoute.getDeclaringType() : null;
+            errorRoute = (declaringType != null ? router.route(declaringType, cause) : router.route(cause)).orElse(null);
+        }
+
+        if (errorRoute != null && hasRequest) {
+            errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest);
+            MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
+            if (errorRoute.isExecutable()) {
+                try {
+                    Object result = errorRoute.execute();
+                    HttpResponse response = errorResultToResponse(result);
+
+                    processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, errorRoute);
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
+                    }
+                    writeDefaultErrorResponse(ctx);
+                }
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                }
+                writeDefaultErrorResponse(ctx);
+            }
+        } else {
+            Optional<ExceptionHandler> exceptionHandler = beanLocator
+                    .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
+
+            if (hasRequest && exceptionHandler.isPresent()) {
+                ExceptionHandler handler = exceptionHandler.get();
+                MediaType defaultResponseMediaType = MediaType.fromType(exceptionHandler.getClass()).orElse(MediaType.APPLICATION_JSON_TYPE);
+                try {
+                    Object result = handler.handle(nettyHttpRequest, cause);
+                    HttpResponse response = errorResultToResponse(result);
+                    processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, null);
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
+                    }
+                    writeDefaultErrorResponse(ctx);
+                }
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                }
+
+                writeDefaultErrorResponse(ctx);
+            }
+        }
+    }
+
+    private HttpResponse errorResultToResponse(Object result) {
+        MutableHttpResponse<?> response;
+        if (result == null) {
+            response = HttpResponse.serverError();
+        } else if (result instanceof HttpResponse) {
+            response = (MutableHttpResponse) result;
+        } else {
+            response = HttpResponse.serverError()
+                    .body(result);
+            MediaType.fromType(result.getClass()).ifPresent(response::contentType);
+        }
+        return response;
     }
 
 
@@ -204,55 +309,37 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request);
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
-        if (!route.isExecutable() && !request.isBodyRequired()) {
-            routingInBoundErrorHandler.handleBadRequest(
-                    context,
-                    request,
-                    route
-            );
+
+        // decorate the execution of the route so that it runs an async executor
+        request.setMatchedRoute(route);
+
+        if (route.isExecutable()) {
+            // The request body is not required so simply execute the route
+            route = prepareRouteForExecution(route, request);
+            route.execute();
+        } else if (HttpMethod.permitsRequestBody(request.getMethod())) {
+
+            // The request body is required, so at this point we must have a StreamedHttpRequest
+            io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
+            if (nativeRequest instanceof StreamedHttpRequest) {
+                Optional<MediaType> contentType = request.getContentType();
+                HttpContentProcessor<?> processor = contentType.flatMap(type ->
+                        beanLocator.findBean(HttpContentSubscriberFactory.class,
+                                new ConsumesMediaTypeQualifier<>(type))
+                ).map(factory ->
+                        factory.build(request)
+                ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
+
+                processor.subscribe(buildSubscriber(request, context, route));
+
+            } else {
+                throw new IllegalStateException("Expected streamed HTTP request");
+            }
         } else {
-
-            // decorate the execution of the route so that it runs an async executor
-            request.setMatchedRoute(route);
-
-            if (route.isExecutable()) {
-                // The request body is not required so simply execute the route
-                route = prepareRouteForExecution(route, request);
-                route.execute();
-            } else if(HttpMethod.permitsRequestBody(request.getMethod())){
-
-                // The request body is required, so at this point we must have a StreamedHttpRequest
-                io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-                if (nativeRequest instanceof StreamedHttpRequest) {
-                    Optional<MediaType> contentType = request.getContentType();
-                    HttpContentProcessor<?> processor = contentType.flatMap(type ->
-                            beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                    new ConsumesMediaTypeQualifier<>(type))
-                    ).map(factory ->
-                            factory.build(request)
-                    ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
-
-                    processor.subscribe(buildSubscriber(request, context, route));
-
-                } else {
-                    routingInBoundErrorHandler.handleBadRequest(
-                            context,
-                            request,
-                            route
-                    );
-                }
-            }
-            else {
-                routingInBoundErrorHandler.handleBadRequest(
-                        context,
-                        request,
-                        route
-                );
-            }
-
+            // execute the invalid route to propagate UnsatisfiedRouteException
+            route.execute();
         }
     }
-
 
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request, ChannelHandlerContext context, RouteMatch<Object> finalRoute) {
@@ -269,57 +356,52 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             @Override
             protected void doOnNext(Object message) {
                 boolean executed = this.executed.get();
-                if(message instanceof ByteBufHolder) {
-                    if(message instanceof HttpData) {
+                if (message instanceof ByteBufHolder) {
+                    if (message instanceof HttpData) {
                         HttpData data = (HttpData) message;
                         String name = data.getName();
-                        if(executed) {
-                            if(currentPart != null) {
-                                if( currentPart.getName().equals(name) ) {
+                        if (executed) {
+                            if (currentPart != null) {
+                                if (currentPart.getName().equals(name)) {
                                     FileUpload upload = (FileUpload) data;
                                     currentPart.onNext(upload);
-                                    if(upload.isCompleted()) {
+                                    if (upload.isCompleted()) {
                                         currentPart.onComplete();
                                     }
-                                }
-                                else {
+                                } else {
                                     onComplete();
                                 }
-                            }
-                            else {
+                            } else {
                                 onComplete();
                             }
-                        }
-                        else {
+                        } else {
                             Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
 
-                            if(requiredInput.isPresent()) {
+                            if (requiredInput.isPresent()) {
                                 Object input = data;
-                                if(data instanceof FileUpload) {
+                                if (data instanceof FileUpload) {
                                     Argument<?> argument = requiredInput.get();
                                     FileUpload fileUpload = (FileUpload) data;
-                                    if(org.particleframework.http.multipart.FileUpload.class.isAssignableFrom(argument.getType())) {
+                                    if (org.particleframework.http.multipart.FileUpload.class.isAssignableFrom(argument.getType())) {
                                         currentPart = createPart(fileUpload);
                                         input = currentPart;
                                     }
                                 }
                                 routeMatch = routeMatch.fulfill(Collections.singletonMap(name, input));
-                            }
-                            else {
+                            } else {
                                 request.addContent(data);
                             }
                         }
-                    }
-                    else {
+                    } else {
                         request.addContent((ByteBufHolder) message);
-                        if(!routeMatch.isExecutable() && message instanceof LastHttpContent) {
+                        if (!routeMatch.isExecutable() && message instanceof LastHttpContent) {
                             Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument();
-                            if(bodyArgument.isPresent()) {
+                            if (bodyArgument.isPresent()) {
                                 Argument<?> argument = bodyArgument.get();
                                 String bodyArgumentName = argument.getName();
-                                if(routeMatch.isRequiredInput(bodyArgumentName)) {
+                                if (routeMatch.isRequiredInput(bodyArgumentName)) {
                                     Optional body = request.getBody();
-                                    if(body.isPresent()) {
+                                    if (body.isPresent()) {
                                         routeMatch = routeMatch.fulfill(
                                                 Collections.singletonMap(
                                                         bodyArgumentName,
@@ -331,18 +413,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             }
                         }
                     }
-                }
-                else {
+                } else {
                     request.setBody(message);
                 }
 
 
-                if(!executed) {
-                    if(routeMatch.isExecutable() || message instanceof LastHttpContent) {
+                if (!executed) {
+                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
                         // we have enough data to satisfy the route, continue
                         doOnComplete();
-                    }
-                    else {
+                    } else {
                         // the route is not yet executable, so keep going
                         subscription.request(1);
                     }
@@ -365,7 +445,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             @Override
             protected void doOnComplete() {
-                if(executed.compareAndSet(false, true)) {
+                if (executed.compareAndSet(false, true)) {
                     try {
                         routeMatch = prepareRouteForExecution(routeMatch, request);
                         routeMatch.execute();
@@ -387,51 +467,39 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         route = route.decorate(finalRoute -> {
             executor.submit(() -> {
 
-                Object result;
+                HttpResponse<?> response;
+                MediaType defaultResponseMediaType = finalRoute
+                        .getProduces()
+                        .stream()
+                        .findFirst()
+                        .orElse(MediaType.APPLICATION_JSON_TYPE);
                 try {
-                    result = finalRoute.execute();
+                    Object result = finalRoute.execute();
 
                     if (result == null) {
-                        result = NettyHttpResponse.getOr(request, HttpResponse.ok());
-                    }
-                    if (result instanceof HttpResponse) {
+                        response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                    } else if (result instanceof HttpResponse) {
                         HttpStatus status = ((HttpResponse) result).getStatus();
                         if (status.getCode() >= 300) {
                             // handle re-mapping of errors
-                            result = routingInBoundErrorHandler
-                                        .findStatusRoute(status, request)
-                                        .map(RouteMatch::execute)
-                                        .orElse(result);
+                            result = router.route(status)
+                                    .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
+                                    .filter(RouteMatch::isExecutable)
+                                    .map(RouteMatch::execute)
+                                    .orElse(result);
                         }
-                    }
-                    else {
-                        result = HttpResponse.ok(result);
+                        if (result instanceof HttpResponse) {
+                            response = (HttpResponse<?>) result;
+                        } else {
+                            response = HttpResponse.status(status)
+                                    .body(result);
+                        }
+                    } else {
+                        response = HttpResponse.ok(result);
                     }
 
-                    Object finalResult = result;
-                    context.writeAndFlush(result)
-                           .addListener((ChannelFuture future) -> {
-                        if (!future.isSuccess()) {
-                            Throwable cause = future.cause();
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error encoding response: " + cause.getMessage(), cause);
-                            }
-                            Channel channel = context.channel();
-                            if (channel.isWritable()) {
-                                context.pipeline().fireExceptionCaught(cause);
-                            }
-                            else {
-                                channel.close();
-                            }
-                        }
-                        else if(finalResult instanceof HttpResponse) {
-                            HttpResponse res = (HttpResponse) finalResult;
-                            if(res.getStatus().getCode() >= 300) {
-                                future.channel().close();
-                            }
-                        }
+                    processResponse(context, request, response, defaultResponseMediaType, finalRoute);
 
-                    });
                 } catch (Throwable e) {
                     context.pipeline().fireExceptionCaught(e);
                 }
@@ -441,7 +509,263 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return route;
     }
 
+    private void processResponse(
+            ChannelHandlerContext context,
+            NettyHttpRequest<?> request,
+            HttpResponse<?> response,
+            MediaType defaultResponseMediaType,
+            RouteMatch<Object> route) {
+        if (corsEnabled && request.getHeaders().getOrigin().isPresent()) {
+            corsHandler.handleResponse(request, (MutableHttpResponse<?>) response);
+        }
 
+        Optional<?> optionalBody = response.getBody();
+        FullHttpResponse nativeResponse = ((NettyHttpResponse) response).getNativeResponse();
+        boolean isChunked = HttpUtil.isTransferEncodingChunked(nativeResponse);
+        if (optionalBody.isPresent()) {
+            // a response body is present so we need to process it
+            Object body = optionalBody.get();
+            Class<?> bodyType = body.getClass();
+
+
+            MediaType responseType = response.getContentType()
+                    .orElse(defaultResponseMediaType);
+
+            Publisher<Object> publisher;
+            MediaTypeCodec codec;
+            if (PublisherUtils.isPublisher(bodyType)) {
+                // if the return type is a reactive type we need to subscribe to Publisher in order to emit
+                // an appropriate response
+                bodyType = resolveBodyType(route, bodyType);
+                codec = resolveRouteCodec(bodyType, responseType);
+                publisher = convertPublisher(body, bodyType);
+            } else {
+                // the return result is not a reactive type so build a publisher for the result that runs on the I/O scheduler
+                if (body instanceof CompletableFuture) {
+                    bodyType = resolveBodyType(route, bodyType);
+                    codec = resolveRouteCodec(bodyType, responseType);
+
+                    publisher = Publishers.fromCompletableFuture(() -> (CompletableFuture<Object>) body);
+                } else {
+                    codec = mediaTypeCodecRegistry.findCodec(
+                            responseType, bodyType
+                    ).orElse(new TextPlainCodec(serverConfiguration));
+                    publisher = Publishers.fromCompletableFuture(() -> {
+                        if (body instanceof byte[] || body instanceof ByteBuf) {
+                            return CompletableFuture.completedFuture(body);
+                        } else {
+                            CompletableFuture<Object> future = new CompletableFuture<>();
+                            ioExecutor.submit(() -> {
+                                try {
+                                    future.complete(codec.encode(body, new NettyByteBufferAllocator(context.alloc())).asNativeBuffer());
+                                } catch (CodecException e) {
+                                    future.completeExceptionally(e);
+                                }
+                            });
+                            return future;
+                        }
+                    });
+                }
+            }
+
+
+            if (isChunked) {
+                // if the transfer encoding is chunked then create a com.typesafe.netty.http.StreamedHttpResponse
+                // that will send the encoded data chunk by chunk
+
+                // adapt the publisher to produce HTTP content
+                writeHttpContentChunkByChunk(context, request, nativeResponse, responseType, codec, publisher);
+            } else {
+                // if the transfer encoding is not chunked then we must send a content length header so subscribe the
+                // publisher, encode the result as a io.netty.handler.codec.http.FullHttpResponse
+                boolean isSingle = PublisherUtils.isSingle(publisher.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
+                if (isSingle) {
+                    publisher.subscribe(new CompletionAwareSubscriber<Object>() {
+                        Subscription s;
+                        Object message;
+
+                        @Override
+                        protected void doOnSubscribe(Subscription subscription) {
+                            this.s = subscription;
+                            this.s.request(1);
+                        }
+
+                        @Override
+                        protected void doOnNext(Object message) {
+                            this.message = message;
+                        }
+
+                        @Override
+                        protected void doOnError(Throwable t) {
+                            context.pipeline().fireExceptionCaught(t);
+                        }
+
+                        @Override
+                        protected void doOnComplete() {
+                            if (message != null) {
+                                if (message instanceof HttpResponse) {
+                                    HttpResponse<?> responseMessage = (HttpResponse<?>) this.message;
+                                    Object body = responseMessage.getBody().orElse(null);
+                                    MediaTypeCodec codecToUse = codec;
+                                    if (body != null) {
+                                        codecToUse = mediaTypeCodecRegistry.findCodec(
+                                                responseType,
+                                                body.getClass()
+                                        ).orElse(new TextPlainCodec(serverConfiguration));
+                                    }
+                                    writeMessage(context, request, nativeResponse, body, codecToUse, responseType);
+                                } else {
+                                    writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                }
+                            } else {
+                                // no body returned so just write the Netty response as is
+                                writeNettyResponse(context, request, nativeResponse);
+                            }
+                        }
+                    });
+                } else {
+                    writeHttpContentChunkByChunk(context, request, nativeResponse, responseType, codec, publisher);
+                }
+            }
+        } else {
+            // no body returned so just write the Netty response as is
+            writeNettyResponse(context, request, nativeResponse);
+        }
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private Publisher<Object> convertPublisher(Object body, Class<?> bodyType) {
+        return ConversionService.SHARED.convert(body, Publisher.class)
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported Reactive type: " + bodyType));
+    }
+
+
+    void writeDefaultErrorResponse(ChannelHandlerContext ctx) {
+        ctx.channel()
+                .writeAndFlush(HttpResponse.serverError())
+                .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    private MediaTypeCodec resolveRouteCodec(Class<?> bodyType, MediaType responseType) {
+        MediaTypeCodec codec;
+        codec = mediaTypeCodecRegistry.findCodec(
+                responseType, bodyType
+        ).orElse(new TextPlainCodec(serverConfiguration));
+        return codec;
+    }
+
+    private Class<?> resolveBodyType(RouteMatch<Object> route, Class<?> bodyType) {
+        if (route != null) {
+            bodyType = route.getReturnType().getFirstTypeVariable().map(Argument::getType).orElse(null);
+        }
+        if (bodyType == null) {
+            bodyType = Object.class;
+        }
+        return bodyType;
+    }
+
+    private void writeHttpContentChunkByChunk(
+            ChannelHandlerContext context,
+            NettyHttpRequest<?> request,
+            FullHttpResponse nativeResponse,
+            MediaType responseType,
+            MediaTypeCodec codec,
+            Publisher<Object> publisher) {
+        Publisher<HttpContent> httpContentPublisher = Publishers.map(publisher, message -> {
+            if (message instanceof ByteBuf) {
+                return new DefaultHttpContent((ByteBuf) message);
+            } else if (message instanceof HttpContent) {
+                return (HttpContent) message;
+            } else {
+                ByteBuffer encoded = codec.encode(message, new NettyByteBufferAllocator(context.alloc()));
+                return new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
+            }
+        });
+
+        if (responseType.equals(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+
+            httpContentPublisher = Publishers.onComplete(httpContentPublisher, () -> {
+                CompletableFuture<Void> future = new CompletableFuture<>();
+                if (request == null || !request.getHeaders().isKeepAlive()) {
+                    context.pipeline()
+                            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                            .addListener(f -> {
+                                if(f.isSuccess()) {
+                                    future.complete(null);
+                                }
+                                else {
+                                    future.completeExceptionally(f.cause());
+                                }
+                                    }
+                            );
+                }
+                return future;
+            });
+        }
+
+        DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
+        streamedResponse.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        writeNettyResponse(
+                context,
+                request,
+                streamedResponse
+        );
+    }
+
+    private void writeMessage(
+            ChannelHandlerContext context,
+            NettyHttpRequest<?> request,
+            FullHttpResponse nativeResponse,
+            Object message,
+            MediaTypeCodec codec,
+            MediaType mediaType) {
+        if (message != null) {
+
+            ByteBuf byteBuf;
+
+            if (message instanceof ByteBuf) {
+                byteBuf = (ByteBuf) message;
+            } else {
+                byteBuf = (ByteBuf) codec.encode(message, new NettyByteBufferAllocator(context.alloc())).asNativeBuffer();
+            }
+            int len = byteBuf.readableBytes();
+            FullHttpResponse newResponse = nativeResponse.replace(byteBuf);
+            HttpHeaders headers = newResponse.headers();
+            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, len);
+            writeNettyResponse(context, request, newResponse);
+        } else {
+            writeNettyResponse(context, request, nativeResponse);
+        }
+
+    }
+
+    private void writeNettyResponse(
+            ChannelHandlerContext context,
+            HttpRequest<?> request,
+            io.netty.handler.codec.http.HttpResponse nettyResponse) {
+        context.writeAndFlush(nettyResponse)
+                .addListener((ChannelFuture future) -> {
+                    if (!future.isSuccess()) {
+                        Throwable cause = future.cause();
+                        // swallow closed channel exception, nothing we can do about it if the client disconnects
+                        if (!(cause instanceof ClosedChannelException)) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Writing writing Netty response: " + cause.getMessage(), cause);
+                            }
+                            Channel channel = context.channel();
+                            if (channel.isWritable()) {
+                                context.pipeline().fireExceptionCaught(cause);
+                            } else {
+                                channel.close();
+                            }
+                        }
+                    } else if (!HttpUtil.isKeepAlive(((NettyHttpRequest) request).getNativeRequest()) || nettyResponse.status().code() >= 300) {
+                        future.channel().close();
+                    }
+                });
+    }
 
 
 }

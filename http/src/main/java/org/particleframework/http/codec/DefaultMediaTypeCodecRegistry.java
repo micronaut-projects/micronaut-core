@@ -51,8 +51,23 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
         }
         MediaTypeCodec decoder = decodersByType.get(mediaType);
         if(decoder == null) {
-            decoder = decodersByType.get(mediaType.getExtension());
+            decoder = decodersByExtension.get(mediaType.getExtension());
         }
         return Optional.ofNullable(decoder);
+    }
+
+    @Override
+    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+        Optional<MediaTypeCodec> codec = findCodec(mediaType);
+        if(codec.isPresent()) {
+            MediaTypeCodec mediaTypeCodec = codec.get();
+            if(mediaTypeCodec.supportsType(type)) {
+                return codec;
+            }
+            else {
+                return Optional.empty();
+            }
+        }
+        return codec;
     }
 }

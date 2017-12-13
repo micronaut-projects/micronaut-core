@@ -44,8 +44,15 @@ public interface Route {
      * @param mediaType The media type
      * @return A new route with the media type applied
      */
-    Route accept(MediaType... mediaType);
+    Route consumes(MediaType... mediaType);
 
+    /**
+     * Applies the given accepted media type the route
+     *
+     * @param mediaType The media type
+     * @return A new route with the media type applied
+     */
+    Route produces(MediaType... mediaType);
     /**
      * Accept all {@link MediaType} references
      *
@@ -81,5 +88,14 @@ public interface Route {
      */
     default List<MediaType> getProduces() {
         return DEFAULT_PRODUCES;
+    }
+
+
+    /**
+     * The media types able to produced by this route
+     * @return A list of {@link MediaType} that this route can produce
+     */
+    default List<MediaType> getConsumes() {
+        return Collections.emptyList();
     }
 }

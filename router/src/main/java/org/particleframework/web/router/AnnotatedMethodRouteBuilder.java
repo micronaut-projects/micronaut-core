@@ -22,6 +22,7 @@ import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Consumes;
+import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.http.annotation.Controller;
@@ -52,12 +53,13 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         httpMethodsHandlers.put(Get.class, (ExecutableMethod method) -> {
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = GET(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
-                        method.getArgumentTypes());
+                        method.getArgumentTypes()).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
@@ -68,13 +70,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = POST(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes());
-                route = route.accept(consumes);
+                route = route.consumes(consumes).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
@@ -85,13 +88,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = PUT(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes());
-                route = route.accept(consumes);
+                route = route.consumes(consumes).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
@@ -102,13 +106,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = PATCH(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes());
-                route = route.accept(consumes);
+                route = route.consumes(consumes).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
@@ -119,13 +124,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = DELETE(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes());
-                route = route.accept(consumes);
+                route = route.consumes(consumes).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
@@ -152,13 +158,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Optional<String> uri = method.getValue(Action.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
+                MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = OPTIONS(resolveUri(val,
                         method,
                         uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes());
-                route = route.accept(consumes);
+                route = route.consumes(consumes).produces(produces);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }

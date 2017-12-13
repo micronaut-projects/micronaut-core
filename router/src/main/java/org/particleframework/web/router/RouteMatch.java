@@ -17,8 +17,10 @@ package org.particleframework.web.router;
 
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
+import org.particleframework.http.MediaType;
 import org.particleframework.inject.MethodExecutionHandle;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
@@ -31,17 +33,6 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Predicate<HttpRequest> {
-    /**
-     * <p>Returns the required arguments for this RouteMatch</p>
-     *
-     * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments excluding those that have been subtracted from the URI variables</p>
-     *
-     * @return The required arguments in order to invoke this route
-     */
-    default Collection<Argument> getRequiredArguments() {
-        return Arrays.asList(getArguments());
-    }
-
     /**
      * @return The variable values following a successful match
      */
@@ -71,6 +62,36 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
      * @return A new route match
      */
     RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
+
+    /**
+     * Return whether the given named input is required by this route
+     * @param name The name of the input
+     * @return True if it is
+     */
+    Optional<Argument<?>> getRequiredInput(String name);
+
+    /**
+     * @return The argument that represents the body
+     */
+    Optional<Argument<?>> getBodyArgument();
+
+    /**
+     * The media types able to produced by this route
+     * @return A list of {@link MediaType} that this route can produce
+     */
+    List<MediaType> getProduces();
+
+
+    /**
+     * <p>Returns the required arguments for this RouteMatch</p>
+     *
+     * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments excluding those that have been subtracted from the URI variables</p>
+     *
+     * @return The required arguments in order to invoke this route
+     */
+    default Collection<Argument> getRequiredArguments() {
+        return Arrays.asList(getArguments());
+    }
 
     /**
      * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}
@@ -108,15 +129,12 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
         return getRequiredInput(name).isPresent();
     }
 
-    /**
-     * Return whether the given named input is required by this route
-     * @param name The name of the input
-     * @return True if it is
-     */
-    Optional<Argument<?>> getRequiredInput(String name);
 
     /**
-     * @return The argument that represents the body
+     * Whether the specified content type is an accepted type
+     *
+     * @param contentType The content type
+     * @return True if it is
      */
-    Optional<Argument<?>> getBodyArgument();
+    boolean accept(@Nullable MediaType contentType);
 }

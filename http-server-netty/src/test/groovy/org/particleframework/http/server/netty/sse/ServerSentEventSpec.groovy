@@ -18,17 +18,21 @@ package org.particleframework.http.server.netty.sse
 import com.launchdarkly.eventsource.EventHandler
 import com.launchdarkly.eventsource.EventSource
 import com.launchdarkly.eventsource.MessageEvent
+import io.reactivex.Flowable
 import org.particleframework.context.annotation.Requires
+import org.particleframework.core.async.subscriber.Emitter
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.sse.Event
 import org.particleframework.http.sse.EventStream
 import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.annotation.Get
+import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
@@ -157,58 +161,69 @@ class ServerSentEventSpec extends AbstractParticleSpec {
         static AtomicBoolean complete = new AtomicBoolean(false)
 
         @Get
-        EventStream object() {
-            EventStream.of { Subscriber<Event> eventSubscriber ->
-                for (i in 1..4) {
-                    eventSubscriber.onNext(Event.of(new Foo(name: "Foo $i", age: i + 10)))
+        Publisher<Event> object() {
+            int i = 0
+            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+                if (i < 4) {
+                    i++
+                    emitter.onNext(Event.of(new Foo(name: "Foo $i", age: i + 10)))
                 }
-                eventSubscriber.onComplete()
-                complete.set(true)
-            }
+                else {
+                    emitter.onComplete()
+                    complete.set(true)
+                }
+            })
         }
 
         @Get
-        EventStream rich() {
-            EventStream.of { Subscriber<Event> eventSubscriber ->
-                for (i in 1..4) {
-                    eventSubscriber.onNext(
-                            Event.of(new Foo(name: "Foo $i", age: i + 10))
-                                    .name('foo')
-                                    .id(i.toString())
-                                    .comment("Foo Comment $i")
-                                    .retry(Duration.of(2, ChronoUnit.MINUTES))
-                    )
+        Publisher<Event> rich() {
+            Integer i = 0
+            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+                if (i < 4) {
+                    i++
+                    emitter.onNext(
+                    Event.of(new Foo(name: "Foo $i", age: i + 10))
+                            .name('foo')
+                            .id(i.toString())
+                            .comment("Foo Comment $i")
+                            .retry(Duration.of(2, ChronoUnit.MINUTES)))
                 }
-                eventSubscriber.onComplete()
-                complete.set(true)
-            }
+                else {
+                    emitter.onComplete()
+                    complete.set(true)
+                }
+            })
         }
 
         @Get
-        EventStream string() {
-            EventStream.of { Subscriber<Event> eventSubscriber ->
-                for (i in 1..4) {
-                    eventSubscriber.onNext(Event.of("Foo $i"))
+        Publisher<Event> string() {
+            int i = 0
+            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+                if (i < 4) {
+                    i++
+                    emitter.onNext(Event.of("Foo $i"))
                 }
-                eventSubscriber.onComplete()
-                complete.set(true)
-            }
+                else {
+                    emitter.onComplete()
+                    complete.set(true)
+                }
+            })
         }
 
         @Get
-        EventStream exception() {
-            EventStream.of { Subscriber<Event> eventSubscriber ->
+        Publisher<Event> exception() {
+            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 complete.set(true)
                 throw new RuntimeException("bad things happened")
-            }
+            })
         }
 
         @Get
-        EventStream onError() {
-            EventStream.of { Subscriber<Event> eventSubscriber ->
-                eventSubscriber.onError(new RuntimeException("bad things happened"))
+        Publisher<Event> onError() {
+            Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
+                emitter.onError(new RuntimeException("bad things happened"))
                 complete.set(true)
-            }
+            })
         }
     }
 

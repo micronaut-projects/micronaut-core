@@ -35,7 +35,8 @@ public interface ResourceRoute extends Route {
      * @param mediaTypes The media types
      * @return This route
      */
-    ResourceRoute accept(MediaType... mediaTypes);
+    @Override
+    ResourceRoute consumes(MediaType... mediaTypes);
 
     /**
      * Nest more routes within this {@link ResourceRoute}
@@ -43,6 +44,7 @@ public interface ResourceRoute extends Route {
      * @param nested The nested routes
      * @return This resource route
      */
+    @Override
     ResourceRoute nest(Runnable nested);
 
     /**
@@ -63,4 +65,7 @@ public interface ResourceRoute extends Route {
 
     @Override
     ResourceRoute where(Predicate<HttpRequest<?>> condition);
+
+    @Override
+    ResourceRoute produces(MediaType... mediaType);
 }

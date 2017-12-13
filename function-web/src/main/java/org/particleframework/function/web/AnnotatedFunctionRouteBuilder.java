@@ -94,7 +94,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
             int argCount = argumentTypes.length;
             if(argCount > 0) {
                if(argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0])) {
-                   route.accept(MediaType.APPLICATION_JSON_TYPE);
+                   route.consumes(MediaType.APPLICATION_JSON_TYPE);
                }
                else {
                    route.body(method.getArgumentNames()[0])

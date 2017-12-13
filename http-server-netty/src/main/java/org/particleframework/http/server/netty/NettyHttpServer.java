@@ -33,6 +33,7 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.interceptor.HttpRequestInterceptor;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -77,6 +78,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
     private final HttpRequestInterceptor[] interceptors;
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final Environment environment;
@@ -91,6 +93,7 @@ public class NettyHttpServer implements EmbeddedServer {
             ApplicationContext applicationContext,
             Router router,
             RequestBinderRegistry binderRegistry,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             HttpRequestInterceptor[] interceptors,
@@ -100,6 +103,7 @@ public class NettyHttpServer implements EmbeddedServer {
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
@@ -149,7 +153,8 @@ public class NettyHttpServer implements EmbeddedServer {
                             }
                             pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(
                                     beanLocator,
-                                    NettyHttpServer.this.router,
+                                    router,
+                                    mediaTypeCodecRegistry,
                                     serverConfiguration,
                                     binderRegistry,
                                     executorSelector,

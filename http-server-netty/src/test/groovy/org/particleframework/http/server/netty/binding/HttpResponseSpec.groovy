@@ -16,6 +16,7 @@
 package org.particleframework.http.server.netty.binding
 
 import okhttp3.Request
+import okhttp3.ResponseBody
 import org.particleframework.http.HttpMessage
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
@@ -23,6 +24,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.annotation.Get
+import spock.lang.Shared
 import spock.lang.Unroll
 
 /**
@@ -30,9 +32,13 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class HttpResponseSpec extends AbstractParticleSpec {
+    @Shared defaultHeaders = [:]
+    
     @Unroll
     void "test custom HTTP response for java action #action"() {
+
         when:
+
         def request = new Request.Builder()
                 .url("$server/java/response/$action")
                 .get()
@@ -44,22 +50,29 @@ class HttpResponseSpec extends AbstractParticleSpec {
         for (name in response.headers().names()) {
             actualHeaders.put(name.toLowerCase(), response.headers().get(name))
         }
+        def responseBody = response.body()
+
 
         then:
         response.code() == status.code
-        body == null || response.body().string() == body
+        body == null || responseBody.string() == body
         actualHeaders == headers
+
+        cleanup:
+        responseBody.close()
+
 
         where:
         action             | status                        | body                       | headers
-        "ok"               | HttpStatus.OK                 | null                       | [:]
-        "okWithBody"       | HttpStatus.OK                 | "some text"                | ['content-length': '9']
-        "okWithBodyObject" | HttpStatus.OK                 | '{"name":"blah","age":10}' | ['content-length': '24', 'content-type': 'application/json']
-        "status"           | HttpStatus.MOVED_PERMANENTLY  | null                       | [:]
-        "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | ['content-length': '24', 'content-type': 'application/json']
-        "createdUri"       | HttpStatus.CREATED            | null                       | ['location': 'http://test.com']
-        "accepted"         | HttpStatus.ACCEPTED           | null                       | [:]
-        "disallow"         | HttpStatus.METHOD_NOT_ALLOWED | null                       | ['allow': 'DELETE']
+        "ok"               | HttpStatus.OK                 | null                       | [connection:'close']
+        "okWithBody"       | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type':'text/plain']
+        "okWithBodyObject" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "status"           | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection:'close']
+        "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "createdUri"       | HttpStatus.CREATED            | null                       | [connection:'close','location': 'http://test.com']
+        "accepted"         | HttpStatus.ACCEPTED           | null                       | [connection:'close']
+        "disallow"         | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
+
     }
 
     @Unroll
@@ -76,6 +89,7 @@ class HttpResponseSpec extends AbstractParticleSpec {
         for (name in response.headers().names()) {
             actualHeaders.put(name.toLowerCase(), response.headers().get(name))
         }
+        def defaultHeaders = [connection: 'close']
 
         then:
         response.code() == status.code
@@ -83,14 +97,14 @@ class HttpResponseSpec extends AbstractParticleSpec {
         actualHeaders == headers
 
         where:
-        action             | status                       | body                       | headers
-        "ok"               | HttpStatus.OK                | null                       | [:]
-        "okWithBody"       | HttpStatus.OK                | "some text"                | ['content-length': '9']
-        "okWithBodyObject" | HttpStatus.OK                | '{"name":"blah","age":10}' | ['content-length': '24', 'content-type': 'application/json']
-        "status"           | HttpStatus.MOVED_PERMANENTLY | null                       | [:]
-        "createdBody"      | HttpStatus.CREATED           | '{"name":"blah","age":10}' | ['content-length': '24', 'content-type': 'application/json']
-        "createdUri"       | HttpStatus.CREATED           | null                       | ['location': 'http://test.com']
-        "accepted"         | HttpStatus.ACCEPTED          | null                       | [:]
+        action             | status                        | body                       | headers
+        "ok"               | HttpStatus.OK                 | null                       | [connection:'close']
+        "okWithBody"       | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type':'text/plain']
+        "okWithBodyObject" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "status"           | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection:'close']
+        "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "createdUri"       | HttpStatus.CREATED            | null                       | [connection:'close','location': 'http://test.com']
+        "accepted"         | HttpStatus.ACCEPTED           | null                       | [connection:'close']
     }
 
     @Controller
@@ -116,7 +130,7 @@ class HttpResponseSpec extends AbstractParticleSpec {
             HttpResponse.ok()
         }
 
-        @Get
+        @Get(produces = MediaType.TEXT_PLAIN)
         HttpResponse okWithBody() {
             HttpResponse.ok("some text")
         }
