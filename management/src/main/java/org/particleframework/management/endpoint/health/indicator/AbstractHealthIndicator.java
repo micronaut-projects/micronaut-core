@@ -18,6 +18,9 @@ package org.particleframework.management.endpoint.health.indicator;
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.management.endpoint.health.HealthStatus;
+import org.reactivestreams.Publisher;
+
+import java.util.concurrent.ExecutorService;
 
 /**
  * <p>A base health indicator class to extend from that catches exceptions
@@ -29,11 +32,17 @@ import org.particleframework.management.endpoint.health.HealthStatus;
  */
 public abstract class AbstractHealthIndicator implements HealthIndicator {
 
+    public AbstractHealthIndicator(ExecutorService executorService) {
+        this.executorService = executorService;
+    }
+
+    protected final ExecutorService executorService;
+
     protected HealthStatus healthStatus;
 
     @Override
-    public AsyncSingleResultPublisher<HealthResult> getResult() {
-        return new AsyncSingleResultPublisher<>(() -> {
+    public Publisher<HealthResult> getResult() {
+        return new AsyncSingleResultPublisher<>(executorService, () -> {
             HealthResult.Builder builder = HealthResult.builder(getName());
             try {
                 builder.details(getHealthInformation());

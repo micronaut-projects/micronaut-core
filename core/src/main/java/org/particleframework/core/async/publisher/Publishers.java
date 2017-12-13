@@ -18,11 +18,12 @@ package org.particleframework.core.async.publisher;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.async.subscriber.Emitter;
+import org.particleframework.core.reflect.ClassUtils;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -39,6 +40,29 @@ import java.util.function.Supplier;
 @Internal
 public class Publishers {
 
+    static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
+    static final List<Class<?>> singleTypes = new ArrayList<>(3);
+    static {
+        ClassLoader classLoader = Publishers.class.getClassLoader();
+        Publishers.singleTypes.add(CompletableFuturePublisher.class);
+        List<String> typeNames = Arrays.asList(
+                "io.reactivex.Maybe",
+                "io.reactivex.Observable",
+                "reactor.core.publisher.Flux"
+        );
+        for (String name : typeNames) {
+            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+            aClass.ifPresent(Publishers.reactiveTypes::add);
+        }
+        for (String name : Arrays.asList("io.reactivex.Single","reactor.core.publisher.Mono")) {
+            Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+            aClass.ifPresent(aClass1 -> {
+                Publishers.singleTypes.add(aClass1);
+                Publishers.reactiveTypes.add(aClass1);
+            });
+
+        }
+    }
     /**
      * Build a {@link Publisher} from a {@link CompletableFuture}
      *
@@ -131,5 +155,27 @@ public class Publishers {
                 });
             }
         });
+    }
+
+    public static boolean isPublisher(Class<?> type) {
+        if (Publisher.class.isAssignableFrom(type)) {
+            return true;
+        } else {
+            for (Class<?> reactiveType : reactiveTypes) {
+                if (reactiveType.isAssignableFrom(type)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    public static boolean isSingle(Class<?> type) {
+        for (Class<?> reactiveType : singleTypes) {
+            if (reactiveType.isAssignableFrom(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

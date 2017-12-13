@@ -15,9 +15,9 @@
  */
 package org.particleframework.management.endpoint.health.indicator;
 
-import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.management.endpoint.health.HealthResult;
+import org.reactivestreams.Publisher;
 
 /**
  * <p>Describes an indicator of health of the application. Used by the {@link org.particleframework.management.endpoint.health.aggregator.HealthAggregator} to create
@@ -32,5 +32,5 @@ public interface HealthIndicator extends Ordered {
      * @return A publisher that returns a {@link HealthResult} that provides the
      * information necessary to build a response.
      */
-    AsyncSingleResultPublisher<HealthResult> getResult();
+    Publisher<HealthResult> getResult();
 }
