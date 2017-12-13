@@ -89,6 +89,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 arguments);
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
+        this.addRequiredComponents(arguments);
     }
 
     @Internal
@@ -105,6 +106,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
+        this.addRequiredComponents(arguments);
     }
 
 
@@ -1366,9 +1368,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
         DefaultMethodInjectionPoint methodInjectionPoint = new DefaultMethodInjectionPoint(this, method, requiresReflection, arguments);
         if (isPreDestroy || isPostConstruct || methodInjectionPoint.getAnnotation(Inject.class) != null) {
-            for (Argument argument : methodInjectionPoint.getArguments()) {
-                requiredComponents.add(argument.getType());
-            }
+            addRequiredComponents(methodInjectionPoint.getArguments());
         }
         methodInjectionPoints.add(methodInjectionPoint);
         return this;
@@ -1484,6 +1484,13 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         }
     }
 
+    private void addRequiredComponents(Argument... arguments) {
+        if (arguments != null) {
+            for (Argument argument: arguments) {
+                requiredComponents.add(argument.getType());
+            }
+        }
+    }
 
     private class MethodKey {
         final String name;
