@@ -16,12 +16,12 @@ import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
-import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -111,6 +111,9 @@ public class RequiresCondition implements Condition {
         if(!matchesConditions(context, annotation)) {
             return true;
         }
+        if(!matchesEndpoint(context, annotation)) {
+            return true;
+        }
         return false;
     }
 
@@ -195,6 +198,28 @@ public class RequiresCondition implements Condition {
 
             }
         }
+    }
+
+    private boolean matchesEndpoint(ConditionContext context, Requires annotation) {
+        String endpoint = annotation.endpoint();
+        if(endpoint.length() > 0) {
+            BeanContext beanContext = context.getBeanContext();
+
+            if(beanContext instanceof PropertyResolver) {
+                PropertyResolver propertyResolver = (PropertyResolver) beanContext;
+                Optional<Boolean> enabled = propertyResolver.getProperty(String.format("%s.enabled", endpoint), Boolean.class);
+                if (enabled.isPresent()) {
+                    return enabled.get();
+                } else {
+                    String[] prefix = endpoint.split("\\.");
+                    prefix[prefix.length - 1] = "all";
+                    String allProperty = String.format("%s.enabled", String.join(".", prefix));
+                    enabled = propertyResolver.getProperty(allProperty, Boolean.class);
+                    return enabled.orElse(true);
+                }
+            }
+        }
+        return true;
     }
 
     private boolean matchesSdk(Requires annotation) {

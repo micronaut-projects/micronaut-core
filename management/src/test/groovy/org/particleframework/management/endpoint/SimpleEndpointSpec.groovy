@@ -23,7 +23,6 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.core.util.Toggleable
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
-import org.particleframework.runtime.ParticleApplication
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
