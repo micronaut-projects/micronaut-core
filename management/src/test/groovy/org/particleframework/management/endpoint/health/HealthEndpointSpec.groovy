@@ -6,7 +6,7 @@ import okhttp3.Request
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.http.HttpStatus
-import org.particleframework.management.endpoint.health.aggregator.DefaultHealthAggregator
+import org.particleframework.management.endpoint.health.aggregator.RxJavaHealthAggregator
 import org.particleframework.management.endpoint.health.indicator.diskspace.DiskSpaceIndicator
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -21,7 +21,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
-        context.containsBean(DefaultHealthAggregator)
+        context.containsBean(RxJavaHealthAggregator)
 
         cleanup:
         context.close()
@@ -37,7 +37,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        context.containsBean(DefaultHealthAggregator)
+        context.containsBean(RxJavaHealthAggregator)
 
         cleanup:
         context.close()
@@ -52,7 +52,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         !context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        !context.containsBean(DefaultHealthAggregator)
+        !context.containsBean(RxJavaHealthAggregator)
 
         cleanup:
         context.close()
@@ -68,7 +68,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         !context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
-        !context.containsBean(DefaultHealthAggregator)
+        !context.containsBean(RxJavaHealthAggregator)
 
         cleanup:
         context.close()
@@ -84,7 +84,7 @@ class HealthEndpointSpec extends Specification {
         expect:
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
-        context.containsBean(DefaultHealthAggregator)
+        context.containsBean(RxJavaHealthAggregator)
 
         cleanup:
         context.close()
