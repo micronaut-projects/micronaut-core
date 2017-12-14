@@ -9,5 +9,7 @@ dependencies {
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
     testCompile project(":session")
+    testCompile project(":http-server-netty")
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
     testCompile "com.github.kstyrc:embedded-redis:0.6"
 }
