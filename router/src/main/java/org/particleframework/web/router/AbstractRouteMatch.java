@@ -17,6 +17,7 @@ package org.particleframework.web.router;
 
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.core.bind.annotation.Bindable;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
@@ -205,11 +206,11 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
                 }
                 if(value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
-                    Optional o = unresolved.get();
+                    ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
 
 
-                    if(o.isPresent()) {
-                        Object resolved = o.get();
+                    if(bindingResult.isPresentAndSatisfied()) {
+                        Object resolved = bindingResult.get();
                         if(resolved instanceof ConversionError) {
                             ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);

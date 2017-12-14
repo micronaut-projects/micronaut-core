@@ -76,10 +76,10 @@ class RequestArgumentSatisfier {
 
                     if (argumentBinder instanceof BodyArgumentBinder) {
                         if (argumentBinder instanceof NonBlockingBodyArgumentBinder) {
-                            Optional bindingResult = argumentBinder
+                            ArgumentBinder.BindingResult bindingResult = argumentBinder
                                     .bind(conversionContext, request);
 
-                            if (bindingResult.isPresent()) {
+                            if (bindingResult.isPresentAndSatisfied()) {
                                 argumentValues.put(argumentName, bindingResult.get());
                             }
 
@@ -91,18 +91,26 @@ class RequestArgumentSatisfier {
                         }
                     } else {
 
-                        Optional bindingResult = argumentBinder
+                        ArgumentBinder.BindingResult bindingResult = argumentBinder
                                 .bind(conversionContext, request);
                         if (argument.getType() == Optional.class) {
-                            argumentValues.put(argumentName, bindingResult);
-                        } else if (bindingResult.isPresent()) {
+                            if(bindingResult.isSatisfied()) {
+                                Optional value = bindingResult.getValue();
+                                if(value.isPresent()) {
+                                    argumentValues.put(argumentName, value.get());
+                                }
+                                else {
+                                    argumentValues.put(argumentName, value);
+                                }
+                            }
+                        } else if (bindingResult.isPresentAndSatisfied()) {
                             argumentValues.put(argumentName, bindingResult.get());
                         } else if (HttpMethod.requiresRequestBody(request.getMethod())) {
                             argumentValues.put(argumentName, (UnresolvedArgument) () -> {
-                                Optional result = argumentBinder.bind(conversionContext, request);
+                                ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
                                 Optional<ConversionError> lastError = conversionContext.getLastError();
                                 if (lastError.isPresent()) {
-                                    return lastError;
+                                    return (ArgumentBinder.BindingResult) () -> lastError;
                                 }
                                 return result;
                             });

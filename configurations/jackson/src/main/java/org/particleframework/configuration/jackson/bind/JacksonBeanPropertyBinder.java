@@ -53,15 +53,15 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     @Override
-    public Optional<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
+    public BindingResult<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
 
         try {
             ObjectNode objectNode = buildSourceObjectNode(source.entrySet());
             Object result = objectMapper.treeToValue(objectNode, context.getArgument().getType());
-            return Optional.of(result);
+            return ()-> Optional.of(result);
         } catch (Exception e) {
             context.reject(e);
-            return Optional.empty();
+            return BindingResult.EMPTY;
         }
     }
 

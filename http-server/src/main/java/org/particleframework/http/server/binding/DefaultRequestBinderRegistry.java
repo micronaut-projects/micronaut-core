@@ -51,7 +51,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
-    private final Map<Class, RequestArgumentBinder> byType = new LinkedHashMap<>();
+    private final Map<Argument<?>, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
     private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache = Caffeine.newBuilder().maximumSize(30).build();
 
@@ -65,11 +65,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
                 if(binder instanceof TypedRequestArgumentBinder) {
                     TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                    Class argumentType = typedRequestArgumentBinder.argumentType();
+                    Argument argumentType = typedRequestArgumentBinder.argumentType();
                     byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
-                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType);
-                    for (Class itfce : allInterfaces) {
-                        byTypeAndAnnotation.put(new TypeAndAnnotation(itfce, annotationType), binder);
+                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                    for (Class<?> itfce : allInterfaces) {
+                        byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
                     }
                 }
                 else {
@@ -86,18 +86,19 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultConverters(conversionService);
         registerDefaultAnnotationBinders(byAnnotation);
 
-        byType.put(HttpHeaders.class, (RequestArgumentBinder<HttpHeaders>) (argument, source) -> Optional.of(source.getHeaders()));
-        byType.put(HttpRequest.class, (RequestArgumentBinder<HttpRequest>) (argument, source) -> Optional.of(source));
-        byType.put(HttpParameters.class, (RequestArgumentBinder<HttpParameters>) (argument, source) -> Optional.of(source.getParameters()));
-        byType.put(Cookies.class, (RequestArgumentBinder<Cookies>) (argument, source) -> Optional.of(source.getCookies()));
-        byType.put(Cookie.class, (RequestArgumentBinder<Cookie>)(context, source) -> {
+        byType.put(Argument.of(HttpHeaders.class), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
+        byType.put(Argument.of(HttpRequest.class), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
+        byType.put(Argument.of(HttpParameters.class), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
+        byType.put(Argument.of(Cookies.class), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
+        byType.put(Argument.of(Cookie.class), (RequestArgumentBinder<Cookie>)(context, source) -> {
             Cookies cookies = source.getCookies();
             String name = context.getArgument().getName();
             Cookie cookie = cookies.get(name);
             if(cookie == null) {
                 cookie = cookies.get(NameUtils.hyphenate(name));
             }
-            return cookie != null ? Optional.of(cookie) : Optional.empty();
+            Cookie finalCookie = cookie;
+            return () -> finalCookie != null ? Optional.of(finalCookie) : Optional.empty();
         });
     }
 
@@ -115,22 +116,29 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             }
         }
         else {
-            RequestArgumentBinder<T> binder = byType.get(argument.getType());
+            RequestArgumentBinder<T> binder = byType.get(argument);
             if(binder != null) {
                 return Optional.of(binder);
+            }
+            else {
+                binder = byType.get(Argument.of(argument.getType()));
+                if(binder != null) {
+                    return Optional.of(binder);
+                }
             }
         }
         return Optional.of(new ParameterAnnotationBinder<>(conversionService));
     }
 
     protected <T> RequestArgumentBinder findBinder(Argument<T> argument, Class<? extends Annotation> annotationType) {
-        TypeAndAnnotation key = new TypeAndAnnotation(argument.getType(), annotationType);
+        TypeAndAnnotation key = new TypeAndAnnotation(argument, annotationType);
         return argumentBinderCache.get(key, key1 -> {
             RequestArgumentBinder requestArgumentBinder = byTypeAndAnnotation.get(key1);
             if(requestArgumentBinder == null) {
-                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(key1.type);
+                Class<?> javaType = key1.type.getType();
+                Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(javaType);
                 for (Class itfce : allInterfaces) {
-                    requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(itfce, annotationType));
+                    requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(itfce), annotationType));
                     if(requestArgumentBinder != null) break;
                 }
             }
@@ -161,10 +169,10 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     private static final class TypeAndAnnotation {
-        private final Class<?> type;
+        private final Argument<?> type;
         private final Class<? extends Annotation> annotation;
 
-        public TypeAndAnnotation(Class<?> type, Class<? extends Annotation> annotation) {
+        public TypeAndAnnotation(Argument<?> type, Class<? extends Annotation> annotation) {
             this.type = type;
             this.annotation = annotation;
         }

@@ -60,12 +60,12 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
     }
 
     @Override
-    public Class<Publisher> argumentType() {
-        return Publisher.class;
+    public Argument<Publisher> argumentType() {
+        return Argument.of(Publisher.class);
     }
 
     @Override
-    public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
+    public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
@@ -77,7 +77,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                 ).map(factory ->
                         factory.build(nettyHttpRequest)
                 ).orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
-                return Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
+                return ()-> Optional.of(subscriber -> processor.subscribe(new CompletionAwareSubscriber<Object>() {
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
@@ -118,6 +118,6 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                 }));
             }
         }
-        return Optional.empty();
+        return BindingResult.EMPTY;
     }
 }

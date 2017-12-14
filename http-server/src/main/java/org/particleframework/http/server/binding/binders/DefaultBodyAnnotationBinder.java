@@ -32,9 +32,9 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Optional<?> body = source.getBody();
         Argument<T> argument = context.getArgument();
-        return body.flatMap(o -> conversionService.convert(o, argument.getType(), context));
+        return () -> body.flatMap(o -> conversionService.convert(o, ConversionContext.of(argument)));
     }
 }

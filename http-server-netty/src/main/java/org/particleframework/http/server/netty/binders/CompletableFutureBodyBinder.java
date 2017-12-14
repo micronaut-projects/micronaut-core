@@ -41,12 +41,12 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     }
 
     @Override
-    public Class<CompletableFuture> argumentType() {
-        return CompletableFuture.class;
+    public Argument<CompletableFuture> argumentType() {
+        return Argument.of(CompletableFuture.class);
     }
 
     @Override
-    public Optional<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
+    public BindingResult<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
@@ -103,13 +103,13 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                     }
                 });
 
-                return Optional.of(future);
+                return ()-> Optional.of(future);
             } else {
 
-                return Optional.empty();
+                return BindingResult.EMPTY;
             }
         } else {
-            return Optional.empty();
+            return BindingResult.EMPTY;
         }
     }
 }

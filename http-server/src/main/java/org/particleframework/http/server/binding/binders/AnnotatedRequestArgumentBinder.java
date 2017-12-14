@@ -49,7 +49,7 @@ public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends
         return new AnnotatedRequestArgumentBinder<SA, ST>() {
 
             @Override
-            public Optional<ST> bind(ArgumentConversionContext<ST> argument, HttpRequest<?> source) {
+            public BindingResult<ST> bind(ArgumentConversionContext<ST> argument, HttpRequest<?> source) {
                 return binder.bind(argument, source);
             }
 

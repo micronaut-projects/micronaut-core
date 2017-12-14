@@ -51,5 +51,58 @@ public interface ArgumentBinder<T, S> {
      * @param source The source
      * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
      */
-    Optional<T> bind(ArgumentConversionContext<T> context, S source);
+    BindingResult<T> bind(ArgumentConversionContext<T> context, S source);
+
+    /**
+     * The result of binding
+     *
+     * @param <T>
+     */
+    interface BindingResult<T> {
+        /**
+         * An empty but satisfied result
+         */
+        BindingResult EMPTY = Optional::empty;
+
+        /**
+         * An empty but unsatisfied result
+         */
+        BindingResult UNSATISFIED = new BindingResult() {
+            @Override
+            public Optional getValue() {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean isSatisfied() {
+                return false;
+            }
+        };
+
+        /**
+         * @return The bound value
+         */
+        Optional<T> getValue();
+
+        /**
+         * @return Was the binding requirement satisfied
+         */
+        default boolean isSatisfied() { return true; }
+
+        /**
+         * @return Is the value present and satisfied
+         */
+        default boolean isPresentAndSatisfied() {
+            return isSatisfied() && getValue().isPresent();
+        }
+
+        /**
+         * Obtains the value. Callers should call {@link #isPresentAndSatisfied()} first
+         *
+         * @return The value
+         */
+        default T get() {
+            return getValue().get();
+        }
+    }
 }

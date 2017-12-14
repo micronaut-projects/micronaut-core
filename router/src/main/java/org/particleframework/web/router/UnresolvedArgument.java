@@ -15,6 +15,8 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.bind.ArgumentBinder;
+
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -25,5 +27,5 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @FunctionalInterface
-public interface UnresolvedArgument<T> extends Supplier<Optional<T>> {
+public interface UnresolvedArgument<T> extends Supplier<ArgumentBinder.BindingResult<T>> {
 }

@@ -24,50 +24,39 @@ import org.particleframework.http.filter.OncePerRequestHttpServerFilter;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.binders.TypedRequestArgumentBinder;
 import org.particleframework.session.Session;
-import org.particleframework.session.SessionStore;
 import org.particleframework.session.http.HttpSessionFilter;
 
 import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Binds an argument of type {@link Session} for controllers
- *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
 @Requires(classes = HttpServerConfiguration.class)
-public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session> {
-
-    private final SessionStore<Session> sessionStore;
-
-    public SessionArgumentBinder(SessionStore<Session> sessionStore) {
-        this.sessionStore = sessionStore;
+public class OptionalSessionArgumentBinder implements TypedRequestArgumentBinder<Optional<Session>> {
+    @SuppressWarnings("unchecked")
+    @Override
+    public Argument<Optional<Session>> argumentType() {
+        Argument argument = Argument.of(Optional.class, Session.class);
+        return argument;
     }
 
     @Override
-    public Argument<Session> argumentType() {
-        return Argument.of(Session.class);
-    }
-
-    @Override
-    public BindingResult<Session> bind(ArgumentConversionContext<Session> context, HttpRequest<?> source) {
+    public BindingResult<Optional<Session>> bind(ArgumentConversionContext<Optional<Session>> context, HttpRequest<?> source) {
         if(!source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
-            // the filter hasn't been executed
-            return BindingResult.EMPTY;
+            // the filter hasn't been executed but the argument is not satisfied
+            return BindingResult.UNSATISFIED;
         }
 
         MutableConvertibleValues<Object> attrs = source.getAttributes();
         Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if(existing.isPresent()) {
-            return ()-> existing;
+            return ()-> Optional.of(existing);
         }
         else {
-            // create a new session store it in the attribute
-            Session newSession = sessionStore.newSession();
-            attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
-            return ()-> Optional.of(newSession);
+            return ()-> Optional.empty();
         }
     }
 }

@@ -31,7 +31,7 @@ import java.util.Optional;
  */
 public class TestAuthorBinder implements ArgumentBinder<Author, PropertyResolver> {
     @Override
-    public Optional<Author> bind(ArgumentConversionContext<Author> context, PropertyResolver source) {
+    public BindingResult<Author> bind(ArgumentConversionContext<Author> context, PropertyResolver source) {
         Author author = new Author();
         if(source.containsProperty("name")) {
             ArgumentConversionContext<String> conversionContext = context.with(Argument.of(String.class, "name"));
@@ -51,6 +51,6 @@ public class TestAuthorBinder implements ArgumentBinder<Author, PropertyResolver
                 author.setWebsite((Optional<URI>) converted.get());
             }
         }
-        return Optional.of(author);
+        return ()-> Optional.of(author);
     }
 }

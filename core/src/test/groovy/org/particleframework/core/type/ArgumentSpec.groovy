@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.core.bind;
+package org.particleframework.core.type
 
-import org.particleframework.core.type.Argument;
+import spock.lang.Specification
 
 /**
- * An {@link ArgumentBinder} that is resolved based on the argument type
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface TypeArgumentBinder<T,S> extends ArgumentBinder<T,S> {
+class ArgumentSpec extends Specification{
 
-    /**
-     * @return The argument type
-     */
-    Argument<T> argumentType();
+    void "test equals/hashcode"() {
+        expect:
+        Argument.of(Optional.class, Integer.class).hashCode() == Argument.of(Optional.class, Integer.class).hashCode()
+        Argument.of(Optional.class, Integer.class) == Argument.of(Optional.class, Integer.class)
+    }
 }
