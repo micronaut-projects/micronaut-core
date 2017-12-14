@@ -42,7 +42,7 @@ import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.codec.TextPlainCodec;
-import org.particleframework.http.server.cors.CorsHandler;
+import org.particleframework.http.server.cors.CorsFilter;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
@@ -83,8 +83,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private final ExecutorSelector executorSelector;
     private final ExecutorService ioExecutor;
     private final BeanLocator beanLocator;
-    private final boolean corsEnabled;
-    private final CorsHandler corsHandler;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
@@ -104,9 +102,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         this.router = router;
         this.requestArgumentSatisfier = new RequestArgumentSatisfier(binderRegistry);
         this.serverConfiguration = serverConfiguration;
-        HttpServerConfiguration.CorsConfiguration corsConfiguration = serverConfiguration.getCors();
-        this.corsEnabled = corsConfiguration.isEnabled();
-        this.corsHandler = this.corsEnabled ? new CorsHandler(corsConfiguration) : null;
     }
 
     @Override
@@ -130,20 +125,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> request) throws Exception {
-        if (corsEnabled && request.getHeaders().getOrigin().isPresent()) {
-            Optional<MutableHttpResponse<?>> corsResponse = corsHandler.handleRequest(request);
-            if (corsResponse.isPresent()) {
-                MutableHttpResponse<?> httpResponse = corsResponse.get();
-                writeNettyResponse(
-                        ctx,
-                        request,
-                        ((NettyHttpResponse) httpResponse).getNativeResponse()
-                );
-                return;
-            }
-        }
-
-
         HttpMethod httpMethod = request.getMethod();
         URI requestPath = request.getPath();
 
@@ -177,8 +158,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    MutableHttpResponse<Object> res = HttpResponse.notAllowed(existingRoutes);
-                    writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                    MutableHttpResponse<Object> defaultResponse = HttpResponse.notAllowed(existingRoutes);
+                    emitDefaultResponse(ctx, request, defaultResponse);
                     return;
                 }
 
@@ -188,7 +169,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     route = statusRoute.get();
                 } else {
                     MutableHttpResponse<Object> res = HttpResponse.notFound();
-                    writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                    emitDefaultResponse(ctx, request, res);
                     return;
                 }
             }
@@ -206,7 +187,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 route = statusRoute.get();
             } else {
                 MutableHttpResponse<Object> res = HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-                writeNettyResponse(ctx, request, ((NettyHttpResponse) res).getNativeResponse());
+                emitDefaultResponse(ctx, request, res);
                 return;
             }
 
@@ -218,7 +199,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         handleRouteMatch(route, (NettyHttpRequest) request, ctx);
 
     }
-
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
@@ -283,6 +263,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
     }
 
+
     private HttpResponse errorResultToResponse(Object result) {
         MutableHttpResponse<?> response;
         if (result == null) {
@@ -296,7 +277,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
         return response;
     }
-
 
     private void handleRouteMatch(
             RouteMatch<Object> route,
@@ -449,6 +429,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         };
     }
 
+
     private RouteMatch<Object> prepareRouteForExecution(RouteMatch<Object> route, NettyHttpRequest<?> request) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
@@ -503,31 +484,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 return completableFuture;
             });
 
-            List<HttpFilter> filters = new ArrayList<>( router.findFilters(request) );
-            if(!filters.isEmpty()) {
-                // make the action executor the last filter in the chain
-                filters.add((HttpServerFilter) (req, chain) -> routePublisher);
-
-                AtomicInteger integer = new AtomicInteger();
-                int len = filters.size();
-                HttpServerFilter.ServerFilterChain filterChain = new HttpServerFilter.ServerFilterChain() {
-                    @SuppressWarnings("unchecked")
-                    @Override
-                    public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
-                        int pos = integer.incrementAndGet();
-                        if(pos > len) {
-                            throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                        }
-                        HttpFilter httpFilter = filters.get(pos);
-                        return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this);
-                    }
-                };
-                HttpFilter httpFilter = filters.get(0);
-                finalPublisher = httpFilter.doFilter(request, filterChain);
-            }
-            else {
-                finalPublisher = routePublisher;
-            }
+            finalPublisher = filterPublisher(request, routePublisher);
 
             finalPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
                 @Override
@@ -556,16 +513,42 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return route;
     }
 
+    private Publisher<? extends HttpResponse<?>> filterPublisher(HttpRequest<?> request, Publisher<MutableHttpResponse<?>> routePublisher) {
+        Publisher<? extends HttpResponse<?>> finalPublisher;
+        List<HttpFilter> filters = new ArrayList<>( router.findFilters(request) );
+        if(!filters.isEmpty()) {
+            // make the action executor the last filter in the chain
+            filters.add((HttpServerFilter) (req, chain) -> routePublisher);
+
+            AtomicInteger integer = new AtomicInteger();
+            int len = filters.size();
+            HttpServerFilter.ServerFilterChain filterChain = new HttpServerFilter.ServerFilterChain() {
+                @SuppressWarnings("unchecked")
+                @Override
+                public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
+                    int pos = integer.incrementAndGet();
+                    if(pos > len) {
+                        throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                    }
+                    HttpFilter httpFilter = filters.get(pos);
+                    return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this);
+                }
+            };
+            HttpFilter httpFilter = filters.get(0);
+            finalPublisher = httpFilter.doFilter(request, filterChain);
+        }
+        else {
+            finalPublisher = routePublisher;
+        }
+        return finalPublisher;
+    }
+
     private void processResponse(
             ChannelHandlerContext context,
             NettyHttpRequest<?> request,
             HttpResponse<?> response,
             MediaType defaultResponseMediaType,
             RouteMatch<Object> route) {
-        if (corsEnabled && request.getHeaders().getOrigin().isPresent()) {
-            corsHandler.handleResponse(request, (MutableHttpResponse<?>) response);
-        }
-
         Optional<?> optionalBody = response.getBody();
         FullHttpResponse nativeResponse = ((NettyHttpResponse) response).getNativeResponse();
         boolean isChunked = HttpUtil.isTransferEncodingChunked(nativeResponse);
@@ -680,7 +663,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
     }
 
-
     @SuppressWarnings("unchecked")
     private Publisher<Object> convertPublisher(Object body, Class<?> bodyType) {
         return ConversionService.SHARED.convert(body, Publisher.class)
@@ -693,6 +675,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 .writeAndFlush(HttpResponse.serverError())
                 .addListener(ChannelFutureListener.CLOSE);
     }
+
 
     private MediaTypeCodec resolveRouteCodec(Class<?> bodyType, MediaType responseType) {
         MediaTypeCodec codec;
@@ -710,6 +693,35 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             bodyType = Object.class;
         }
         return bodyType;
+    }
+
+    private void emitDefaultResponse(ChannelHandlerContext ctx, HttpRequest<?> request, MutableHttpResponse<Object> defaultResponse) {
+        Publisher<MutableHttpResponse<?>> notAllowedResponse = Publishers.just(defaultResponse);
+        notAllowedResponse  = (Publisher<MutableHttpResponse<?>>) filterPublisher(request, notAllowedResponse);
+        notAllowedResponse.subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
+            @Override
+            protected void doOnSubscribe(Subscription subscription) {
+                subscription.request(1);
+            }
+
+            @Override
+            protected void doOnNext(MutableHttpResponse<?> message) {
+                writeNettyResponse(ctx, request, ((NettyHttpResponse) message).getNativeResponse());
+            }
+
+            @Override
+            protected void doOnError(Throwable t) {
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Unexpected error occurred: " + t.getMessage(), t);
+                }
+                writeNettyResponse(ctx, request, ((NettyHttpResponse) HttpResponse.serverError()).getNativeResponse());
+            }
+
+            @Override
+            protected void doOnComplete() {
+
+            }
+        });
     }
 
     private void writeHttpContentChunkByChunk(

@@ -7,17 +7,17 @@ import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MutableHttpResponse
-import org.particleframework.http.server.cors.CorsHandler
+import org.particleframework.http.server.cors.CorsFilter
 import org.particleframework.http.server.cors.CorsOriginConfiguration
 import org.particleframework.http.server.HttpServerConfiguration
 import spock.lang.Specification
 
 import static org.particleframework.http.HttpHeaders.*
 
-class CorsHandlerSpec extends Specification {
+class CorsFilterSpec extends Specification {
 
-    CorsHandler buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsHandler(config ?: new HttpServerConfiguration.CorsConfiguration())
+    CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
+        new CorsFilter(config ?: new HttpServerConfiguration.CorsConfiguration())
     }
 
     void "test handleRequest for non CORS request"() {
@@ -27,7 +27,7 @@ class CorsHandlerSpec extends Specification {
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.empty()
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -47,7 +47,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedOrigins = ['http://www.foo.com']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -68,7 +68,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedOrigins = regex
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -98,7 +98,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedMethods = [HttpMethod.GET]
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -122,7 +122,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedMethods = [HttpMethod.GET]
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -146,7 +146,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedHeaders = ['foo']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
 
         when:
@@ -172,7 +172,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedHeaders = ['foo', 'bar']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
 
         when:
@@ -193,7 +193,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.allowedOrigins = ['http://www.foo.com']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
@@ -215,7 +215,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
@@ -246,7 +246,7 @@ class CorsHandlerSpec extends Specification {
         originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
         config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
         config.configurations.put('foo', originConfig)
-        CorsHandler corsHandler = buildCorsHandler(config)
+        CorsFilter corsHandler = buildCorsHandler(config)
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
