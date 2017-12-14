@@ -15,15 +15,16 @@
  */
 package org.particleframework.management.endpoint.health.aggregator;
 
-import org.particleframework.context.annotation.Requires;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.management.endpoint.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
-import org.particleframework.management.endpoint.health.indicator.HealthIndicatorSubscriber;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
 
 /**
  * <p>Default implementation of {@link HealthAggregator} that creates
@@ -38,11 +39,22 @@ import java.util.concurrent.CountDownLatch;
  * [status: "UP, details: [diskSpace: [status: UP, details: [:]], cpuUsage: ...]]</p>
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-@Requires(endpoint = "endpoints.health")
-public class DefaultHealthAggregator implements HealthAggregator {
+public class RxJavaHealthAggregator implements HealthAggregator {
+
+    @Override
+    public Publisher<Object> aggregate(HealthIndicator[] indicators) {
+        Flowable<HealthResult> results = aggregateResults(indicators);
+        Single<Object> result = results.toList().map(list -> {
+            HealthStatus overallStatus = calculateOverallStatus(list);
+
+            return buildResult(overallStatus, aggregateDetails(list));
+        });
+        return result.toFlowable();
+    }
 
     protected HealthStatus calculateOverallStatus(List<HealthResult> results) {
         return results.stream()
@@ -53,25 +65,12 @@ public class DefaultHealthAggregator implements HealthAggregator {
                 .orElse(HealthStatus.UNKNOWN);
     }
 
-    protected List<HealthResult> aggregateResults(HealthIndicator[] indicators) {
-        List<HealthResult> results = Collections.synchronizedList(new ArrayList<>(indicators.length));
-        CountDownLatch latch = new CountDownLatch(indicators.length);
-        for (HealthIndicator indicator: indicators) {
-            indicator.getResult().subscribe(new HealthIndicatorSubscriber(indicator) {
-                @Override
-                public void onNext(HealthResult result) {
-                    results.add(result);
-                    latch.countDown();
-                }
-            });
-        }
-
-        try {
-            latch.await();
-            return results;
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+    protected Flowable<HealthResult> aggregateResults(HealthIndicator[] indicators) {
+        return Flowable.merge(
+                Arrays.stream(indicators)
+                      .map(HealthIndicator::getResult)
+                      .collect(Collectors.toList())
+        );
     }
 
     protected Object aggregateDetails(List<HealthResult> results) {
@@ -86,13 +85,5 @@ public class DefaultHealthAggregator implements HealthAggregator {
         status.getDescription().ifPresent(description -> healthStatus.put("description", description));
         healthStatus.put("details", details);
         return healthStatus;
-    }
-
-    @Override
-    public Object aggregate(HealthIndicator[] indicators) {
-        List<HealthResult> results = aggregateResults(indicators);
-        HealthStatus overallStatus = calculateOverallStatus(results);
-
-        return buildResult(overallStatus, aggregateDetails(results));
     }
 }

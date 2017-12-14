@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Singleton
-@Requires(endpoint = "endpoints.health")
 @Requires(property = "endpoints.health.disk-space.enabled", notEquals = "false")
 public class DiskSpaceIndicator extends AbstractHealthIndicator {
 

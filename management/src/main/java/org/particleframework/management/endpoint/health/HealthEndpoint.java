@@ -15,7 +15,6 @@
  */
 package org.particleframework.management.endpoint.health;
 
-import org.particleframework.context.annotation.Requires;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
 import org.particleframework.management.endpoint.health.aggregator.HealthAggregator;
@@ -28,7 +27,6 @@ import org.particleframework.management.endpoint.health.indicator.HealthIndicato
  * @since 1.0
  */
 @Endpoint("health")
-@Requires(endpoint = "endpoints.health")
 public class HealthEndpoint {
 
     private HealthAggregator healthAggregator;
