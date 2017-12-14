@@ -35,8 +35,8 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "particle.session.http.strategy", value = "cookie")
-public class CookieHttpSessionStrategy implements HttpSessionIdResolver, HttpSessionIdEncoder {
+@Requires(property = "particle.session.http.cookie", notEquals = "false")
+public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
     private final boolean base64Decode;
     private final String prefix;
     private final HttpSessionConfiguration configuration;

@@ -36,6 +36,7 @@ public class InMemorySession implements Session {
     private final Instant creationTime;
     private Duration maxInactiveInterval;
     protected Instant lastAccessTime = Instant.now();
+    private boolean isNew =true;
 
     protected InMemorySession(String id, Duration maxInactiveInterval) {
         this(id, Instant.now(), maxInactiveInterval);
@@ -78,6 +79,11 @@ public class InMemorySession implements Session {
     }
 
     @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @Override
     public Instant getCreationTime() {
         return creationTime;
     }
@@ -113,4 +119,7 @@ public class InMemorySession implements Session {
         return attributes.get(name, conversionContext);
     }
 
+    void setNew(boolean aNew) {
+        isNew = aNew;
+    }
 }

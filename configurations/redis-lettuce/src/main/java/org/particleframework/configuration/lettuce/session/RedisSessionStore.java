@@ -581,7 +581,8 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             return super.clear();
         }
 
-        boolean isNew() {
+        @Override
+        public boolean isNew() {
             return modifications.contains(Modification.CREATED);
         }
 

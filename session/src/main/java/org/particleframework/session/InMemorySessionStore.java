@@ -81,6 +81,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
     public CompletableFuture<InMemorySession> save(InMemorySession session) {
         if(session == null) throw new IllegalArgumentException("Session cannot be null");
         String id = session.getId();
+        session.setNew(false);
         InMemorySession existing = sessions.getIfPresent(id);
         // if the instance is the same then merely accessing it as above will
         // result in the expiry interval being reset so nothing else needs to be done

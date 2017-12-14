@@ -97,6 +97,10 @@ public interface Session extends MutableConvertibleValues<Object> {
     Duration getMaxInactiveInterval();
 
     /**
+     * @return Is the session a newly created and unsaved session
+     */
+    boolean isNew();
+    /**
      * Retrieve an attribute for the given name
      * @param attr The attribute name
      * @return An {@link Optional} of the attribute

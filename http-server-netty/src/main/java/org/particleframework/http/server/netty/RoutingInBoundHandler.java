@@ -64,6 +64,7 @@ import java.nio.channels.ClosedChannelException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -451,7 +452,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     MutableHttpResponse<?> response;
 
                     try {
-                        Object result = finalRoute.execute();
+                        RouteMatch<Object> routeMatch = finalRoute;
+                        if (!routeMatch.isExecutable()) {
+                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request);
+                        }
+                        Object result = routeMatch.execute();
 
                         if (result == null) {
                             response = NettyHttpResponse.getOr(request, HttpResponse.ok());

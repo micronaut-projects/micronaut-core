@@ -34,8 +34,8 @@ import java.util.List;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "particle.session.http.strategy", value = "header")
-public class HeadersHttpSessionIdStrategy implements HttpSessionIdResolver, HttpSessionIdEncoder {
+@Requires(property = "particle.session.http.header", notEquals = "false")
+public class HeadersHttpSessionIdStrategy implements HttpSessionIdStrategy {
 
     private final String[] headerNames;
 
