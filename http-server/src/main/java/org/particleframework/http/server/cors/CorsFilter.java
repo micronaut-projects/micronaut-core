@@ -15,11 +15,17 @@
  */
 package org.particleframework.http.server.cors;
 
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
+import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.reactivestreams.Publisher;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,15 +38,35 @@ import static org.particleframework.http.HttpHeaders.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CorsHandler {
+@Filter("/**")
+public class CorsFilter implements HttpServerFilter {
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      */
-    public CorsHandler(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
+    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
         this.corsConfiguration = corsConfiguration;
+    }
+
+    @Override
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+        boolean originHeaderPresent = request.getHeaders().getOrigin().isPresent();
+        if(originHeaderPresent) {
+            Optional<MutableHttpResponse<?>> response = handleRequest(request);
+            if(response.isPresent()) {
+                return Publishers.just(response.get());
+            }
+            else {
+                return Publishers.then(chain.proceed(request), mutableHttpResponse ->
+                        handleResponse(request, mutableHttpResponse)
+                );
+            }
+        }
+        else {
+            return chain.proceed(request);
+        }
     }
 
     /**
@@ -49,7 +75,7 @@ public class CorsHandler {
      * @param request The {@link HttpRequest} object
      * @param response The {@link MutableHttpResponse} object
      */
-    public void handleResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
+    protected void handleResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
         HttpHeaders headers = request.getHeaders();
         Optional<String> originHeader = headers.getOrigin();
         originHeader.ifPresent(requestOrigin -> {
@@ -85,7 +111,7 @@ public class CorsHandler {
      * @param request The {@link HttpRequest} object
      * @return An optional {@link MutableHttpResponse}. The request should proceed normally if empty
      */
-    public Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
+    protected Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
         HttpHeaders headers = request.getHeaders();
         Optional<String> originHeader = headers.getOrigin();
         if (originHeader.isPresent()) {
@@ -201,4 +227,6 @@ public class CorsHandler {
     private boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }
+
+
 }
