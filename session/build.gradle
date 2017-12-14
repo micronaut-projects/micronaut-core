@@ -1,8 +1,10 @@
 dependencies {
     compileOnly project(":inject-java")
+    compileOnly project(":http-server")
     compile project(":bootstrap")
     compile project(":http")
 
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
+    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
 }
