@@ -55,9 +55,6 @@ These should be built on the `Endpoint` API
 
 ### HTTP Server
 
-#### Session Support
-
-We need to support customizable, non-blocking HTTP sessions.
 
 #### HTTPS Support
 
