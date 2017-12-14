@@ -19,11 +19,14 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.filter.OncePerRequestHttpServerFilter;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.server.binding.binders.AnnotatedRequestArgumentBinder;
 import org.particleframework.http.server.binding.binders.TypedRequestArgumentBinder;
 import org.particleframework.session.Session;
+import org.particleframework.session.annotation.SessionValue;
 import org.particleframework.session.http.HttpSessionFilter;
 
 import javax.inject.Singleton;
@@ -35,25 +38,39 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(classes = HttpServerConfiguration.class)
-public class OptionalSessionArgumentBinder implements TypedRequestArgumentBinder<Optional<Session>> {
-    @SuppressWarnings("unchecked")
+public class OptionalSessionValueArgumentBinder implements TypedRequestArgumentBinder<Optional>, AnnotatedRequestArgumentBinder<SessionValue, Optional> {
+    private static final Argument<Optional> OPTIONAL_ARGUMENT = Argument.of(Optional.class);
+
     @Override
-    public Argument<Optional<Session>> argumentType() {
-        Argument argument = Argument.of(Optional.class, Session.class);
-        return argument;
+    public Argument<Optional> argumentType() {
+        return OPTIONAL_ARGUMENT;
     }
 
     @Override
-    public BindingResult<Optional<Session>> bind(ArgumentConversionContext<Optional<Session>> context, HttpRequest<?> source) {
+    public Class<SessionValue> getAnnotationType() {
+        return SessionValue.class;
+    }
+
+    @Override
+    public BindingResult<Optional> bind(ArgumentConversionContext<Optional> context, HttpRequest<?> source) {
         MutableConvertibleValues<Object> attrs = source.getAttributes();
         if(!attrs.contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
             // the filter hasn't been executed but the argument is not satisfied
             return BindingResult.UNSATISFIED;
         }
 
+        SessionValue annotation = context.getAnnotation(SessionValue.class);
+        Argument<Optional> argument = context.getArgument();
+        String name = annotation != null ? annotation.value() : argument.getName();
+        if(StringUtils.isEmpty(name)) {
+            name = argument.getName();
+        }
         Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if(existing.isPresent()) {
-            return ()-> Optional.of(existing);
+            String finalName = name;
+            return ()-> Optional.of(
+                    existing.get().get(finalName, context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT))
+            );
         }
         else {
             return BindingResult.EMPTY;
