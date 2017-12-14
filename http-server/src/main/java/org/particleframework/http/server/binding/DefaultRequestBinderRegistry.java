@@ -141,6 +141,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(itfce), annotationType));
                     if(requestArgumentBinder != null) break;
                 }
+
+                if(requestArgumentBinder == null) {
+                    // try the raw type
+                    requestArgumentBinder = byTypeAndAnnotation.get(new TypeAndAnnotation(Argument.of(argument.getType()), annotationType));
+                }
             }
             return Optional.ofNullable(requestArgumentBinder);
         }).orElse(null);

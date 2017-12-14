@@ -133,6 +133,16 @@ class SessionBindingSpec extends Specification {
         response.body().string() == "value in session"
         response.header(HttpHeaders.AUTHORIZATION_INFO)
 
+        when:
+        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/value"))
+                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+        response = httpClient.newCall(request.build())
+                .execute()
+
+        then:
+        response.body().string() == "value in session"
+        response.header(HttpHeaders.AUTHORIZATION_INFO)
+
         cleanup:
         embeddedServer.stop()
     }
