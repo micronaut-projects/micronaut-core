@@ -44,7 +44,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
         Header annotation = argument.getAnnotation(Header.class);
         String parameterName = annotation.value();

@@ -41,7 +41,8 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         this.conversionService = conversionService;
     }
 
-    protected Optional<T> doBind(
+    @SuppressWarnings("unchecked")
+    protected BindingResult<T> doBind(
             ArgumentConversionContext<T> context,
             ConvertibleValues<?> values,
             String annotationValue) {
@@ -53,7 +54,7 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
                 annotationValue = fallbackName;
                 value = resolveValue(context, values, annotationValue);
                 if (value == null) {
-                    return Optional.empty();
+                    return BindingResult.EMPTY;
                 }
             }
         }
@@ -69,12 +70,12 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         return values.get(annotationValue, context).orElse(null);
     }
 
-    private Optional<T> doConvert(Object value, ArgumentConversionContext<T> context) {
+    private BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context) {
         Optional<T> result = conversionService.convert(value, context);
         if (result.isPresent() && context.getArgument().getType() == Optional.class) {
-            return (Optional<T>) result.get();
+            return () -> (Optional<T>) result.get();
         } else {
-            return result;
+            return () -> result;
         }
     }
 

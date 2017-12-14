@@ -65,7 +65,7 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
 
     @SuppressWarnings("unchecked")
     @Override
-    public Optional<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
+    public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
         Optional<MediaType> contentType = source.getContentType();
         if(contentType.isPresent() && MediaType.MULTIPART_FORM_DATA_TYPE.equals(contentType.get())) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
@@ -75,7 +75,7 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             final ArgumentConversionContext<?> typeContext = context.with(context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
             if (nativeRequest instanceof StreamedHttpRequest) {
-                return Optional.of(subscriber -> {
+                return ()-> Optional.of(subscriber -> {
                     Subscriber<HttpData> contentSubscriber = new CompletionAwareSubscriber<HttpData>() {
                         int position = 0;
                         String partName;
@@ -142,6 +142,6 @@ public class PublisherPartBinder implements AnnotatedRequestArgumentBinder<Part,
                 });
             }
         }
-        return Optional.empty();
+        return BindingResult.EMPTY;
     }
 }

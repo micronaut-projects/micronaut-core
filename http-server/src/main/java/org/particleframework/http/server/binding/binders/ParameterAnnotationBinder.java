@@ -48,24 +48,25 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     }
 
     @Override
-    public Optional<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
         Parameter annotation = argument.getAnnotation(Parameter.class);
         boolean hasAnnotation = annotation != null;
         String parameterName = hasAnnotation ? annotation.value() : argument.getName();
 
-        Optional<T> result = doBind(context, parameters, parameterName);
-        if(!result.isPresent() && !hasAnnotation) {
+        BindingResult<T> result = doBind(context, parameters, parameterName);
+        Optional<T> val = result.getValue();
+        if(!val.isPresent() && !hasAnnotation) {
             // try attribute
             result = doBind(context, source.getAttributes(), parameterName);
         }
-        if(!result.isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
+        if(!result.getValue().isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
                 result = doBind(context, body.get(), parameterName);
-                if(!result.isPresent()) {
-                    return source.getBody(argument.getType());
+                if(!result.getValue().isPresent()) {
+                    return () -> source.getBody(argument.getType());
                 }
             }
         }

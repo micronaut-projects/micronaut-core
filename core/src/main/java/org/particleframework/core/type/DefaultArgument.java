@@ -5,10 +5,7 @@ import org.particleframework.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Represents an argument to a constructor or method
@@ -24,7 +21,7 @@ class DefaultArgument<T> implements Argument<T> {
     private final AnnotatedElement annotatedElement;
     private final Map<String, Argument<?>> typeParameters;
 
-    DefaultArgument(Class type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
+    DefaultArgument(Class<T> type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
         this.type = type;
         this.name = name;
         this.annotatedElement = createInternalElement(annotations);
@@ -32,7 +29,7 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameters = initializeTypeParameters(genericTypes);
     }
 
-    DefaultArgument(Class type, String name, Annotation qualifier, Argument... genericTypes) {
+    DefaultArgument(Class<T> type, String name, Annotation qualifier, Argument... genericTypes) {
         this.type = type;
         this.name = name;
         this.annotatedElement = AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
@@ -83,18 +80,20 @@ class DefaultArgument<T> implements Argument<T> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        DefaultArgument that = (DefaultArgument) o;
+        DefaultArgument<?> that = (DefaultArgument<?>) o;
 
         if (!type.equals(that.type)) return false;
-        if (!name.equals(that.name)) return false;
-        return qualifier != null ? qualifier.equals(that.qualifier) : that.qualifier == null;
+        if(typeParameters.isEmpty() && that.typeParameters.isEmpty()) return true;
+        return new HashSet<>(typeParameters.values()).equals(new HashSet<>(that.typeParameters.values()));
     }
 
     @Override
     public int hashCode() {
         int result = type.hashCode();
-        result = 31 * result + name.hashCode();
-        result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
+        Collection<Argument<?>> values = typeParameters.values();
+        if(!values.isEmpty()) {
+            result = 31 * result + new HashSet<>(values).hashCode();
+        }
         return result;
     }
 

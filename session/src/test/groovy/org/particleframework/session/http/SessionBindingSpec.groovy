@@ -26,6 +26,8 @@ import org.particleframework.session.annotation.SessionValue
 import org.particleframework.web.router.annotation.Get
 import spock.lang.Specification
 
+import javax.inject.Singleton
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -95,7 +97,48 @@ class SessionBindingSpec extends Specification {
         embeddedServer.stop()
     }
 
+    void "test bind optional session"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        OkHttpClient httpClient = new OkHttpClient()
+
+
+        when:
+        def request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
+        def response = httpClient.newCall(request.build())
+                .execute()
+
+        then:
+        response.body().string() == "no session"
+        !response.header(HttpHeaders.AUTHORIZATION_INFO)
+
+        when:
+        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/simple"))
+        response = httpClient.newCall(request.build())
+                .execute()
+
+        then:
+        response.body().string() == "not in session"
+        response.header(HttpHeaders.AUTHORIZATION_INFO)
+
+        when:
+        def sessionId = response.header(HttpHeaders.AUTHORIZATION_INFO)
+
+
+        request = new Request.Builder().url(new URL(embeddedServer.getURL(), "/sessiontest/optional"))
+                .header(HttpHeaders.AUTHORIZATION_INFO, sessionId)
+        response = httpClient.newCall(request.build())
+                .execute()
+        then:
+        response.body().string() == "value in session"
+        response.header(HttpHeaders.AUTHORIZATION_INFO)
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
     @Controller('/sessiontest')
+    @Singleton
     static class SessionController {
 
         @Get
