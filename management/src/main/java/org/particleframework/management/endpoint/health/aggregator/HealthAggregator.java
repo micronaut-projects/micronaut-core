@@ -24,11 +24,11 @@ import org.reactivestreams.Publisher;
  * @author James Kleeh
  * @since 1.0
  */
-public interface HealthAggregator {
+public interface HealthAggregator<T> {
 
     /**
      * @param indicators The health indicators to aggregate.
      * @return An aggregated response.
      */
-    Publisher<Object> aggregate(HealthIndicator[] indicators);
+    Publisher<T> aggregate(HealthIndicator[] indicators);
 }

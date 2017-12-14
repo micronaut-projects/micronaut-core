@@ -43,14 +43,13 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Singleton
-public class RxJavaHealthAggregator implements HealthAggregator {
+public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
     @Override
-    public Publisher<Object> aggregate(HealthIndicator[] indicators) {
+    public Publisher<Map<String, Object>> aggregate(HealthIndicator[] indicators) {
         Flowable<HealthResult> results = aggregateResults(indicators);
-        Single<Object> result = results.toList().map(list -> {
+        Single<Map<String, Object>> result = results.toList().map(list -> {
             HealthStatus overallStatus = calculateOverallStatus(list);
-
             return buildResult(overallStatus, aggregateDetails(list));
         });
         return result.toFlowable();
@@ -79,7 +78,7 @@ public class RxJavaHealthAggregator implements HealthAggregator {
         return details;
     }
 
-    protected Object buildResult(HealthStatus status, Object details) {
+    protected Map<String, Object> buildResult(HealthStatus status, Object details) {
         Map<String, Object> healthStatus = new LinkedHashMap<>(3);
         healthStatus.put("status", status.getName());
         status.getDescription().ifPresent(description -> healthStatus.put("description", description));
