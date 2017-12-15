@@ -39,10 +39,10 @@ import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.http.filter.HttpServerFilter;
-import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.hateos.Link;
+import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.codec.TextPlainCodec;
-import org.particleframework.http.server.cors.CorsFilter;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
@@ -64,7 +64,6 @@ import java.nio.channels.ClosedChannelException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -159,8 +158,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    MutableHttpResponse<Object> defaultResponse = HttpResponse.notAllowed(existingRoutes);
-                    emitDefaultResponse(ctx, request, defaultResponse);
+                    VndError error = newError(request, "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
+
+                    MutableHttpResponse<Object> defaultResponse = HttpResponse.notAllowed(existingRoutes)
+                                                                              .body(error);
+                    emitDefaultErrorResponse(ctx, request, defaultResponse);
                     return;
                 }
 
@@ -169,8 +171,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    MutableHttpResponse<Object> res = HttpResponse.notFound();
-                    emitDefaultResponse(ctx, request, res);
+                    VndError error = newError(request, "Page Not Found");
+                    MutableHttpResponse<Object> res = HttpResponse.notFound()
+                                                                  .body(error);
+                    emitDefaultErrorResponse(ctx, request, res);
                     return;
                 }
             }
@@ -187,8 +191,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             if (statusRoute.isPresent()) {
                 route = statusRoute.get();
             } else {
-                MutableHttpResponse<Object> res = HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-                emitDefaultResponse(ctx, request, res);
+                VndError error = newError(request, "Unsupported Media Type: " + contentType);
+                MutableHttpResponse<Object> res = HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                                                              .body(error);
+                emitDefaultErrorResponse(ctx, request, res);
                 return;
             }
 
@@ -201,47 +207,53 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     }
 
+    private VndError newError(HttpRequest<?> request, String message) {
+        URI path = request.getPath();
+        return new VndError(message)
+                     .link(Link.SELF, Link.of(path));
+    }
+
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.get(ctx);
         RouteMatch<Object> errorRoute = null;
-        boolean hasRequest = nettyHttpRequest != null;
+        if(nettyHttpRequest == null) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Particle Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+            }
+            ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
+            return;
+        }
+
         if (cause instanceof UnsatisfiedRouteException) {
             errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
         }
-        if (errorRoute == null && hasRequest) {
+        if (errorRoute == null) {
 
             RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
             Class declaringType = originalRoute != null ? originalRoute.getDeclaringType() : null;
             errorRoute = (declaringType != null ? router.route(declaringType, cause) : router.route(cause)).orElse(null);
         }
 
-        if (errorRoute != null && hasRequest) {
+        if (errorRoute != null) {
             errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
-            if (errorRoute.isExecutable()) {
-                try {
-                    Object result = errorRoute.execute();
-                    HttpResponse response = errorResultToResponse(result);
+            try {
+                Object result = errorRoute.execute();
+                HttpResponse response = errorResultToResponse(result);
 
-                    processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, errorRoute);
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
-                    }
-                    writeDefaultErrorResponse(ctx);
-                }
-            } else {
+                processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, errorRoute);
+            } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                    LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
                 }
-                writeDefaultErrorResponse(ctx);
+                writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
             }
         } else {
             Optional<ExceptionHandler> exceptionHandler = beanLocator
                     .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
 
-            if (hasRequest && exceptionHandler.isPresent()) {
+            if (exceptionHandler.isPresent()) {
                 ExceptionHandler handler = exceptionHandler.get();
                 MediaType defaultResponseMediaType = MediaType.fromType(exceptionHandler.getClass()).orElse(MediaType.APPLICATION_JSON_TYPE);
                 try {
@@ -249,17 +261,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     HttpResponse response = errorResultToResponse(result);
                     processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, null);
                 } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Exception occurred executing error handler. Falling back to default error handling.");
                     }
-                    writeDefaultErrorResponse(ctx);
+                    writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
                 }
             } else {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-                }
 
-                writeDefaultErrorResponse(ctx);
+                writeDefaultErrorResponse(ctx, nettyHttpRequest, cause);
             }
         }
     }
@@ -640,15 +649,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             if (message != null) {
                                 if (message instanceof HttpResponse) {
                                     HttpResponse<?> responseMessage = (HttpResponse<?>) this.message;
-                                    Object body = responseMessage.getBody().orElse(null);
-                                    MediaTypeCodec codecToUse = codec;
-                                    if (body != null) {
-                                        codecToUse = mediaTypeCodecRegistry.findCodec(
-                                                responseType,
-                                                body.getClass()
-                                        ).orElse(new TextPlainCodec(serverConfiguration));
-                                    }
-                                    writeMessage(context, request, nativeResponse, body, codecToUse, responseType);
+                                    writeHttpResponse(context, request, responseMessage, nativeResponse, codec, responseType);
                                 } else {
                                     writeMessage(context, request, nativeResponse, message, codec, responseType);
                                 }
@@ -668,6 +669,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
     }
 
+    private void writeHttpResponse(ChannelHandlerContext context, HttpRequest<?> request, HttpResponse<?> responseMessage, FullHttpResponse nativeResponse, MediaTypeCodec codec, MediaType responseType) {
+        Object body = responseMessage.getBody().orElse(null);
+        MediaTypeCodec codecToUse = codec;
+        if (body != null) {
+            codecToUse = mediaTypeCodecRegistry.findCodec(
+                    responseType,
+                    body.getClass()
+            ).orElse(new TextPlainCodec(serverConfiguration));
+        }
+        writeMessage(context, request, nativeResponse, body, codecToUse, responseType);
+    }
+
     @SuppressWarnings("unchecked")
     private Publisher<Object> convertPublisher(Object body, Class<?> bodyType) {
         return ConversionService.SHARED.convert(body, Publisher.class)
@@ -675,10 +688,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     }
 
 
-    void writeDefaultErrorResponse(ChannelHandlerContext ctx) {
-        ctx.channel()
-                .writeAndFlush(HttpResponse.serverError())
-                .addListener(ChannelFutureListener.CLOSE);
+    void writeDefaultErrorResponse(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause) {
+        if (LOG.isErrorEnabled()) {
+            LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+        }
+
+        NettyHttpResponse error = (NettyHttpResponse) HttpResponse.serverError()
+                                                        .body(new VndError("Internal Server Error: " + cause.getMessage()));
+        writeHttpResponse(
+            ctx,
+            nettyHttpRequest,
+                error,
+                error.getNativeResponse(),
+                null,
+                MediaType.APPLICATION_VND_ERROR_TYPE
+        );
     }
 
 
@@ -700,7 +724,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return bodyType;
     }
 
-    private void emitDefaultResponse(ChannelHandlerContext ctx, HttpRequest<?> request, MutableHttpResponse<Object> defaultResponse) {
+    private void emitDefaultErrorResponse(ChannelHandlerContext ctx, HttpRequest<?> request, MutableHttpResponse<Object> defaultResponse) {
         Publisher<MutableHttpResponse<?>> notAllowedResponse = Publishers.just(defaultResponse);
         notAllowedResponse  = (Publisher<MutableHttpResponse<?>>) filterPublisher(request, notAllowedResponse);
         notAllowedResponse.subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
@@ -711,6 +735,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             @Override
             protected void doOnNext(MutableHttpResponse<?> message) {
+                writeHttpResponse(ctx,
+                        request,
+                        message,
+                        ((NettyHttpResponse)message).getNativeResponse(),
+                        null,
+                        MediaType.APPLICATION_VND_ERROR_TYPE);
                 writeNettyResponse(ctx, request, ((NettyHttpResponse) message).getNativeResponse());
             }
 
@@ -719,7 +749,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if(LOG.isErrorEnabled()) {
                     LOG.error("Unexpected error occurred: " + t.getMessage(), t);
                 }
-                writeNettyResponse(ctx, request, ((NettyHttpResponse) HttpResponse.serverError()).getNativeResponse());
+                writeDefaultErrorResponse(ctx, (NettyHttpRequest) request, t);
             }
 
             @Override
@@ -779,7 +809,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     private void writeMessage(
             ChannelHandlerContext context,
-            NettyHttpRequest<?> request,
+            HttpRequest<?> request,
             FullHttpResponse nativeResponse,
             Object message,
             MediaTypeCodec codec,
