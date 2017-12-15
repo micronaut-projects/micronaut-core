@@ -53,8 +53,8 @@ public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Obje
 
     @Override
     protected Map<String, Object> getHealthInformation() {
-        File path = configuration.path;
-        long threshold = configuration.threshold;
+        File path = configuration.getPath();
+        long threshold = configuration.getThreshold();
         long freeSpace = path.getUsableSpace();
         Map<String, Object> detail = new LinkedHashMap<>(3);
 
