@@ -2,11 +2,6 @@ dependencies {
     compile project(":http-server")
     compile project(":router")
 
-
-
-
-    compileOnly project(":inject-groovy")
-    compile project(":particle-groovy")
     compileOnly project(":inject-java")
 
     compile 'com.typesafe.netty:netty-reactive-streams-http:2.0.0', {
