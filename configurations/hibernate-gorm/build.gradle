@@ -1,6 +1,7 @@
 dependencies {
     compile "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly project(":inject-groovy")
+    compile project(":particle-groovy")
     compile project(":inject")
     compile project(":spring")
     compile "org.grails:grails-datastore-gorm-hibernate5:$gormVersion"
