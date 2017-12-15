@@ -1,9 +1,12 @@
 package org.particleframework.context.env.groovy;
 
-import org.particleframework.context.env.*;
+import org.particleframework.context.env.EnvironmentPropertySource;
+import org.particleframework.context.env.PropertySourceLoader;
+import org.particleframework.context.env.PropertySource;
+import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.MapPropertySource;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.core.value.ValueException;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
