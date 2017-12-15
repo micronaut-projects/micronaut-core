@@ -544,6 +544,7 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinition> reduced = qualifier.reduce(Object.class, beanDefinitions.stream());
             candidates.addAll(reduced.collect(Collectors.toList()));
         }
+        filterProxiedTypes(candidates, true, true);
         return candidates;
     }
 
