@@ -1,0 +1,58 @@
+Particle `inject-java` dependency provides an annotation processor to your Android app. When using the Android plugin 3.0.0,
+you must add annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
+Particle `inject-java`  dependency includes components that also need to be on the compile classpath. Because of that
+ you need to declare that dependency a second time and use the `compile` dependency configuration. E.g.:
+
+[source, groovy]
+----
+dependencies {
+...
+..
+.
+annotationProcessor "org.particleframework:inject-java:1.0.0-SNAPSHOT"
+compile "org.particleframework:inject-java:1.0.0-SNAPSHOT"
+...
+..
+.
+}
+----
+
+You can find more information at: https://developer.android.com/studio/build/gradle-plugin-3-0-0-migration.html#annotationProcessor_config[Use the annotation processor dependency configuration
+] in the android documentation.
+
+Particle `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
+
+### Start Bean Context
+
+You will then need to start the bean context.
+
+You could use a base application which extends https://developer.android.com/reference/android/app/Application.html[android.app.Application]:
+
+[source, java]
+----
+import android.app.Application;
+
+import org.particleframework.context.ApplicationContext;
+
+public class BaseApplication extends Application {
+
+    public BaseApplication() {
+        super();
+    }
+
+    ApplicationContext ctx;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+         ctx = ApplicationContext.build(MainActivity.class).start();
+    }
+
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        ctx.stop();
+    }
+
+}
+----
