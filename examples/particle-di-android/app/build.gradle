@@ -20,6 +20,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+    lintOptions {
+        lintOptions { warning 'InvalidPackage' }
+    }
 }
 
 repositories {
@@ -34,7 +37,7 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.1'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     annotationProcessor "org.particleframework:inject-java:${particleVersion}"
-    compile "org.particleframework:inject-java:${particleVersion}"
+    compileOnly "org.particleframework:inject-java:${particleVersion}"
     compile "org.particleframework:runtime:${particleVersion}"
     //runtimeOnly 'org.codehaus.groovy:groovy-all:2.4.13'
 }
