@@ -48,15 +48,15 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
         return threshold;
     }
 
-    protected void setEnabled(boolean enabled) {
+    void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
-    protected void setPath(File path) {
+    void setPath(File path) {
         this.path = path;
     }
 
-    protected void setThreshold(long threshold) {
+    void setThreshold(long threshold) {
         this.threshold = threshold;
     }
 }
