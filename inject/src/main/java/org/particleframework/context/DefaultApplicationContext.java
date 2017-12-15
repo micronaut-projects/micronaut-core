@@ -7,6 +7,7 @@ import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.convert.TypeConverterRegistrar;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -152,6 +153,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 }
             }
         }
+        Collection<TypeConverterRegistrar> registrars = getBeansOfType(TypeConverterRegistrar.class);
+        for (TypeConverterRegistrar registrar : registrars) {
+            registrar.register(conversionService);
+        }
+
         super.initializeContext(contextScopeBeans);
     }
 

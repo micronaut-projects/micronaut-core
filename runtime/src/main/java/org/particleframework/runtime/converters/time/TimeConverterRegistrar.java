@@ -19,6 +19,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.convert.TypeConverterRegistrar;
 import org.particleframework.core.convert.format.Format;
 
 import javax.inject.Singleton;
@@ -37,9 +38,10 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(notEnv = Environment.ANDROID) // Android doesn't support java.time
-public class TimeConverterRegistrar {
+public class TimeConverterRegistrar implements TypeConverterRegistrar{
 
-    public TimeConverterRegistrar(ConversionService<?> conversionService) {
+    @Override
+    public void register(ConversionService<?> conversionService) {
         // CharSequence -> LocalDataTime
         conversionService.addConverter(
                 CharSequence.class,
@@ -90,7 +92,6 @@ public class TimeConverterRegistrar {
         );
     }
 
-
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
         Format ann = context.getAnnotation(Format.class);
         Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
@@ -98,5 +99,4 @@ public class TimeConverterRegistrar {
                 .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
                 .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
-
 }
