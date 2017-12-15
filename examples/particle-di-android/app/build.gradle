@@ -1,11 +1,11 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 25
     defaultConfig {
         applicationId "demo.particlediandroid"
-        minSdkVersion 27
-        targetSdkVersion 27
+        minSdkVersion 25
+        targetSdkVersion 25
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
@@ -35,5 +35,6 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     annotationProcessor "org.particleframework:inject-java:${particleVersion}"
     compile "org.particleframework:inject-java:${particleVersion}"
+    compile "org.particleframework:runtime:${particleVersion}"
     //runtimeOnly 'org.codehaus.groovy:groovy-all:2.4.13'
 }
