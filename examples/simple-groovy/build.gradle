@@ -26,7 +26,6 @@ dependencies {
     compile "org.particleframework:http-server-netty:${props.projectVersion}"
 //    compile "org.particleframework:runtime-green-lightning:${props.projectVersion}"
 
-    compile "org.particleframework.configuration:jackson:${props.projectVersion}"
     compile "org.particleframework.configuration:hibernate-gorm:${props.projectVersion}"
 
     runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'

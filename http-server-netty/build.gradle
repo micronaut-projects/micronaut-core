@@ -17,7 +17,6 @@ dependencies {
     compile "io.netty:netty-codec-http:$nettyVersion"
     compile "io.netty:netty-handler:$nettyVersion"
 
-    testCompile project(":configurations/jackson")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
