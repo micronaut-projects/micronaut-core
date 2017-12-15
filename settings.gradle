@@ -21,6 +21,7 @@ include "runtime-green-lightning"
 include "test-suite"
 include "validation"
 include "jdbc"
+include "particle-groovy"
 
 // configurations
 include "configurations/hibernate-validator"
