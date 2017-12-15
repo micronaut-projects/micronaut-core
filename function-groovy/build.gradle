@@ -1,7 +1,6 @@
 dependencies {
     compile project(":inject-groovy")
     compile project(":function")
-    runtime project(":configurations/jackson")
 
     testCompile project(":function-web")
     testRuntime project(":http-server-netty")
