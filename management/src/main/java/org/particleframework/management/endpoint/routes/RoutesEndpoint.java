@@ -43,7 +43,6 @@ public class RoutesEndpoint {
 
     private Router router;
 
-    @Inject
     public RoutesEndpoint(Router router) {
         this.router = router;
     }

@@ -48,7 +48,6 @@ We need endpoints for managing and/or exposing information about:
 
 - logging
 - beans
-- health checks
 - server stop/start
 
 These should be built on the `Endpoint` API
