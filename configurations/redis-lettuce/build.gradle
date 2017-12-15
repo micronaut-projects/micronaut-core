@@ -1,5 +1,5 @@
 dependencies {
-    compile project(":bootstrap")
+    compile project(":runtime")
     compileOnly project(":session")
     compileOnly project(":inject-java")
     compile "io.lettuce:lettuce-core:$lettuceVersion"

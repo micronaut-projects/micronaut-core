@@ -1,7 +1,7 @@
 dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
-    compile project(":bootstrap")
+    compile project(":runtime")
     compile project(":http")
 
     testCompile project(":inject-groovy")
