@@ -18,8 +18,11 @@ package org.particleframework.management.endpoint.health.indicator;
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.management.endpoint.health.HealthStatus;
+import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -30,15 +33,15 @@ import java.util.concurrent.ExecutorService;
  * @author James Kleeh
  * @since 1.0
  */
-public abstract class AbstractHealthIndicator implements HealthIndicator {
+public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
 
-    public AbstractHealthIndicator(ExecutorService executorService) {
+    protected ExecutorService executorService;
+    protected HealthStatus healthStatus;
+
+    @Inject
+    public void setExecutorService(@Named(IOExecutorServiceConfig.NAME) ExecutorService executorService) {
         this.executorService = executorService;
     }
-
-    protected final ExecutorService executorService;
-
-    protected HealthStatus healthStatus;
 
     @Override
     public Publisher<HealthResult> getResult() {
@@ -63,7 +66,7 @@ public abstract class AbstractHealthIndicator implements HealthIndicator {
      *
      * @return Any details to be included in the response.
      */
-    protected abstract Object getHealthInformation();
+    protected abstract T getHealthInformation();
 
     /**
      * Used to populate the {@link HealthResult}. Provides a key to go
