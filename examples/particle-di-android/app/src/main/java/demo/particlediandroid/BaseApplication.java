@@ -5,6 +5,7 @@ import android.app.Application;
 import android.os.Bundle;
 
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.env.Environment;
 
 public class BaseApplication extends Application {
 
@@ -17,7 +18,7 @@ public class BaseApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        ctx = ApplicationContext.build(MainActivity.class).start();
+        ctx = ApplicationContext.build(MainActivity.class, Environment.ANDROID).start();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
             public void onActivityCreated(Activity activity, Bundle bundle) {
@@ -59,7 +60,9 @@ public class BaseApplication extends Application {
     @Override
     public void onTerminate() {
         super.onTerminate();
-        ctx.stop();
+        if(ctx != null && ctx.isRunning()) {
+            ctx.stop();
+        }
     }
 
 
