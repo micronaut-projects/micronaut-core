@@ -24,6 +24,16 @@ class TypeConverterFactory {
 
 At compile time we know the types but at runtime the lambda loses type information. We need to add an API to obtain type information for a bean from the factory.
 
+#### Expression Language Support
+
+Should be able to embed expressions in annotations and allow for pluggable EL support, so for example:
+
+```
+@Secured("${hasRole('Admin')}")
+```
+
+Can be implemented.
+
 #### AOP API
 
 We need to allow `Introduction` advise to specify additional interfaces that should be be implemented by the interceptor.
@@ -66,6 +76,11 @@ Content negotiation must be supported
 #### WebSocket Support
 
 WebSocket Support must be implemented
+
+#### Serve Static Resources
+
+* Must be able to serve static resources / directories of resources
+* Must be able to transfer files from server chunk by chunk (streaming)
 
 #### Support for Views
 
