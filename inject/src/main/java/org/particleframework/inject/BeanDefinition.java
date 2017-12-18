@@ -23,7 +23,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     /**
      * @return The scope of the component
      */
-    Class<? extends Annotation> getScope();
+    Optional<Class<? extends Annotation>> getScope();
 
     /**
      * @return Whether the scope is singleton

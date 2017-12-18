@@ -63,7 +63,7 @@ public class DefaultBeanContext implements BeanContext {
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     public static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
-    protected final Set<BeanDefinition> beanDefinitions = Collections.newSetFromMap(new ConcurrentHashMap<>(30));
+    protected final Set<BeanDefinition<?>> beanDefinitions = Collections.newSetFromMap(new ConcurrentHashMap<>(30));
     protected final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
 
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
@@ -541,10 +541,33 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if(!beanDefinitions.isEmpty()) {
-            Stream<BeanDefinition> reduced = qualifier.reduce(Object.class, beanDefinitions.stream());
+            Stream<BeanDefinition> reduced = qualifier.reduce(Object.class, beanDefinitions.stream().map(BeanDefinition.class::cast));
             candidates.addAll(reduced.collect(Collectors.toList()));
         }
         return candidates;
+    }
+
+    @Override
+    public Collection<BeanDefinition<?>> getAllBeanDefinitions() {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Finding all bean definitions");
+        }
+        // first traverse component definition classes and load candidates
+
+        if (!beanDefinitionsClasses.isEmpty()) {
+            synchronized (beanDefinitionsClasses) {
+                beanDefinitionsClasses.forEach(reference -> {
+                    beanDefinitionsClasses.remove(reference);
+                    try {
+                        beanDefinitions.add(reference.load());
+                    } catch (Throwable e) {
+                        throw new BeanInstantiationException(reference, e);
+                    }
+                });
+            }
+        }
+
+        return Collections.unmodifiableSet(beanDefinitions);
     }
 
     public <T> Provider<T> getBeanProvider(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
@@ -908,8 +931,8 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
         boolean isProxy = definition instanceof ProxyBeanDefinition;
-        Class<? extends Annotation> scope = isProxy ? null : definition.getScope();
-        Optional<CustomScope> registeredScope = scope != null ? customScopeRegistry.findScope(scope) : Optional.empty();
+        Optional<Class<? extends Annotation>> scope = isProxy ? Optional.empty() : definition.getScope();
+        Optional<CustomScope> registeredScope = scope.flatMap(customScopeRegistry::findScope);
         if (registeredScope.isPresent()) {
             CustomScope customScope = registeredScope.get();
             if (isProxy) {
@@ -1552,8 +1575,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public Class<? extends Annotation> getScope() {
-            return Singleton.class;
+        public Optional<Class<? extends Annotation>> getScope() {
+            return Optional.of(Singleton.class);
         }
 
         @Override
