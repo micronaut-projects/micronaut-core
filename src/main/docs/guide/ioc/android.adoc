@@ -10,7 +10,7 @@ dependencies {
 ..
 .
 annotationProcessor "org.particleframework:inject-java:1.0.0-SNAPSHOT"
-compile "org.particleframework:inject-java:1.0.0-SNAPSHOT"
+compileOnly "org.particleframework:inject-java:1.0.0-SNAPSHOT"
 ...
 ..
 .

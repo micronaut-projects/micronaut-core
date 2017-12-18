@@ -15,7 +15,7 @@
  */
 package org.particleframework.docs.intro
 
-import org.particleframework.context.DefaultBeanContext
+import org.particleframework.context.*
 import spock.lang.Specification
 
 /**
@@ -27,9 +27,8 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        Vehicle vehicle = new DefaultBeanContext()
-                .start()
-                .getBean(Vehicle)
+        Vehicle vehicle = BeanContext.run()
+                                     .getBean(Vehicle)
         println( vehicle.start() )
         // end::start[]
 

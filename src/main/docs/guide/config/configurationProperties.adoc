@@ -1,4 +1,4 @@
-Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/org/particleframework/config/ConfigurationProperties.html[ConfigurationProperties].
+Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/org/particleframework/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
 
 Unlike the aforementioned frameworks, however, Particle uses ASM to generate a class that avoids the use of reflection and dynamic parsing so that loading the configuration is an efficient as possible with minimal impact on startup time.
 
