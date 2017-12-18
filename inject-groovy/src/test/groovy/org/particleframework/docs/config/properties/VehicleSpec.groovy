@@ -32,9 +32,10 @@ class VehicleSpec extends Specification {
 
         when:
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource('my.engine.cylinders':'8'))
-        applicationContext.start()
+        ApplicationContext applicationContext = ApplicationContext.run(
+                ['my.engine.cylinders':'8'],
+                "test"
+        )
 
         Vehicle vehicle = applicationContext
                 .getBean(Vehicle)
