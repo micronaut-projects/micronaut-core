@@ -15,7 +15,8 @@
  */
 package org.particleframework.core.naming;
 
-import java.beans.Introspector;
+import org.particleframework.core.beans.Introspector;
+
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.stream.Collectors;

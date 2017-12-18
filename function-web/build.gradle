@@ -8,6 +8,5 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
 
-    testRuntime project(":configurations/jackson")
 
 }

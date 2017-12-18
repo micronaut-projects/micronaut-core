@@ -1,8 +1,8 @@
 dependencies {
-    compile project(":inject-groovy")
+    compileOnly project(":inject-groovy")
     compile project(":function")
-    runtime project(":configurations/jackson")
-
+    compile project(":runtime-groovy")
+    testCompile(project(":inject-groovy"))
     testCompile project(":function-web")
     testRuntime project(":http-server-netty")
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'

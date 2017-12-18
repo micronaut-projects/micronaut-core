@@ -3,6 +3,7 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.*;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
@@ -28,7 +29,6 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
-import java.beans.Introspector;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
@@ -1267,7 +1267,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                         if (i > -1) {
                             name = name.substring(i + 1, name.length());
                         }
-                        prefix.append(Introspector.decapitalize(name));
+                        prefix.append(NameUtils.decapitalize(name));
                     }
                 }
                 Optional<String> named = resolutionContext.get(Named.class.getName(), String.class);

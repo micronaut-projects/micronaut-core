@@ -34,7 +34,15 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The development environment
      */
     String DEVELOPMENT = "dev";
+    /**
+     * The android environment
+     */
+    String ANDROID = "android";
 
+    /**
+     * The cloud environment
+     */
+    String CLOUD = "cloud";
     /**
      * @return The active environment names
      */

@@ -1,6 +1,5 @@
 dependencies {
     compile project(":function")
-    runtime project(":configurations/jackson")
     compile 'com.amazonaws:aws-lambda-java-core:1.1.0'
 
     testCompile project(":inject-groovy")

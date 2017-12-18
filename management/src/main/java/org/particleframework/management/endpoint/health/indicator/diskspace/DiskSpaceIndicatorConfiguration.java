@@ -30,13 +30,33 @@ import java.io.File;
 @ConfigurationProperties("endpoints.health.disk-space")
 public class DiskSpaceIndicatorConfiguration implements Toggleable {
 
-    protected boolean enabled = true;
-    protected File path = new File(".");
+    private boolean enabled = true;
+    private File path = new File(".");
     @ReadableBytes
-    protected long threshold = 1024 * 1024 * 10; // 10MB
+    private long threshold = 1024 * 1024 * 10; // 10MB
 
+    @Override
     public boolean isEnabled() {
         return enabled;
     }
 
+    public File getPath() {
+        return path;
+    }
+
+    public long getThreshold() {
+        return threshold;
+    }
+
+    void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    void setPath(File path) {
+        this.path = path;
+    }
+
+    void setThreshold(long threshold) {
+        this.threshold = threshold;
+    }
 }

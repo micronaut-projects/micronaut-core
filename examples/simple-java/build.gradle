@@ -18,11 +18,8 @@ repositories {
 }
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
-    compile 'io.reactivex.rxjava2:rxjava:2.1.5'
     compile "org.particleframework:http-server-netty:${projectVersion}"
     compile "org.particleframework:management:${projectVersion}"
-    compile "org.particleframework:validation:${projectVersion}"
-    compile "org.particleframework.configuration:jackson:${projectVersion}"
     compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 
