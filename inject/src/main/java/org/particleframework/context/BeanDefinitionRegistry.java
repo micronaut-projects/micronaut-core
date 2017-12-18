@@ -94,6 +94,12 @@ public interface BeanDefinitionRegistry {
     Collection<BeanDefinition<?>> getBeanDefinitions(Qualifier<Object> qualifier);
 
     /**
+     * Get all of the registered {@link BeanDefinition}
+     * @return The bean definitions
+     */
+    Collection<BeanDefinition<?>> getAllBeanDefinitions();
+
+    /**
      * Find active {@link javax.inject.Singleton} beans for the given qualifier
      * @param qualifier The qualifier
      * @return The beans

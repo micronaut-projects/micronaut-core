@@ -183,8 +183,8 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Class<? extends Annotation> getScope() {
-        return getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class).orElse(null);
+    public Optional<Class<? extends Annotation>> getScope() {
+        return getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
     }
 
     @Override

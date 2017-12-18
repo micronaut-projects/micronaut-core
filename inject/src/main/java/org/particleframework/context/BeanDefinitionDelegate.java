@@ -57,7 +57,7 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     }
 
     @Override
-    public Class<? extends Annotation> getScope() {
+    public Optional<Class<? extends Annotation>> getScope() {
         return definition.getScope();
     }
 
