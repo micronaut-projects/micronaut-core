@@ -25,6 +25,12 @@ public @interface Requires {
     String[] env() default {};
 
     /**
+     * Expresses that the configuration will not load within the given environments
+     *
+     * @return The names of the environments this configuration will load in
+     */
+    String[] notEnv() default {};
+    /**
      * Expresses that the given property should be set for the bean to load. By default the value of the property
      * should be "yes", "YES", "true", "TRUE", "y" or "Y" for it to be considered to be set. If a different value is to be used then
      * the {@link #value()} method should be used

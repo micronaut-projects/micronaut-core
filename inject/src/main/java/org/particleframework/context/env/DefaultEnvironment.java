@@ -229,6 +229,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
                     environmentsAndPackage.enviroments.add(Environment.TEST);
                 }
+                else if(className.startsWith("com.android")) {
+                    environmentsAndPackage.enviroments.add(Environment.ANDROID);
+                }
             }
         }
 

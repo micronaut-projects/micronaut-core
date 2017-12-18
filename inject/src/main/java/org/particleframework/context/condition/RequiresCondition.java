@@ -11,6 +11,7 @@ import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
@@ -23,6 +24,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -158,7 +160,18 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesEnvironment(ConditionContext context, Requires annotation) {
         String[] env = annotation.env();
-        if(env.length == 0) {
+        if(ArrayUtils.isEmpty(env)) {
+            env = annotation.notEnv();
+            if( ArrayUtils.isNotEmpty(env) ) {
+                BeanContext beanContext = context.getBeanContext();
+                if(beanContext instanceof ApplicationContext) {
+                    ApplicationContext applicationContext = (ApplicationContext) beanContext;
+                    Environment environment = applicationContext.getEnvironment();
+                    Set<String> activeNames = environment.getActiveNames();
+                    return !activeNames.contains(env[0]);
+                }
+
+            }
             return true;
         }
         else {
@@ -166,7 +179,8 @@ public class RequiresCondition implements Condition {
             if(beanContext instanceof ApplicationContext) {
                 ApplicationContext applicationContext = (ApplicationContext) beanContext;
                 Environment environment = applicationContext.getEnvironment();
-                return Arrays.stream(env).anyMatch(name -> environment.getActiveNames().contains(name));
+                Set<String> activeNames = environment.getActiveNames();
+                return Arrays.stream(env).anyMatch(activeNames::contains);
             }
         }
         return true;

@@ -17,10 +17,7 @@ package org.particleframework.http;
 
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.value.OptionalValues;
 
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Optional;
 

@@ -15,18 +15,14 @@
  */
 package org.particleframework.configuration.lettuce.session
 
-import org.particleframework.configuration.jackson.serialize.JacksonObjectSerializer
+import org.particleframework.jackson.serialize.JacksonObjectSerializer
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.event.ApplicationEventListener
-import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.session.Session
 import org.particleframework.session.event.AbstractSessionEvent
 import org.particleframework.session.event.SessionCreatedEvent
 import org.particleframework.session.event.SessionDeletedEvent
 import org.particleframework.session.event.SessionExpiredEvent
-import redis.embedded.RedisServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

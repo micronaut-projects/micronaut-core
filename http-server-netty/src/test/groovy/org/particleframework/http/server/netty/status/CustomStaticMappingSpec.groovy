@@ -30,7 +30,6 @@ class CustomStaticMappingSpec extends AbstractParticleSpec {
         ).execute()
 
         then:
-        applicationContext.containsBean(TestController)
         response.code() == HttpStatus.BAD_REQUEST.code
         response.message() == "You sent me bad stuff"
 
@@ -50,7 +49,6 @@ class CustomStaticMappingSpec extends AbstractParticleSpec {
         ).execute()
 
         then:
-        applicationContext.containsBean(TestController)
         response.code() == HttpStatus.BAD_REQUEST.code
         response.message() == "You sent me bad stuff"
 

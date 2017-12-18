@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.ParticleApplication
+import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -33,14 +34,13 @@ abstract class AbstractParticleSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
 
-    @Shared int serverPort = SocketUtils.findAvailableTcpPort()
+
     @Shared File uploadDir = File.createTempDir()
-    @Shared @AutoCleanup ApplicationContext applicationContext =
-                            ParticleApplication.build('-port',String.valueOf(serverPort))
-                                               .include(configurationNames() as String[])
-                                               .properties(getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName])
-                                               .start()
-    @Shared String server = "http://localhost:$serverPort"
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+            getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName]
+    )
+    @Shared int serverPort = embeddedServer.getPort()
+    @Shared URL server = embeddedServer.getURL()
     @Shared OkHttpClient client = new OkHttpClient()
                                             .newBuilder()
 //                                            .readTimeout(1, TimeUnit.MINUTES)

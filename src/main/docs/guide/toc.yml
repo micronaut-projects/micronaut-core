@@ -10,6 +10,7 @@ ioc:
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
+  android: Dependency Injection in Android
 config:
   title: Configuration
   environments: The Environment
