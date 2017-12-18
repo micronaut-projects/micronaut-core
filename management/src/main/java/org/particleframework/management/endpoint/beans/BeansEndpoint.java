@@ -31,9 +31,9 @@ public class BeansEndpoint {
     private BeanContext beanContext;
     private BeanDefinitionDataCollector beanDefinitionDataCollector;
 
-    public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector beanAggregator) {
+    public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector beanDefinitionDataCollector) {
         this.beanContext = beanContext;
-        this.beanDefinitionDataCollector = beanAggregator;
+        this.beanDefinitionDataCollector = beanDefinitionDataCollector;
     }
 
     @Read

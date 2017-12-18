@@ -57,7 +57,6 @@ Need a mechanism for configuration discovery and sharing across the federation
 We need endpoints for managing and/or exposing information about:
 
 - logging
-- beans
 - server stop/start
 
 These should be built on the `Endpoint` API

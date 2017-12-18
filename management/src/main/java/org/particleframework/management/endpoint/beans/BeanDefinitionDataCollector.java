@@ -16,6 +16,7 @@
 package org.particleframework.management.endpoint.beans;
 
 import org.particleframework.inject.BeanDefinition;
+import org.reactivestreams.Publisher;
 
 import java.util.Collection;
 
@@ -29,7 +30,8 @@ public interface BeanDefinitionDataCollector<T> {
 
     /**
      * @param beanDefinitions A collection of bean definitions
-     * @return Data representing all of the given bean definitions
+     * @return A publisher that returns data representing all of
+     *         the given bean definitions
      */
-    T getData(Collection<BeanDefinition<?>> beanDefinitions);
+    Publisher<T> getData(Collection<BeanDefinition<?>> beanDefinitions);
 }
