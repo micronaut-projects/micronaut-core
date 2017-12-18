@@ -19,5 +19,31 @@ config:
   configurationProperties: Configuration Properties
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
-  validation: Validating Configuration
+  # validation: Validating Configuration
+aop:
+  title: Aspect Oriented Programming
+  aroundAdvice: Around Advice
+  introductionAdvice: Introduction Advice
+  caching: 
+    title: Cache Advice      
+httpServer:
+  title: The HTTP Server
+  running: Running the Embedded Server 
+  serverConfiguration:
+    title: Configuring the HTTP Server
+    threadPools: Configuring Server Thread Pools
+    cors: Configuring CORS
+    https: Securing the Server with HTTPS
+  routing: HTTP Routing
+  binding: Parameter Binding
+  reactiveServer: Reactive HTTP Request Processing
+  filters: HTTP Filters
+  uploads: File Uploads
+  transfers: File Transfers
+  sse: Server Sent Events
+  sessions: HTTP Sessions
+httpClient:
+  title: The HTTP Client
+management:
+  title: Management & Monitoring
 
