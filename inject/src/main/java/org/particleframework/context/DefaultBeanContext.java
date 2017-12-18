@@ -552,7 +552,6 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding all bean definitions");
         }
-        // first traverse component definition classes and load candidates
 
         if (!beanDefinitionsClasses.isEmpty()) {
             synchronized (beanDefinitionsClasses) {
