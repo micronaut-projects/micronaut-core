@@ -7,7 +7,9 @@ Particle features an extensible bean scoping mechanism based on JSR-303. The fol
 |link:{jeeapi}/javax/inject/Singleton.html[Singleton]
 |Singleton scope indicates only one instance of the bean should exist
 |`@Singleton`
+|link:{api}/org/particleframework/context/annotation/Context.html[@Context]
+|Context scope indicates that the bean should be created at the same time as the `ApplicationContext` (eager initialization)
+|`@Context`
 
 |===
 
-TODO: Complete remaining scopes
