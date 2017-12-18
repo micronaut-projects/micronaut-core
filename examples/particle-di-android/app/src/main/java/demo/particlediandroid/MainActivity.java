@@ -46,9 +46,11 @@ public class MainActivity extends Activity {
     void logBooks() {
         if ( bookList != null) {
             StringBuilder sb = new StringBuilder();
-            sb.append("Books Fetched #"+bookList.size() + "\n");
+            sb.append("Books Fetched #"+bookList.size());
+            sb.append("\n");
             for ( Book book : bookList ) {
-                sb.append("Book "+book.getTitle() + "\n");
+                sb.append("Book "+book.getTitle());
+                sb.append("\n");
             }
             Log.i(TAG, sb.toString());
             textViewMessage.setText(sb.toString());
