@@ -26,8 +26,8 @@ class BeansEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[0] == "org.particleframework.management.endpoint.beans.BeanAggregator"
-        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[1] == "org.particleframework.context.BeanContext"
+        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[0] == "org.particleframework.context.BeanContext"
+        beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies[1] == "org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector"
         beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "singleton"
         beans["org.particleframework.management.endpoint.beans.\$BeansEndpointDefinition"].type == "org.particleframework.management.endpoint.beans.BeansEndpoint"
 
