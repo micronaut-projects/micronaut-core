@@ -15,6 +15,7 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.context.BeanContext;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
@@ -40,4 +41,12 @@ public interface BeanType<T> extends AnnotationMetadataProvider {
     default String getName() {
         return getBeanType().getName();
     }
+
+    /**
+     * Whether the bean is enabled
+     *
+     * @param beanContext The bean context
+     * @return True if it is
+     */
+    boolean isEnabled(BeanContext beanContext);
 }

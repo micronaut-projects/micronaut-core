@@ -55,12 +55,4 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      */
     boolean isPresent();
 
-    /**
-     * Whether the bean is enabled
-     *
-     * @param beanContext The bean context
-     * @return True if it is
-     */
-    boolean isEnabled(BeanContext beanContext);
-
 }

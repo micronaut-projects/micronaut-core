@@ -1,0 +1,27 @@
+The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves, nor do they provide any ability to introspect annotation stereotypes (Often called meta-annotations, an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
+
+To solve this problem many frameworks produce runtime metadata or perform expensive reflection to analyze the annotations of a class.
+
+Particle instead produces this annotation metadata at compile time, avoiding expensive reflection and saving on memory.
+
+The link:{api}/org/particleframework/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/org/particleframework/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
+
+For example the following code will obtain all bean definitions annotated with a particular stereotype:
+
+.Lookup Bean Definitions by Stereotype
+[source,java]
+----
+BeanContext beanContext = ... // obtain the bean context
+Collection<BeanDefinition definitions =
+    beanContext.getBeanDefinitions(Qualfiers.byStereotype(Controller.class))
+
+for(BeanDefinition definition : definitions) {
+    Controller controllerAnn = definition.getAnnotation(Controller.class);
+    // do something with the annotation
+}
+----
+
+The above example will find all link:{api}/org/particleframework/inject/BeanDefinition.html[BeanDefinition] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+
+Like Spring, Particle also supports an link:{api}/org/particleframework/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
+

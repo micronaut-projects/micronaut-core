@@ -1,0 +1,36 @@
+At times you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans etc.
+
+The link:{api}/org/particleframework/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
+
+Consider the following example:
+
+.Using @Requires
+[source,java]
+----
+include::{testsjava}/requires/JdbcBookService.java[tags=requires, indent=0]
+}
+----
+
+The above bean defines two requirements. The first indicates that a `DataSource` bean must be present for the bean to load. The second requirement ensures that the `datasource.url` property is set before loading the `JdbcBookService` bean.
+
+If you have multiple requirements that you find you may need to repeat on multiple beans then you can define a meta-annotation with the requirements:
+
+
+.Using a @Requires meta-annotation
+[source,java]
+----
+include::{testsjava}/requires/RequiresJdbc.java[tags=annotation, indent=0]
+----
+
+In the above example an annotation called `RequiresJdbc` is defined that can then be used on the `JdbcBookService` instead:
+
+.Using a @Requires meta-annotation
+[source,java]
+----
+@RequiresJdbc
+public class JdbcBookService implements BookService {
+    ...
+}
+----
+
+If you have multiple beans that need to fullfill a given requirement before loading then you may want to consider a bean configuration group, as explained in the next section.

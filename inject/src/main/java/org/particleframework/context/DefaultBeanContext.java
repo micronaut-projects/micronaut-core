@@ -1640,6 +1640,11 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
+        public boolean isEnabled(BeanContext beanContext) {
+            return true;
+        }
+
+        @Override
         public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
             Optional<Method> method = ReflectionUtils.findMethod(singletonClass, name, argumentTypes);
             return method.map(theMethod -> new ReflectionExecutableMethod(this, theMethod));

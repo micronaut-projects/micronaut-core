@@ -1,58 +1,94 @@
-Particle `inject-java` dependency provides an annotation processor to your Android app. When using the Android plugin 3.0.0,
-you must add annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
-Particle `inject-java`  dependency includes components that also need to be on the compile classpath. Because of that
- you need to declare that dependency a second time and use the `compile` dependency configuration. E.g.:
+Since Particle dependency injection is based on annotation processors and doesn't rely on reflection, it can be used on Android when using the Android plugin 3.0.0 or above.
 
+This allows you to use the same application framework for both your Android client and server implementation.
+
+### Configuring Your Android Build
+
+To get started you must add the Particle annotation processors to the processor classpath using the `annotationProcessor` dependency configuration.
+
+The Particle `inject-java` dependency should be included in both the `annotationProcessor` and `compileOnly` scopes of your Android build configuration:
+
+.Example Android build.gradle
 [source, groovy]
 ----
 dependencies {
-...
-..
-.
-annotationProcessor "org.particleframework:inject-java:1.0.0-SNAPSHOT"
-compileOnly "org.particleframework:inject-java:1.0.0-SNAPSHOT"
-...
-..
-.
+    ...
+    annotationProcessor "org.particleframework:inject-java:{version}"
+    compileOnly "org.particleframework:inject-java:{version}"
+    ...
 }
 ----
 
-You can find more information at: https://developer.android.com/studio/build/gradle-plugin-3-0-0-migration.html#annotationProcessor_config[Use the annotation processor dependency configuration
-] in the android documentation.
+If you use `lint` as part of your build you may also need to disable the invalid packages check since Android includes a hard coded check that regards the `javax.inject` package as invalid unless you are using Dagger:
 
-Particle `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
+.Configure lint within build.gradle
+[source,groovy]
+----
 
-### Start Bean Context
+android {
+    ...
+    lintOptions {
+        lintOptions { warning 'InvalidPackage' }
+    }
+}
+----
 
-You will then need to start the bean context.
+You can find more information on https://developer.android.com/studio/build/gradle-plugin-3-0-0-migration.html#annotationProcessor_config[configuring annotations processors] in the Android documentation.
 
-You could use a base application which extends https://developer.android.com/reference/android/app/Application.html[android.app.Application]:
+NOTE: Particle `inject-java` dependency uses https://developer.android.com/studio/write/java8-support.html[Android Java 8 support] features.
 
+### Enabling Dependency Injection
+
+Once you have configured the classpath correctly, the next step is start the link:{api}/org/particleframework/context/ApplicationContext.html[ApplicationContext].
+
+
+The following example demonstrates creating a subclass of https://developer.android.com/reference/android/app/Application.html[android.app.Application] for that purpose:
+
+.Example Android Application Class
 [source, java]
 ----
+import android.app.Activity;
 import android.app.Application;
+import android.os.Bundle;
 
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.env.Environment;
 
-public class BaseApplication extends Application {
+public class BaseApplication extends Application { // <1>
+
+    private ApplicationContext ctx;
 
     public BaseApplication() {
         super();
     }
 
-    ApplicationContext ctx;
-
     @Override
     public void onCreate() {
         super.onCreate();
-         ctx = ApplicationContext.build(MainActivity.class).start();
+        ctx = ApplicationContext.run(MainActivity.class, Environment.ANDROID); // <2>
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() { // <3>
+            @Override
+            public void onActivityCreated(Activity activity, Bundle bundle) {
+                ctx.inject(activity);
+            }
+            ... // shortened for brevity, it is not necessary to implement other methods
+        });
     }
 
     @Override
     public void onTerminate() {
         super.onTerminate();
-        ctx.stop();
+        if(ctx != null && ctx.isRunning()) { // <4>
+            ctx.stop();
+        }
     }
 
 }
+
 ----
+
+<1> Extend the `android.app.Application` class
+<2> Run the `ApplicationContext` with the `ANDROID` environment
+<3> To allow dependency injection of Android `Activity` instances register a `ActivityLifecycleCallbacks` instance
+<4> Stop the `ApplicationContext` when the application terminates
+
