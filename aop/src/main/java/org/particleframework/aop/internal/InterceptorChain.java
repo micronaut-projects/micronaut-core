@@ -130,7 +130,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         }
         try {
             return interceptor.intercept(this);
-        } finally {
+        }
+        catch (RuntimeException t) {
+            AopAttributes.remove(executionHandle.getDeclaringType(), executionHandle.getMethodName(), executionHandle.getArgumentTypes());
+            throw t;
+        }
+        finally {
             if(last) {
                 AopAttributes.remove(executionHandle.getDeclaringType(), executionHandle.getMethodName(), executionHandle.getArgumentTypes());
             }
