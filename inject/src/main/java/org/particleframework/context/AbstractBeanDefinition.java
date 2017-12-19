@@ -1,6 +1,8 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.*;
+import org.particleframework.context.condition.Condition;
+import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.naming.NameUtils;
@@ -66,6 +68,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap = new LinkedHashMap<>(3);
     private Map<Class, String> valuePrefixes;
+    private Boolean enabled = null;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type
@@ -109,6 +112,15 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.addRequiredComponents(arguments);
     }
 
+    @Override
+    public boolean isEnabled(BeanContext beanContext) {
+        if(enabled == null) {
+            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class)? new RequiresCondition(annotationMetadata) : null;
+            enabled = condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
+        }
+        return enabled;
+    }
 
     @Override
     public boolean isIterable() {

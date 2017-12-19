@@ -3,14 +3,17 @@ ioc:
   title: Inversion of Control
   beans: Defining Beans
   how: How Does it Work?
+  beanContext: The BeanContext 
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
   scopes: Bean Scopes
   factories: Bean Factories
+  conditionalBeans: Conditional Beans
   configurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
-  android: Dependency Injection in Android
+  annotationMetadata: Bean Annotation Metadata  
+  android: Android Support
 config:
   title: Application Configuration
   environments: The Environment
@@ -29,21 +32,27 @@ aop:
 httpServer:
   title: The HTTP Server
   running: Running the Embedded Server 
-  serverConfiguration:
-    title: Configuring the HTTP Server
-    threadPools: Configuring Server Thread Pools
-    cors: Configuring CORS
-    https: Securing the Server with HTTPS
   routing: HTTP Routing
   binding: Parameter Binding
   reactiveServer: Reactive HTTP Request Processing
+  jsonBinding: JSON Binding with Jackson
+  errorHandling: Error Handling
   filters: HTTP Filters
   uploads: File Uploads
   transfers: File Transfers
   sse: Server Sent Events
   sessions: HTTP Sessions
+  serverConfiguration:
+    title: Configuring the HTTP Server
+    threadPools: Configuring Server Thread Pools
+    cors: Configuring CORS
+    https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
+cloud:
+  title: Cloud Deployment
+  configurationSharing: Configuration Sharing
+  serviceDiscovery: Service Discovery
 management:
   title: Management & Monitoring
 

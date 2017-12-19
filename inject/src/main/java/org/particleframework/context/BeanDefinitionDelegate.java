@@ -122,6 +122,11 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     }
 
     @Override
+    public boolean isEnabled(BeanContext beanContext) {
+        return definition.isEnabled(beanContext);
+    }
+
+    @Override
     public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
         return definition.findMethod(name, argumentTypes);
     }

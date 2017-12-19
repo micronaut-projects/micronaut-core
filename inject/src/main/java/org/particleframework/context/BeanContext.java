@@ -18,7 +18,9 @@ package org.particleframework.context;
 import org.particleframework.context.event.ApplicationEventPublisher;
 import org.particleframework.inject.BeanIdentifier;
 
+import javax.annotation.Nonnull;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -123,7 +125,8 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     ClassLoader getClassLoader();
 
     @Override
-    default BeanContext registerSingleton(Object singleton) {
+    default BeanContext registerSingleton(@Nonnull Object singleton) {
+        Objects.requireNonNull(singleton, "Argument [singleton] must not be null");
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
     }

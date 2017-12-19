@@ -1,0 +1,12 @@
+Aspect-Oriented Programming (AOP) historically has had many incarnations and some very complicated implementations. Generally AOP can be thought of as a way to define cross cutting concerns (logging, transactions, tracing etc.) separate from application code in the form of aspects that define advice.
+
+There are typically two forms of advice:
+
+- Around Advice - decorates a method or class
+- Introduction Advice - introduces new behaviour to a class.
+
+In modern Java applications declaring advice typically takes the form of an annotation. The most well-known annotation advice in the Java world is probably `@Transactional` which is used to demarcate transaction boundries in Spring and Grails applications.
+
+The disadvantage of traditional approaches to AOP is the heavy reliance on runtime proxy creation and reflection, which slows application performance, makes debugging harder and increases memory consumption.
+
+Particle tries to address these concerns by providing a simple compile time AOP API that does not use reflection.
