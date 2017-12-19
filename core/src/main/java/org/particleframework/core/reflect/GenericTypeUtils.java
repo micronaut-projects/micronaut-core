@@ -48,6 +48,10 @@ public class GenericTypeUtils {
                 }
             }
         }
+        Class superClass = type.getSuperclass();
+        if (superClass != null && superClass != Object.class) {
+            return resolveInterfaceTypeArgument(superClass, interfaceType);
+        }
         return Optional.empty();
     }
 
