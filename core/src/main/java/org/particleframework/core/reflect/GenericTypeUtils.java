@@ -32,7 +32,8 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolves a single type argument from the given interface of the given class
+     * Resolves a single type argument from the given interface of the given class. Also
+     * searches superclasses.
      *
      * @param type The type to resolve from
      * @param interfaceType The interface to resolve for
@@ -141,7 +142,8 @@ public class GenericTypeUtils {
 
 
     /**
-     * Resolve all of the type arguments for the given interface from the given type
+     * Resolve all of the type arguments for the given interface from the given type. Also
+     * searches superclasses.
      *
      * @param type The type to resolve from
      * @param interfaceType The interface to resolve from
@@ -156,6 +158,10 @@ public class GenericTypeUtils {
                     return resolveTypeArguments(genericInterface);
                 }
             }
+        }
+        Class superClass = type.getSuperclass();
+        if (superClass != null && superClass != Object.class) {
+            return resolveInterfaceTypeArguments(superClass, interfaceType);
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
