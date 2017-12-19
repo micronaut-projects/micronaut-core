@@ -1,1 +1,8 @@
-TODO
+Introduction advice is distinct from Around advice in that it involves providing an implementation instead of decorating.
+
+Examples of introduction advice include things like http://gorm.grails.org[GORM] or http://projects.spring.io/spring-data[Spring Data] that will both automatically implement persistence logic for you.
+
+TODO: Introduction advice example
+
+
+The following sections cover core advice types that are built into Particle and provided by the framework.

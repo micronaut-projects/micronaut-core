@@ -1,1 +1,61 @@
-TODO
+Similar to Spring and Grails, Particle provides a set of caching annotations within the link:{api}/org/particleframework/cache/package-summary.html[org.particleframework.cache] package.
+
+The link:{api}/org/particleframework/cache/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
+
+The link:{api}/org/particleframework/cache/SyncCache.html[SyncCache] interface provides a synchronous API for caching, whilst the link:{api}/org/particleframework/cache/AsyncCache.html[AsyncCache] API allows non-blocking operation.
+
+=== Cache Annotations
+
+The following cache annotations are supported:
+
+- link:{api}/org/particleframework/cache/annotation/Cacheable.html[@Cacheable] - Indicates a method is cacheable within the given cache name
+- link:{api}/org/particleframework/cache/annotation/CachePut.html[@CachePut] - Indicates that the return value of a method invocation should be cached. Unlike `@Cacheable` the original operation is never skipped.
+- link:{api}/org/particleframework/cache/annotation/CacheInvalidate.html[@CacheInvalidate] - Indicates the invocation of a method should cause the invalidation of one or many caches.
+
+
+By using one of the annotations the link:{api}/org/particleframework/cache/interceptor/CacheInterceptor.html[CacheInterceptor] is activated which in the case of `@Cacheable` will cache the return result of the method.
+
+NOTE: If the return type of the method is a non-blocking type (either link:{jdkapi}/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of link:{rsapi}/org/reactivestreams/Publisher.html[org.reactivestreams.Publisher]) the emitted result will be cached.
+
+
+=== Configuring Caches
+
+By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache definitions which can be configured via application configuration. For example with `application.yml`:
+
+.Cache Configuration Example
+[source,yaml]
+----
+particle:
+    caches:
+        myCache:
+            maximumSize: 20
+----
+
+The above example will configure a cache called "myCache" with a maximum size of 20.
+
+=== Caching with Redis
+
+If you wish to use Redis to cache results then you need to add the Lettuce configuration to your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Particle provides an implementation that allows cached results to be read reactively. To configure the Lettuce configuration add the following dependency to your application:
+
+.Lettuce Configuration build.gradle
+[source,groovy,subs="attributes"]
+----
+dependencies {
+    ...
+    compile "org.particleframework.configurations:redis-lettuce:{version}"
+    ...
+}
+----
+
+Then within your application configuration configure the Redis URL and Redis caches:
+
+.Cache Configuration Example
+[source,yaml]
+----
+particle:
+    redis:
+        uri: redis://localhost
+        caches:
+            myCache:
+                expireAfterWrite: "1h" # expire one hour after write
+----

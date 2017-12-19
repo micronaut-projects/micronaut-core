@@ -9,7 +9,7 @@ To get started you must add the Particle annotation processors to the processor 
 The Particle `inject-java` dependency should be included in both the `annotationProcessor` and `compileOnly` scopes of your Android build configuration:
 
 .Example Android build.gradle
-[source, groovy]
+[source,groovy,subs="attributes"]
 ----
 dependencies {
     ...
