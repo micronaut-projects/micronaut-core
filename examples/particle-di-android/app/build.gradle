@@ -39,5 +39,4 @@ dependencies {
     annotationProcessor "org.particleframework:inject-java:${particleVersion}"
     compileOnly "org.particleframework:inject-java:${particleVersion}"
     compile "org.particleframework:runtime:${particleVersion}"
-    //runtimeOnly 'org.codehaus.groovy:groovy-all:2.4.13'
 }
