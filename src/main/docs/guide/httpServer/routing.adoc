@@ -125,7 +125,7 @@ To start off with you should subclass link:{api}/org/particleframework/web/route
 ----
 include::{testsuite}/server/routes/MyRoutes.java[tags=imports, indent=0]
 
-include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=4]
+include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=0]
 ----
 
 <1> Route definitions should subclass link:{api}/org/particleframework/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder]
