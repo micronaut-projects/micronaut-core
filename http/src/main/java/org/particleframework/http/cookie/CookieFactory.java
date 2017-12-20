@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.cookie;
 
+import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
 
 /**
@@ -30,7 +31,7 @@ public interface CookieFactory {
      */
     CookieFactory INSTANCE = SoftServiceLoader.load(CookieFactory.class)
                                               .firstOr("org.particleframework.http.server.netty.cookies.NettyCookieFactory", CookieFactory.class.getClassLoader())
-                                              .map(SoftServiceLoader.Service::load)
+                                              .map(ServiceDefinition::load)
                                               .orElse(null);
 
     /**

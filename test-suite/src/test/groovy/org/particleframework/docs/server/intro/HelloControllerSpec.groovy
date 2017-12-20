@@ -33,7 +33,7 @@ class HelloControllerSpec extends Specification {
         expect:
         new URL(embeddedServer.getURL(), "/hello").text == "Hello World"
 
-//        cleanup:
-//        embeddedServer.stop()
+        cleanup:
+        embeddedServer.stop()
     }
 }

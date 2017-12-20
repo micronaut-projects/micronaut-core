@@ -19,6 +19,7 @@ import org.particleframework.core.convert.ConversionService;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -130,6 +131,20 @@ public class CollectionUtils {
         return set;
     }
 
+
+    /**
+     * Convert an {@link Enumeration} to a {@link Set}
+     * @param enumeration The iterator
+     * @param <T> The type
+     * @return The set
+     */
+    public static <T> Set<T> enumerationToSet(Enumeration<T> enumeration) {
+        Set<T> set = new HashSet<>();
+        while(enumeration.hasMoreElements()) {
+            set.add(enumeration.nextElement());
+        }
+        return set;
+    }
     /**
      * Creates a set of the given objects
      *
@@ -180,4 +195,6 @@ public class CollectionUtils {
         }
         return builder.toString();
     }
+
+
 }

@@ -15,11 +15,10 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
-import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.http.cookie.CookieFactory;
 
-import java.net.URI;
 import java.util.Optional;
 
 /**
@@ -37,7 +36,7 @@ public interface HttpResponseFactory {
             .firstOr("org.particleframework.http.server.netty.NettyHttpResponseFactory",
                       HttpResponseFactory.class.getClassLoader()
             )
-            .map(SoftServiceLoader.Service::load);
+            .map(ServiceDefinition::load);
 
 
     /**

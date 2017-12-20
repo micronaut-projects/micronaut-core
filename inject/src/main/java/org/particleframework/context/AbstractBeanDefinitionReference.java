@@ -7,6 +7,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.context.exceptions.BeanContextException;
+import org.particleframework.context.exceptions.BeanInstantiationException;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -78,10 +79,10 @@ public abstract class AbstractBeanDefinitionReference implements BeanDefinitionR
             try {
                 return (BeanDefinition) beanDefinition.newInstance();
             } catch (Throwable e) {
-                throw new BeanContextException("Error loading bean definition [" + beanTypeName + "]: " + e.getMessage(), e);
+                throw new BeanInstantiationException("Error loading bean definition [" + beanTypeName + "]: " + e.getMessage(), e);
             }
         } else {
-            throw new BeanContextException("Cannot load bean for type [" + beanTypeName + "]. The type is not present on the classpath");
+            throw new BeanInstantiationException("Cannot load bean for type [" + beanTypeName + "]. The type is not present on the classpath");
         }
     }
 
