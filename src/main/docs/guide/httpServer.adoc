@@ -1,0 +1,3 @@
+Particle includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty]. A "Hello World" application can be seen below:
+
+

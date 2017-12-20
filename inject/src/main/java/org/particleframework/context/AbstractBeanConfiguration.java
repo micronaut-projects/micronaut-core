@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.Requirements;
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.AnnotationMetadata;
@@ -29,7 +30,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     protected AbstractBeanConfiguration(String thePackage) {
         this.packageName = thePackage.intern();
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        this.condition = annotationMetadata.hasDeclaredAnnotation(Requirements.class)? null : new RequiresCondition(annotationMetadata);
+        this.condition = !annotationMetadata.hasStereotype(Requires.class) && !annotationMetadata.hasStereotype(Requirements.class) ? null : new RequiresCondition(annotationMetadata);
     }
 
     @Override
@@ -57,7 +58,7 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
 
     @Override
     public boolean isWithin(BeanDefinitionReference beanDefinitionReference) {
-        String beanTypeName = beanDefinitionReference.getBeanTypeName();
+        String beanTypeName = beanDefinitionReference.getBeanDefinitionName();
         return isWithin(beanTypeName);
     }
 

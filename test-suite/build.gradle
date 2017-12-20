@@ -2,6 +2,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":configurations/hibernate-gorm")
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"

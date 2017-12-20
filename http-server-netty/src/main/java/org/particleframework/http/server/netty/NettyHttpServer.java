@@ -28,13 +28,11 @@ import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.io.socket.SocketUtils;
-import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
-import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
@@ -69,14 +67,12 @@ public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CODEC = "http-codec";
     public static final String PARTICLE_HANDLER = "particle-inbound-handler";
-    public static final String CORS_HANDLER = "particle-cors-handler";
     public static final String OUTBOUND_KEY = "-outbound-";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final ExecutorService ioExecutor;
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
-    private final HttpFilter[] interceptors;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
@@ -95,7 +91,6 @@ public class NettyHttpServer implements EmbeddedServer {
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
-            HttpFilter[] interceptors,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -113,8 +108,6 @@ public class NettyHttpServer implements EmbeddedServer {
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
-        OrderUtil.sort(interceptors);
-        this.interceptors = interceptors;
         this.binderRegistry = binderRegistry;
     }
 
@@ -283,13 +276,5 @@ public class NettyHttpServer implements EmbeddedServer {
         }
     }
 
-
-    static ChannelFutureListener createCloseListener(io.netty.handler.codec.http.HttpRequest msg) {
-        return future -> {
-            if (!io.netty.handler.codec.http.HttpUtil.isKeepAlive(msg)) {
-                future.channel().close();
-            }
-        };
-    }
 
 }

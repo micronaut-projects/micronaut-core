@@ -13,18 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
+package org.particleframework.docs.server.intro
+
+import org.particleframework.context.ApplicationContext
+import org.particleframework.runtime.server.EmbeddedServer
+import spock.lang.Specification
+
 /**
- * Configuration for Redis sessions
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Configuration
-@Requires(property = "particle.session.http.redis.enabled", value = StringUtils.TRUE)
-@Requires(classes = SessionStore.class)
-package org.particleframework.configuration.lettuce.session;
+class HelloControllerSpec extends Specification {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.core.util.StringUtils;
-import org.particleframework.session.SessionStore;
+    void "test hello world response"() {
+        setup:
+        EmbeddedServer embeddedServer =
+                ApplicationContext.run(EmbeddedServer)
+
+        expect:
+        new URL(embeddedServer.getURL(), "/hello").text == "Hello World"
+
+//        cleanup:
+//        embeddedServer.stop()
+    }
+}
