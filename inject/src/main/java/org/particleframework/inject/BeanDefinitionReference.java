@@ -24,9 +24,9 @@ import org.particleframework.core.annotation.Internal;
 public interface BeanDefinitionReference<T> extends BeanType<T> {
 
     /**
-     * @return The name of the bean type
+     * @return The class name of the backing {@link BeanDefinition}
      */
-    String getBeanTypeName();
+    String getBeanDefinitionName();
 
     /**
      * @return The name of the bean that this bean replaces

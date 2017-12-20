@@ -86,6 +86,14 @@ public @interface Requires {
     Class[] classes() default {};
 
     /**
+     * Expresses that the configuration requires entities annotated with the given annotations to be available to the application via package scanning
+     *
+     * @return The classes
+     */
+    Class<? extends Annotation>[] entities() default {};
+
+
+    /**
      * Expresses that beans of the given types should be available for the bean or configuration to load
      *
      * @return The beans

@@ -171,9 +171,9 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})
     @Override
     public <T> Optional<T> refreshBean(BeanIdentifier identifier) {
-        if(identifier != null) {
+        if (identifier != null) {
             BeanRegistration beanRegistration = singletonObjects.get(identifier);
-            if(beanRegistration != null) {
+            if (beanRegistration != null) {
                 BeanDefinition definition = beanRegistration.getBeanDefinition();
                 return Optional.of((T) definition.inject(this, beanRegistration.getBean()));
             }
@@ -184,7 +184,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier) {
-        if(qualifier == null) {
+        if (qualifier == null) {
             return Collections.emptyList();
         }
         List result = singletonObjects
@@ -195,7 +195,7 @@ public class DefaultBeanContext implements BeanContext {
                     return qualifier.reduce(beanDefinition.getBeanType(), Stream.of(beanDefinition)).findFirst().isPresent();
                 })
                 .collect(Collectors.toList());
-        return (Collection<BeanRegistration<?>>)result;
+        return (Collection<BeanRegistration<?>>) result;
     }
 
     @SuppressWarnings("unchecked")
@@ -530,8 +530,10 @@ public class DefaultBeanContext implements BeanContext {
                             BeanDefinition definition;
                             try {
                                 definition = reference.load();
-                                beanDefinitions.add(definition);
-                                candidates.add(definition);
+                                if (definition.isEnabled(this)) {
+                                    beanDefinitions.add(definition);
+                                    candidates.add(definition);
+                                }
                             } catch (Throwable e) {
                                 throw new BeanInstantiationException(reference, e);
                             }
@@ -540,7 +542,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        if(!beanDefinitions.isEmpty()) {
+        if (!beanDefinitions.isEmpty()) {
             Stream<BeanDefinition> reduced = qualifier.reduce(Object.class, beanDefinitions.stream().map(BeanDefinition.class::cast));
             candidates.addAll(reduced.collect(Collectors.toList()));
         }
@@ -669,10 +671,12 @@ public class DefaultBeanContext implements BeanContext {
 
                     BeanDefinition beanDefinition = contextScopeBean.load();
                     beanDefinitionsClasses.remove(contextScopeBean);
-                    beanDefinitions.add(beanDefinition);
-                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
+                    if (beanDefinition.isEnabled(this)) {
+                        beanDefinitions.add(beanDefinition);
+                        createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
+                    }
                 } catch (Throwable e) {
-                    throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getBeanTypeName() + "] could not be loaded: " + e.getMessage(), e);
+                    throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
         }
@@ -705,14 +709,14 @@ public class DefaultBeanContext implements BeanContext {
                             // load it
 
                             BeanDefinition beanDefinition = beanClass.load();
-                            if (beanDefinition != null) {
-                                candidateClasses.add(beanClass);
+                            candidateClasses.add(beanClass);
+                            if (beanDefinition != null && beanDefinition.isEnabled(this)) {
                                 beanDefinitions.add(beanDefinition);
                                 candidates.add(beanDefinition);
                             }
                         }
                     } catch (Throwable e) {
-                        throw new BeanInstantiationException("Bean definition [" + beanClass.getBeanTypeName() + "] could not be loaded: " + e.getMessage(), e);
+                        throw new BeanInstantiationException("Bean definition [" + beanClass.getName() + "] could not be loaded: " + e.getMessage(), e);
                     }
                 }
                 if (!candidateClasses.isEmpty()) {
@@ -722,7 +726,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
 
-        for (BeanDefinition beanDefinition: beanDefinitions) {
+        for (BeanDefinition beanDefinition : beanDefinitions) {
             Class beanDefinitionBeanType = beanDefinition.getBeanType();
             if (beanDefinitionBeanType == beanType || beanType.isAssignableFrom(beanDefinitionBeanType)) {
                 candidates.add(beanDefinition);
@@ -971,13 +975,12 @@ public class DefaultBeanContext implements BeanContext {
                         registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
                     }
                 }
-            }
-            else if(key.qualifier == null) {
+            } else if (key.qualifier == null) {
                 BeanRegistration registration = entry.getValue();
                 Object existing = registration.bean;
-                if(beanType.isInstance(existing)) {
+                if (beanType.isInstance(existing)) {
                     Optional<BeanDefinition> candidate = qualifier.reduce(beanType, Stream.of(registration.beanDefinition)).findFirst();
-                    if(candidate.isPresent()) {
+                    if (candidate.isPresent()) {
                         synchronized (singletonObjects) {
                             bean = (T) existing;
                             registerSingletonBean(candidate.get(), beanType, bean, qualifier, true);
@@ -1221,7 +1224,7 @@ public class DefaultBeanContext implements BeanContext {
                         replacementsByDefinition.put(replacesBeanDefinitionName, beanDefinitionReference);
                     }
 
-                    beanDefinitionsClassesByType.put(beanDefinitionReference.getBeanTypeName(), beanDefinitionReference);
+                    beanDefinitionsClassesByType.put(beanDefinitionReference.getName(), beanDefinitionReference);
                     beanDefinitionsClassesByDefinition.put(beanDefinitionReference.toString(), beanDefinitionReference);
                     if (beanDefinitionReference.isContextScope()) {
                         contextScopeBeans.add(beanDefinitionReference);
@@ -1252,7 +1255,7 @@ public class DefaultBeanContext implements BeanContext {
                         && (beanDefinitionsClassesByDefinition.containsKey(definitionToBeReplaced))) {
 
                     BeanDefinitionReference removedClass = beanDefinitionsClassesByDefinition.remove(definitionToBeReplaced);
-                    beanDefinitionsClassesByType.remove(removedClass.getBeanTypeName());
+                    beanDefinitionsClassesByType.remove(removedClass.getName());
                     contextScopeBeans.remove(removedClass);
                 }
             }
@@ -1262,8 +1265,7 @@ public class DefaultBeanContext implements BeanContext {
             Collection<BeanDefinitionReference> values = new HashSet<>(beanDefinitionsClasses);
             values.forEach(beanDefinitionClass -> {
                         for (BeanConfiguration configuration : beanConfigurations.values()) {
-                            boolean enabled = configuration.isEnabled(this);
-                            if (!enabled && configuration.isWithin(beanDefinitionClass)) {
+                            if (configuration.isWithin(beanDefinitionClass) && !configuration.isEnabled(this)) {
                                 beanDefinitionsClasses.remove(beanDefinitionClass);
                                 contextScopeBeans.remove(beanDefinitionClass);
                             }

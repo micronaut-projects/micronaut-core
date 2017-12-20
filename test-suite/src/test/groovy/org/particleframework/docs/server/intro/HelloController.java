@@ -13,18 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
+package org.particleframework.docs.server.intro;
+
+// tag::imports[]
+import org.particleframework.http.annotation.Controller;
+import org.particleframework.web.router.annotation.Get;
+
+import javax.inject.Singleton;
+// end::imports[]
+
 /**
- * Configuration for Redis sessions
- *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Configuration
-@Requires(property = "particle.session.http.redis.enabled", value = StringUtils.TRUE)
-@Requires(classes = SessionStore.class)
-package org.particleframework.configuration.lettuce.session;
+// tag::class[]
+@Controller("/hello")
+@Singleton
+public class HelloController {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.core.util.StringUtils;
-import org.particleframework.session.SessionStore;
+    @Get
+    String index() {
+        return "Hello World";
+    }
+}
+// end::class[]

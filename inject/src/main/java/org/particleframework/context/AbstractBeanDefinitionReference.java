@@ -44,7 +44,7 @@ public abstract class AbstractBeanDefinitionReference implements BeanDefinitionR
 
     @Override
     public String getName() {
-        return getBeanTypeName();
+        return beanTypeName;
     }
 
     /**
@@ -91,8 +91,8 @@ public abstract class AbstractBeanDefinitionReference implements BeanDefinitionR
     }
 
     @Override
-    public String getBeanTypeName() {
-        return beanTypeName;
+    public String getBeanDefinitionName() {
+        return beanDefinitionTypeName;
     }
 
     @Override
