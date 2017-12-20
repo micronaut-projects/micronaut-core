@@ -55,4 +55,15 @@ cloud:
   serviceDiscovery: Service Discovery
 management:
   title: Management & Monitoring
+  building:
+    title: Creating Endpoints
+    annotation: The Endpoint Annotation
+    method: Executable Method
+    configuration: Endpoint Configuration
+  provided:
+    title: Built-In Endpoints
+    beans: The Beans Endpoint
+    health: The Health Endpoint
+    refresh: The Refresh Endpoint
+    routes: The Routes Endpoint
 
