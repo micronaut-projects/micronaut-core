@@ -15,18 +15,14 @@
  */
 package org.particleframework.core.io.service;
 
-import org.particleframework.core.cli.Option;
 import org.particleframework.core.reflect.ClassUtils;
-import org.particleframework.core.reflect.InstantiationUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -35,13 +31,13 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<S>> {
+public class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
 
     private final Class<S> serviceType;
     private final ClassLoader classLoader;
-    private final Map<String,Service<S>> loadedServices = new LinkedHashMap<>();
-    private final Iterator<Service<S>> unloadedServices;
+    private final Map<String,ServiceDefinition<S>> loadedServices = new LinkedHashMap<>();
+    private final Iterator<ServiceDefinition<S>> unloadedServices;
     private final Predicate<String> condition;
 
     private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader) {
@@ -101,8 +97,8 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     /**
      * @return Return the first such instance
      */
-    public Optional<Service<S>> first() {
-        Iterator<Service<S>> i = iterator();
+    public Optional<ServiceDefinition<S>> first() {
+        Iterator<ServiceDefinition<S>> i = iterator();
         if(i.hasNext()) {
             return Optional.of(i.next());
         }
@@ -115,8 +111,8 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
      *
      * @return Return the first such instance
      */
-    public Optional<Service<S>> firstOr(String alternative, ClassLoader classLoader) {
-        Iterator<Service<S>> i = iterator();
+    public Optional<ServiceDefinition<S>> firstOr(String alternative, ClassLoader classLoader) {
+        Iterator<ServiceDefinition<S>> i = iterator();
         if(i.hasNext()) {
             return Optional.of(i.next());
         }
@@ -129,9 +125,9 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
     }
 
     @Override
-    public Iterator<Service<S>> iterator() {
-        return new Iterator<Service<S>>() {
-            Iterator<Service<S>> loaded = loadedServices.values().iterator();
+    public Iterator<ServiceDefinition<S>> iterator() {
+        return new Iterator<ServiceDefinition<S>>() {
+            Iterator<ServiceDefinition<S>> loaded = loadedServices.values().iterator();
             @Override
             public boolean hasNext() {
                 if(loaded.hasNext()) {
@@ -144,14 +140,14 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
             }
 
             @Override
-            public Service<S> next() {
+            public ServiceDefinition<S> next() {
                 if(!hasNext()) throw new NoSuchElementException();
 
                 if(loaded.hasNext()) {
                     return loaded.next();
                 }
                 else if(unloadedServices.hasNext()) {
-                    Service<S> nextService = unloadedServices.next();
+                    ServiceDefinition<S> nextService = unloadedServices.next();
                     loadedServices.put(nextService.getName(), nextService);
                     return nextService;
                 }
@@ -161,7 +157,7 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
         };
     }
 
-    private final class ServiceLoaderIterator implements  Iterator<Service<S>> {
+    private final class ServiceLoaderIterator implements  Iterator<ServiceDefinition<S>> {
         private Enumeration<URL> serviceConfigs = null;
         private Iterator<String> unprocessed = null;
         @Override
@@ -206,7 +202,7 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
         }
 
         @Override
-        public Service<S> next() {
+        public ServiceDefinition<S> next() {
             if(!hasNext()) {
                 throw new NoSuchElementException();
             }
@@ -217,66 +213,9 @@ public class SoftServiceLoader<S> implements Iterable<SoftServiceLoader.Service<
         }
     }
 
-    protected Service<S> newService(String name, Optional<Class> loadedClass) {
-        return new Service<S>() {
-            @Override
-            public String getName() {
-                return name;
-            }
-
-            @Override
-            public boolean isPresent() {
-                return loadedClass.isPresent();
-            }
-
-            @Override
-            public <X extends Throwable> S orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
-                return InstantiationUtils.instantiate((Class<S>)loadedClass.orElseThrow(exceptionSupplier));
-            }
-
-            @Override
-            public S load() {
-                return loadedClass.map(aClass -> {
-                    try {
-                        return InstantiationUtils.instantiate((Class<S>) aClass);
-                    } catch (Throwable e) {
-                        throw new ServiceConfigurationError("Error loading service ["+aClass.getName()+"]: " + e.getMessage(), e);
-                    }
-                })
-                                  .orElseThrow(()-> new ServiceConfigurationError("Call to load() when class '"+ name +"' is not present"));
-            }
-        };
+    @SuppressWarnings("unchecked")
+    protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
+        return new DefaultServiceDefinition(name, loadedClass);
     }
 
-    /**
-     * A service that may or may not be present on the classpath
-     *
-     * @param <T> The service type
-     */
-    public interface Service<T> {
-
-        /**
-         * @return The full class name of the service
-         */
-        String getName();
-        /**
-         * @return is the service present
-         */
-        boolean isPresent();
-
-        /**
-         * Load the service of throw the given exception
-         *
-         * @param exceptionSupplier The exception supplier
-         * @param <X> The exception type
-         * @return The instance
-         * @throws X The exception concrete type
-         */
-        <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X;
-
-        /**
-         * @return load the service
-         */
-        T load();
-    }
 }

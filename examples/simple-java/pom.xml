@@ -83,11 +83,6 @@
         </dependency>
         <dependency>
             <groupId>org.particleframework.configuration</groupId>
-            <artifactId>jackson</artifactId>
-            <version>${particle.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.particleframework.configuration</groupId>
             <artifactId>hibernate-validator</artifactId>
             <version>${particle.version}</version>
         </dependency>

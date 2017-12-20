@@ -7,6 +7,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
+import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.order.OrderUtil;
@@ -135,7 +136,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if(running.compareAndSet(false, true)) {
             ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
             SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = SoftServiceLoader.load(PropertySourceLoader.class);
-            for (SoftServiceLoader.Service<PropertySourceLoader> loader : propertySourceLoaders) {
+            for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
                 if(loader.isPresent()) {
                     Optional<PropertySource> propertySource = loader.load().load(this);
                     propertySource.ifPresent(propertySources::add);
