@@ -1,0 +1,23 @@
+To run the server simply create an `Application` class with a `static void main` method. For example:
+
+.Particle Application Class
+[source,java]
+----
+include::{testsuite}/server/intro/Application.java[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/Application.java[tags=class, indent=0]
+----
+
+To run the application from a unit test you can use the link:{api}/org/particleframework/runtime/server/EmbeddedServer.html[EmbeddedServer] interface. The following test is written in Groovy with http://spockframework.org[Spock]:
+
+
+.Particle Spock Test
+[source,groovy]
+----
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=0]
+----
+
+<1> The `EmbeddedServer` is run and Spock's `@AutoCleanup` annotation ensures the server is stopped after the specification completes.
+<2> The `EmbeddedServer` interface provides the `URL` of the server under test which runs on a random port.

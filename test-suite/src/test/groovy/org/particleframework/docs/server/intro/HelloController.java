@@ -17,8 +17,6 @@ package org.particleframework.docs.server.intro;
 
 // tag::imports[]
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Get;
-
 import javax.inject.Singleton;
 // end::imports[]
 
@@ -27,13 +25,11 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 // tag::class[]
-@Controller("/hello")
-@Singleton
+@Controller("/hello") // <1>
+@Singleton // <2>
 public class HelloController {
-
-    @Get
-    String index() {
+    public String index() {
         return "Hello World";
-    }
+    } // <3>
 }
 // end::class[]

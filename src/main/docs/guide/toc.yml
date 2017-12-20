@@ -31,7 +31,7 @@ aop:
     title: Cache Advice      
 httpServer:
   title: The HTTP Server
-  running: Running the Embedded Server 
+  runningServer: Running the Embedded Server 
   routing: HTTP Routing
   binding: Parameter Binding
   reactiveServer: Reactive HTTP Request Processing
@@ -55,15 +55,15 @@ cloud:
   serviceDiscovery: Service Discovery
 management:
   title: Management & Monitoring
-  building:
+  buildingEndpoints:
     title: Creating Endpoints
-    annotation: The Endpoint Annotation
-    method: Executable Method
-    configuration: Endpoint Configuration
-  provided:
+    endpointAnnotation: The Endpoint Annotation
+    endpointMethod: Executable Method
+    endpointConfiguration: Endpoint Configuration
+  providedEndpoints:
     title: Built-In Endpoints
-    beans: The Beans Endpoint
-    health: The Health Endpoint
-    refresh: The Refresh Endpoint
-    routes: The Routes Endpoint
+    beansEndpoint: The Beans Endpoint
+    healthEndpoint: The Health Endpoint
+    refreshEndpoint: The Refresh Endpoint
+    routesEndpoint: The Routes Endpoint
 

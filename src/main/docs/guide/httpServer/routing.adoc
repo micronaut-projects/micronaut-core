@@ -1,1 +1,135 @@
-TODO
+The link:{api}/org/particleframework/http/annotation/Controller.html[@Controller] annotation used in the previous section is one of link:{api}/org/particleframework/web/router/annotation/package-summary.html[several annotations] that allow you to control the construction of HTTP routes.
+
+
+=== URI Paths and Variables
+
+In the previous example a value of `/hello` was specified as the path to the controller. If no value is specified to the `@Controller` action then the URI is formulated from the class name.
+
+The following table summarizes values for the `@Controller` annotation and the calculated base paths:
+
+
+|===
+|Class Name | Annotation |Path
+
+|`HelloController`
+|`@Controller`
+|`/hello`
+
+|`HelloWorldController`
+|`@Controller`
+|`/hello-world`
+
+|`HelloController`
+|`@Controller("/somepath")`
+|`/somepath`
+
+|`HelloController`
+|`@Controller("/")`
+|`/`
+|===
+
+The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] you can therefore embed URI variables within the path using the syntax defined the by the URI template specification.
+
+NOTE: Many other frameworks, including Spring, implement the URI template specification
+
+URI variables can be referenced via method arguments. For example:
+
+.URI Variables Example
+[source,java]
+----
+include::{testsuite}/server/routes/MessageController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/routes/MessageController.java[tags=class, indent=0]
+----
+
+<1> The `@Controller` annotation is specified without an argument resulting in a base URI of `/message`
+<2> The link:{api}/org/particleframework/web/router/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/org/particleframework/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `name`
+<3> The value of the URI variable is referenced in the implementation
+
+Particle will map the URI `/message/hello/{name}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
+
+.Testing URI Variables
+[source,java]
+----
+include::{testsuite}/server/routes/MessageControllerTest.java[tags=imports, indent=0]
+
+public class MessageControllerTest {
+include::{testsuite}/server/routes/MessageControllerTest.java[tags=setup, indent=4]
+
+include::{testsuite}/server/routes/MessageControllerTest.java[tags=test, indent=4]
+}
+----
+
+<1> For JUnit you can write methods to start and stop the server for the scope of the test
+<2> The tests sends a request to the URI `/message/hello/John`
+<3> And then asserts the response is "Hello John!"
+
+=== Routing Annotations
+
+The previous example used the link:{api}/org/particleframework/web/router/annotation/Get.html[Get] annotation to add method that accepted HTTP link:{api}/org/particleframework/http/HttpMethod.html#GET[GET] requests. The following tables summarizes the available annotations and how they map to the different HTTP methods:
+
+
+.HTTP Routing Annotations
+|===
+|Annotation |HTTP Method
+
+|link:{api}/org/particleframework/web/router/annotation/Delete.html[@Delete]
+|link:{api}/org/particleframework/http/HttpMethod.html#DELETE[DELETE]
+
+|link:{api}/org/particleframework/web/router/annotation/Get.html[@Get]
+|link:{api}/org/particleframework/http/HttpMethod.html#GET[GET]
+
+|link:{api}/org/particleframework/web/router/annotation/Head.html[@Head]
+|link:{api}/org/particleframework/http/HttpMethod.html#HEAD[HEAD]
+
+|link:{api}/org/particleframework/web/router/annotation/Options.html[@Options]
+|link:{api}/org/particleframework/http/HttpMethod.html#OPTIONS[OPTIONS]
+
+|link:{api}/org/particleframework/web/router/annotation/Patch.html[@Patch]
+|link:{api}/org/particleframework/http/HttpMethod.html#PATCH[PATCH]
+
+|link:{api}/org/particleframework/web/router/annotation/Put.html[@Put]
+|link:{api}/org/particleframework/http/HttpMethod.html#PUT[PUT]
+
+|link:{api}/org/particleframework/web/router/annotation/Post.html[@Post]
+|link:{api}/org/particleframework/http/HttpMethod.html#POST[POST]
+
+|link:{api}/org/particleframework/web/router/annotation/Trace.html[@Trace]
+|link:{api}/org/particleframework/http/HttpMethod.html#TRACE[TRACE]
+
+|===
+
+If no URI path is specified to any of the annotations then the method name is used as the URI. In other words both of the following methods are essentially equivalent and map to the `/hello` URI:
+
+[source,java]
+----
+@Get("/hello")
+String hello() {
+    return "Hello World";
+}
+
+@Get
+String hello() {
+    return "Hello World";
+}
+----
+
+=== Building Routes Programmatically
+
+If you prefer to not use annotations and declare all of your routes in code then never fear, Particle has a flexible link:{api}/org/particleframework/web/router/RouteBuilder.html[RouteBuilder] API that makes a breeze to define routes programmatically.
+
+To start off with you should subclass link:{api}/org/particleframework/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and then simply inject the controller you wish to route to into the method and define your routes:
+
+.RouteBuilder Example
+[source,java]
+----
+include::{testsuite}/server/routes/MyRoutes.java[tags=imports, indent=0]
+
+include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=4]
+----
+
+<1> Route definitions should subclass link:{api}/org/particleframework/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder]
+<2> Use `@Inject` to inject a method with the controllers you want to route to
+<3> Use methods such as link:{api}/org/particleframework/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods
+
+TIP: Unfortunately due to type erasure a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.

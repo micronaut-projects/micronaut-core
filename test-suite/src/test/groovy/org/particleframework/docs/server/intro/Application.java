@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.docs.server.intro
+package org.particleframework.docs.server.intro;
 
 // tag::imports[]
-import org.particleframework.context.ApplicationContext
-import org.particleframework.runtime.server.EmbeddedServer
-import spock.lang.*
+import org.particleframework.runtime.ParticleApplication;
 // end::imports[]
 
 /**
@@ -26,14 +24,10 @@ import spock.lang.*
  * @since 1.0
  */
 // tag::class[]
-class HelloControllerSpec extends Specification {
+public class Application {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
-
-    void "test hello world response"() {
-        expect:
-        new URL(embeddedServer.getURL(), "/hello").text == "Hello World" // <2>
+    public static void main(String[] args) {
+        ParticleApplication.run(Application.class);
     }
 }
 // end::class[]

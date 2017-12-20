@@ -202,7 +202,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             return rootUri + value;
         } else {
             Optional<MethodConvention> convention = MethodConvention.forMethod(method.getMethodName());
-            return rootUri + convention.map(MethodConvention::uri).orElse("/" + method.getMethodName());
+            return rootUri + convention.map(MethodConvention::uri).orElse(uriNamingStrategy.resolveUri(method.getMethodName()));
         }
     }
 
