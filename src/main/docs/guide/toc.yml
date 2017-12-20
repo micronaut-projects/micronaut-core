@@ -33,9 +33,12 @@ httpServer:
   title: The HTTP Server
   runningServer: Running the Embedded Server 
   routing: HTTP Routing
-  binding: Parameter Binding
-  reactiveServer: Reactive HTTP Request Processing
-  jsonBinding: JSON Binding with Jackson
+  binding: Simple Request Binding
+  requestResponse: The HttpRequest and HttpResponse
+  reactiveServer:
+    title: Reactive HTTP Request Processing
+    jsonBinding: JSON Binding with Jackson
+    reactiveResponses: Reactive Responses
   errorHandling: Error Handling
   filters: HTTP Filters
   uploads: File Uploads

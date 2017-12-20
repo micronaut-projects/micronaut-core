@@ -1,1 +1,101 @@
-TODO
+The examples in the previous section demonstrates how Particle allows you to bind method parameters from URI path variables.
+
+=== Binding Annotations
+
+You can customize the name of the variable bound with the link:{api}/org/particleframework/http/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
+
+In addition, there are other annotations within the link:{api}/org/particleframework/http/annotation/package-summary.html[org.particleframework.http.annotation] package to bind from different sources.
+
+The following table summarizes the annotations, their purpose and provides an example:
+
+
+.Parameter Binding Annotations
+|===
+|Annotation|Description |Example
+
+|link:{api}/org/particleframework/http/annotation/Body.html[@Body]
+|Allows to specify the parameter the body of the request should bind to
+|`@Body String body`
+
+|link:{api}/org/particleframework/http/annotation/Cookie.html[@Cookie]
+|Binds a parameter from a Cookie
+|`@Cookie String myCookie`
+
+|link:{api}/org/particleframework/http/annotation/Header.html[@Header]
+|Binds a parameter from an HTTP header
+|`@Header String contentType`
+
+|link:{api}/org/particleframework/http/annotation/Parameter.html[@Parameter]
+|Bindings from a request URI variable or request parameter
+|`@Parameter String myParam`
+|===
+
+When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
+
+[source,groovy]
+----
+String hello(@Cookie("myCookie") String myCookie) {
+    ...
+}
+
+String hello(@Cookie String myCookie) {
+    ...
+}
+----
+
+Since Java doesn't allow hyphens in variable names in the case of headers the following two definitions are equivalent:
+
+
+[source,java]
+----
+public String hello(@Header("Content-Type") String contentType) {
+    ...
+}
+
+public String hello(@Header String contentType) {
+    ...
+}
+----
+
+
+
+=== Bindable Types
+
+Generally any type that can be converted from a String representation to a Java type via the link:{api}/org/particleframework/core/convert/ConversionService.html[ConversionService] API can be bound to.
+
+This includes most common Java types, however additional link:{api}/org/particleframework/core/convert/TypeConverter.html[TypeConverter] instances can be registered simply be creating `@Singleton` beans of type `TypeConverter`.
+
+The handling of link:{jdkapi}/java/util/Optional.html[Optional] deserves special mention. Consider for example the following example:
+
+[source,java]
+----
+public String hello(@Header String contentType) {
+    ...
+}
+----
+
+In this case if the HTTP header `Content-Type` is not present in the request the route is considered invalid, since it cannot be satisfied and a HTTP 400 `BAD REQUEST` is returned.
+
+If you wish for the `Content-Type` header to be optional, you can instead write:
+
+[source,java]
+----
+public String hello(@Header Optional<String> contentType) {
+    ...
+}
+----
+
+An empty `Optional` will be passed if the header is absent from the request.
+
+Additionally, any `DateTime` that conforms to link:{jdkapi}/api/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/org/particleframework/core/convert/format/Format.html[Format] annotation:
+
+[source,java]
+----
+public String hello(@Header ZonedDateTime date) {
+    ...
+}
+
+public String hello(@Format('dd/MM/yyy') @Header ZonedDateTime date) {
+    ...
+}
+----
