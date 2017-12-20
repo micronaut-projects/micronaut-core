@@ -19,7 +19,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * <p>Represents the built in </p>
+ * <p>Represents the built in conventions for mapping a method name to an HTTP Method and URI</p>
  *
  * @author Graeme Rocher
  * @since 1.0

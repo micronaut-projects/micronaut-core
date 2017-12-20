@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.docs.server.intro
+package org.particleframework.docs.server.routes;
 
 // tag::imports[]
-import org.particleframework.context.ApplicationContext
-import org.particleframework.runtime.server.EmbeddedServer
-import spock.lang.*
+import org.particleframework.http.annotation.Controller;
+import org.particleframework.web.router.annotation.Get;
+import javax.inject.Singleton;
 // end::imports[]
+
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 // tag::class[]
-class HelloControllerSpec extends Specification {
+@Controller // <1>
+@Singleton
+public class MessageController {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
-
-    void "test hello world response"() {
-        expect:
-        new URL(embeddedServer.getURL(), "/hello").text == "Hello World" // <2>
+    @Get("/hello/{name}") // <2>
+    String hello(String name) {
+        return "Hello " + name + "!"; // <3>
     }
 }
 // end::class[]

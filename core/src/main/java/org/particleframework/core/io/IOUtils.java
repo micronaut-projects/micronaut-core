@@ -33,7 +33,7 @@ public class IOUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
     /**
-     * Read the content of the BufferedReader and return it as a String.
+     * Read the content of the BufferedReader and return it as a String in a blocking manner.
      * The BufferedReader is closed afterwards.
      *
      * @param reader a BufferedReader whose content we want to read

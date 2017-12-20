@@ -43,10 +43,19 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Executable
 public @interface Controller {
     /**
+     * <p>This attribute returns the base URI of the controller. If not specified the URI will be
+     * formulated from the controller class name without the "Controller" suffix (ie. {@code MessageController becomes} {@code /message}).</p>
+     *
+     * <p>A value of {@code /} can be used to map a controller
+     * to the root URI.</p>
+     *
      * @return The base URI of the controller in the case of web applications
      */
     String value() default "";
 
+    /**
+     * @return Same as {@link #value()}
+     */
     @AliasFor(member = "value")
     String uri() default "";
 
