@@ -18,7 +18,6 @@ package org.particleframework.docs
 import org.asciidoctor.extension.*
 import org.asciidoctor.ast.*
 
-import groovy.transform.CompileStatic
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -30,7 +29,6 @@ class ApiMacro extends InlineMacroProcessor {
 
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
-
         // is it a method reference
         int methodIndex = target.lastIndexOf('(')
         String methodRef = ""
@@ -68,9 +66,14 @@ class ApiMacro extends InlineMacroProcessor {
             }
         }
 
+        String defaultPackage = getDefaultPackagePrefix()
+        if(defaultPackage != null && !target.startsWith(defaultPackage)) {
+            target = "${defaultPackage}${target}" // allow excluding org.particleframework
+        }
+        String baseUri = getBaseUri(parent.document.attributes)
         final Map options = [
                 type: ':link',
-                target: "../api/${target.replace('.','/')}.html${methodRef}".toString()
+                target: "${baseUri}/${target.replace('.','/')}.html${methodRef}".toString()
         ] as Map<String, Object>
 
         // Prepend twitterHandle with @ as text link.
@@ -78,5 +81,13 @@ class ApiMacro extends InlineMacroProcessor {
 
         // Convert to String value.
         return apiLink.convert()
+    }
+
+    protected String getBaseUri(Map<String, Object> attrs) {
+        "../api"
+    }
+
+    protected String getDefaultPackagePrefix() {
+        "org.particleframework."
     }
 }

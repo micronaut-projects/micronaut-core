@@ -24,8 +24,14 @@ import groovy.transform.CompileStatic
 class DocsExtensionRegistry implements ExtensionRegistry{
     @Override
     void register(Asciidoctor asciidoctor) {
-        println "Registering extensions!"
+
         final JavaExtensionRegistry javaExtensionRegistry = asciidoctor.javaExtensionRegistry()
         javaExtensionRegistry.inlineMacro 'api', ApiMacro
+        javaExtensionRegistry.inlineMacro 'jdk', JdkApiMacro
+        javaExtensionRegistry.inlineMacro 'jee', JeeApiMacro
+        javaExtensionRegistry.inlineMacro 'rs', ReactiveStreamsApiMacro
+        javaExtensionRegistry.inlineMacro 'rx', RxJavaApiMacro
+
+
     }
 }

@@ -37,13 +37,15 @@ httpServer:
   requestResponse: The HttpRequest and HttpResponse
   reactiveServer:
     title: Reactive HTTP Request Processing
-    jsonBinding: JSON Binding with Jackson
+    bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
+    jsonBinding: JSON Binding with Jackson
   errorHandling: Error Handling
-  filters: HTTP Filters
+  formData: Handling Form Data
   uploads: File Uploads
   transfers: File Transfers
   sse: Server Sent Events
+  filters: HTTP Filters
   sessions: HTTP Sessions
   serverConfiguration:
     title: Configuring the HTTP Server
