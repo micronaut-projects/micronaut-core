@@ -31,7 +31,6 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-@Requires(classes = Flowable.class)
 public class PublisherToFlowableConverter implements TypeConverter<Publisher, Flowable> {
     @SuppressWarnings("unchecked")
     @Override

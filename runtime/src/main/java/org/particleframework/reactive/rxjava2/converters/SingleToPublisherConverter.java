@@ -15,9 +15,7 @@
  */
 package org.particleframework.reactive.rxjava2.converters;
 
-import io.reactivex.Maybe;
 import io.reactivex.Single;
-import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 import org.reactivestreams.Publisher;
@@ -26,16 +24,17 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a {@link Publisher} into a {@link Maybe}
+ * Converts a {@link Single} to a {@link Publisher}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class PublisherToMaybeConverter implements TypeConverter<Publisher, Maybe> {
-    @SuppressWarnings("unchecked")
+public class SingleToPublisherConverter implements TypeConverter<Single, Publisher> {
     @Override
-    public Optional<Maybe> convert(Publisher object, Class<Maybe> targetType, ConversionContext context) {
-        return Optional.of(Maybe.fromSingle(Single.fromPublisher(object)));
+    public Optional<Publisher> convert(Single object, Class<Publisher> targetType, ConversionContext context) {
+        return Optional.of(
+                object.toFlowable()
+        );
     }
 }
