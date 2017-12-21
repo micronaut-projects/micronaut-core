@@ -15,17 +15,20 @@
  */
 package org.particleframework.docs.server.request;
 
-import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpResponse;
+// tag::imports[]
+import org.particleframework.http.*;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.web.router.annotation.Get;
-
 import javax.inject.Singleton;
+
+import static org.particleframework.http.HttpResponse.*; // <1>
+// end::imports[]
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+// tag::class[]
 @Controller("/request")
 @Singleton
 public class MessageController {
@@ -36,7 +39,8 @@ public class MessageController {
                              .getFirst("name")
                              .orElse("Nobody"); // <3>
 
-        return HttpResponse.ok("Hello " + name + "!!")
-                           .header("X-My-Header", "Foo"); // <4>
+        return ok("Hello " + name + "!!")
+                 .header("X-My-Header", "Foo"); // <4>
     }
 }
+// end::class[]
