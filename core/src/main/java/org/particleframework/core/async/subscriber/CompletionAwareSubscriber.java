@@ -57,7 +57,11 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
     @Override
     public final void onNext(T t) {
         if(!complete.get()) {
-            doOnNext(t);
+            try {
+                doOnNext(t);
+            } catch (Throwable e) {
+                onError(e);
+            }
         }
     }
 

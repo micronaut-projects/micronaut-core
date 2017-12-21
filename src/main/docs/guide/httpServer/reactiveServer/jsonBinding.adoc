@@ -1,1 +1,8 @@
-TODO
+The examples so far have dealt with simply text based responses, but the most common data interchange format nowadays is JSON.
+
+In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Particle consume and produce JSON by default.
+
+In order do so in a non-blocking manner Particle builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
+
+From a developer perspective however, you can generally just work with POJOs. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
+

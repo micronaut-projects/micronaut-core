@@ -19,6 +19,7 @@ import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.conventions.MethodConvention;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Consumes;
@@ -198,8 +199,13 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     private String resolveUri(String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
         Class declaringType = method.getDeclaringType();
         String rootUri = uriNamingStrategy.resolveUri(declaringType);
-        if (value != null && value.length() > 0) {
-            return rootUri + value;
+        if (StringUtils.isNotEmpty(value)) {
+            if(value.length() == 1 && value.charAt(0) == '/') {
+                return rootUri;
+            }
+            else {
+                return rootUri + value;
+            }
         } else {
             Optional<MethodConvention> convention = MethodConvention.forMethod(method.getMethodName());
             return rootUri + convention.map(MethodConvention::uri).orElse(uriNamingStrategy.resolveUri(method.getMethodName()));

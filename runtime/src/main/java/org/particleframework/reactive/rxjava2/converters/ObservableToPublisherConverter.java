@@ -15,9 +15,8 @@
  */
 package org.particleframework.reactive.rxjava2.converters;
 
-import io.reactivex.Maybe;
-import io.reactivex.Single;
-import org.particleframework.context.annotation.Requires;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Observable;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 import org.reactivestreams.Publisher;
@@ -26,16 +25,17 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts a {@link Publisher} into a {@link Maybe}
+ * Defaults conversion strategy for {@link Observable} to {@link Publisher}. By default a buffering back pressure strategy is used
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class PublisherToMaybeConverter implements TypeConverter<Publisher, Maybe> {
-    @SuppressWarnings("unchecked")
+public class ObservableToPublisherConverter implements TypeConverter<Observable, Publisher> {
     @Override
-    public Optional<Maybe> convert(Publisher object, Class<Maybe> targetType, ConversionContext context) {
-        return Optional.of(Maybe.fromSingle(Single.fromPublisher(object)));
+    public Optional<Publisher> convert(Observable object, Class<Publisher> targetType, ConversionContext context) {
+        return Optional.of(
+                object.toFlowable(BackpressureStrategy.BUFFER)
+        );
     }
 }

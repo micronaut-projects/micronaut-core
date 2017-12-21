@@ -1,4 +1,4 @@
-To parse the request body, you first need to indicate to Particle the parameter which will receive the data. This is done with the api:org.particleframework.http.annotation.Body[] annotation.
+To parse the request body, you first need to indicate to Particle the parameter which will receive the data. This is done with the api:http.annotation.Body[] annotation.
 
 The following example implements a simple echo server that echos the body sent in the request:
 
