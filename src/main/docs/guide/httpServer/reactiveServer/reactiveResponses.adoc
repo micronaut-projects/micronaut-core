@@ -1,1 +1,43 @@
-TODO
+The previous section introduced the notion of Reactive programming using RxJava 2.x and Particle.
+
+Particle supports returning common reactive types such as rx:Single[] or rx:Observable[] (or the `Mono` type from Reactor 3.x), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+
+The argument that is designated the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
+
+Particle also uses these types to influence which thread pool to execute the method on. If the request is considered non-blocking (because it returns a non-blocking type) then the Netty event loop thread will be used to execute the method.
+
+If the method is considered blocking then the method is executed on the I/O thread pool, which Particle creates at startup.
+
+TIP: See the section on <<threadPools, Configuring Thread Pools>> for information on the thread pools that Particle sets up and how to configure them.
+
+To summarize, the following table illustrates some common response types and their handling:
+
+
+.Particle Response Types
+|===
+|Type|Description|Example Signature
+
+|rs:Publisher[]
+|Any type that implements the rs:Publisher[] interface
+|`Flowable<String> hello()`
+
+|jdk:java.util.concurrent.CompletableFuture[]
+|A Java `CompletableFuture` instance
+|`CompletableFuture<String> hello()`
+
+|api:http.HttpResponse[]
+|An api:http.HttpResponse[] and optional response body
+|`HttpResponse<Flowable<String>> hello()`
+
+|jdk:java.lang.CharSequence[]
+|Any implementation of `CharSequence`
+|`String hello()`
+
+|T
+|Any simple POJO type
+|`Book show()`
+|===
+
+NOTE: When returning a Reactive type, the type of reactive type has an impact on the response returned. For example, when returning a rx:Flowable[], Particle cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `rx:Single[]` the `Content-Length` header will be populated.
+
+
