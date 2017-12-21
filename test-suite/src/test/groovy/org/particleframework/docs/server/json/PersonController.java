@@ -15,28 +15,26 @@
  */
 package org.particleframework.docs.server.json;
 
-import io.reactivex.Maybe;
-import io.reactivex.Single;
+import io.reactivex.*;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Get;
-import org.particleframework.web.router.annotation.Post;
+import org.particleframework.http.annotation.*;
+import org.particleframework.web.router.annotation.*;
 
 import javax.inject.Singleton;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+// tag::class[]
 @Controller("/people")
 @Singleton
 public class PersonController {
 
     Map<String, Person> inMemoryDatastore = new LinkedHashMap<>();
+// end::class[]
 
     @Get("/")
     Collection<Person> index() {
@@ -51,12 +49,24 @@ public class PersonController {
         return Maybe.empty();
     }
 
+    // tag::single[]
     @Post("/")
-    Single<HttpResponse<Person>> save(@Body Single<Person> person) {
+    Single<HttpResponse<Person>> save(@Body Single<Person> person) { // <1>
         return person.map(p -> {
+                    inMemoryDatastore.put(p.getFirstName(), p); // <2>
+                    return HttpResponse.created(p); // <3>
+                }
+        );
+    }
+    // end::single[]
+
+    // tag::future[]
+    CompletableFuture<HttpResponse<Person>> saveFuture(@Body CompletableFuture<Person> person) {
+        return person.thenApply(p -> {
                     inMemoryDatastore.put(p.getFirstName(), p);
                     return HttpResponse.created(p);
                 }
         );
     }
+    // end::future[]
 }

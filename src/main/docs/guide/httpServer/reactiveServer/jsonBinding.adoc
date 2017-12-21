@@ -4,5 +4,34 @@ In fact, the defaults in the api:http.annotation.Controller[] annotation specify
 
 In order do so in a non-blocking manner Particle builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.
 
-From a developer perspective however, you can generally just work with POJOs. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
+From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs). The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
 
+.Using RxJava 2 to Read the JSON
+[source,java]
+----
+include::{testsuite}/server/json/PersonController.java[tags=class, indent=0]
+
+include::{testsuite}/server/json/PersonController.java[tags=single, indent=4]
+}
+----
+
+<1> The method receives a RxJava rx:Single[] which emits the POJO once the JSON has been read
+<2> The `map` method is used to store the instance in `Map`
+<3> An api:http.HttpResponse[] is returned
+
+Using CURL from the command line you can POST JSON to the `/people` URI for the server to receive it:
+
+.Using CURL to Post JSON
+----
+$ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintstone","age":45}'
+----
+
+The same method as the previous example can also be written with the jdk:java.util.concurrent.CompletableFuture[] API instead:
+
+.Using CompletableFuture to Read the JSON
+[source,java]
+----
+include::{testsuite}/server/json/PersonController.java[tags=future, indent=0]
+----
+
+The above example uses the `thenApply` method to achieve the same as the previous example.
