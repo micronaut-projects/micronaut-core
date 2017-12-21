@@ -31,18 +31,46 @@ class ApiMacro extends InlineMacroProcessor {
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
 
-        // Define options for an 'anchor' element.
+        // is it a method reference
+        int methodIndex = target.lastIndexOf('(')
+        String methodRef = ""
         String shortName
-        int i = target.lastIndexOf('.')
-        if(i > -1) {
-            shortName = target.substring(i+1, target.length())
+        if(methodIndex > -1 && target.endsWith(")")) {
+            String sig = target.substring(methodIndex+1, target.length()-1)
+            target = target.substring(0, methodIndex)
+            methodIndex = target.lastIndexOf('.')
+            if(methodIndex > -1) {
+                String sigRef = "-${sig.split(',').join('-')}-"
+                String methodName = target.substring(methodIndex + 1, target.length())
+
+                methodRef = "#${methodName}${sigRef}"
+                target = target.substring(0, methodIndex)
+                int classIndex = target.lastIndexOf('.')
+                if(classIndex > -1) {
+                    shortName = "${target.substring(classIndex+1, target.length())}.${methodName}(${sig})"
+                }
+                else {
+                    shortName = target
+                }
+            }
+            else {
+                return null
+            }
         }
         else {
-            shortName = target
+
+            int classIndex = target.lastIndexOf('.')
+            if(classIndex > -1) {
+                shortName = target.substring(classIndex+1, target.length())
+            }
+            else {
+                shortName = target
+            }
         }
+
         final Map options = [
                 type: ':link',
-                target: "../api/${target.replace('.','/')}.html".toString()
+                target: "../api/${target.replace('.','/')}.html${methodRef}".toString()
         ] as Map<String, Object>
 
         // Prepend twitterHandle with @ as text link.
