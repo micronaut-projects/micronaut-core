@@ -15,7 +15,10 @@
  */
 package org.particleframework.core.convert.value;
 
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.reflect.GenericTypeUtils;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.value.OptionalValues;
 
 import java.util.*;
@@ -121,9 +124,24 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
      */
     default <T> Optional<T> getFirst(CharSequence name, Class<T> requiredType) {
-        return get(name, requiredType);
+        return getFirst(name, Argument.of(requiredType));
     }
 
+    /**
+     * Find a header and convert it to the given type
+     *
+     * @param name The name of the header
+     * @param requiredType The required type
+     * @param <T> The generic type
+     * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
+     */
+    default <T> Optional<T> getFirst(CharSequence name, Argument<T> requiredType) {
+        V v = get(name);
+        if(v != null) {
+            return ConversionService.SHARED.convert(v, ConversionContext.of(requiredType));
+        }
+        return Optional.empty();
+    }
     /**
      * Find a header and convert it to the given type
      *
@@ -134,7 +152,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @return The first value of the default supplied value if it is isn't present
      */
     default <T> T getFirst(CharSequence name, Class<T> requiredType, T defaultValue) {
-        return get(name, requiredType).orElse(defaultValue);
+        return getFirst(name, requiredType).orElse(defaultValue);
     }
     /**
      * Creates a new {@link OptionalValues} for the given type and values

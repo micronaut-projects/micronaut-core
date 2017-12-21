@@ -3,7 +3,6 @@ If you need more control over request processing then you can instead write a me
 In fact, there are several higher level interfaces that can be bound to method parameters of controllers. These include:
 
 
-
 .Bindable Particle Interfaces
 |===
 |Interface |Description |Example
@@ -20,5 +19,12 @@ In fact, there are several higher level interfaces that can be bound to method p
 |All HTTP parameters (either from URI variables or request parameters) present in the request
 |`String hello(HttpParameters params)`
 
+|api:org.particleframework.http.cookie.Cookies[]
+|All the Cookies present in the request
+|`String hello(Cookies cookies)`
 |===
+
+In addition, for full control over the emitted HTTP response you can use the static factory methods of the api:org.particleframework.http.HttpResponse[] class which return a api:org.particleframework.http.MutableHttpResponse[].
+
+The following example implements the previous `MessageController` example using the api:org.particleframework.http.HttpRequest[] and api:org.particleframework.http.HttpResponse[] objects:
 
