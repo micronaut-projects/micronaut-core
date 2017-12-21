@@ -18,3 +18,10 @@ At the same time Particle aims to avoid the downsides of frameworks like Spring,
 * Minimal use of reflection
 * Minimal use of proxies
 * Easy Unit Testing
+
+Whilst frameworks like Spring and Grails were never designed to run in scenarios such as as functions on a Server-less platform, or on Android or as a low memory footprint Micro Service; Particle on the other hand is designed to be suitable for all of these scenarios.
+
+The way this is achieved is through a series of Java annotation processors, that are usable on any JVM language that supports them, and an HTTP Server and Client built on Netty.
+
+The purpose of the annotation processors is to provide a similar programming model to Spring and Grails, but by pre-compiling all the information necessary to perform DI, define AOP proxies and configure your application to run in a Micro Services environment.
+
