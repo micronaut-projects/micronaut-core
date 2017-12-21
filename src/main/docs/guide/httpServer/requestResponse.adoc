@@ -1,1 +1,24 @@
-TODO
+If you need more control over request processing then you can instead write a method that receives the complete api:org.particleframework.http.HttpRequest[].
+
+In fact, there are several higher level interfaces that can be bound to method parameters of controllers. These include:
+
+
+
+.Bindable Particle Interfaces
+|===
+|Interface |Description |Example
+
+|api:org.particleframework.http.HttpRequest[]
+|The full `HttpRequest`
+|`String hello(HttpRequest request)`
+
+|api:org.particleframework.http.HttpHeaders[]
+|All HTTP headers present in the request
+|`String hello(HttpHeaders headers)`
+
+|api:org.particleframework.http.HttpParameters[]
+|All HTTP parameters (either from URI variables or request parameters) present in the request
+|`String hello(HttpParameters params)`
+
+|===
+
