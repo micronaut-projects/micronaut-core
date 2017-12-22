@@ -52,7 +52,7 @@ class RequestArgumentSatisfier {
      * @param request The request
      * @return The route
      */
-    RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request) {
+    RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request, boolean satisfyOptionals) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
@@ -94,7 +94,7 @@ class RequestArgumentSatisfier {
                         ArgumentBinder.BindingResult bindingResult = argumentBinder
                                 .bind(conversionContext, request);
                         if (argument.getType() == Optional.class) {
-                            if(bindingResult.isSatisfied()) {
+                            if(bindingResult.isSatisfied() || satisfyOptionals) {
                                 Optional value = bindingResult.getValue();
                                 if(value.isPresent()) {
                                     argumentValues.put(argumentName, value.get());

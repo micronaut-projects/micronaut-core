@@ -70,6 +70,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
                 }
             }
             else {
+                //noinspection unchecked
                 return BindingResult.UNSATISFIED;
             }
         }
