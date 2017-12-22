@@ -242,7 +242,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
         if (errorRoute != null) {
-            errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest);
+            errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
                 Object result = errorRoute.execute();
@@ -302,7 +302,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         request.setMatchedRoute(route);
 
         // try to fulfill the argument requirements of the route
-        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request);
+        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request, false);
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
 
@@ -475,7 +475,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     try {
                         RouteMatch<Object> routeMatch = finalRoute;
                         if (!routeMatch.isExecutable()) {
-                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request);
+                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, true);
                         }
                         Object result = routeMatch.execute();
 
@@ -486,7 +486,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             if (status.getCode() >= 300) {
                                 // handle re-mapping of errors
                                 result = router.route(status)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
                                         .filter(RouteMatch::isExecutable)
                                         .map(RouteMatch::execute)
                                         .orElse(result);
