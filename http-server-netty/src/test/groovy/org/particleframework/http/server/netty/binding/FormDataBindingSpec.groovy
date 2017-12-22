@@ -20,6 +20,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
+import org.particleframework.http.annotation.Body
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.annotation.Post
@@ -51,6 +52,26 @@ class FormDataBindingSpec extends AbstractParticleSpec {
 
     }
 
+    void "test pojo body parsing"() {
+
+        when:
+        RequestBody formBody = new FormBody.Builder()
+                .add("name", "Fred")
+                .add("something", "else")
+                .add("age", "10").build()
+        def request = new Request.Builder()
+                .url("$server/form/pojo")
+                .post(formBody)
+
+        def response = client.newCall(
+                request.build()
+        ).execute()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().string() == "name: Fred, age: 10"
+
+    }
 
     void "test simple string-based body parsing with missing data"() {
 
@@ -75,6 +96,16 @@ class FormDataBindingSpec extends AbstractParticleSpec {
         @Post
         String simple(String name, Integer age) {
             "name: $name, age: $age"
+        }
+
+        @Post
+        String pojo(@Body Person person) {
+            "name: $person.name, age: $person.age"
+        }
+
+        static class Person {
+            String name
+            Integer age
         }
     }
 }

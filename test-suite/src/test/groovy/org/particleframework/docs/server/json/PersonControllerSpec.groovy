@@ -76,6 +76,8 @@ class PersonControllerSpec extends Specification {
         response.code() == HttpStatus.CREATED.code
     }
 
+
+
     void "test retrieve person"() {
         given:
         // TODO: Replace with Particle HTTP client when written
@@ -108,5 +110,19 @@ class PersonControllerSpec extends Specification {
 
     }
 
+    void "test save person with args"() {
+        given:
+        // TODO: Replace with Particle HTTP client when written
+        OkHttpClient client = new OkHttpClient()
+        String body = '{"firstName":"Fred","lastName":"Flintstone","age":45}'
+        Request.Builder request = new Request.Builder()
+                .url(new URL(embeddedServer.getURL(), "/people/saveWithArgs"))
+                .post(RequestBody.create(MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), body))// <2>
+        Response response = client.newCall(request.build()).execute()
 
+
+        expect:
+        response.body().string() == body // <2>
+        response.code() == HttpStatus.CREATED.code
+    }
 }

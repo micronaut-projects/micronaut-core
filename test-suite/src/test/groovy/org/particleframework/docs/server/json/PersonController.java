@@ -66,6 +66,17 @@ public class PersonController {
     }
     // end::single[]
 
+
+    @Post("/saveWithArgs")
+    // tag::args[]
+    public HttpResponse<Person> save(String firstName, String lastName, Optional<Integer> age) {
+        Person p = new Person(firstName, lastName);
+        age.ifPresent(p::setAge);
+        inMemoryDatastore.put(p.getFirstName(), p);
+        return HttpResponse.created(p);
+    }
+    // end::args[]
+
     // tag::future[]
     public CompletableFuture<HttpResponse<Person>> save(@Body CompletableFuture<Person> person) {
         return person.thenApply(p -> {
