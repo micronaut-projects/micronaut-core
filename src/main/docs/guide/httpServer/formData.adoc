@@ -23,4 +23,4 @@ Alternatively, instead of using a POJO you can bind form data directly to method
 include::{testsuite}/server/json/PersonController.java[tags=args, indent=0]
 ----
 
-As you can see from the example above, this approach allows you to use features as support for jdk:java.util.Optional[] types.
+As you can see from the example above, this approach allows you to use features as support for jdk:java.util.Optional[] types and restrict the parameters to be bound (When using POJOs you must be careful to use Jackson annotations to exclude properties that should not be bound).
