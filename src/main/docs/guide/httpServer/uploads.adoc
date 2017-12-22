@@ -1,1 +1,2 @@
-TODO
+Handling of file uploads has special treatment in Particle. In order to allow streaming of data and non-blocking file uploads there are two possible approaches.
+

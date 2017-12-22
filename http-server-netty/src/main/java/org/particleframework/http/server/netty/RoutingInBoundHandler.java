@@ -125,6 +125,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> request) throws Exception {
+        ctx.channel().config().setAutoRead(false);
         HttpMethod httpMethod = request.getMethod();
         URI requestPath = request.getPath();
 
@@ -322,6 +323,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             processor.subscribe(buildSubscriber(request, context, route));
         } else {
+            context.read();
             route = prepareRouteForExecution(route, request);
             route.execute();
         }
@@ -426,7 +428,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             @Override
             protected void doOnError(Throwable t) {
-                context.pipeline().fireExceptionCaught(t);
+                try {
+                    exceptionCaught(context, t);
+                } catch (Exception e) {
+                    // should never happen
+                    writeDefaultErrorResponse(context, request, e);
+                }
             }
 
             @Override
@@ -652,16 +659,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
                         @Override
                         protected void doOnComplete() {
-                            if (message != null) {
-                                if (message instanceof HttpResponse) {
-                                    NettyHttpResponse<?> responseMessage = (NettyHttpResponse<?>) this.message;
-                                    writeHttpResponse(context, request, responseMessage, responseMessage.getNativeResponse(), codec, responseType);
+                            try {
+                                if (message != null) {
+                                    if (message instanceof HttpResponse) {
+                                        NettyHttpResponse<?> responseMessage = (NettyHttpResponse<?>) this.message;
+                                        writeHttpResponse(context, request, responseMessage, responseMessage.getNativeResponse(), codec, responseType);
+                                    } else {
+                                        writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                    }
                                 } else {
-                                    writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                    // no body emitted so return a 404
+                                    emitDefaultNotFoundResponse(context, request);
                                 }
-                            } else {
-                                // no body emitted so return a 404
-                                emitDefaultNotFoundResponse(context, request);
+                            } finally {
+                                // final read required to complete request
+                                context.read();
                             }
                         }
                     });
