@@ -189,8 +189,24 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Error.class, (ExecutableMethod method) -> {
-                    Optional<HttpStatus> value = method.getValue(Error.class, HttpStatus.class);
-                    value.ifPresent(httpStatus -> status(httpStatus, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes()));
+                    if (method.isPresent(Error.class, "status")) {
+                        Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
+                        value.ifPresent(httpStatus -> status(httpStatus, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes()));
+                    } else if (method.isPresent(Error.class, "value")) {
+                        Optional<Class> aClass = method.classValue(Error.class);
+                        aClass.ifPresent(exceptionType ->
+                                {
+                                    if (Throwable.class.isAssignableFrom(exceptionType)) {
+                                        //noinspection unchecked
+                                        error(exceptionType, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+                                    }
+                                }
+                        );
+                    }
+                    else {
+                        error(Throwable.class, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+                    }
+
                 }
 
         );
@@ -200,10 +216,9 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         Class declaringType = method.getDeclaringType();
         String rootUri = uriNamingStrategy.resolveUri(declaringType);
         if (StringUtils.isNotEmpty(value)) {
-            if(value.length() == 1 && value.charAt(0) == '/') {
+            if (value.length() == 1 && value.charAt(0) == '/') {
                 return rootUri;
-            }
-            else {
+            } else {
                 return rootUri + value;
             }
         } else {

@@ -45,7 +45,7 @@ import org.particleframework.http.annotation.*
 
 @Controller(consumes = MediaType.APPLICATION_FORM_URLENCODED)
 class FormController {
-   @Error(HttpStatus.BAD_REQUEST)
+   @Error(status=HttpStatus.BAD_REQUEST)
     HttpResponse badHandler() {
         HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff")
     }
@@ -57,7 +57,10 @@ class FormController {
         then:
         metadata != null
         metadata.hasStereotype(Error)
-        metadata.getValue(Error, HttpStatus).get() == HttpStatus.BAD_REQUEST
+        !metadata.isPresent(Error.class, "exception")
+        !metadata.isPresent(Error.class, "value")
+        metadata.isPresent(Error.class, "status")
+        metadata.getValue(Error,"status", HttpStatus).get() == HttpStatus.BAD_REQUEST
     }
 
 
