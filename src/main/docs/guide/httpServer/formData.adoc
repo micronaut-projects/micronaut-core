@@ -1,1 +1,26 @@
-TODO
+In order to make data binding model customizations consistent between form data and JSON, Particle uses Jackson to implement binding data from form submissions.
+
+The advantage of this approach is that the same Jackson annotations used for customizing JSON binding can be used for form submissions too.
+
+What this means in practise is that in order to bind regular form data the only change required to the previous JSON binding code is updating the api:http.MediaType[] consumed:
+
+.Binding Form Data to POJOs
+[source,java]
+----
+@Post(uri="/", consumes=MediaType.APPLICATION_FORM_URLENCODED)
+include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
+----
+
+TIP: To avoid denial of service attacks collection types and arrays created during binding are limited by the setting `jackson.arraySizeThreshold` in `application.yml`
+
+
+Alternatively, instead of using a POJO you can bind form data directly to method parameters (which works with JSON too!):
+
+.Binding Form Data to Parameters
+[source,java]
+----
+@Post(uri="/", consumes=MediaType.APPLICATION_FORM_URLENCODED)
+include::{testsuite}/server/json/PersonController.java[tags=args, indent=0]
+----
+
+As you can see from the example above, this approach allows you to use features as support for jdk:java.util.Optional[] types.

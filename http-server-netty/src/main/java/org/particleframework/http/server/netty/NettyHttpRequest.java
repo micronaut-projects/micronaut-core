@@ -15,13 +15,16 @@
  */
 package org.particleframework.http.server.netty;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http.multipart.MemoryAttribute;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.DefaultAttributeMap;
@@ -38,6 +41,7 @@ import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -326,8 +330,24 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
 
     @Internal
     void addContent(ByteBufHolder httpContent) {
-        if(httpContent instanceof HttpData) {
-            // TODO: handle binding attributes
+        if(httpContent instanceof MemoryAttribute) {
+            Object body = this.body;
+            if (body == null) {
+                synchronized (this) { // double check
+                    body = this.body;
+                    if (body == null) {
+                        this.body = body = new LinkedHashMap<String, Object>();
+                    }
+                }
+            }
+            if(body instanceof Map) {
+                Attribute attribute = (Attribute) httpContent;
+                try {
+                    ((Map)body).put(attribute.getName(), attribute.getValue());
+                } catch (IOException e) {
+                    // ignore
+                }
+            }
         }
         else {
             receivedContent.add(httpContent);
