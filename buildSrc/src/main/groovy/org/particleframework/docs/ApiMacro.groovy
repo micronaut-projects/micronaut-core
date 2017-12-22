@@ -31,7 +31,9 @@ class ApiMacro extends InlineMacroProcessor {
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
         // is it a method reference
         int methodIndex = target.lastIndexOf('(')
+        int propIndex = target.lastIndexOf('#')
         String methodRef = ""
+        String propRef = ""
         String shortName
         if(methodIndex > -1 && target.endsWith(")")) {
             String sig = target.substring(methodIndex+1, target.length()-1)
@@ -56,13 +58,20 @@ class ApiMacro extends InlineMacroProcessor {
             }
         }
         else {
-
-            int classIndex = target.lastIndexOf('.')
-            if(classIndex > -1) {
-                shortName = target.substring(classIndex+1, target.length())
+            if(propIndex > -1) {
+                propRef = target.substring(propIndex, target.length())
+                target = target.substring(0, propIndex)
+                shortName = propRef.substring(1)
             }
             else {
-                shortName = target
+
+                int classIndex = target.lastIndexOf('.')
+                if(classIndex > -1) {
+                    shortName = target.substring(classIndex+1, target.length())
+                }
+                else {
+                    shortName = target
+                }
             }
         }
 
@@ -73,7 +82,7 @@ class ApiMacro extends InlineMacroProcessor {
         String baseUri = getBaseUri(parent.document.attributes)
         final Map options = [
                 type: ':link',
-                target: "${baseUri}/${target.replace('.','/')}.html${methodRef}".toString()
+                target: "${baseUri}/${target.replace('.','/')}.html${methodRef}${propRef}".toString()
         ] as Map<String, Object>
 
         // Prepend twitterHandle with @ as text link.

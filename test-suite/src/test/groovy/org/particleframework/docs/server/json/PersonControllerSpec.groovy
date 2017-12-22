@@ -39,6 +39,27 @@ class PersonControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
 
+    void "test global error handler"() {
+        given:
+        // TODO: Replace with Particle HTTP client when written
+        OkHttpClient client = new OkHttpClient()
+        Request.Builder request = new Request.Builder()
+                .url(new URL(embeddedServer.getURL(), "/people/error"))
+
+        when:
+        Response response = client.newCall(request.build()).execute()
+
+
+        then:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+
+        when:
+        def json = new JsonSlurper().parseText(response.body().string())
+
+        then:
+        json.message == 'Bad Things Happened: Something went wrong'
+    }
+
     void "test save person"() {
         given:
         // TODO: Replace with Particle HTTP client when written
@@ -86,4 +107,6 @@ class PersonControllerSpec extends Specification {
         response.code() == HttpStatus.NOT_FOUND.code
 
     }
+
+
 }

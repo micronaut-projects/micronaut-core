@@ -17,6 +17,7 @@ package org.particleframework.docs.server.body;
 
 // tag::imports[]
 import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.*;
 import org.particleframework.web.router.annotation.Post;
@@ -44,12 +45,11 @@ public class MessageController {
 
     // tag::echoReactive[]
     @Post(consumes = MediaType.TEXT_PLAIN)
-    Flowable<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { // <1>
+    Single<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { // <1>
         return text.collect(StringBuffer::new, StringBuffer::append)
                    .map(buffer ->
                         HttpResponse.ok(buffer.toString()) // <2>
-                   )
-                   .toFlowable(); // <3>
+                   );
     }
     // end::echoReactive[]
 }

@@ -236,7 +236,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
             Class declaringType = originalRoute != null ? originalRoute.getDeclaringType() : null;
-            errorRoute = (declaringType != null ? router.route(declaringType, cause) : router.route(cause)).orElse(null);
+            Optional<RouteMatch<Object>> errorRouteMatch = declaringType != null ? router.route(declaringType, cause) : Optional.empty();
+            errorRoute = errorRouteMatch.orElseGet(() -> router.route(cause).orElse(null));
         }
 
         if (errorRoute != null) {
