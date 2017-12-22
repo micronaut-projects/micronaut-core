@@ -1,6 +1,6 @@
 A bean link:{api}/org/particleframework/context/annotation/Configuration.html[@Configuration] is a grouping of multiple bean definitions within a package.
 
-The `@Configuration` annotation is applied at the package level and informs Particle that the bean defined with the package form a logical grouping.
+The `@Configuration` annotation is applied at the package level and informs Particle that the beans defined with the package form a logical grouping.
 
 The `@Configuration` annotation is typically applied to `package-info` class. For example:
 
