@@ -16,6 +16,7 @@
 package org.particleframework.management.endpoint.health.indicator.diskspace;
 
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.management.endpoint.health.HealthEndpoint;
 import org.particleframework.management.endpoint.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.AbstractHealthIndicator;
 
@@ -36,6 +37,7 @@ import java.util.Map;
  */
 @Singleton
 @Requires(property = "endpoints.health.disk-space.enabled", notEquals = "false")
+@Requires(beans = HealthEndpoint.class)
 public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Object>> {
 
     protected static final String NAME = "diskSpace";

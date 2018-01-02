@@ -19,6 +19,7 @@ import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
 import org.particleframework.management.endpoint.health.aggregator.HealthAggregator;
 import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -38,7 +39,7 @@ public class HealthEndpoint {
     }
 
     @Read
-    Object getHealth() {
+    Publisher getHealth() {
         return healthAggregator.aggregate(healthIndicators);
     }
 }

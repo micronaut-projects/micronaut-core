@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.beans;
+package org.particleframework.management.endpoint.beans.impl;
 
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.management.endpoint.beans.BeanDefinitionData;
 
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;

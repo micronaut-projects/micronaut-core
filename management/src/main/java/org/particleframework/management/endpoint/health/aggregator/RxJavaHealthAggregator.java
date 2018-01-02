@@ -17,6 +17,8 @@ package org.particleframework.management.endpoint.health.aggregator;
 
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import org.particleframework.context.annotation.Requires;
+import org.particleframework.management.endpoint.health.HealthEndpoint;
 import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.management.endpoint.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = HealthEndpoint.class)
 public class RxJavaHealthAggregator implements HealthAggregator<Map<String, Object>> {
 
     @Override
