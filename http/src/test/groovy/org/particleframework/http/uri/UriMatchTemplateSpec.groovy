@@ -27,6 +27,27 @@ import spock.lang.Unroll
 class UriMatchTemplateSpec extends Specification {
 
     @Unroll
+    void "test compareTo for #left and #right"() {
+        given:
+        UriMatchTemplate leftTemplate = new UriMatchTemplate(left)
+        UriMatchTemplate rightTemplate = new UriMatchTemplate(right)
+
+        expect:
+        leftTemplate.compareTo(rightTemplate) == result
+
+        where:
+        left           | right          | result
+        "/book"        | "/{name}"      | 1
+        "/"            | "/"            | 0
+        "/"            | "/book"        | -1
+        "/book/foo"    | "/book"        | 1
+        "/book/{name}" | "/book"        | 1
+        "/book/{name}" | "/book/{test}" | 0
+        "/book/{name}" | "/book/test"   | -1
+
+    }
+
+    @Unroll
     void "Test URI template #template matches #uri when nested with #nested"() {
         given:
         UriMatchTemplate matchTemplate = new UriMatchTemplate(template)

@@ -383,10 +383,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return error;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception) {
-            if (originatingClass == this.originatingClass) {
-                return match(exception);
+            if (originatingClass == this.originatingClass && error.isInstance(exception)) {
+                return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
             }
             return Optional.empty();
         }
@@ -394,7 +395,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @SuppressWarnings("unchecked")
         @Override
         public <T> Optional<RouteMatch<T>> match(Throwable exception) {
-            if (error.isInstance(exception)) {
+            if (originatingClass == null && error.isInstance(exception)) {
                 return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
             }
             return Optional.empty();
@@ -623,6 +624,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return this.uriMatchTemplate;
         }
 
+        @Override
+        public int compareTo(UriRoute o) {
+            return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+        }
     }
 
     class DefaultSingleRoute extends DefaultResourceRoute {

@@ -125,6 +125,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> request) throws Exception {
+        ctx.channel().config().setAutoRead(false);
         HttpMethod httpMethod = request.getMethod();
         URI requestPath = request.getPath();
 
@@ -171,10 +172,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
-                    VndError error = newError(request, "Page Not Found");
-                    MutableHttpResponse<Object> res = HttpResponse.notFound()
-                                                                  .body(error);
-                    emitDefaultErrorResponse(ctx, request, res);
+                    emitDefaultNotFoundResponse(ctx, request);
                     return;
                 }
             }
@@ -207,6 +205,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     }
 
+    private void emitDefaultNotFoundResponse(ChannelHandlerContext ctx, HttpRequest<?> request) {
+        VndError error = newError(request, "Page Not Found");
+        MutableHttpResponse<Object> res = HttpResponse.notFound()
+                                                      .body(error);
+        emitDefaultErrorResponse(ctx, request, res);
+    }
+
     private VndError newError(HttpRequest<?> request, String message) {
         URI path = request.getPath();
         return new VndError(message)
@@ -232,11 +237,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
             Class declaringType = originalRoute != null ? originalRoute.getDeclaringType() : null;
-            errorRoute = (declaringType != null ? router.route(declaringType, cause) : router.route(cause)).orElse(null);
+            Optional<RouteMatch<Object>> errorRouteMatch = declaringType != null ? router.route(declaringType, cause) : Optional.empty();
+            errorRoute = errorRouteMatch.orElseGet(() -> router.route(cause).orElse(null));
         }
 
         if (errorRoute != null) {
-            errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest);
+            errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
                 Object result = errorRoute.execute();
@@ -296,7 +302,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         request.setMatchedRoute(route);
 
         // try to fulfill the argument requirements of the route
-        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request);
+        route = requestArgumentSatisfier.fulfillArgumentRequirements(route, request, false);
 
         // If it is not executable and the body is not required send back 400 - BAD REQUEST
 
@@ -317,6 +323,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             processor.subscribe(buildSubscriber(request, context, route));
         } else {
+            context.read();
             route = prepareRouteForExecution(route, request);
             route.execute();
         }
@@ -421,7 +428,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             @Override
             protected void doOnError(Throwable t) {
-                context.pipeline().fireExceptionCaught(t);
+                try {
+                    exceptionCaught(context, t);
+                } catch (Exception e) {
+                    // should never happen
+                    writeDefaultErrorResponse(context, request, e);
+                }
             }
 
             @Override
@@ -463,7 +475,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     try {
                         RouteMatch<Object> routeMatch = finalRoute;
                         if (!routeMatch.isExecutable()) {
-                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request);
+                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, true);
                         }
                         Object result = routeMatch.execute();
 
@@ -474,7 +486,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             if (status.getCode() >= 300) {
                                 // handle re-mapping of errors
                                 result = router.route(status)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request))
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
                                         .filter(RouteMatch::isExecutable)
                                         .map(RouteMatch::execute)
                                         .orElse(result);
@@ -560,11 +572,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private void processResponse(
             ChannelHandlerContext context,
             NettyHttpRequest<?> request,
-            HttpResponse<?> response,
+            HttpResponse<?> defaultResponse,
             MediaType defaultResponseMediaType,
             RouteMatch<Object> route) {
-        Optional<?> optionalBody = response.getBody();
-        FullHttpResponse nativeResponse = ((NettyHttpResponse) response).getNativeResponse();
+        Optional<?> optionalBody = defaultResponse.getBody();
+        FullHttpResponse nativeResponse = ((NettyHttpResponse) defaultResponse).getNativeResponse();
         boolean isChunked = HttpUtil.isTransferEncodingChunked(nativeResponse);
         if (optionalBody.isPresent()) {
             // a response body is present so we need to process it
@@ -572,7 +584,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             Class<?> bodyType = body.getClass();
 
 
-            MediaType responseType = response.getContentType()
+            MediaType responseType = defaultResponse.getContentType()
                     .orElse(defaultResponseMediaType);
 
             Publisher<Object> publisher;
@@ -582,7 +594,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 // an appropriate response
                 bodyType = resolveBodyType(route, bodyType);
                 codec = resolveRouteCodec(bodyType, responseType);
-                publisher = convertPublisher(body, bodyType);
+                publisher = convertPublisher(body, body.getClass());
             } else {
                 // the return result is not a reactive type so build a publisher for the result that runs on the I/O scheduler
                 if (body instanceof CompletableFuture) {
@@ -622,7 +634,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             } else {
                 // if the transfer encoding is not chunked then we must send a content length header so subscribe the
                 // publisher, encode the result as a io.netty.handler.codec.http.FullHttpResponse
-                boolean isSingle = Publishers.isSingle(publisher.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
+                boolean isPublisher = Publishers.isPublisher(body.getClass());
+                boolean isSingle = !isPublisher || Publishers.isSingle(body.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
                 if (isSingle) {
                     publisher.subscribe(new CompletionAwareSubscriber<Object>() {
                         Subscription s;
@@ -646,16 +659,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
                         @Override
                         protected void doOnComplete() {
-                            if (message != null) {
-                                if (message instanceof HttpResponse) {
-                                    HttpResponse<?> responseMessage = (HttpResponse<?>) this.message;
-                                    writeHttpResponse(context, request, responseMessage, nativeResponse, codec, responseType);
+                            try {
+                                if (message != null) {
+                                    if (message instanceof HttpResponse) {
+                                        NettyHttpResponse<?> responseMessage = (NettyHttpResponse<?>) this.message;
+                                        writeHttpResponse(context, request, responseMessage, responseMessage.getNativeResponse(), codec, responseType);
+                                    } else {
+                                        writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                    }
                                 } else {
-                                    writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                    // no body emitted so return a 404
+                                    emitDefaultNotFoundResponse(context, request);
                                 }
-                            } else {
-                                // no body returned so just write the Netty response as is
-                                writeNettyResponse(context, request, nativeResponse);
+                            } finally {
+                                // final read required to complete request
+                                context.read();
                             }
                         }
                     });

@@ -69,6 +69,10 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
                     return () -> source.getBody(argument.getType());
                 }
             }
+            else {
+                //noinspection unchecked
+                return BindingResult.UNSATISFIED;
+            }
         }
         return result;
     }

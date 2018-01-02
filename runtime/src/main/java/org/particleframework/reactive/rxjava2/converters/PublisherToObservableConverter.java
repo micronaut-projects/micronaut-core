@@ -29,7 +29,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(classes = Observable.class)
 public class PublisherToObservableConverter implements TypeConverter<Publisher, Observable> {
     @SuppressWarnings("unchecked")
     @Override

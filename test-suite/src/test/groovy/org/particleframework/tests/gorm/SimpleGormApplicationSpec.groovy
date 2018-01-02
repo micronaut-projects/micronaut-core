@@ -37,7 +37,7 @@ class SimpleGormApplicationSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(Settings.SETTING_DB_CREATE): "create-drop"])
 
         then:
-        new URL(server.URL, "/people").getText(readTimeout: 3000) == "People: []"
+        new URL(server.URL, "/gorm/people").getText(readTimeout: 3000) == "People: []"
 
         cleanup:
         server?.stop()
@@ -49,7 +49,7 @@ class SimpleGormApplicationSpec extends Specification {
 
 
         then:
-        new URL(server.URL, "/people").getText(readTimeout: 3000) == "People: []"
+        new URL(server.URL, "/gorm/people").getText(readTimeout: 3000) == "People: []"
 
         cleanup:
         System.setProperty(Settings.SETTING_DB_CREATE, "")
@@ -59,7 +59,7 @@ class SimpleGormApplicationSpec extends Specification {
 
 }
 
-@Controller('/people')
+@Controller('/gorm/people')
 class PersonController {
 
     @Transactional
