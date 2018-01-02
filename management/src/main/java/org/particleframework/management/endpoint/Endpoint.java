@@ -19,6 +19,7 @@ package org.particleframework.management.endpoint;
 import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.ConfigurationReader;
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.context.annotation.Requires;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
@@ -40,7 +41,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Singleton
 @ConfigurationReader
 @Executable
+@Requires(condition = EndpointEnabledCondition.class)
 public @interface Endpoint {
+
+    /**
+     * Whether endpoints are enabled by default
+     */
+    boolean ENABLED = true;
+
+    /**
+     * Whether endpoints are sensitive by default
+     */
+    boolean SENSITIVE = false;
 
     /**
      * @return The ID of the endpoint
@@ -59,4 +71,19 @@ public @interface Endpoint {
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "prefix")
     String prefix() default "endpoints";
+
+    /**
+     * @return If the endpoint is enabled when no configuration is provided
+     */
+    boolean defaultEnabled() default ENABLED;
+
+    /**
+     * @return If the endpoint is sensitive when no configuration is provided
+     */
+    boolean defaultSensitive() default SENSITIVE;
+
+    /**
+     * @return The configuration key to look for when no configuration is provided
+     */
+    String defaultConfigurationId() default "all";
 }

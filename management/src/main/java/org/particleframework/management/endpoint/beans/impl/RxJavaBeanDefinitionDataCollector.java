@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.beans;
+package org.particleframework.management.endpoint.beans.impl;
 
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.management.endpoint.beans.BeanDefinitionData;
+import org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
