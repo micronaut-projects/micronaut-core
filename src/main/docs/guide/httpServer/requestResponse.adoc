@@ -1,1 +1,42 @@
-TODO
+If you need more control over request processing then you can instead write a method that receives the complete api:org.particleframework.http.HttpRequest[].
+
+In fact, there are several higher level interfaces that can be bound to method parameters of controllers. These include:
+
+
+.Bindable Particle Interfaces
+|===
+|Interface |Description |Example
+
+|api:org.particleframework.http.HttpRequest[]
+|The full `HttpRequest`
+|`String hello(HttpRequest request)`
+
+|api:org.particleframework.http.HttpHeaders[]
+|All HTTP headers present in the request
+|`String hello(HttpHeaders headers)`
+
+|api:org.particleframework.http.HttpParameters[]
+|All HTTP parameters (either from URI variables or request parameters) present in the request
+|`String hello(HttpParameters params)`
+
+|api:org.particleframework.http.cookie.Cookies[]
+|All the Cookies present in the request
+|`String hello(Cookies cookies)`
+|===
+
+In addition, for full control over the emitted HTTP response you can use the static factory methods of the api:org.particleframework.http.HttpResponse[] class which return a api:org.particleframework.http.MutableHttpResponse[].
+
+The following example implements the previous `MessageController` example using the api:org.particleframework.http.HttpRequest[] and api:org.particleframework.http.HttpResponse[] objects:
+
+.Request and Response Example
+[source,java]
+----
+include::{testsuite}/server/request/MessageController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/request/MessageController.java[tags=class, indent=0]
+----
+
+<1> The factory methods of the api:http.HttpResponse[] are statically imported
+<2> The method is mapped to the URI `/hello` and accepts a api:org.particleframework.http.HttpRequest[]
+<3> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
+<4> The api:http.HttpResponse.ok(T)[] method is used to return a api:http.MutableHttpResponse[] with a text body. A header called `X-My-Header` is also added to the response object.

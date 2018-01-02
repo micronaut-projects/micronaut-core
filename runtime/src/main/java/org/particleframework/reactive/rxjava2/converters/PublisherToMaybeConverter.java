@@ -32,7 +32,6 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-@Requires(classes = Maybe.class)
 public class PublisherToMaybeConverter implements TypeConverter<Publisher, Maybe> {
     @SuppressWarnings("unchecked")
     @Override

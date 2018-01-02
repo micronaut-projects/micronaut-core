@@ -102,34 +102,40 @@ public class DefaultRouter implements Router {
         for (HttpMethod method : HttpMethod.values()) {
             switch (method) {
                 case GET:
-                    routesByMethod[method.ordinal()] = getRoutes.toArray(new UriRoute[getRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(getRoutes);
                     break;
                 case PUT:
-                    routesByMethod[method.ordinal()] = putRoutes.toArray(new UriRoute[putRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(putRoutes);
                     break;
                 case POST:
-                    routesByMethod[method.ordinal()] = postRoutes.toArray(new UriRoute[postRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(postRoutes);
                     break;
                 case PATCH:
-                    routesByMethod[method.ordinal()] = patchRoutes.toArray(new UriRoute[patchRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(patchRoutes);
                     break;
                 case DELETE:
-                    routesByMethod[method.ordinal()] = deleteRoutes.toArray(new UriRoute[deleteRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(deleteRoutes);
                     break;
                 case OPTIONS:
-                    routesByMethod[method.ordinal()] = optionsRoutes.toArray(new UriRoute[optionsRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(optionsRoutes);
                     break;
                 case HEAD:
-                    routesByMethod[method.ordinal()] = headRoutes.toArray(new UriRoute[headRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(headRoutes);
                     break;
                 case CONNECT:
-                    routesByMethod[method.ordinal()] = connectRoutes.toArray(new UriRoute[connectRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(connectRoutes);
                     break;
                 case TRACE:
-                    routesByMethod[method.ordinal()] = traceRoutes.toArray(new UriRoute[traceRoutes.size()]);
+                    routesByMethod[method.ordinal()] = finalizeRoutes(traceRoutes);
                     break;
             }
         }
+    }
+
+    private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
+        Collections.sort(routes);
+        Collections.reverse(routes);
+        return routes.toArray(new UriRoute[routes.size()]);
     }
 
     @SuppressWarnings("unchecked")

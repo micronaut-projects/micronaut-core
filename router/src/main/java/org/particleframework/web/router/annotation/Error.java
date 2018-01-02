@@ -1,6 +1,7 @@
 package org.particleframework.web.router.annotation;
 
 
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.http.HttpStatus;
 
 import java.lang.annotation.Documented;
@@ -22,7 +23,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Action
 public @interface Error {
     /**
+     * @return The exception to map to
+     */
+    Class<? extends Throwable> value() default Throwable.class;
+
+    /**
+     * @return The exception to map to
+     */
+    @AliasFor("value")
+    Class<? extends Throwable> exception() default Throwable.class;
+
+    /**
      * @return The {@link HttpStatus} code to map
      */
-    HttpStatus value() default HttpStatus.INTERNAL_SERVER_ERROR;
+    HttpStatus status() default HttpStatus.INTERNAL_SERVER_ERROR;
 }

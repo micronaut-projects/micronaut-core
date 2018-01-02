@@ -43,7 +43,7 @@ abstract class AbstractParticleSpec extends Specification {
     @Shared URL server = embeddedServer.getURL()
     @Shared OkHttpClient client = new OkHttpClient()
                                             .newBuilder()
-//                                            .readTimeout(1, TimeUnit.MINUTES)
+                                            .readTimeout(1, TimeUnit.MINUTES)
                                             .build()
 
     Collection<String> configurationNames() {

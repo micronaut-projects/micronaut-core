@@ -34,6 +34,8 @@ import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,7 +55,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.http.multipart.FileUpload, FileUpload> implements FileUpload, ByteBufHolder {
-
+    private static final Logger LOG = LoggerFactory.getLogger(NettyPart.class);
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
     private final ExecutorService ioExecutor;
     private final HttpServerConfiguration.MultipartConfiguration configuration;
@@ -131,6 +133,9 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
     public Publisher<Boolean> transferTo(File destination) {
         Supplier<Boolean> transferOperation = () -> {
             try {
+                if(LOG.isDebugEnabled()) {
+                    LOG.debug("Transferring file {} to location {}", fileUpload.getFilename(), destination);
+                }
                 return destination != null && fileUpload.renameTo(destination);
             } catch (IOException e) {
                 throw new MultipartException("Error transferring file: " + fileUpload.getName(), e);
@@ -164,6 +169,11 @@ public class NettyPart extends SingleSubscriberProcessor<io.netty.handler.codec.
                     else {
                         getSubscriber().onError(new MultipartException("Transfer did not complete"));
                     }
+                }
+
+                @Override
+                protected void doOnComplete() {
+                    super.doOnComplete();
                 }
 
                 @Override

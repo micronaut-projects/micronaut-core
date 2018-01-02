@@ -1,1 +1,20 @@
-TODO
+Handling of file uploads has special treatment in Particle. In order to allow streaming of data and non-blocking file uploads there are a number of approaches depending on your use case.
+
+To receive and file and enable easy non-blocking file transfer you can use the api:http.multipart.FileUpload[] interface:
+
+.Using the File Upload Interface
+[source,java]
+----
+include::{testsuite}/server/upload/UploadController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
+
+}
+----
+
+<1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
+<2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
+<3> The api:http.multipart.FileUpload.transferTo(java.lang.String)[] method is used to transfer the file to the server. The method returns a rs:Publisher[]
+<4> The returned rx:Single[] subscribes to the rs:Publisher[] and outputs a response once the upload is complete, without blocking.

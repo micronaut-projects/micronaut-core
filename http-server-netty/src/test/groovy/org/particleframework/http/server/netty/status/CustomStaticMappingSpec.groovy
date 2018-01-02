@@ -68,7 +68,7 @@ class CustomStaticMappingSpec extends AbstractParticleSpec {
             "name: $name, age: $age"
         }
 
-        @Error(HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatus.BAD_REQUEST)
         HttpResponse badHandler() {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff")
         }

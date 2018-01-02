@@ -35,29 +35,18 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
 
     @Override
     public final void onSubscribe(Subscription s) {
-        subscription = new Subscription() {
-
-            @Override
-            public void request(long n) {
-                if (!complete.get()) {
-                    s.request(n);
-                }
-            }
-
-            @Override
-            public void cancel() {
-                if (complete.compareAndSet(false, true)) {
-                    s.cancel();
-                }
-            }
-        };
+        subscription = s;
         doOnSubscribe(subscription);
     }
 
     @Override
     public final void onNext(T t) {
         if(!complete.get()) {
-            doOnNext(t);
+            try {
+                doOnNext(t);
+            } catch (Throwable e) {
+                onError(e);
+            }
         }
     }
 

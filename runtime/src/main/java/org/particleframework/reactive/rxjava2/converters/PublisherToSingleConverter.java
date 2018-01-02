@@ -15,9 +15,7 @@
  */
 package org.particleframework.reactive.rxjava2.converters;
 
-import io.reactivex.Flowable;
 import io.reactivex.Single;
-import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.TypeConverter;
 import org.reactivestreams.Publisher;
@@ -32,7 +30,6 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-@Requires(classes = Single.class)
 public class PublisherToSingleConverter implements TypeConverter<Publisher, Single> {
     @SuppressWarnings("unchecked")
     @Override

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.particleframework.context.annotation.Primary;
 import org.particleframework.jackson.JacksonConfiguration;
 import org.particleframework.core.bind.ArgumentBinder;
 import org.particleframework.core.bind.BeanPropertyBinder;
@@ -42,6 +43,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Singleton
+@Primary
 public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
 
     private final ObjectMapper objectMapper;
