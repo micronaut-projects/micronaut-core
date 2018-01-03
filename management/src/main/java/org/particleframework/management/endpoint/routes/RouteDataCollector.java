@@ -15,32 +15,24 @@
  */
 package org.particleframework.management.endpoint.routes;
 
-import org.particleframework.management.endpoint.Endpoint;
-import org.particleframework.management.endpoint.Read;
-import org.particleframework.web.router.Router;
+import org.particleframework.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 
+import java.util.Collection;
+import java.util.stream.Stream;
+
 /**
- * <p>Exposes an {@link Endpoint} to display application routes</p>
- *
- * @see org.particleframework.web.router.annotation.Action
+ * <p>Used to respond with route information used for the {@link RoutesEndpoint}</p>
  *
  * @author James Kleeh
  * @since 1.0
  */
-@Endpoint("routes")
-public class RoutesEndpoint {
+public interface RouteDataCollector<T> {
 
-    private final Router router;
-    private final RouteDataCollector routeDataCollector;
-
-    public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
-        this.router = router;
-        this.routeDataCollector = routeDataCollector;
-    }
-
-    @Read
-    public Publisher getRoutes() {
-        return routeDataCollector.getData(router.uriRoutes());
-    }
+    /**
+     * @param routes A java stream of uri routes
+     * @return A publisher that returns data representing all of
+     *         the given routes.
+     */
+    Publisher<T> getData(Stream<UriRoute> routes);
 }

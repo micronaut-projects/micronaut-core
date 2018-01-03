@@ -18,9 +18,11 @@ package org.particleframework.management.endpoint.beans.impl;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.management.endpoint.beans.BeanDefinitionData;
 import org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector;
+import org.particleframework.management.endpoint.beans.BeansEndpoint;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
@@ -40,6 +42,7 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = BeansEndpoint.class)
 public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
     private BeanDefinitionData beanDefinitionData;
