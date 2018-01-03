@@ -13,17 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.management.endpoint.routes;
+
+import org.particleframework.web.router.UriRoute;
 
 /**
- * This package contains classes and interfaces for the bean endpoint
+ * <p>Returns data for a given route to be used for the {@link RoutesEndpoint}</p>
  *
  * @author James Kleeh
  * @since 1.0
  */
-@Configuration
-@Requires(beans = BeansEndpoint.class)
-package org.particleframework.management.endpoint.beans.impl;
+public interface RouteData<T> {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.management.endpoint.beans.BeansEndpoint;
+    /**
+     * @param route The route
+     * @return Route data
+     */
+    T getData(UriRoute route);
+}
