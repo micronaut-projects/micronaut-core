@@ -6,7 +6,7 @@ In addition to being able to inject beans Particle natively supports injecting t
 |Type |Description |Example
 
 |link:{jdkapi}/java/util/Optional.html[java.util.Optional]
-|An `Optional` of a bean. If the bean doesn't exists `empty()` is injected
+|An `Optional` of a bean. If the bean doesn't exist `empty()` is injected
 |`Optional<Engine>`
 
 |link:{jdkapi}/java/util/Iterable.html[java.util.Iterable]

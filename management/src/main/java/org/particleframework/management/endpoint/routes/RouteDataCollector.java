@@ -13,16 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.management.endpoint.routes;
+
+import org.particleframework.web.router.UriRoute;
+import org.reactivestreams.Publisher;
+
+import java.util.Collection;
+import java.util.stream.Stream;
 
 /**
- * This package contains classes and interfaces for the bean endpoint
+ * <p>Used to respond with route information used for the {@link RoutesEndpoint}</p>
  *
  * @author James Kleeh
  * @since 1.0
  */
-@Configuration
-@Requires(endpoint = "endpoints.beans")
-package org.particleframework.management.endpoint.beans;
+public interface RouteDataCollector<T> {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;
+    /**
+     * @param routes A java stream of uri routes
+     * @return A publisher that returns data representing all of
+     *         the given routes.
+     */
+    Publisher<T> getData(Stream<UriRoute> routes);
+}

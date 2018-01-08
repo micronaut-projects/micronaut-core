@@ -116,7 +116,7 @@ String hello() {
 
 === Building Routes Programmatically
 
-If you prefer to not use annotations and declare all of your routes in code then never fear, Particle has a flexible link:{api}/org/particleframework/web/router/RouteBuilder.html[RouteBuilder] API that makes a breeze to define routes programmatically.
+If you prefer to not use annotations and declare all of your routes in code then never fear, Particle has a flexible link:{api}/org/particleframework/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 
 To start off with you should subclass link:{api}/org/particleframework/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and then simply inject the controller you wish to route to into the method and define your routes:
 

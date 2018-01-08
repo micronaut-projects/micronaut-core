@@ -15,20 +15,10 @@
  */
 package org.particleframework.management.endpoint.routes;
 
-import org.particleframework.core.type.Argument;
-import org.particleframework.core.type.ReturnType;
-import org.particleframework.http.MediaType;
-import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
 import org.particleframework.web.router.Router;
-import org.particleframework.web.router.UriRoute;
-
-import javax.inject.Inject;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
+import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to display application routes</p>
@@ -41,52 +31,16 @@ import java.util.stream.Collectors;
 @Endpoint("routes")
 public class RoutesEndpoint {
 
-    private Router router;
+    private final Router router;
+    private final RouteDataCollector routeDataCollector;
 
-    public RoutesEndpoint(Router router) {
+    public RoutesEndpoint(Router router, RouteDataCollector routeDataCollector) {
         this.router = router;
+        this.routeDataCollector = routeDataCollector;
     }
 
     @Read
-    Map<String, Map<String, String>> getRoutes() {
-        return router.uriRoutes().collect(Collectors.toMap(this::getRouteKey, this::getRouteValue));
-    }
-
-    protected String getMethodString(MethodExecutionHandle targetMethod) {
-        return new StringBuilder()
-                .append(targetMethod.getReturnType().asArgument().getTypeString(false))
-                .append(" ")
-                .append(targetMethod.getDeclaringType().getName())
-                .append('.')
-                .append(targetMethod.getMethodName())
-                .append("(")
-                .append(Arrays.stream(targetMethod.getArguments())
-                        .map(argument -> argument.getType().getName() + " " + argument.getName())
-                        .collect(Collectors.joining( ", " )))
-                .append(")")
-                .toString();
-    }
-
-    protected String getRouteKey(UriRoute route) {
-        String produces = route.getProduces().stream()
-                .map(MediaType::toString)
-                .collect(Collectors.joining(" || "));
-
-        return new StringBuilder("{[")
-                .append(route.getUriMatchTemplate())
-                .append("],method=[")
-                .append(route.getHttpMethod().name())
-                .append("],produces=[")
-                .append(produces)
-                .append("]}")
-                .toString();
-    }
-
-    protected Map<String, String> getRouteValue(UriRoute route) {
-        Map<String, String> values = new LinkedHashMap<>(1);
-
-        values.put("method", getMethodString(route.getTargetMethod()));
-
-        return values;
+    public Publisher getRoutes() {
+        return routeDataCollector.getData(router.uriRoutes());
     }
 }

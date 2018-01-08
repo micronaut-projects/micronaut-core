@@ -16,17 +16,14 @@
 package org.particleframework.management.endpoint.processors;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.uri.UriTemplate;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.management.endpoint.Endpoint;
-import org.particleframework.management.endpoint.EndpointConfiguration;
 import org.particleframework.management.endpoint.Read;
 
 import javax.inject.Singleton;
-import java.util.Optional;
+import java.lang.annotation.Annotation;
 
 /**
  * A processor that processes references to {@link Read} operations {@link Endpoint} instances
@@ -35,23 +32,21 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Endpoint>{
+public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     public ReadEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+    protected Class<? extends Annotation> getSupportedAnnotation() {
+        return Read.class;
+    }
+
+    @Override
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
         Class<?> declaringType = method.getDeclaringType();
-        if(method.hasStereotype(Read.class)) {
-
-            Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
-
-            registeredEndpoint.ifPresent(config -> {
-                UriTemplate template = buildUriTemplate(method, config.getId());
-                GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
-            });
-        }
+        UriTemplate template = buildUriTemplate(method, id);
+        GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
     }
 }

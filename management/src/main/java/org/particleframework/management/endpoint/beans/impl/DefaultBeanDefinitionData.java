@@ -13,9 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.beans;
+package org.particleframework.management.endpoint.beans.impl;
 
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.management.endpoint.beans.BeanDefinitionData;
+import org.particleframework.management.endpoint.beans.BeansEndpoint;
 
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;
@@ -32,6 +35,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = BeansEndpoint.class)
 public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String, Object>> {
 
     @Override
