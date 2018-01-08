@@ -40,6 +40,7 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
     jsonBinding: JSON Binding with Jackson
+  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data
   uploads: File Uploads
@@ -58,6 +59,9 @@ cloud:
   title: Cloud Deployment
   configurationSharing: Configuration Sharing
   serviceDiscovery: Service Discovery
+languageSupport:
+  title: Language Support
+  groovy: Particle for Groovy
 management:
   title: Management & Monitoring
   buildingEndpoints:
