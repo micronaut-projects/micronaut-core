@@ -21,13 +21,10 @@ import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.annotation.Filter;
-import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.http.filter.HttpServerFilter;
+import org.particleframework.http.filter.ServerFilterChain;
 import org.reactivestreams.Publisher;
 import org.spockframework.util.Assert;
-
-import javax.inject.Singleton;
-import java.util.function.Consumer;
 
 /**
  * @author Graeme Rocher

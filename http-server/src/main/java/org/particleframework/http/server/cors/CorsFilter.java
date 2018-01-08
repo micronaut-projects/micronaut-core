@@ -20,6 +20,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.filter.HttpServerFilter;
+import org.particleframework.http.filter.ServerFilterChain;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.reactivestreams.Publisher;
 

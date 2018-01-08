@@ -1,0 +1,19 @@
+The Particle HTTP server supports the ability to apply filters to request/response processing in a similar, but reactive, way to Servlet filters in traditional Java applications.
+
+Filters provide the ability to support the following use cases:
+
+* Decoration of the incoming api:http.HttpRequest[]
+* Modification of the outgoing api:http.HttpResponse[]
+* Implementation of cross cutting concerns such as security, tracing etc.
+
+For a server application, the api:http.filter.HttpServerFilter[] interface's `doFilter` method can be implemented.
+
+The `doFilter` method accepts the api:http.HttpRequest[] and an instance of api:http.filter.ServerFilterChain[].
+
+The `ServerFilterChain` interface contains a resolved chain of filters with the final entry in the chain being the matched route. The api:http.filter.ServerFilterChain.proceed(org.particleframework.http.HttpRequest)[] method can be used to resume processing of the request.
+
+The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response that will be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] object to modify the response prior to returning the response to the client.
+
+To put these concepts into practise lets look at an example.
+
+

@@ -39,6 +39,7 @@ import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.http.filter.HttpServerFilter;
+import org.particleframework.http.filter.ServerFilterChain;
 import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
@@ -548,7 +549,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             AtomicInteger integer = new AtomicInteger();
             int len = filters.size();
-            HttpServerFilter.ServerFilterChain filterChain = new HttpServerFilter.ServerFilterChain() {
+            ServerFilterChain filterChain = new ServerFilterChain() {
                 @SuppressWarnings("unchecked")
                 @Override
                 public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
