@@ -20,8 +20,6 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.reactivestreams.Publisher;
 
-import java.util.concurrent.CompletableFuture;
-
 /**
  * <p>A interface for classes that can intercept and filter {@link org.particleframework.http.HttpRequest} instances and can either proceed with the request or return a modified result</p>
  *
@@ -48,17 +46,4 @@ public interface HttpFilter extends Ordered {
     Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain);
 
 
-    /**
-     * <p>A non-blocking and thread-safe filter chain. Consumers should call {@link #proceed(HttpRequest)} to continue with the request or return an alternative {@link HttpResponse} {@link Publisher}</p>
-     *
-     * <p>The context instance itself can be passed to other threads as necessary if blocking operations are required to implement the {@link HttpFilter}</p>
-     */
-    interface FilterChain {
-        /**
-         * Proceed to the next interceptor or final request invocation
-         *
-         * @param request The current request
-         */
-        Publisher<? extends HttpResponse<?>> proceed(HttpRequest<?> request);
-    }
 }
