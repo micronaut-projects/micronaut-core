@@ -11,6 +11,7 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.*;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -786,11 +787,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
+    public void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
         if(currentConfigBuilderField != null) {
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
             String propertyName = NameUtils.decapitalize( methodName.substring(prefix.length()) );
+
+            if (StringUtils.isNotEmpty(configurationPrefix)) {
+                propertyName = configurationPrefix + '.' + propertyName;
+            }
 
             injectMethodVisitor.loadThis();
             injectMethodVisitor.loadArg(0); // the resolution context

@@ -331,13 +331,14 @@ public interface BeanDefinitionVisitor {
      * Visit a configuration builder method
      *
      * @param prefix The prefix used for the method
+     * @param configurationPrefix The prefix used to retrieve the configuration value
      * @param returnType The return type
      * @param methodName The method name
      * @param paramType The method type
      * @param generics
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics);
+    void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics);
 
     /**
      * Finalize a configuration builder field
