@@ -17,3 +17,49 @@ The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits th
 To put these concepts into practise lets look at an example.
 
 
+=== Writing a Filter
+
+Consider a hypothetical use case whereby you wish to trace each request to the Particle "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.
+
+What you don't want to do is block the underlying Netty event loop within your filter, instead you want to the filter to proceed with execution once any I/O is complete.
+
+As an example, consider the following example `TraceService` that uses RxJava to compose an I/O operation:
+
+.A TraceService Example using RxJava
+[source,java]
+----
+include::{testsuite}/server/filters/TraceService.java[tags=imports, indent=0]
+include::{testsuite}/server/filters/TraceService.java[tags=class, indent=0]
+----
+
+<1> The rx:Flowable[] type is used to create logic that executes potentially blocking operations to write the trace data from the request
+<2> Since this is just an example the logic does nothing and a place holder comment is used
+<3> The RxJava I/O scheduler is used to execute the logic
+
+You can then inject this implementation into your filter definition:
+
+.An Example HttpServerFilter
+[source,java]
+----
+include::{testsuite}/server/filters/TraceFilter.java[tags=imports, indent=0]
+
+include::{testsuite}/server/filters/TraceFilter.java[tags=class, indent=0]
+    ...
+}
+----
+
+<1> The api:http.annotation.Filter[] annotation is used to define the URI patterns the filter matches
+<2> The class implements the api:http.filter.HttpServerFilter[] interface
+<3> The previously defined `TraceService` is injected via a constructor argument
+
+The final step is write the `doFilter` implementation of the api:http.filter.HttpServerFilter[] interface.
+
+.The doFilter implementation
+[source,java]
+----
+include::{testsuite}/server/filters/TraceFilter.java[tags=doFilter, indent=0]
+----
+
+<1> The previously defined `TraceService` is called to trace the request
+<2> If the trace call succeeds then the filter switches back to resuming the request processing using RxJava's `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
+<3> Finally, RxJava's `doAfterNext` method is used to add a header called `X-Trace-Enabled` to the response.
