@@ -868,6 +868,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(builderElement);
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false);
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(new String[]{"set"}));
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("");
             PublicMethodVisitor visitor = new PublicMethodVisitor() {
                 @Override
                 protected void accept(ExecutableElement method, Object o) {
@@ -878,6 +879,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
                     writer.visitConfigBuilderMethod(
                             prefix,
+                            configurationPrefix,
                             modelUtils.resolveTypeReference(method.getReturnType()),
                             methodName,
                             expectedType,
