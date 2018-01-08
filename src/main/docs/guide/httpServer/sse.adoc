@@ -1,1 +1,1 @@
-TODO
+The Particle HTTP server supports emitting https://en.wikipedia.org/wiki/Server-sent_events[Server Sent Events (SSE)] using the api:http.sse.Event[] API.
