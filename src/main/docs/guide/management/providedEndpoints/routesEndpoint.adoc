@@ -1,1 +1,23 @@
-TODO
+The routes endpoint returns information about URIs available to be called for your application. By default the data returned includes the URI, allowed method, content types produced, and information about the method that would be executed.
+
+To execute the beans endpoint, send a GET request to /routes.
+
+=== Configuration
+
+To configure the routes endpoint, supply configuration through `endpoints.routes`.
+
+.Routes Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    routes:
+        enabled: Boolean
+        sensitive: Boolean
+        id: String
+----
+
+=== Customization
+
+The routes endpoint is composed of a route data collector and a route data implementation. The route data collector (link:{api}/org/particleframework/management/endpoint/routes/RouteDataCollector.html[RouteDataCollector]) is responsible for returning a publisher that will return the data used in the response. The route data (link:{api}/org/particleframework/management/endpoint/routes/RouteData.html[RouteData]) is responsible for returning data about an individual route.
+
+To override the default behavior for either of the helper classes, either extend the default implementations (link:{api}/org/particleframework/management/endpoint/beans/impl/RxJavaRouteDataCollector.html[RxJavaRouteDataCollector], link:{api}/org/particleframework/management/endpoint/beans/impl/DefaultRouteData.html[DefaultRouteData]), or implement the relevant interface directly. To ensure your implementation is used instead of the default, add the link:{api}/org/particleframework/context/annotation/Replaces.html[@Replaces] annotation to your class with the value being the default implementation.

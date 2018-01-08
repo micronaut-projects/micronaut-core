@@ -18,6 +18,7 @@ package org.particleframework.management.endpoint.beans;
 import org.particleframework.context.BeanContext;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
+import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -37,7 +38,7 @@ public class BeansEndpoint {
     }
 
     @Read
-    public Object getBeans() {
+    public Publisher getBeans() {
         return beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions());
     }
 }

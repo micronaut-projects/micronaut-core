@@ -116,8 +116,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     public boolean isEnabled(BeanContext beanContext) {
         if(enabled == null) {
             AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class)? new RequiresCondition(annotationMetadata) : null;
-            enabled = condition == null || condition.matches(new DefaultConditionContext<>(beanContext, this));
+            enabled = new RequiresCondition(annotationMetadata).matches(new DefaultConditionContext<>(beanContext, this));
         }
         return enabled;
     }

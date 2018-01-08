@@ -15,6 +15,7 @@
  */
 package org.particleframework.management.endpoint.health;
 
+import javax.annotation.concurrent.Immutable;
 import javax.validation.constraints.NotNull;
 import java.util.Optional;
 
@@ -24,12 +25,13 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
+@Immutable
 public class HealthStatus implements Comparable<HealthStatus> {
 
-    private String name;
-    private Optional<String> description;
-    private Optional<Boolean> operational;
-    private Optional<Integer> severity;
+    private final String name;
+    private final Optional<String> description;
+    private final Optional<Boolean> operational;
+    private final Optional<Integer> severity;
 
     public static final HealthStatus UP = new HealthStatus("UP", null, true, null);
     public static final HealthStatus DOWN = new HealthStatus("DOWN", null, false, 1000);

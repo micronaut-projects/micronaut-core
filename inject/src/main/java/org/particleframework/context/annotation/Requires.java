@@ -101,15 +101,6 @@ public @interface Requires {
     Class[] beans() default {};
 
     /**
-     * Expresses that the given endpoint must be enabled for the bean or configuration to load. The
-     * endpoint prefix must be included (eg: "endpoints.health"). Falls back to "<prefix>.all" if
-     * no configuration is provided for the given value.
-     *
-     * @return The endpoint name
-     */
-    String endpoint() default "";
-
-    /**
      * Expresses the given classes that should be missing from the classpath for the bean or configuration to load
      *
      * @return The classes

@@ -16,20 +16,17 @@
 package org.particleframework.management.endpoint.processors;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.uri.UriTemplate;
-import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.management.endpoint.Endpoint;
-import org.particleframework.management.endpoint.EndpointConfiguration;
 import org.particleframework.management.endpoint.Write;
 
 import javax.inject.Singleton;
-import java.util.Optional;
+import java.lang.annotation.Annotation;
 
 /**
  * A processor that processes references to {@link Write} operations {@link Endpoint} instances
@@ -38,27 +35,25 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder implements ExecutableMethodProcessor<Endpoint> {
+public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     public WriteEndpointRouteBuilder(ApplicationContext beanContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(beanContext, uriNamingStrategy, conversionService);
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Class<?> declaringType = method.getDeclaringType();
-        if(method.hasStereotype(Write.class)) {
-
-            Optional<EndpointConfiguration> registeredEndpoint = resolveActiveEndPointId(declaringType);
-            registeredEndpoint.ifPresent(config -> {
-                Write annotation = method.getAnnotation(Write.class);
-                UriTemplate template = buildUriTemplate(method, config.getId());
-                POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-                        .consumes(MediaType.of(annotation.consumes()));
-            });
-        }
+    protected Class<? extends Annotation> getSupportedAnnotation() {
+        return Write.class;
     }
 
+    @Override
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+        Class<?> declaringType = method.getDeclaringType();
+        UriTemplate template = buildUriTemplate(method, id);
+        Write annotation = method.getAnnotation(Write.class);
+        POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
+                .consumes(MediaType.of(annotation.consumes()));
+    }
 
     @Override
     protected boolean isPathParameter(Argument argument) {

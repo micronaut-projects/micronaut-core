@@ -16,6 +16,7 @@
 package org.particleframework.management.endpoint.processors;
 
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
@@ -24,12 +25,10 @@ import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.uri.UriTemplate;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.management.endpoint.Endpoint;
-import org.particleframework.management.endpoint.EndpointConfiguration;
-import org.particleframework.management.endpoint.EndpointDefaultConfiguration;
 import org.particleframework.web.router.DefaultRouteBuilder;
 
+import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,10 +40,10 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Completable  {
+abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, Completable {
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
 
-    private Map<Class, Optional<EndpointConfiguration>> endpointIds = new ConcurrentHashMap<>();
+    private Map<Class, Optional<String>> endpointIds = new ConcurrentHashMap<>();
     private final ApplicationContext beanContext;
 
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
@@ -52,7 +51,25 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
         this.beanContext = applicationContext;
     }
 
-    protected Optional<EndpointConfiguration> resolveActiveEndPointId(Class<?> declaringType) {
+    @Override
+    public final void onComplete() {
+        endpointIds.clear();
+    }
+
+    @Override
+    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        Class<?> declaringType = method.getDeclaringType();
+        if(method.hasStereotype(getSupportedAnnotation())) {
+            Optional<String> endPointId = resolveActiveEndPointId(declaringType);
+            endPointId.ifPresent(id -> registerRoute(method, id));
+        }
+    }
+
+    abstract protected Class<? extends Annotation> getSupportedAnnotation();
+
+    abstract protected void registerRoute(ExecutableMethod<?, ?> method, String id);
+
+    protected Optional<String> resolveActiveEndPointId(Class<?> declaringType) {
         return endpointIds.computeIfAbsent(declaringType, aClass -> {
             Optional<? extends BeanDefinition<?>> opt = beanContext.findBeanDefinition(declaringType);
             if (opt.isPresent()) {
@@ -63,40 +80,12 @@ class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements Comple
                         id = NameUtils.hyphenate( beanDefinition.getName() );
                     }
 
-                    return findEndpointConfiguration(id);
+                    return Optional.ofNullable(id);
                 }
             }
 
             return Optional.empty();
         });
-    }
-
-    private Optional<EndpointConfiguration> findEndpointConfiguration(String id) {
-        Optional<EndpointConfiguration> config = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName(id));
-        if(config.isPresent()) {
-            EndpointConfiguration endpointConfiguration = config.get();
-            if(endpointConfiguration.isEnabled()) {
-                return Optional.of(endpointConfiguration);
-            }
-        }
-        else {
-            Optional<EndpointConfiguration> allConfig = beanContext.findBean(EndpointConfiguration.class, Qualifiers.byName("all"));
-            if(allConfig.isPresent()) {
-                EndpointConfiguration c = allConfig.get();
-                if(c.isEnabled()) {
-                    return Optional.of(c);
-                }
-            }
-            else {
-                return Optional.of(new EndpointConfiguration(id, new EndpointDefaultConfiguration()));
-            }
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public final void onComplete() {
-        endpointIds.clear();
     }
 
     protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
