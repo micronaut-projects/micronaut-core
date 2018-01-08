@@ -20,6 +20,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.filter.HttpServerFilter;
+import org.particleframework.http.filter.ServerFilterChain;
 import org.reactivestreams.Publisher;
 
 /**

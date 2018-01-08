@@ -16,7 +16,6 @@
 package org.particleframework.session.http;
 
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.HttpRequest;
@@ -24,6 +23,7 @@ import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.filter.OncePerRequestHttpServerFilter;
+import org.particleframework.http.filter.ServerFilterChain;
 import org.particleframework.session.Session;
 import org.particleframework.session.SessionStore;
 import org.reactivestreams.Publisher;

@@ -19,6 +19,7 @@ import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.FilterChain;
 import org.particleframework.http.filter.HttpFilter;
 import org.reactivestreams.Publisher;
 import org.spockframework.util.Assert;
