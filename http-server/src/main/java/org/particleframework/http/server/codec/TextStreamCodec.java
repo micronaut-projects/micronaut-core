@@ -40,12 +40,12 @@ import java.time.Duration;
  */
 @Singleton
 public class TextStreamCodec implements MediaTypeCodec {
-    public static final byte[] DATA_PREFIX = "data: ".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] EVENT_PREFIX = "event: ".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] ID_PREFIX = "id: ".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] DATA_PREFIX = "data: ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EVENT_PREFIX = "event: ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] ID_PREFIX = "id: ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
 
     private final HttpServerConfiguration serverConfiguration;
     private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
@@ -130,7 +130,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     protected void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
         if(value != null) {
             eventData.write(attribute)
-                    .write(value, StandardCharsets.UTF_8)
+                    .write(value, serverConfiguration.getDefaultCharset())
                     .write(NEWLINE);
         }
     }

@@ -63,3 +63,7 @@ include::{testsuite}/server/filters/TraceFilter.java[tags=doFilter, indent=0]
 <1> The previously defined `TraceService` is called to trace the request
 <2> If the trace call succeeds then the filter switches back to resuming the request processing using RxJava's `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
 <3> Finally, RxJava's `doAfterNext` method is used to add a header called `X-Trace-Enabled` to the response.
+
+The previous example demonstrates some key concepts such as executing logic in a non-blocking matter before proceeding with the request and modifying the outgoing response.
+
+TIP: The examples use RxJava, however you can use any reactive framework that supports the Reactive streams specifications

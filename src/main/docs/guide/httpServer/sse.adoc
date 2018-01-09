@@ -1,1 +1,42 @@
 The Particle HTTP server supports emitting https://en.wikipedia.org/wiki/Server-sent_events[Server Sent Events (SSE)] using the api:http.sse.Event[] API.
+
+To emit events from the server you simply return a Reactive Streams rs:Publisher[] that emits objects of type api:http.sse.Event[].
+
+The rs:Publisher[] itself could publish events from a background task, via an event system or whatever.
+
+Imagine for an example a event stream of news headlines, you may define a data class as follows:
+
+.Headline.java
+[source,java]
+----
+include::{testsuite}/server/sse/Headline.java[tags=imports, indent=0]
+
+include::{testsuite}/server/sse/Headline.java[tags=class, indent=0]
+----
+
+To emit news headline events you can write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using which ever Reactive library you prefer. The example below uses RxJava 2's rx:Flowable[] via the `generate` method:
+
+.Publishing Server Sent Events from a Controller
+[source,java]
+----
+include::{testsuite}/server/sse/HeadlineController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/sse/HeadlineController.java[tags=class, indent=0]
+----
+
+<1> The controller method returns a rs:Publisher[] of api:http.sse.Event[]
+<2> For each version of Particle a headline is emitted
+<3> The rx:Flowable[] type's `generate` method is used to generate a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[].  Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map and existing "hot" rx:Flowable[].
+<4> The rx:Emitter[] interface's `onNext` method is used to emit objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method is used to construct the event.
+<5> he rx:Emitter[] interface's `onComplete` method is used to indicate when to finish sending server sent events.
+
+The above example will send back a response of type `text/event-stream` and for each  api:http.sse.Event[] emitted the `Headline` type previously will be converted to JSON resulting in responses such as:
+
+.Server Sent Event Response Output
+[source,json]
+----
+ data: {"title":"Particle 1.0 Released","description":"Come and get it"}
+ data: {"title":"Particle 2.0 Released","description":"Come and get it"}
+----
+
+You can use the methods of the api:http.sse.Event[] interface to customize the Server Sent Event data sent back including associating event ids, comments, retry timeouts etc.
