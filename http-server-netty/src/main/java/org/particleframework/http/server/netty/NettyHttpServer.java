@@ -81,6 +81,8 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final int serverPort;
+    private NioEventLoopGroup workerGroup;
+    private NioEventLoopGroup parentGroup;
 
     @Inject
     public NettyHttpServer(
@@ -120,8 +122,8 @@ public class NettyHttpServer implements EmbeddedServer {
     public EmbeddedServer start() {
         if(!isRunning()) {
 
-            NioEventLoopGroup workerGroup = createWorkerEventLoopGroup();
-            NioEventLoopGroup parentGroup = createParentEventLoopGroup();
+            workerGroup = createWorkerEventLoopGroup();
+            parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
@@ -180,9 +182,10 @@ public class NettyHttpServer implements EmbeddedServer {
 
     @Override
     public EmbeddedServer stop() {
-        if (isRunning() && this.serverChannel != null) {
+        if (isRunning()) {
             try {
-                serverChannel.close().sync();
+                workerGroup.shutdownGracefully().sync();
+                parentGroup.shutdownGracefully().sync();
                 if(beanLocator instanceof LifeCycle) {
                     LifeCycle lifeCycle = (LifeCycle) beanLocator;
                     if(lifeCycle.isRunning()) {

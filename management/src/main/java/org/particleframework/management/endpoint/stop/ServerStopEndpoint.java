@@ -13,11 +13,11 @@ import java.util.Map;
 public class ServerStopEndpoint {
 
     private final ApplicationContext context;
-    private final Map message;
+    private final Map<String, String> message;
 
     ServerStopEndpoint(ApplicationContext context) {
         this.context = context;
-        this.message = new LinkedHashMap(1);
+        this.message = new LinkedHashMap<>(1);
         this.message.put("message", "Server shutdown started");
     }
 
@@ -27,7 +27,20 @@ public class ServerStopEndpoint {
             return message;
         }
         finally {
-            context.stop();
+            Thread thread = new Thread(this::stopServer);
+            thread.setContextClassLoader(getClass().getClassLoader());
+            thread.start();
         }
     }
+
+    private void stopServer() {
+        try {
+            Thread.sleep(500L);
+        }
+        catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        this.context.stop();
+    }
+
 }
