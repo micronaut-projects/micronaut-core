@@ -49,7 +49,7 @@ class RoutesEndpointSpec extends Specification {
         result['{[/refresh],method=[POST],produces=[application/json]}']['method'] == "[Ljava.lang.String; org.particleframework.management.endpoint.refresh.RefreshEndpoint.refresh()"
         result['{[/test],method=[GET],produces=[application/json]}']['method'] == "java.lang.String org.particleframework.management.endpoint.routes.RoutesEndpointSpec\$TestController.index()"
         result['{[/test/generics],method=[PUT],produces=[application/json]}']['method'] == "java.util.Map<java.lang.Integer, java.lang.String> org.particleframework.management.endpoint.routes.RoutesEndpointSpec\$TestController.generics()"
-        result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "java.util.Map<java.lang.String, java.util.Map<java.lang.String, java.lang.String>> org.particleframework.management.endpoint.routes.RoutesEndpoint.getRoutes()"
+        result['{[/routes],method=[GET],produces=[application/json]}']['method'] == "org.reactivestreams.Publisher org.particleframework.management.endpoint.routes.RoutesEndpoint.getRoutes()"
         result['{[/test/post],method=[POST],produces=[application/json]}']['method'] == "org.particleframework.http.HttpResponse org.particleframework.management.endpoint.routes.RoutesEndpointSpec\$TestController.post(java.lang.Integer number, java.lang.String text)"
 
         cleanup:

@@ -1,10 +1,8 @@
 package org.particleframework.management.endpoint.stop;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.env.Environment;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Write;
-import org.particleframework.runtime.server.EmbeddedServer;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,7 +19,7 @@ public class ServerStopEndpoint {
         this.message.put("message", "Server shutdown started");
     }
 
-    @Write
+    @Write(consumes = {})
     public Object stop() {
         try {
             return message;

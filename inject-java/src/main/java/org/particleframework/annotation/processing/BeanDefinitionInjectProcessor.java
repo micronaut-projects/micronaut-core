@@ -799,12 +799,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 if(annotationUtils.hasStereotype(field, ConfigurationBuilder.class)) {
                     String fieldName = field.getSimpleName().toString();
-                    writer.visitConfigBuilderFieldStart(fieldType, fieldName);
+                    ConfigBuilder configBuilder = new ConfigBuilder(fieldType).forField(fieldName);
+                    writer.visitConfigBuilderStart(configBuilder);
 
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);
                     } finally {
-                        writer.visitConfigBuilderFieldEnd();
+                        writer.visitConfigBuilderEnd();
                     }
                 }
                 else {
