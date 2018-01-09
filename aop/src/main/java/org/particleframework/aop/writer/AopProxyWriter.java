@@ -898,8 +898,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderFieldStart(Object fieldType, String fieldName) {
-        proxyBeanDefinitionWriter.visitConfigBuilderFieldStart(fieldType, fieldName);
+    public void visitConfigBuilderStart(ConfigBuilder configBuilder) {
+        proxyBeanDefinitionWriter.visitConfigBuilderStart(configBuilder);
     }
 
     @Override
@@ -908,8 +908,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderFieldEnd() {
-        proxyBeanDefinitionWriter.visitConfigBuilderFieldEnd();
+    public void visitConfigBuilderEnd() {
+        proxyBeanDefinitionWriter.visitConfigBuilderEnd();
     }
 
     @Override

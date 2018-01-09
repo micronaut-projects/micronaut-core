@@ -317,11 +317,10 @@ public interface BeanDefinitionVisitor {
     /**
      * Begin defining a configuration builder
      *
-     * @param fieldType The builder type
-     * @param fieldName The name of the field
+     * @param configBuilder The configuration builder information
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderFieldStart(Object fieldType, String fieldName);
+    void visitConfigBuilderStart(ConfigBuilder configBuilder);
 
     /**
      * Visit a configuration builder method
@@ -341,5 +340,5 @@ public interface BeanDefinitionVisitor {
      *
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderFieldEnd();
+    void visitConfigBuilderEnd();
 }
