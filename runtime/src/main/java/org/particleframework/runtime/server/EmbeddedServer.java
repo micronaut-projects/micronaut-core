@@ -17,6 +17,7 @@ package org.particleframework.runtime.server;
 
 import org.particleframework.context.LifeCycle;
 
+import java.net.URI;
 import java.net.URL;
 
 /**
@@ -42,4 +43,9 @@ public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
      * @return The full URL to the server
      */
     URL getURL();
+
+    /**
+     * @return The full URI to the server
+     */
+    URI getURI();
 }

@@ -162,12 +162,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));
-        Type scope = parent.getScope();
-        String scopeClassName = scope != null ? scope.getClassName() : null;
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                scopeClassName,
                 parent.isSingleton(),
                 parent.getAnnotationMetadata());
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
@@ -178,14 +175,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      *
      * @param packageName The package name
      * @param className The class name
-     * @param scope The scope annotation type
      * @param isInterface Is the target of the advise an interface
      * @param isSingleton Is the target of the advise singleton
      * @param interceptorTypes The interceptor types
      */
     public AopProxyWriter(String packageName,
                           String className,
-                          String scope,
                           boolean isInterface,
                           boolean isSingleton,
                           AnnotationMetadata annotationMetadata,
@@ -207,7 +202,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                scope,
                 isSingleton, annotationMetadata);
         startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
     }
@@ -233,11 +227,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public boolean isInterface() {
         return isInterface;
-    }
-
-    @Override
-    public Type getScope() {
-        return proxyBeanDefinitionWriter.getScope();
     }
 
     @Override
