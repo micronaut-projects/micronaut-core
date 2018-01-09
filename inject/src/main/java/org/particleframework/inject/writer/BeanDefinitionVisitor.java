@@ -47,10 +47,6 @@ public interface BeanDefinitionVisitor {
      */
     boolean isSingleton();
 
-    /**
-     * @return The scope type
-     */
-    Type getScope();
 
     /**
      * Visit a marker interface on the generated bean definition

@@ -161,7 +161,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitClass(ClassNode node) {
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node)
             if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
-                String scopeType = annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null)
                 String packageName = node.packageName
                 String beanClassName = node.nameWithoutPackage
 
@@ -180,7 +179,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 AopProxyWriter aopProxyWriter = new AopProxyWriter(
                         packageName,
                         beanClassName,
-                        scopeType,
                         isInterface,
                         isSingleton,
                         annotationMetadata,
@@ -270,7 +268,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
                 methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
-                String scopeAnn = methodAnnotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null)
                 String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
                 String factoryMethodBeanDefinitionName =
@@ -282,7 +279,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         factoryMethodBeanDefinitionName,
                         producedType.name,
                         producedType.isInterface(),
-                        scopeAnn,
                         methodAnnotationMetadata.hasDeclaredStereotype(Singleton),
                         methodAnnotationMetadata
                 )
@@ -758,14 +754,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             classNode.isInterface(),
-                            annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null),
                             annotationMetadata.hasDeclaredStereotype(Singleton), annotationMetadata)
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
-                            annotationMetadata.getAnnotationNameByStereotype(Scope).orElse(null),
                             annotationMetadata.hasDeclaredStereotype(Singleton), annotationMetadata)
                 }
                 beanDefinitionWriters.put(classNode, beanWriter)
