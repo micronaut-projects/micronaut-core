@@ -49,6 +49,8 @@ import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
@@ -217,6 +219,16 @@ public class NettyHttpServer implements EmbeddedServer {
         try {
             return new URL("http://" + getHost() + ':' + getPort());
         } catch (MalformedURLException e) {
+            throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
+        }
+    }
+
+
+    @Override
+    public URI getURI() {
+        try {
+            return new URI("http://" + getHost() + ':' + getPort());
+        } catch (URISyntaxException e) {
             throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
         }
     }

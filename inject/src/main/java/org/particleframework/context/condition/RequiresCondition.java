@@ -60,14 +60,10 @@ public class RequiresCondition implements Condition {
                         }
                     }
 
-                    if(isBeanConfiguration && processRequirements(context)) {
-                        return false;
-                    }
+                    return !isBeanConfiguration || !processRequirements(context);
                 }
                 else {
-                    if (processRequirements(context)) {
-                        return false;
-                    }
+                    return !processRequirements(context);
 
                 }
 
@@ -84,9 +80,7 @@ public class RequiresCondition implements Condition {
                 if(isBeanConfiguration) {
                     Requires ann = annotationMetadata.getAnnotation(Requires.class);
                     if(ann != null) {
-                        if (processRequires(context, ann)) {
-                            return false;
-                        }
+                        return !processRequires(context, ann);
                     }
                 }
             }
@@ -94,9 +88,7 @@ public class RequiresCondition implements Condition {
 
                 Requires ann = annotationMetadata.getAnnotation(Requires.class);
                 if(ann != null) {
-                    if (processRequires(context, ann)) {
-                        return false;
-                    }
+                    return !processRequires(context, ann);
                 }
             }
 
@@ -132,29 +124,14 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean processRequires(ConditionContext context, Requires annotation) {
-        if(!matchesPresenceOfBeans(context, annotation)) {
-            return true;
-        }
+        return !matchesPresenceOfBeans(context, annotation) ||
+                !matchesProperty(context, annotation) ||
+                !matchesMissingProperty(context, annotation) ||
+                !matchesEnvironment(context, annotation) ||
+                !matchesConfiguration(context, annotation) ||
+                !matchesSdk(annotation) ||
+                !matchesConditions(context, annotation);
 
-        if(!matchesProperty(context, annotation)) {
-            return true;
-        }
-        if(!matchesMissingProperty(context, annotation)) {
-            return true;
-        }
-        if(!matchesEnvironment(context, annotation)) {
-            return true;
-        }
-        if(!matchesConfiguration(context, annotation)) {
-            return true;
-        }
-        if(!matchesSdk(annotation)) {
-            return true;
-        }
-        if(!matchesConditions(context, annotation)) {
-            return true;
-        }
-        return false;
     }
 
     private boolean matchesProperty(ConditionContext context, Requires annotation) {

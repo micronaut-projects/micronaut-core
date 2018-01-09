@@ -20,6 +20,7 @@ import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.net.URI;
 import java.net.URL;
 
 @Singleton
@@ -61,6 +62,11 @@ public class GreenLightningHttpServer implements EmbeddedServer {
 
     @Override
     public URL getURL() {
+        return null;
+    }
+
+    @Override
+    public URI getURI() {
         return null;
     }
 }

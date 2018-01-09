@@ -46,3 +46,4 @@ class TraceFilterSpec extends Specification {
         response.header('X-Trace-Enabled') == 'true'
     }
 }
+
