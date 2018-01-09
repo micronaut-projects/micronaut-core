@@ -778,10 +778,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             String propertyName = NameUtils.decapitalize( methodName.substring(prefix.length()) );
 
-            if (StringUtils.isNotEmpty(configurationPrefix)) {
-                propertyName = configurationPrefix + '.' + propertyName;
-            }
-
             injectMethodVisitor.loadThis();
             injectMethodVisitor.loadArg(0); // the resolution context
             injectMethodVisitor.loadArg(1); // the bean context
@@ -802,10 +798,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 );
             }
             // at some point we may want to support nested builders, hence the arrays and property path resolution
-            pushNewArray(injectMethodVisitor, String.class, 1);
-            String[] propertyPath = {propertyName};
-            for (int i = 0; i < propertyPath.length; i++) {
-                pushStoreStringInArray(injectMethodVisitor, i, 1, propertyPath[i]);
+            String[] propertyPath;
+            if (StringUtils.isNotEmpty(configurationPrefix)) {
+                propertyPath = new String[]{configurationPrefix, propertyName};
+            } else {
+                propertyPath = new String[]{propertyName};
+            }
+            int propertyPathLength = propertyPath.length;
+            pushNewArray(injectMethodVisitor, String.class, propertyPathLength);
+
+            for (int i = 0; i < propertyPathLength; i++) {
+                pushStoreStringInArray(injectMethodVisitor, i, propertyPathLength, propertyPath[i]);
             }
             // Optional optional = AbstractBeanDefinition.getValueForPath(...)
             injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
