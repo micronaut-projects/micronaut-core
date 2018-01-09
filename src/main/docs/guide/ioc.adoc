@@ -1,4 +1,4 @@
-When most developers thing of Inversion of Control (also known as Dependency Injection and referred to as such from this point onwards) the Spring Framework comes to mind.
+When most developers think of Inversion of Control (also known as Dependency Injection and referred to as such from this point onwards) the Spring Framework comes to mind.
 
 Particle takes heavy inspiration from Spring, and in fact, the core developers of Particle are former SpringSource/Pivotal engineers now working for https://objectcomputing.com[OCI].
 
