@@ -230,13 +230,15 @@ class MyBean {
     }
 
     void "test requires property with property not present"() {
+        setup:
+        System.setProperty("foo.bar","")
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
 package test;
 
 import org.particleframework.context.annotation.*;
 
-@Requires(property="foo.bar")
+@Requires(property="mybean.foo.bar")
 @javax.inject.Singleton
 class MyBean {
 }

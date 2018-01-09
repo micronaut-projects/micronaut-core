@@ -916,8 +916,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeMirror providerTypeParam =
                     genericUtils.interfaceGenericTypeFor(typeElement, Provider.class);
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
-            Optional<String> scopeAnn =
-                    annotationMetadata.getAnnotationNameByStereotype(Scope.class);
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
@@ -931,7 +929,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             ? elementUtils.getBinaryName(typeElement).toString()
                             : providerTypeParam.toString(),
                     isInterface,
-                    scopeAnn.orElse(null),
                     isSingleton, annotationMetadata);
             return beanDefinitionWriter;
         }
@@ -947,9 +944,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private AopProxyWriter createAopWriterFor(TypeElement typeElement) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
-            Optional<String> scopeAnn =
-                    annotationMetadata.getAnnotationNameByStereotype(Scope.class);
-
 
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
@@ -966,7 +960,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
-                    scopeAnn.orElse(null),
                     isInterface,
                     isSingleton,
                     annotationMetadata,
@@ -989,7 +982,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String packageName = producedPackageElement.getQualifiedName().toString();
             String beanDefinitionPackage = definingPackageElement.getQualifiedName().toString();
             String shortClassName = modelUtils.simpleBinaryNameFor(producedElement);
-            String beanScope = scopeAnn.orElse(null);
             String upperCaseMethodName = NameUtils.capitalize(method.getSimpleName().toString());
             String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + "Definition";
             BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
@@ -998,7 +990,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
-                    beanScope,
                     annotationMetadata.hasDeclaredStereotype(Singleton.class),
                     annotationMetadata);
             return beanDefinitionWriter;

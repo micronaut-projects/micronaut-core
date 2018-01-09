@@ -96,8 +96,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     }
 
     @Internal
-    protected AbstractBeanDefinition(Annotation scope,
-                                     boolean singleton,
+    protected AbstractBeanDefinition(boolean singleton,
                                      Class<T> type,
                                      Constructor<T> constructor,
                                      Argument... arguments) {
