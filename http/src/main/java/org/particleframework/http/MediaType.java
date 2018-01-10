@@ -43,7 +43,12 @@ public class MediaType implements CharSequence {
     /**
      * A wildcard media type representing all types
      */
-    public static final MediaType ALL = new MediaType("*/*", "all");
+    public static final String ALL = "*/*";
+
+    /**
+     * A wildcard media type representing all types
+     */
+    public static final MediaType ALL_TYPE = new MediaType(ALL, "all");
 
     /**
      * Form encoded data: application/x-www-form-urlencoded

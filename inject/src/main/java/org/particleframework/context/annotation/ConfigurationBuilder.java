@@ -43,6 +43,16 @@ public @interface ConfigurationBuilder {
      */
     String[] prefixes() default "set";
 
+
+    /**
+     * <p>When this annotation is used, by default the name of the field or method is not taken into account when retrieving configuration properties.</p>
+     *
+     * <p>This method allows overriding this behaviour. For example if the annotation is placed on a field, you can change the prefix for which configuration values will be searched to populate the field.</p>
+     *
+     * @return The configuration prefix to use
+     */
+    String configurationPrefix() default "";
+
     /**
      * <p>Some APIs allow zero argument setters to set boolean flags such as {@code setDebug()}. These by default are not processed unless the value of this annotation is set to true.</p>
      *

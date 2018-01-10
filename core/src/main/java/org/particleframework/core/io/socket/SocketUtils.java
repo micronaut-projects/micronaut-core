@@ -16,8 +16,10 @@
 package org.particleframework.core.io.socket;
 
 import javax.net.ServerSocketFactory;
+import javax.net.SocketFactory;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Random;
 
 import static org.particleframework.core.util.ArgumentUtils.check;
@@ -75,13 +77,11 @@ public class SocketUtils {
      */
     public static boolean isTcpPortAvailable(int currentPort) {
         try {
-            ServerSocket serverSocket = ServerSocketFactory
-                                            .getDefault()
-                                            .createServerSocket(currentPort,1, InetAddress.getByName("localhost"));
-            serverSocket.close();
-            return true;
-        } catch (Throwable e) {
+            Socket socket = SocketFactory.getDefault().createSocket(InetAddress.getLocalHost(), currentPort);
+            socket.close();
             return false;
+        } catch (Throwable e) {
+            return true;
         }
     }
 
