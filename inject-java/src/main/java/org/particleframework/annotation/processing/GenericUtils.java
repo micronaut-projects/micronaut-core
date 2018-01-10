@@ -1,6 +1,7 @@
 package org.particleframework.annotation.processing;
 
 import org.particleframework.core.reflect.ClassUtils;
+import org.particleframework.core.util.CollectionUtils;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -46,7 +47,7 @@ class GenericUtils {
      * Finds the generic type for the given interface for the given class element
      *
      *
-     * For example, for <code>class AProvider implements Provider<A></code>
+     * For example, for <code>class AProvider implements Provider&lt;A&gt;</code>
      *   element = AProvider
      *   interfaceName = interface javax.inject.Provider
      *   return A
@@ -76,6 +77,24 @@ class GenericUtils {
             }
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Return the first type argument for the given type mirror. For example for Optional&lt;String&gt; this will return {@code String}
+     * @param type The type
+     * @return The first argument.
+     */
+    Optional<TypeMirror> getFirstTypeArgument(TypeMirror type) {
+        TypeMirror typeMirror = null;
+
+        if(type instanceof DeclaredType) {
+            DeclaredType declaredType = (DeclaredType) type;
+            List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
+            if(CollectionUtils.isNotEmpty(typeArguments)) {
+                typeMirror = typeArguments.get(0);
+            }
+        }
+        return Optional.ofNullable(typeMirror);
     }
 
     Map<String, Object> resolveGenericTypes(TypeMirror type) {

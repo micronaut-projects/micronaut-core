@@ -28,6 +28,7 @@ import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.annotation.JavaAnnotationMetadataBuilder;
+import org.particleframework.inject.configuration.ConfigurationMetadataWriter;
 import org.particleframework.inject.writer.*;
 
 import javax.annotation.PostConstruct;
@@ -71,13 +72,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private static final String AROUND_TYPE = "org.particleframework.aop.Around";
     private static final String INTRODUCTION_TYPE = "org.particleframework.aop.Introduction";
 
+    private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private ClassWriterOutputVisitor classWriterOutputVisitor;
     private Set<String> processed = new HashSet<>();
 
+
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils);
         this.beanDefinitionWriters = new LinkedHashMap<>();
         this.classWriterOutputVisitor = new BeanDefinitionWriterVisitor(filer, getTargetDirectory().orElse(null));
     }
@@ -138,6 +142,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     });
 
                 });
+                if(metadataBuilder.hasMetadata()) {
+                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+
+                    for (ConfigurationMetadataWriter writer : writers) {
+                        try {
+                            writer.write(metadataBuilder, classWriterOutputVisitor);
+                        } catch (IOException e) {
+                            error("Error occurred writing configuration metadata: %s", e.getMessage());
+                        }
+                    }
+                }
                 return true;
             }
         }
@@ -415,12 +430,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
+            String docComment = elementUtils.getDocComment(method);
+            String setterName = method.getSimpleName().toString();
+            metadataBuilder.visitProperty(
+                    concreteClass,
+                    getPropertyMetadataTypeReference(valueType),
+                    NameUtils.getPropertyNameForSetter(setterName),
+                    docComment,null
+            );
+
             writer.visitSetterValue(
                     modelUtils.resolveTypeReference(declaringClass),
                     qualifierRef,
                     modelUtils.requiresReflection(method),
                     fieldType,
-                    method.getSimpleName().toString(),
+                    setterName,
                     genericTypes,
                     true);
         }
@@ -797,8 +821,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeElement declaringClass = modelUtils.classElementFor(field);
 
 
+                String fieldName = field.getSimpleName().toString();
                 if(annotationUtils.hasStereotype(field, ConfigurationBuilder.class)) {
-                    String fieldName = field.getSimpleName().toString();
                     writer.visitConfigBuilderFieldStart(fieldType, fieldName);
 
                     try {
@@ -811,12 +835,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     if (setterMethod.isPresent()) {
                         ExecutableElement method = setterMethod.get();
+                        // visit the field metadata
+                        String docComment = elementUtils.getDocComment(method);
+                        metadataBuilder.visitProperty(
+                                concreteClass,
+                                getPropertyMetadataTypeReference(fieldTypeMirror),
+                                fieldName,
+                                docComment,null
+                        );
+
                         writer.visitSetterValue(
                                 modelUtils.resolveTypeReference(declaringClass),
                                 qualifierRef,
                                 modelUtils.requiresReflection(method),
                                 fieldType,
-                                field.getSimpleName().toString(),
+                                fieldName,
                                 method.getSimpleName().toString(),
                                 genericTypes,
                                 isConfigurationPropertiesType);
@@ -826,7 +859,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if(!isPrivate) {
                             Object declaringType = modelUtils.resolveTypeReference(declaringClass);
-                            String fieldName = field.getSimpleName().toString();
+                            String docComment = elementUtils.getDocComment(field);
+
+                            metadataBuilder.visitProperty(
+                                    concreteClass,
+                                    getPropertyMetadataTypeReference(fieldTypeMirror),
+                                    fieldName,
+                                    docComment,null
+                            );
                             writer.visitFieldValue(
                                     declaringType,
                                     qualifierRef,
@@ -1062,6 +1102,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return params;
         }
 
+    }
+
+    private String getPropertyMetadataTypeReference(TypeMirror valueType) {
+        return modelUtils.isOptional(valueType) ? genericUtils.getFirstTypeArgument(valueType).map(TypeMirror::toString).orElse(valueType.toString()) : valueType.toString();
     }
 
     class DynamicName implements Name {

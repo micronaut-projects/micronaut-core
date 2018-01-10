@@ -16,6 +16,7 @@ dependencies {
     testCompile "com.google.testing.compile:compile-testing:0.12"
     testCompile 'org.mongodb:mongo-java-driver:3.6.0-rc0'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
 //    testCompile 'com.datastax.cassandra:cassandra-driver-core:3.3.2', {
 //        transitive = false
 //    }

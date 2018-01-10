@@ -32,4 +32,11 @@ public class BeanDefinitionWriterVisitor implements ClassWriterOutputVisitor {
             new File(root, SoftServiceLoader.META_INF_SERVICES + File.separator + classname)
         );
     }
+
+    @Override
+    public Optional<File> visitMetaInfFile(String path) throws IOException {
+        return Optional.ofNullable(targetDirectory).map(root ->
+                new File(root, "META-INF" + File.separator + path)
+        );
+    }
 }

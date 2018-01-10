@@ -17,11 +17,18 @@ public interface ClassWriterOutputVisitor {
     /**
      *
      * @param classname the fully qualified classname
-     * @return the output directory
+     * @return An optional file it was possible to create it
      * @throws IOException
      */
     Optional<File> visitServiceDescriptor(String classname) throws IOException;
 
+    /**
+     * Visit a file within the META-INF directory
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     * @throws IOException
+     */
+    Optional<File> visitMetaInfFile(String path) throws IOException;
     /**
      * @param type The service type
      * @return the output directory
