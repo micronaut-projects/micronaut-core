@@ -75,4 +75,5 @@ management:
     healthEndpoint: The Health Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
+    stopEndpoint: The Server Stop Endpoint
 

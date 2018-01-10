@@ -46,4 +46,5 @@ class ConfigurationPropertiesSpec extends Specification {
         config.primitiveDefaultValue == 9999
         config.inner.enabled
     }
+
 }

@@ -33,6 +33,7 @@ import javax.inject.*
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 
 /**
@@ -258,7 +259,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             publicMethodVisitor.accept(node)
         }
-
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
@@ -605,13 +605,27 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     }
                     if (isValue) {
-                        beanWriter.visitFieldValue(
-                                declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
-                                requiresReflection,
-                                fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name,
-                                fieldNode.name,
-                                isConfigurationProperties
-                        )
+                        String fieldName = fieldNode.name
+                        Object fieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
+
+                        if(isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                            ConfigBuilder configBuilder = new ConfigBuilder(fieldType).forField(fieldName)
+                            beanWriter.visitConfigBuilderStart(configBuilder)
+                            try {
+                                visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, beanWriter)
+                            } finally {
+                                beanWriter.visitConfigBuilderEnd()
+                            }
+                        } else {
+                            beanWriter.visitFieldValue(
+                                    declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
+                                    requiresReflection,
+                                    fieldType,
+                                    fieldName,
+                                    isConfigurationProperties
+                            )
+                        }
+
                     } else {
                         beanWriter.visitFieldInjectionPoint(
                                 declaringClass.isResolved() ? declaringClass.typeClass : declaringClass.name, qualifierRef,
@@ -682,7 +696,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
 
                 if (isInject) {
-
                     beanWriter.visitSetterInjectionPoint(
                             AstGenericUtils.resolveTypeReference(declaringClass),
                             qualifier,
@@ -693,16 +706,28 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             genericTypeList
                     )
                 } else if (isValue) {
-                    beanWriter.visitSetterValue(
-                            AstGenericUtils.resolveTypeReference(declaringClass),
-                            qualifier,
-                            false,
-                            AstGenericUtils.resolveTypeReference(fieldType),
-                            fieldNode.name,
-                            getSetterName(propertyNode.name),
-                            genericTypeList,
-                            isConfigurationProperties
-                    )
+
+                    if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                        Object resolvedFieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
+                        ConfigBuilder configBuilder = new ConfigBuilder(resolvedFieldType).forMethod(getGetterName(propertyNode))
+                        beanWriter.visitConfigBuilderStart(configBuilder)
+                        try {
+                            visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, beanWriter)
+                        } finally {
+                            beanWriter.visitConfigBuilderEnd()
+                        }
+                    } else {
+                        beanWriter.visitSetterValue(
+                                AstGenericUtils.resolveTypeReference(declaringClass),
+                                qualifier,
+                                false,
+                                AstGenericUtils.resolveTypeReference(fieldType),
+                                fieldNode.name,
+                                getSetterName(propertyNode.name),
+                                genericTypeList,
+                                isConfigurationProperties
+                        )
+                    }
                 }
             } else if (isAopProxyType && !propertyNode.isStatic()) {
                 AopProxyWriter aopWriter = (AopProxyWriter) aopProxyWriter
@@ -831,6 +856,56 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
             return publicConstructors
+        }
+
+        private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {
+            Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
+            List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("")
+
+            PublicMethodVisitor visitor = new PublicMethodVisitor(sourceUnit) {
+                @Override
+                void accept(MethodNode method) {
+                    Parameter[] params = method.getParameters()
+                    String methodName = method.getName()
+                    String prefix = getMethodPrefix(methodName)
+                    Parameter paramType = params.size() == 1 ? params[0] : null
+                    Object expectedType = paramType != null ? AstGenericUtils.resolveTypeReference(paramType.type) : null;
+                    writer.visitConfigBuilderMethod(
+                            prefix,
+                            configurationPrefix,
+                            AstGenericUtils.resolveTypeReference(method.getReturnType()),
+                            methodName,
+                            expectedType,
+                            paramType != null ? resolveGenericTypes(paramType) : null
+                    )
+                }
+
+                @Override
+                protected boolean isAcceptable(MethodNode node) {
+                    int paramCount = node.getParameters().size()
+                    return (paramCount == 1 || allowZeroArgs && paramCount == 0) && super.isAcceptable(node) && isPrefixedWith(node)
+                }
+
+                private boolean isPrefixedWith(MethodNode node) {
+                    String name = node.getName()
+                    for (String prefix : prefixes) {
+                        if (name.startsWith(prefix)) return true
+                    }
+                    return false
+                }
+
+                private String getMethodPrefix(String methodName) {
+                    for (String prefix : prefixes) {
+                        if(methodName.startsWith(prefix)) {
+                            return prefix
+                        }
+                    }
+                    return methodName
+                }
+            }
+
+            visitor.accept(classNode)
         }
     }
 

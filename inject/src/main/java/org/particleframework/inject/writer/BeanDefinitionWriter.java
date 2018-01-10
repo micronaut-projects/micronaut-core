@@ -11,6 +11,7 @@ import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.*;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -199,8 +200,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
     private final AnnotationMetadata annotationMetadata;
-    private String currentConfigBuilderField;
-    private Type currentConfigBuilderType;
+    private ConfigBuilder currentConfigBuilder;
     private int optionalInstanceIndex;
 
 
@@ -764,15 +764,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderFieldStart(Object fieldType, String fieldName) {
-        this.currentConfigBuilderField = fieldName;
-        this.currentConfigBuilderType = getTypeReference(fieldType);
-
+    public void visitConfigBuilderStart(ConfigBuilder configBuilder) {
+        this.currentConfigBuilder = configBuilder;
     }
 
     @Override
-    public void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
-        if(currentConfigBuilderField != null) {
+    public void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
+        if(currentConfigBuilder != null) {
+            Type builderType = currentConfigBuilder.getType();
+            String builderName = currentConfigBuilder.getName();
+            boolean invokeMethod = currentConfigBuilder.isInvokeMethod();
+
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
             String propertyName = NameUtils.decapitalize( methodName.substring(prefix.length()) );
@@ -797,10 +799,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 );
             }
             // at some point we may want to support nested builders, hence the arrays and property path resolution
-            pushNewArray(injectMethodVisitor, String.class, 1);
-            String[] propertyPath = {propertyName};
-            for (int i = 0; i < propertyPath.length; i++) {
-                pushStoreStringInArray(injectMethodVisitor, i, 1, propertyPath[i]);
+            String[] propertyPath;
+            if (StringUtils.isNotEmpty(configurationPrefix)) {
+                propertyPath = new String[]{configurationPrefix, propertyName};
+            } else {
+                propertyPath = new String[]{propertyName};
+            }
+            int propertyPathLength = propertyPath.length;
+            pushNewArray(injectMethodVisitor, String.class, propertyPathLength);
+
+            for (int i = 0; i < propertyPathLength; i++) {
+                pushStoreStringInArray(injectMethodVisitor, i, propertyPathLength, propertyPath[i]);
             }
             // Optional optional = AbstractBeanDefinition.getValueForPath(...)
             injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
@@ -815,14 +824,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, ifEnd);
             injectMethodVisitor.visitLabel(new Label());
 
-            // get the value: optional.get()
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
 
-            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex); // the instance to be injected
-            injectMethodVisitor.getField(beanType, currentConfigBuilderField, currentConfigBuilderType);
+            if (invokeMethod) {
+                String desc = builderType.getClassName() + " " + builderName + "()";
+                injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(desc));
+            } else {
+                injectMethodVisitor.getField(beanType, builderName, builderType);
+            }
             Type returnTypeRef = getTypeReference(returnType);
             Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
             String desc = returnTypeRef.getClassName() + " " + methodName + "(" + (!zeroArgs ? paramTypeRef.getClassName() : "") + ")";
             injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+            // get the value: optional.get()
             injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Optional.class, "get" )
             ));
@@ -833,7 +847,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, zeroArgsEnd);
                 injectMethodVisitor.visitLabel(new Label());
                 injectMethodVisitor.invokeVirtual(
-                        currentConfigBuilderType,
+                        builderType,
                         org.objectweb.asm.commons.Method.getMethod(desc)
                 );
 
@@ -841,7 +855,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             else {
                 injectMethodVisitor.invokeVirtual(
-                        currentConfigBuilderType,
+                        builderType,
                         org.objectweb.asm.commons.Method.getMethod(desc)
                 );
             }
@@ -852,9 +866,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderFieldEnd() {
-        currentConfigBuilderField = null;
-        currentConfigBuilderType =null;
+    public void visitConfigBuilderEnd() {
+        currentConfigBuilder = null;
     }
 
     /**

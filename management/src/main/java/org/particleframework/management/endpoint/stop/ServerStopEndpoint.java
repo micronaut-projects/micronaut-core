@@ -1,10 +1,8 @@
 package org.particleframework.management.endpoint.stop;
 
 import org.particleframework.context.ApplicationContext;
-import org.particleframework.context.env.Environment;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Write;
-import org.particleframework.runtime.server.EmbeddedServer;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -13,21 +11,34 @@ import java.util.Map;
 public class ServerStopEndpoint {
 
     private final ApplicationContext context;
-    private final Map message;
+    private final Map<String, String> message;
 
     ServerStopEndpoint(ApplicationContext context) {
         this.context = context;
-        this.message = new LinkedHashMap(1);
+        this.message = new LinkedHashMap<>(1);
         this.message.put("message", "Server shutdown started");
     }
 
-    @Write
+    @Write(consumes = {})
     public Object stop() {
         try {
             return message;
         }
         finally {
-            context.stop();
+            Thread thread = new Thread(this::stopServer);
+            thread.setContextClassLoader(getClass().getClassLoader());
+            thread.start();
         }
     }
+
+    private void stopServer() {
+        try {
+            Thread.sleep(500L);
+        }
+        catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        this.context.stop();
+    }
+
 }
