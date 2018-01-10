@@ -204,7 +204,12 @@ class ModelUtils {
             }
         } else if (type.getKind() != VOID && type.getKind() != ERROR) {
             TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
-            result = resolveTypeReferenceForTypeElement(typeElement);
+            if(typeElement != null) {
+                result = resolveTypeReferenceForTypeElement(typeElement);
+            }
+            else if(type instanceof DeclaredType){
+                result = resolveTypeReferenceForTypeElement((TypeElement) ((DeclaredType)type).asElement());
+            }
         }
         return result;
     }
@@ -299,9 +304,9 @@ class ModelUtils {
             TypeElement enclosingElement = typeElement;
             StringBuilder builder = new StringBuilder();
             while(nestingKind == NestingKind.MEMBER) {
-                enclosingElement = (TypeElement) typeElement.getEnclosingElement();
+                builder.insert(0,'$').insert(1,enclosingElement.getSimpleName());
+                enclosingElement = (TypeElement) enclosingElement.getEnclosingElement();
                 nestingKind = enclosingElement.getNestingKind();
-                builder.insert(0,'$').insert(1,typeElement.getSimpleName());
             }
             Name enclosingName = enclosingElement.getQualifiedName();
             return enclosingName.toString() + builder;
@@ -314,5 +319,14 @@ class ModelUtils {
 
     public boolean isFinal(Element element) {
         return element.getModifiers().contains(FINAL);
+    }
+
+    /**
+     * Is the given type mirror an optional
+     * @param mirror The mirror
+     * @return True if it is
+     */
+    public boolean isOptional(TypeMirror mirror) {
+        return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
     }
 }
