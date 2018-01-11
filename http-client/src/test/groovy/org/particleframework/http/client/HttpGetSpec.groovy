@@ -17,6 +17,7 @@ package org.particleframework.http.client
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.type.Argument
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
@@ -70,10 +71,10 @@ class HttpGetSpec extends Specification {
         body.get() == 'success'
     }
 
-    @Ignore
     void "test simple get request with POJO"() {
         given:
-        HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
+        def context = ApplicationContext.run()
+        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
@@ -92,6 +93,35 @@ class HttpGetSpec extends Specification {
 
     }
 
+    void "test simple get request with POJO list"() {
+        given:
+        def context = ApplicationContext.run()
+        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+
+        when:
+        Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.get("/get/pojoList"), Argument.of(List, Book)
+        ))
+
+        HttpResponse<List<Book>> response = flowable.blockingFirst()
+        Optional<List<Book>> body = response.getBody()
+
+        then:
+        response.contentType.isPresent()
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.status == HttpStatus.OK
+        body.isPresent()
+
+
+        when:
+        List<Book> list = body.get()
+
+        then:
+        list.size() == 1
+        list.get(0) instanceof Book
+        list.get(0).title == 'The Stand'
+
+    }
 
     @Controller("/get")
     static class GetController {
@@ -104,6 +134,11 @@ class HttpGetSpec extends Specification {
         @Get("/pojo")
         Book pojo() {
             return new Book(title: "The Stand")
+        }
+
+        @Get("/pojoList")
+        List<Book> pojoList() {
+            return [ new Book(title: "The Stand") ]
         }
     }
 

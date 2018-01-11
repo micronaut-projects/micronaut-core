@@ -168,6 +168,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
+    @SuppressWarnings("unchecked")
     static Argument of(
             Method method,
             String name,
@@ -198,6 +199,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
+    @SuppressWarnings("unchecked")
     static Argument of(
             Constructor constructor,
             String name,
@@ -226,6 +228,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
+    @SuppressWarnings("unchecked")
     static Argument of(
             Field field,
             String name,
@@ -251,6 +254,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
+    @SuppressWarnings("unchecked")
     static Argument of(
             Field field,
             @Nullable Class qualifierType,
@@ -274,6 +278,7 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @param typeParameters The generic type parameters
      * @return The argument instance
      */
+    @SuppressWarnings("unchecked")
     static Argument of(
             Field field,
             @Nullable Argument...typeParameters) {
@@ -309,5 +314,12 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
                 .append(">");
         }
         return returnType.toString();
+    }
+
+    /**
+     * @return Whether the argument has any type variables
+     */
+    default boolean hasTypeVariables() {
+        return !getTypeVariables().isEmpty();
     }
 }

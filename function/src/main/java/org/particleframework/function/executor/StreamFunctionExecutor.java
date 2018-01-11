@@ -168,7 +168,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) functionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
                 if(registeredDecoder.isPresent()) {
                     MediaTypeCodec decoder = registeredDecoder.get();
-                    return decoder.decode(argType, input);
+                    return decoder.decode(arg, input);
                 }
             }
         }

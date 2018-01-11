@@ -21,7 +21,7 @@ package org.particleframework.core.io.buffer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ByteBufferAllocator<T> {
+public interface ByteBufferFactory<T, B> {
 
     /**
      * @return The native allocator
@@ -32,20 +32,20 @@ public interface ByteBufferAllocator<T> {
      * Allocate a {@link ByteBuffer}. If it is a direct or heap buffer
      * depends on the actual implementation.
      */
-    ByteBuffer buffer();
+    ByteBuffer<B> buffer();
 
     /**
      * Allocate a {@link ByteBuffer} with the given initial capacity.
      * If it is a direct or heap buffer depends on the actual implementation.
      */
-    ByteBuffer buffer(int initialCapacity);
+    ByteBuffer<B> buffer(int initialCapacity);
 
     /**
      * Allocate a {@link ByteBuffer} with the given initial capacity and the given
      * maximal capacity. If it is a direct or heap buffer depends on the actual
      * implementation.
      */
-    ByteBuffer buffer(int initialCapacity, int maxCapacity);
+    ByteBuffer<B> buffer(int initialCapacity, int maxCapacity);
 
     /**
      * Creates a new big-endian buffer whose content is a copy of the
@@ -53,5 +53,12 @@ public interface ByteBufferAllocator<T> {
      * {@code readerIndex} and {@code writerIndex} are {@code 0} and
      * the specified {@code length} respectively.
      */
-    ByteBuffer copiedBuffer(byte[] bytes);
+    ByteBuffer<B> copiedBuffer(byte[] bytes);
+
+    /**
+     * Wrap an existing buffer
+     * @param existing The buffer to wrap
+     * @return The wrapped {@link ByteBuffer}
+     */
+    ByteBuffer<B> wrap(B existing);
 }

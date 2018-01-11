@@ -16,6 +16,8 @@
 package org.particleframework.http.client;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -26,15 +28,21 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import org.particleframework.context.annotation.Argument;
+import org.particleframework.context.annotation.Prototype;
 import org.particleframework.core.async.publisher.Publishers;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
+import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import java.io.Closeable;
@@ -59,6 +67,7 @@ import java.util.concurrent.TimeUnit;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Prototype
 public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     private final ServerSelector serverSelector;
@@ -66,6 +75,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     final Charset charset;
     protected final Bootstrap bootstrap;
     protected final EventLoopGroup group;
+    private MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     public DefaultHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration) {
         this.serverSelector = serverSelector;
@@ -101,7 +112,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this(serverSelector, new HttpClientConfiguration());
     }
 
-    public DefaultHttpClient(URL url) {
+    @Inject
+    public DefaultHttpClient(@Argument URL url) {
         this(()-> url);
     }
 
@@ -109,8 +121,18 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this(()-> url, configuration);
     }
 
+    @Inject
+    void setMediaTypeCodecRegistry(Optional<MediaTypeCodecRegistry> mediaTypeCodecRegistry) {
+        mediaTypeCodecRegistry.ifPresent(reg -> this.mediaTypeCodecRegistry = reg);
+    }
+
     @Override
-    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
+    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request) {
+        return exchange(request, (org.particleframework.core.type.Argument<O>)null);
+    }
+
+    @Override
+    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
         URL server = serverSelector.select();
         URI requestURI;
         try {
@@ -135,7 +157,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                     channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
                         @Override
                         protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse httpObject) throws Exception {
-                            NettyClientHttpResponse<O> response = new NettyClientHttpResponse<>(httpObject);
+                            FullNettyClientHttpResponse<O> response = new FullNettyClientHttpResponse<>(httpObject, mediaTypeCodecRegistry, byteBufferFactory);
                             if(bodyType != null) {
                                 // convert the body
                                 response.getBody(bodyType);
@@ -156,12 +178,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             });
             return completableFuture;
         });
-
-    }
-
-    @Override
-    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request) {
-        return exchange(request, null);
     }
 
     /**

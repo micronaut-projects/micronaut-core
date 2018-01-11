@@ -17,7 +17,8 @@ package org.particleframework.http.server.codec;
 
 import org.particleframework.core.io.IOUtils;
 import org.particleframework.core.io.buffer.ByteBuffer;
-import org.particleframework.core.io.buffer.ByteBufferAllocator;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -47,8 +48,8 @@ public class TextPlainCodec implements MediaTypeCodec{
     }
 
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
-        if(CharSequence.class.isAssignableFrom(type)) {
+    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+        if(CharSequence.class.isAssignableFrom(type.getType())) {
             try {
                 return (T) IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, serverConfiguration.getDefaultCharset())));
             } catch (IOException e) {
@@ -74,7 +75,7 @@ public class TextPlainCodec implements MediaTypeCodec{
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException {
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
         String string = object.toString();
         int len = string.length();
         return allocator.buffer(len, len)
