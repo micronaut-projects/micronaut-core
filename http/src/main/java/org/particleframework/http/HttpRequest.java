@@ -10,6 +10,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -39,7 +40,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     URI getUri();
 
     /**
-     * @return Get the
+     * @return Get the path without any parameters
      */
     URI getPath();
 
@@ -61,12 +62,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return Is the request an HTTPS request
      */
     boolean isSecure();
-    /**
-     * @return The protocol in use
-     */
-    default String getProtocol() {
-        return "http";
-    }
 
     @Override
     default Optional<Locale> getLocale() {
@@ -94,4 +89,36 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
     }
 
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#GET} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> get(String uri) {
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.get(uri);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#GET} request for the given URI
+     *
+     * @param uri The URI
+     * @param body The body of the request
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> post(String uri, T body) {
+        Objects.requireNonNull(body, "Argument [body] cannot be null");
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.post(uri, body);
+    }
 }

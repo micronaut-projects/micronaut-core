@@ -22,6 +22,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.annotation.Filter;
+import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.filter.HttpFilter;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.qualifiers.Qualifiers;
@@ -55,6 +56,10 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder  {
     public void process() {
         Collection<BeanDefinition<?>> filterDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(Filter.class));
         for (BeanDefinition<?> beanDefinition : filterDefinitions) {
+            if(HttpClientFilter.class.isAssignableFrom(beanDefinition.getBeanType())) {
+                // ignore http client filters
+                continue;
+            }
             Filter filterAnn = beanDefinition.getAnnotation(Filter.class);
             String[] patterns = filterAnn.value();
             if(ArrayUtils.isNotEmpty(patterns)) {

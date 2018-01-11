@@ -29,7 +29,8 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.cookie.Cookie;
-import org.particleframework.http.server.netty.cookies.NettyCookie;
+import org.particleframework.http.netty.NettyHttpHeaders;
+import org.particleframework.http.netty.cookies.NettyCookie;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -48,21 +49,21 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
 
     protected FullHttpResponse nettyResponse;
     private final ConversionService conversionService;
-    final NettyHttpRequestHeaders headers;
+    final NettyHttpHeaders headers;
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
 
     public NettyHttpResponse(DefaultFullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
-        this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
 
     public NettyHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-        this.headers = new NettyHttpRequestHeaders(nettyResponse.headers(), conversionService);
+        this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
