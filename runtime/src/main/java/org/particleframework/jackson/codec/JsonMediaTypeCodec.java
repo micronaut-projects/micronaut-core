@@ -16,9 +16,11 @@
 package org.particleframework.jackson.codec;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.core.io.buffer.ByteBuffer;
-import org.particleframework.core.io.buffer.ByteBufferAllocator;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -27,6 +29,8 @@ import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * A {@link MediaTypeCodec} for JSON and Jackson
@@ -52,19 +56,33 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         return MediaType.APPLICATION_JSON_TYPE;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
         try {
-            return objectMapper.readValue(inputStream, type);
+            if(type.hasTypeVariables()) {
+                JavaType javaType = constructJavaType(type);
+                return objectMapper.readValue(inputStream, javaType);
+            }
+            else {
+                return objectMapper.readValue(inputStream, type.getType());
+            }
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
         }
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
-    public <T> T decode(Class<T> type, String data) throws CodecException {
+    public <T> T decode(Argument<T> type, String data) throws CodecException {
         try {
-            return objectMapper.readValue(data, type);
+            if(type.hasTypeVariables()) {
+                JavaType javaType = constructJavaType(type);
+                return objectMapper.readValue(data, javaType);
+            }
+            else {
+                return objectMapper.readValue(data, type.getType());
+            }
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
         }
@@ -94,8 +112,18 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException {
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
         byte[] bytes = encode(object);
         return allocator.copiedBuffer(bytes);
+    }
+
+    private <T> JavaType constructJavaType(Argument<T> type) {
+        Map<String, Argument<?>> typeVariables = type.getTypeVariables();
+        Stream<? extends Class<?>> classStream = typeVariables.values().stream().map(Argument::getType);
+        Class[] objects = classStream.toArray(Class[]::new);
+        return objectMapper.getTypeFactory().constructParametricType(
+                type.getType(),
+                objects
+        );
     }
 }

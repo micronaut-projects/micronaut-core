@@ -22,7 +22,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class BeanAnnotationSpec extends Specification{
+class PrototypeAnnotationSpec extends Specification{
 
     void "test @bean annotation makes a class available as a bean"() {
 

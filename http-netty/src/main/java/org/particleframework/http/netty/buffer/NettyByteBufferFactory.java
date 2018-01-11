@@ -13,33 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.http.netty.buffer;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.io.buffer.ByteBuffer;
-import org.particleframework.core.io.buffer.ByteBufferAllocator;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
 
 import javax.inject.Singleton;
 
 /**
- * A {@link ByteBufferAllocator} implementation for Netty
+ * A {@link ByteBufferFactory} implementation for Netty
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
 @Singleton
-class NettyByteBufferAllocator implements ByteBufferAllocator<ByteBufAllocator> {
+public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
 
     private final ByteBufAllocator allocator;
 
-    public NettyByteBufferAllocator() {
+    public NettyByteBufferFactory() {
         this.allocator = ByteBufAllocator.DEFAULT;
     }
 
-    NettyByteBufferAllocator(ByteBufAllocator allocator) {
+    public NettyByteBufferFactory(ByteBufAllocator allocator) {
         this.allocator = allocator;
     }
 
@@ -49,22 +50,27 @@ class NettyByteBufferAllocator implements ByteBufferAllocator<ByteBufAllocator> 
     }
 
     @Override
-    public ByteBuffer buffer() {
+    public ByteBuffer<ByteBuf> buffer() {
         return new NettyByteBuffer( allocator.buffer() );
     }
 
     @Override
-    public ByteBuffer buffer(int initialCapacity) {
+    public ByteBuffer<ByteBuf> buffer(int initialCapacity) {
         return new NettyByteBuffer( allocator.buffer(initialCapacity) );
     }
 
     @Override
-    public ByteBuffer buffer(int initialCapacity, int maxCapacity) {
+    public ByteBuffer<ByteBuf> buffer(int initialCapacity, int maxCapacity) {
         return new NettyByteBuffer( allocator.buffer(initialCapacity, maxCapacity) );
     }
 
     @Override
-    public ByteBuffer copiedBuffer(byte[] bytes) {
+    public ByteBuffer<ByteBuf> copiedBuffer(byte[] bytes) {
         return new NettyByteBuffer( Unpooled.copiedBuffer(bytes) );
+    }
+
+    @Override
+    public ByteBuffer<ByteBuf> wrap(ByteBuf existing) {
+        return new NettyByteBuffer(existing);
     }
 }

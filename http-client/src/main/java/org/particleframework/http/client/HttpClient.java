@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.MutableHttpRequest;
@@ -37,7 +38,6 @@ public interface HttpClient {
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I,O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request);
-
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type
@@ -48,5 +48,18 @@ public interface HttpClient {
      * @param <O> The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I,O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType);
+    <I,O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType);
+    /**
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
+     * the response body to the specified type
+     *
+     * @param request The {@link HttpRequest} to execute
+     * @param bodyType The body type
+     * @param <I> The request body type
+     * @param <O> The response body type
+     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     */
+    default <I,O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
+        return exchange(request, Argument.of(bodyType));
+    }
 }

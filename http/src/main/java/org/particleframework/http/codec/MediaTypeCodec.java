@@ -16,7 +16,8 @@
 package org.particleframework.http.codec;
 
 import org.particleframework.core.io.buffer.ByteBuffer;
-import org.particleframework.core.io.buffer.ByteBufferAllocator;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 
 import java.io.ByteArrayInputStream;
@@ -46,7 +47,7 @@ public interface MediaTypeCodec {
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    <T> T decode(Class<T> type, InputStream inputStream) throws CodecException;
+    <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException;
 
     /**
      * Encode the given type from the given {@link InputStream}
@@ -58,7 +59,6 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be decoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
-
     /**
      * Encode the given type returning the object as a byte[]
      *
@@ -78,7 +78,20 @@ public interface MediaTypeCodec {
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException;
+    <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
+
+    /**
+     * Decode the given type from the given {@link InputStream}
+     *
+     * @param type The type
+     * @param inputStream The input stream
+     * @param <T> The generic type
+     * @return The decoded result
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
+        return decode(Argument.of(type), inputStream);
+    }
     /**
      * Decode the given type from the given bytes
      *
@@ -92,7 +105,45 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, byte[] bytes) throws CodecException {
         return decode(type, new ByteArrayInputStream(bytes));
     }
-
+    /**
+     * Decode the given type from the given bytes
+     *
+     * @param type The type
+     * @param bytes The bytes
+     * @param <T> The decoded type
+     * @return The decoded result
+     *
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
+        return decode(type, new ByteArrayInputStream(bytes));
+    }
+    /**
+     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
+     *
+     * @param type The type
+     * @param buffer the buffer
+     * @param <T> The decoded type
+     * @return The decoded result
+     *
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Class<T> type, ByteBuffer<?> buffer) throws CodecException {
+        return decode(type, buffer.toInputStream());
+    }
+    /**
+     * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
+     *
+     * @param type The type
+     * @param buffer the buffer
+     * @param <T> The decoded type
+     * @return The decoded result
+     *
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
+        return decode(type, buffer.toInputStream());
+    }
     /**
      * Decode the given type from the given bytes
      *
@@ -104,6 +155,19 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be decoded
      */
     default <T> T decode(Class<T> type, String data) throws CodecException {
+        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+    }
+    /**
+     * Decode the given type from the given bytes
+     *
+     * @param type The type
+     * @param data The data as a string
+     * @param <T> The decoded type
+     * @return The decoded result
+     *
+     * @throws CodecException When the result cannot be decoded
+     */
+    default <T> T decode(Argument<T> type, String data) throws CodecException {
         return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
     }
 

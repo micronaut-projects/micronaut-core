@@ -18,13 +18,14 @@ package org.particleframework.inject.factory
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.annotation.Bean
+import org.particleframework.context.annotation.Prototype
 import spock.lang.Specification
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class BeanAnnotationSpec extends Specification{
+class PrototypeAnnotationSpec extends Specification{
 
     void "test @bean annotation makes a class available as a bean"() {
 
@@ -35,7 +36,7 @@ class BeanAnnotationSpec extends Specification{
         beanContext.getBean(A) != beanContext.getBean(A) // prototype by default
     }
 
-    @Bean
+    @Prototype
     static class A {
 
     }

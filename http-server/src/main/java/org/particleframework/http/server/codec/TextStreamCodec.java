@@ -16,7 +16,8 @@
 package org.particleframework.http.server.codec;
 
 import org.particleframework.core.io.buffer.ByteBuffer;
-import org.particleframework.core.io.buffer.ByteBufferAllocator;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
+import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -49,15 +50,15 @@ public class TextStreamCodec implements MediaTypeCodec {
 
     private final HttpServerConfiguration serverConfiguration;
     private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
-    private final ByteBufferAllocator byteBufferAllocator;
+    private final ByteBufferFactory byteBufferFactory;
     private MediaTypeCodecRegistry codecRegistry;
 
     public TextStreamCodec(
             HttpServerConfiguration serverConfiguration,
-            ByteBufferAllocator byteBufferAllocator,
+            ByteBufferFactory byteBufferFactory,
             Provider<MediaTypeCodecRegistry> codecRegistryProvider) {
         this.serverConfiguration = serverConfiguration;
-        this.byteBufferAllocator = byteBufferAllocator;
+        this.byteBufferFactory = byteBufferFactory;
         this.codecRegistryProvider = codecRegistryProvider;
     }
 
@@ -67,8 +68,13 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
+    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+        throw new UnsupportedOperationException("This codec currently only supports encoding");
+    }
+
+    @Override
     public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
-        throw new UnsupportedOperationException("This codec only supports encoding");
+        throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
@@ -82,12 +88,12 @@ public class TextStreamCodec implements MediaTypeCodec {
 
     @Override
     public <T> byte[] encode(T object) throws CodecException {
-        ByteBuffer buffer = encode(object, byteBufferAllocator);
+        ByteBuffer buffer = encode(object, byteBufferFactory);
         return buffer.toByteArray();
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferAllocator allocator) throws CodecException {
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
         Event<Object> event;
         if(object instanceof Event) {
             event = (Event<Object>) object;

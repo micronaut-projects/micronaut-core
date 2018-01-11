@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.http.netty.buffer;
 
 import io.netty.buffer.*;
 import org.particleframework.core.annotation.Internal;

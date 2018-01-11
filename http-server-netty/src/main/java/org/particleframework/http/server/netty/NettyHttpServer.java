@@ -78,7 +78,6 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private volatile Channel serverChannel;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final Environment environment;
     private final Router router;
@@ -171,9 +170,7 @@ public class NettyHttpServer implements EmbeddedServer {
             }
 
             future.addListener(op -> {
-                if (future.isSuccess()) {
-                    serverChannel = future.channel();
-                } else {
+                if (!future.isSuccess()) {
                     Throwable cause = op.cause();
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error starting Particle server: " + cause.getMessage(), cause);

@@ -1,8 +1,8 @@
 package org.particleframework.inject.factory.beanannotation;
 
-import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.Prototype;
 
-@Bean
+@Prototype
 public class A {
 
 }

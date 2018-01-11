@@ -16,15 +16,21 @@
 package org.particleframework.http.client;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.FullHttpResponse;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.netty.NettyHttpHeaders;
 
 import java.util.HashMap;
@@ -36,19 +42,23 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyClientHttpResponse<B> implements HttpResponse<B> {
+class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private final MutableConvertibleValues<Object> attributes;
     private final FullHttpResponse nettyHttpResponse;
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
 
-    NettyClientHttpResponse(FullHttpResponse fullHttpResponse) {
+    FullNettyClientHttpResponse(FullHttpResponse fullHttpResponse, MediaTypeCodecRegistry mediaTypeCodecRegistry, ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory) {
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.byteBufferFactory = byteBufferFactory;
     }
 
     @Override
@@ -68,13 +78,12 @@ class NettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public Optional<B> getBody() {
-        if(!convertedBodies.isEmpty()) {
+        if (!convertedBodies.isEmpty()) {
             return convertedBodies.values().iterator().next();
-        }
-        else {
+        } else {
             ByteBuf content = nettyHttpResponse.content();
-            if(content.refCnt() > 0) {
-                if(content.readableBytes() > 0) {
+            if (content.refCnt() > 0) {
+                if (content.readableBytes() > 0) {
                     return Optional.of((B) content);
                 }
             }
@@ -90,8 +99,23 @@ class NettyClientHttpResponse<B> implements HttpResponse<B> {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        return (Optional<T>) convertedBodies.computeIfAbsent(type, argument ->
-                getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)))
+        return (Optional<T>) convertedBodies.computeIfAbsent(type, argument -> {
+                    Optional<MediaType> contentType = getContentType();
+                    ByteBuf content = nettyHttpResponse.content();
+                    if(content.refCnt() == 0 || content.readableBytes() == 0) {
+                        return Optional.empty();
+                    }
+                    if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
+                        Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+                        if (foundCodec.isPresent()) {
+                            MediaTypeCodec codec = foundCodec.get();
+                            return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+                        }
+                    }
+                    // last chance, try type conversion
+                    return getBody().flatMap(b -> ConversionService.SHARED.convert(content, ConversionContext.of(type)));
+                }
+
         );
     }
 }

@@ -42,6 +42,7 @@ import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.filter.ServerFilterChain;
 import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
+import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
@@ -614,7 +615,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             CompletableFuture<Object> future = new CompletableFuture<>();
                             ioExecutor.submit(() -> {
                                 try {
-                                    future.complete(codec.encode(body, new NettyByteBufferAllocator(context.alloc())).asNativeBuffer());
+                                    future.complete(codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer());
                                 } catch (CodecException e) {
                                     future.completeExceptionally(e);
                                 }
@@ -791,7 +792,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             } else if (message instanceof HttpContent) {
                 return (HttpContent) message;
             } else {
-                ByteBuffer encoded = codec.encode(message, new NettyByteBufferAllocator(context.alloc()));
+                ByteBuffer encoded = codec.encode(message, new NettyByteBufferFactory(context.alloc()));
                 return new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
             }
         });
@@ -840,7 +841,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             if (message instanceof ByteBuf) {
                 byteBuf = (ByteBuf) message;
             } else {
-                byteBuf = (ByteBuf) codec.encode(message, new NettyByteBufferAllocator(context.alloc())).asNativeBuffer();
+                byteBuf = (ByteBuf) codec.encode(message, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
             }
             int len = byteBuf.readableBytes();
             FullHttpResponse newResponse = nativeResponse.replace(byteBuf);
