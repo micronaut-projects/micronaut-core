@@ -22,6 +22,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.LifeCycle;
@@ -186,8 +188,10 @@ public class NettyHttpServer implements EmbeddedServer {
     public EmbeddedServer stop() {
         if (isRunning()) {
             try {
-                workerGroup.shutdownGracefully().sync();
-                parentGroup.shutdownGracefully().sync();
+                workerGroup.shutdownGracefully()
+                           .addListener(this::logShutdownErrorIfNecessary);
+                parentGroup.shutdownGracefully()
+                           .addListener(this::logShutdownErrorIfNecessary);
                 if(beanLocator instanceof LifeCycle) {
                     LifeCycle lifeCycle = (LifeCycle) beanLocator;
                     if(lifeCycle.isRunning()) {
@@ -201,6 +205,15 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         }
         return this;
+    }
+
+    private void logShutdownErrorIfNecessary(Future<?> future) {
+        if(!future.isSuccess()) {
+            if (LOG.isWarnEnabled()) {
+                Throwable e = future.cause();
+                LOG.warn("Error stopping Particle server: " + e.getMessage(), e);
+            }
+        }
     }
 
 

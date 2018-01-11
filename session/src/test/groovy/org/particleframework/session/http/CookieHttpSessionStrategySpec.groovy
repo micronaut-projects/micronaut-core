@@ -26,9 +26,9 @@ import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.cookie.Cookie
+import org.particleframework.http.netty.cookies.NettyCookie
 import org.particleframework.http.server.HttpServerConfiguration
 import org.particleframework.http.server.netty.NettyHttpRequest
-import org.particleframework.http.server.netty.cookies.NettyCookie
 import org.particleframework.session.Session
 import spock.lang.Specification
 

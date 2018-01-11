@@ -15,19 +15,15 @@
  */
 package org.particleframework.http.server.netty;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.MemoryAttribute;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
-import io.netty.util.DefaultAttributeMap;
 import io.netty.util.ReferenceCounted;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
@@ -37,13 +33,14 @@ import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.cookie.Cookies;
+import org.particleframework.http.netty.AbstractNettyHttpRequest;
+import org.particleframework.http.netty.NettyHttpHeaders;
 import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.server.netty.cookies.NettyCookies;
+import org.particleframework.http.netty.cookies.NettyCookies;
 import org.particleframework.web.router.RouteMatch;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,28 +51,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequest<T> {
+public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
 
     public static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
-    private final io.netty.handler.codec.http.HttpRequest nettyRequest;
-    private final HttpMethod httpMethod;
-    private final URI uri;
-    private final NettyHttpRequestHeaders headers;
+    private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
-    private final ConversionService<?> conversionService;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
-    private NettyHttpParameters httpParameters;
     private NettyCookies nettyCookies;
-    private Locale locale;
-    private URI path;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
 
     private Object body;
-    private MediaType mediaType;
-    private Charset charset;
     private RouteMatch<Object> matchedRoute;
     private boolean bodyRequired;
 
@@ -84,6 +72,7 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
                             ChannelHandlerContext ctx,
                             ConversionService environment,
                             HttpServerConfiguration serverConfiguration) {
+        super(nettyRequest, environment);
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
         Objects.requireNonNull(environment, "Environment cannot be null");
@@ -92,14 +81,9 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
             channel.attr(KEY).set(this);
         }
         this.serverConfiguration = serverConfiguration;
-        this.conversionService = environment;
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
-        this.nettyRequest = nettyRequest;
-        this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
-        String fullUri = nettyRequest.uri();
-        this.uri = URI.create(fullUri);
-        this.headers = new NettyHttpRequestHeaders(nettyRequest.headers(), conversionService);
+        this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
     }
 
     /**
@@ -117,78 +101,17 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     }
 
     @Override
-    public Charset getCharacterEncoding() {
-        Charset charset = this.charset;
-        if (charset == null) {
-            synchronized (this) { // double check
-                charset = this.charset;
-                if (charset == null) {
-                    this.charset = charset = initCharset();
-                }
-            }
-        }
-        return charset;
-    }
-
-    @Override
-    public Optional<MediaType> getContentType() {
-        MediaType contentType = this.mediaType;
-        if (contentType == null) {
-            synchronized (this) { // double check
-                contentType = this.mediaType;
-                if (contentType == null) {
-                    this.mediaType = contentType = HttpRequest.super.getContentType().orElse(null);
-                }
-            }
-        }
-        return Optional.ofNullable(contentType);
-    }
-
-    @Override
-    public Optional<Locale> getLocale() {
-        Locale locale = this.locale;
-        if (locale == null) {
-            synchronized (this) { // double check
-                locale = this.locale;
-                if (locale == null) {
-                    this.locale = locale = HttpRequest.super.getLocale().orElse(null);
-                }
-            }
-        }
-        return Optional.ofNullable(locale);
-    }
-
-    @Override
     public Cookies getCookies() {
         NettyCookies cookies = this.nettyCookies;
         if (cookies == null) {
             synchronized (this) { // double check
                 cookies = this.nettyCookies;
                 if (cookies == null) {
-                    this.nettyCookies = cookies = new NettyCookies(getPath(), headers.nettyHeaders, headers.conversionService);
+                    this.nettyCookies = cookies = new NettyCookies(getPath(), headers.getNettyHeaders(), conversionService);
                 }
             }
         }
         return cookies;
-    }
-
-    @Override
-    public HttpParameters getParameters() {
-        NettyHttpParameters httpParameters = this.httpParameters;
-        if (httpParameters == null) {
-            synchronized (this) { // double check
-                httpParameters = this.httpParameters;
-                if (httpParameters == null) {
-                    this.httpParameters = httpParameters = decodeParameters(nettyRequest.uri());
-                }
-            }
-        }
-        return httpParameters;
-    }
-
-    @Override
-    public HttpMethod getMethod() {
-        return httpMethod;
     }
 
     @Override
@@ -214,25 +137,6 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
     public boolean isSecure() {
         ChannelHandlerContext channelHandlerContext = getChannelHandlerContext();
         return channelHandlerContext.pipeline().get(SslHandler.class) != null;
-    }
-
-    @Override
-    public URI getUri() {
-        return this.uri;
-    }
-
-    @Override
-    public URI getPath() {
-        URI path = this.path;
-        if (path == null) {
-            synchronized (this) { // double check
-                path = this.path;
-                if (path == null) {
-                    this.path = path = decodePath(nettyRequest.uri());
-                }
-            }
-        }
-        return path;
     }
 
     @Override
@@ -369,23 +273,8 @@ public class NettyHttpRequest<T> extends DefaultAttributeMap implements HttpRequ
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
     }
 
-    private URI decodePath(String uri) {
-        QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return URI.create(queryStringDecoder.path());
-    }
-
-    private NettyHttpParameters decodeParameters(String uri) {
-        QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), headers.conversionService);
-    }
-
-    private QueryStringDecoder createDecoder(String uri) {
-        Charset charset = getCharacterEncoding();
-        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
-    }
-
-    private Charset initCharset() {
-        Charset characterEncoding = HttpRequest.super.getCharacterEncoding();
+    @Override
+    protected Charset initCharset(Charset characterEncoding) {
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
 

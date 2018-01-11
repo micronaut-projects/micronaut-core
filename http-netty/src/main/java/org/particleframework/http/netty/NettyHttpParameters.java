@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.http.netty;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -32,10 +33,11 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class NettyHttpParameters implements HttpParameters {
     private final ConvertibleMultiValues<String> values;
 
-    NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
+    public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
         LinkedHashMap<CharSequence, List<String>> values = new LinkedHashMap<>(parameters.size());
         this.values = new ConvertibleMultiValuesMap<>(values, conversionService);
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {

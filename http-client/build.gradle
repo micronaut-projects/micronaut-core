@@ -1,0 +1,9 @@
+dependencies {
+    compile project(":http-netty")
+    compile "io.netty:netty-handler-proxy:$nettyVersion"
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+
+    testCompile project(":http-server-netty")
+}

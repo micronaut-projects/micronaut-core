@@ -29,12 +29,7 @@ import java.util.function.Consumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableHttpResponse<B> extends HttpResponse<B> {
-    /**
-     * @return The headers for the response
-     */
-    @Override
-    MutableHttpHeaders getHeaders();
+public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMessage<B> {
 
     /**
      * Adds the specified cookie to the response.  This method can be called
@@ -50,6 +45,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      * @param body The body
      * @return This response object
      */
+    @Override
     MutableHttpResponse<B> body(B body);
 
     /**
@@ -59,15 +55,19 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
      */
     MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
 
-    /**
-     * Mutate the headers with the given consumer
-     *
-     * @param headers The headers
-     * @return This response
-     */
+    @Override
     default MutableHttpResponse<B> headers(Consumer<MutableHttpHeaders> headers) {
-        headers.accept(getHeaders());
-        return this;
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.headers(headers);
+    }
+
+    @Override
+    default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.header(name,value);
+    }
+
+    @Override
+    default MutableHttpResponse<B> headers(Map<CharSequence, CharSequence> namesAndValues) {
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.headers(namesAndValues);
     }
 
     /**
@@ -93,57 +93,20 @@ public interface MutableHttpResponse<B> extends HttpResponse<B> {
         return characterEncoding(encoding.toString());
     }
 
-    /**
-     * Set a response header
-     *
-     * @param name  The name of the header
-     * @param value The value of the header
-     */
-    default MutableHttpResponse<B> header(CharSequence name, CharSequence value) {
-        getHeaders().add(name, value);
-        return this;
-    }
 
-    /**
-     * Set multiple headers
-     *
-     * @param namesAndValues The names and values
-     */
-    default MutableHttpResponse<B> headers(Map<CharSequence, CharSequence> namesAndValues) {
-        MutableHttpHeaders headers = getHeaders();
-        namesAndValues.forEach(headers::add);
-        return this;
-    }
-
-    /**
-     * Sets the content length
-     *
-     * @param length The length
-     * @return This HttpResponse
-     */
+    @Override
     default MutableHttpResponse<B> contentLength(long length) {
-        getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
-        return this;
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentLength(length);
     }
 
-    /**
-     * Set the response content type
-     *
-     * @param contentType The content type
-     */
+    @Override
     default MutableHttpResponse<B> contentType(CharSequence contentType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, contentType);
-        return this;
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentType(contentType);
     }
 
-    /**
-     * Set the response content type
-     *
-     * @param mediaType The media type
-     */
+    @Override
     default MutableHttpResponse<B> contentType(MediaType mediaType) {
-        getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
-        return this;
+        return (MutableHttpResponse<B>) MutableHttpMessage.super.contentType(mediaType);
     }
 
     /**

@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty;
+package org.particleframework.http.netty;
 
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
@@ -30,13 +31,21 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyHttpRequestHeaders implements MutableHttpHeaders {
+@Internal
+public class NettyHttpHeaders implements MutableHttpHeaders {
     final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
     final ConversionService<?> conversionService;
 
-    NettyHttpRequestHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
+    public NettyHttpHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.nettyHeaders = nettyHeaders;
         this.conversionService = conversionService;
+    }
+
+    /**
+     * @return The underlying Netty headers
+     */
+    public io.netty.handler.codec.http.HttpHeaders getNettyHeaders() {
+        return nettyHeaders;
     }
 
     @Override
