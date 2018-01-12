@@ -54,6 +54,24 @@ class HttpGetSpec extends Specification {
 
     }
 
+    void "test simple blocking get request"() {
+        given:
+        BlockingHttpClient client = new DefaultHttpClient(embeddedServer.getURL()).toBlocking()
+
+        when:
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.GET("/get/simple"),
+                String
+        )
+
+        def body = response.getBody()
+
+        then:
+        body.isPresent()
+        body.get() == 'success'
+
+    }
+
     void "test simple get request with type"() {
         given:
         HttpClient client = new DefaultHttpClient(embeddedServer.getURL())

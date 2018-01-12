@@ -15,79 +15,20 @@
  */
 package org.particleframework.http.client;
 
-import org.particleframework.core.async.publisher.Publishers;
-import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.MutableHttpRequest;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
-import org.particleframework.http.sse.Event;
 import org.reactivestreams.Publisher;
 
-import java.util.Map;
-import java.util.function.Function;
-
 /**
- * A non-blocking HTTP client interface designed around the Particle API and Reactive Streams.
+ * A blocking HTTP client interface that features a subset of the operations provided by {@link HttpClient} and
+ * is designed primarily for testing purposes
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpClient {
-
-    /**
-     * @return A blocking HTTP client suitable for testing and non-production scenarios.
-     */
-    BlockingHttpClient toBlocking();
-
-    /**
-     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
-     */
-    <I> Publisher<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request);
-
-    /**
-     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @param <O>     The event type
-     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
-     */
-    <I, O> Publisher<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, Argument<O> bodyType);
-
-    /**
-     * Perform an HTTP request and receive data chunk by chunk as it becomes available
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request);
-
-    /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I> Publisher<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request);
-
-    /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request  The {@link HttpRequest} to execute
-     * @param bodyType The body type
-     * @param <I>      The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Argument<O> bodyType);
-
+public interface BlockingHttpClient {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type</p>
@@ -102,7 +43,7 @@ public interface HttpClient {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType);
+    <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType);
 
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher}
@@ -112,7 +53,7 @@ public interface HttpClient {
      * @param <O>     The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request) {
+    default <I, O> HttpResponse<O> exchange(HttpRequest<I> request) {
         return exchange(request, (Argument<O>) null);
     }
 
@@ -126,7 +67,7 @@ public interface HttpClient {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Class<O> bodyType) {
         return exchange(request, Argument.of(bodyType));
     }
 
@@ -140,13 +81,14 @@ public interface HttpClient {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
-        return Publishers.map(exchange(request, bodyType), response ->
-                response.getBody()
+    default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
+        HttpResponse<O> response = exchange(request, bodyType);
+        return response
+                        .getBody()
                         .orElseThrow(() -> new HttpClientResponseException(
                                 "Empty body",
                                 response
-                        )));
+                        ));
     }
 
 
@@ -160,19 +102,8 @@ public interface HttpClient {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> O retrieve(HttpRequest<I> request, Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
     }
 
-    /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request  The {@link HttpRequest} to execute
-     * @param bodyType The body type
-     * @param <I>      The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    default <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Class<O> bodyType) {
-        return jsonStream(request, Argument.of(bodyType));
-    }
 }

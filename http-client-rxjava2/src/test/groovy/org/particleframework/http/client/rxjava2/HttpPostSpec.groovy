@@ -25,6 +25,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Header
+import org.particleframework.http.client.BlockingHttpClient
 import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.web.router.annotation.Head
@@ -77,6 +78,21 @@ class HttpPostSpec extends Specification {
                 Book
         )
         Book book = flowable.blockingFirst()
+
+        then:
+        book.title == "The Stand"
+    }
+
+    void "test simple post retrieve blocking request with JSON"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        )
 
         then:
         book.title == "The Stand"
