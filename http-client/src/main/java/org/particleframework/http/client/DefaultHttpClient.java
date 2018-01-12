@@ -33,6 +33,7 @@ import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.core.async.publisher.Publishers;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
@@ -50,6 +51,7 @@ import org.particleframework.http.sse.Event;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +71,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -146,6 +149,42 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this(()-> url);
     }
 
+
+    @Override
+    public BlockingHttpClient toBlocking() {
+        return new BlockingHttpClient() {
+            @Override
+            public <I, O> HttpResponse<O> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
+                Publisher<HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
+                CompletableFuture<HttpResponse<O>> future = new CompletableFuture<>();
+                publisher.subscribe(new CompletionAwareSubscriber<HttpResponse<O>>() {
+                    @Override
+                    protected void doOnSubscribe(Subscription subscription) {
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    protected void doOnNext(HttpResponse<O> message) {
+                        future.complete(message);
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
+                        future.completeExceptionally(t);
+                    }
+
+                    @Override
+                    protected void doOnComplete() {
+                    }
+                });
+                try {
+                    return future.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new HttpClientException("Request execution exception: " + e.getMessage(), e);
+                }
+            }
+        };
+    }
 
     @Override
     public <I> Publisher<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request) {
