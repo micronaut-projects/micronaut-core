@@ -16,8 +16,20 @@
 package org.particleframework.http.client
 
 import io.reactivex.Flowable
+import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
+import org.particleframework.http.HttpStatus
+import org.particleframework.http.MediaType
+import org.particleframework.http.annotation.Body
+import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Header
+import org.particleframework.runtime.server.EmbeddedServer
+import org.particleframework.web.router.annotation.Head
+import org.particleframework.web.router.annotation.Post
+import spock.lang.AutoCleanup
 import spock.lang.Ignore
+import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -26,24 +38,44 @@ import spock.lang.Specification
  */
 class HttpPostSpec extends Specification {
 
-    @Ignore
-    void "test simple post request with JSON"() {
-        given:
-        HttpClient client = null
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
 
+    void "test simple post request with JSON"() {
         when:
-        def flowable = Flowable.fromPublisher(client.exchange(
+        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.post("/post/simple", new Book(title: "The Stand"))
-                           .header("X-My-Header", "Foo")
+                           .accept(MediaType.APPLICATION_JSON_TYPE)
+                           .header("X-My-Header", "Foo"),
+
+                Book
         ))
-        Optional<String> body = flowable.blockingFirst().getBody(String.class)
+        HttpResponse<Book> response = flowable.blockingFirst()
+        Optional<Book> body = response.getBody()
 
         then:
+        response.status == HttpStatus.OK
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.contentLength == 21
         body.isPresent()
-        body.get() == 'success'
-
+        body.get() instanceof Book
+        body.get().title == 'The Stand'
     }
 
+    @Controller('/post')
+    static class PostController {
+
+        @Post('/simple')
+        Book simple(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
+            assert contentType == MediaType.APPLICATION_JSON
+            assert contentLength == 21
+            assert accept == MediaType.APPLICATION_JSON
+            assert custom == 'Foo'
+            return book
+        }
+
+    }
     static class Book {
         String title
     }

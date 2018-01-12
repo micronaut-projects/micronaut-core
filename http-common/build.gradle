@@ -1,0 +1,5 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":runtime")
+    compile project(":http")
+}

@@ -15,45 +15,49 @@
  */
 package org.particleframework.http.client;
 
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.HttpVersion;
+import com.typesafe.netty.http.DefaultStreamedHttpRequest;
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.*;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.HttpParameters;
 import org.particleframework.http.MutableHttpHeaders;
 import org.particleframework.http.MutableHttpRequest;
 import org.particleframework.http.cookie.Cookies;
-import org.particleframework.http.netty.AbstractNettyHttpRequest;
 import org.particleframework.http.netty.NettyHttpHeaders;
+import org.particleframework.http.netty.NettyHttpParameters;
+import org.reactivestreams.Publisher;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class NettyClientHttpRequest<B> extends AbstractNettyHttpRequest<B> implements MutableHttpRequest<B>{
+class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
 
-    private final NettyHttpHeaders headers;
-    private final MutableConvertibleValues<Object> attributes;
+    private final NettyHttpHeaders headers = new NettyHttpHeaders();
+    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
+    private final HttpMethod httpMethod;
+    private final URI uri;
     private B body;
+    private NettyHttpParameters httpParameters;
 
-    NettyClientHttpRequest(HttpMethod httpMethod, String uri) {
-        super(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), uri), ConversionService.SHARED);
-        this.headers = new NettyHttpHeaders(nettyRequest.headers(), ConversionService.SHARED);
-        this.attributes = new MutableConvertibleValuesMap<>();
+    NettyClientHttpRequest(HttpMethod httpMethod, URI uri) {
+        this.httpMethod = httpMethod;
+        this.uri = uri;
     }
 
-
-    @Override
-    protected Charset initCharset(Charset characterEncoding) {
-        return characterEncoding != null ? characterEncoding : StandardCharsets.UTF_8;
+    NettyClientHttpRequest(HttpMethod httpMethod, String uri) {
+        this.httpMethod = httpMethod;
+        this.uri = URI.create(uri);
     }
 
     @Override
@@ -73,18 +77,12 @@ class NettyClientHttpRequest<B> extends AbstractNettyHttpRequest<B> implements M
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
-        if(body != null) {
-            return ConversionService.SHARED.convert(body, type);
-        }
-        return Optional.empty();
+        return getBody(Argument.of(type));
     }
 
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        if(body != null) {
-            return ConversionService.SHARED.convert(body, ConversionContext.of(type));
-        }
-        return Optional.empty();
+        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
     }
 
     @Override
@@ -95,26 +93,87 @@ class NettyClientHttpRequest<B> extends AbstractNettyHttpRequest<B> implements M
 
     @Override
     public Cookies getCookies() {
-        return null;
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    @Override
+    public HttpParameters getParameters() {
+        NettyHttpParameters httpParameters = this.httpParameters;
+        if (httpParameters == null) {
+            synchronized (this) { // double check
+                httpParameters = this.httpParameters;
+                if (httpParameters == null) {
+                    this.httpParameters = httpParameters = decodeParameters(getUri().getRawPath());
+                }
+            }
+        }
+        return httpParameters;
+    }
+
+    @Override
+    public HttpMethod getMethod() {
+        return httpMethod;
+    }
+
+    @Override
+    public URI getUri() {
+        return uri;
+    }
+
+    @Override
+    public URI getPath() {
+        return URI.create(uri.getPath());
     }
 
     @Override
     public InetSocketAddress getRemoteAddress() {
-        return null;
+        return getServerAddress();
     }
 
     @Override
     public InetSocketAddress getServerAddress() {
-        return null;
+        String host = uri.getHost();
+        int port = uri.getPort();
+        return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);
     }
 
     @Override
     public String getServerName() {
-        return null;
+        return uri.getHost();
     }
 
     @Override
     public boolean isSecure() {
-        return false;
+        String scheme = getUri().getScheme();
+        return scheme != null && scheme.equals("https");
+    }
+
+    private NettyHttpParameters decodeParameters(String uri) {
+        QueryStringDecoder queryStringDecoder = createDecoder(uri);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), ConversionService.SHARED);
+    }
+
+    protected QueryStringDecoder createDecoder(String uri) {
+        Charset charset = getCharacterEncoding();
+        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
+    }
+
+    HttpRequest getNettyRequest(Publisher<HttpContent> bodyPublisher) {
+        HttpRequest request;
+        if(bodyPublisher != null) {
+            request = new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString(), bodyPublisher);
+        }
+        else {
+            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString());
+        }
+        request.headers().setAll(headers.getNettyHeaders());
+        return request;
+    }
+
+    HttpRequest getNettyRequest(ByteBuf content) {
+        DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString(), content) :
+                                                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString());
+        req.headers().setAll(headers.getNettyHeaders());
+        return req;
     }
 }

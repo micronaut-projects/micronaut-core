@@ -16,6 +16,7 @@
 package org.particleframework.core.async.processor;
 
 import org.particleframework.core.async.subscriber.SingleThreadedBufferingSubscriber;
+import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -33,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThreadedBufferingSubscriber<R> implements Publisher<T> {
+public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThreadedBufferingSubscriber<R> implements Processor<R,T> {
     private final AtomicReference<Subscriber<? super T>> downstreamSubscriber = new AtomicReference<>();
 
     @Override

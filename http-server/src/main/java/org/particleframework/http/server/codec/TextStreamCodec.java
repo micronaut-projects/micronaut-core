@@ -72,6 +72,7 @@ public class TextStreamCodec implements MediaTypeCodec {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
+
     @Override
     public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
         throw new UnsupportedOperationException("This codec currently only supports encoding");

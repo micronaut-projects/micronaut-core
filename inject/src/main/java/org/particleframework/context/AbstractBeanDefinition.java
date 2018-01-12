@@ -812,9 +812,14 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                 Value valAnn = argument.findAnnotation(Value.class)
                         .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
 
-                Optional value = propertyResolver.getProperty(valAnn.value(), ConversionContext.of(argument));
-                // can't use orElseThrow here due to compiler bug
-                result = value.orElseGet(() -> new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + value + "]. Property doesn't exist"));
+                String prop = valAnn.value();
+                Optional<?> value = propertyResolver.getProperty(prop, ConversionContext.of(argument));
+                if (argument.getType() == Optional.class) {
+                    return resolveOptionalObject(value);
+                } else {
+                    // can't use orElseThrow here due to compiler bug
+                    result = value.orElseThrow(() -> new DependencyInjectionException(resolutionContext, argument, "Error resolving property value [" + prop + "]. Property doesn't exist"));
+                }
             } else {
                 throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
             }

@@ -19,6 +19,7 @@ import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.convert.format.ReadableBytes;
 import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.server.cors.CorsOriginConfiguration;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.io.File;
 import java.nio.charset.Charset;
@@ -31,12 +32,11 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(value = "particle.server", cliPrefix = "")
-public class HttpServerConfiguration {
+@ConfigurationProperties(value = "server", cliPrefix = "")
+public class HttpServerConfiguration extends ApplicationConfiguration {
 
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
-    protected Charset defaultCharset = StandardCharsets.UTF_8;
     protected Optional<Integer> readTimeout;
     @ReadableBytes
     protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
@@ -55,13 +55,6 @@ public class HttpServerConfiguration {
      */
     public Optional<String> getHost() {
         return host;
-    }
-
-    /**
-     * The default charset to use when encoding and decoding responses if {@link org.particleframework.http.HttpHeaders#ACCEPT_CHARSET} or {@link org.particleframework.http.HttpHeaders#ACCEPT} is not sent by the client
-     */
-    public Charset getDefaultCharset() {
-        return defaultCharset;
     }
 
     /**

@@ -46,7 +46,7 @@ public class ObjectMapperFactory {
      * @return The {@link ObjectMapper}
      */
     @Bean
-    ObjectMapper objectMapper(Optional<JacksonConfiguration> jacksonConfiguration,
+    public ObjectMapper objectMapper(Optional<JacksonConfiguration> jacksonConfiguration,
                               Optional<JsonFactory> jsonFactory) {
 
         ObjectMapper objectMapper = jsonFactory.map(ObjectMapper::new)

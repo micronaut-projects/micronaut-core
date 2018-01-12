@@ -51,14 +51,21 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
+    private final B body;
 
-    FullNettyClientHttpResponse(FullHttpResponse fullHttpResponse, MediaTypeCodecRegistry mediaTypeCodecRegistry, ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory) {
+    FullNettyClientHttpResponse(
+            FullHttpResponse fullHttpResponse,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            ByteBufferFactory<ByteBufAllocator,
+            ByteBuf> byteBufferFactory,
+            Argument<B> bodyType) {
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
+        this.body = getBody(bodyType).orElse(null);
     }
 
     @Override
@@ -78,28 +85,25 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public Optional<B> getBody() {
-        if (!convertedBodies.isEmpty()) {
-            return convertedBodies.values().iterator().next();
-        } else {
-            ByteBuf content = nettyHttpResponse.content();
-            if (content.refCnt() > 0) {
-                if (content.readableBytes() > 0) {
-                    return Optional.of((B) content);
-                }
-            }
-            return Optional.empty();
-        }
+        return Optional.ofNullable(body);
     }
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
+        if(type == null) return Optional.empty();
         return getBody(Argument.of(type));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
+        if(type == null) return Optional.empty();
+
         return (Optional<T>) convertedBodies.computeIfAbsent(type, argument -> {
+                    Optional<B> existing = getBody();
+                    if(existing.isPresent()) {
+                        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+                    }
                     Optional<MediaType> contentType = getContentType();
                     ByteBuf content = nettyHttpResponse.content();
                     if(content.refCnt() == 0 || content.readableBytes() == 0) {
@@ -113,7 +117,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                         }
                     }
                     // last chance, try type conversion
-                    return getBody().flatMap(b -> ConversionService.SHARED.convert(content, ConversionContext.of(type)));
+                    return ConversionService.SHARED.convert(content, ConversionContext.of(type));
                 }
 
         );

@@ -21,6 +21,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.core.convert.format.ReadableBytes;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.net.Proxy;
@@ -45,9 +46,7 @@ public class HttpClientConfiguration {
      * The encoding to use
      */
     private Charset encoding = StandardCharsets.UTF_8;
-    /**
-     * The number of threads the client should use for requests
-     */
+
     private Integer numOfThreads = null;
 
     /**
@@ -79,10 +78,7 @@ public class HttpClientConfiguration {
      */
     private TrustManagerFactory sslTrustManagerFactory = InsecureTrustManagerFactory.INSTANCE;
 
-    /**
-     * The maximum content length the client can consume
-     */
-    private int maxContentLength = Integer.MAX_VALUE;
+    private int maxContentLength = 1024 * 1024 * 10; // 10MB;
 
     /**
      * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
@@ -114,6 +110,9 @@ public class HttpClientConfiguration {
         return encoding;
     }
 
+    /**
+     * The number of threads the client should use for requests
+     */
     public OptionalInt getNumOfThreads() {
         return numOfThreads != null ? OptionalInt.of(numOfThreads) : OptionalInt.empty();
     }
@@ -138,6 +137,9 @@ public class HttpClientConfiguration {
         return Optional.ofNullable(sslTrustManagerFactory);
     }
 
+    /**
+     * The maximum content length the client can consume
+     */
     public int getMaxContentLength() {
         return maxContentLength;
     }
@@ -158,6 +160,9 @@ public class HttpClientConfiguration {
         this.encoding = encoding;
     }
 
+    /**
+     * The number of threads the client should use for requests
+     */
     public void setNumOfThreads(Integer numOfThreads) {
         this.numOfThreads = numOfThreads;
     }
@@ -186,6 +191,10 @@ public class HttpClientConfiguration {
         this.sslTrustManagerFactory = sslTrustManagerFactory;
     }
 
+    /**
+     * The maximum content length the client can consume
+     */
+    @ReadableBytes
     public void setMaxContentLength(int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
