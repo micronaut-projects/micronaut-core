@@ -17,6 +17,8 @@ package org.particleframework.http.hateos;
 
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalMultiValues;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Produces;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -27,6 +29,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Produces(MediaType.APPLICATION_HAL_JSON)
 public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {
     private final Map<CharSequence, List<Link>> links = new LinkedHashMap<>(1);
     private final Map<CharSequence, List<Resource>> embedded = new LinkedHashMap<>(1);

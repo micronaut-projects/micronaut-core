@@ -45,7 +45,7 @@ public class HttpGetTest {
 
         HttpClient client = new DefaultHttpClient(server.getURL());
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/simple"), String.class
+                HttpRequest.GET("/get/simple"), String.class
         ));
         HttpResponse<String> response = flowable.blockingFirst();
 
@@ -65,7 +65,7 @@ public class HttpGetTest {
         HttpClient client = applicationContext.createBean(HttpClient.class, Collections.singletonMap("url", server.getURL()));
 
         Flowable<HttpResponse<List>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/pojoList"), Argument.of(List.class, HttpGetSpec.Book.class)
+                HttpRequest.GET("/get/pojoList"), Argument.of(List.class, HttpGetSpec.Book.class)
         ));
         HttpResponse<List> response = flowable.blockingFirst();
 

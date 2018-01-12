@@ -91,13 +91,13 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
 
     /**
-     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#GET} request for the given URI
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI
      *
      * @param uri The URI
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> get(String uri) {
+    static <T> MutableHttpRequest<T> GET(String uri) {
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")
         );
@@ -113,7 +113,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> post(String uri, T body) {
+    static <T> MutableHttpRequest<T> POST(String uri, T body) {
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")

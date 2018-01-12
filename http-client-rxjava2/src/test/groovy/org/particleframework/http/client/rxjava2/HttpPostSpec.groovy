@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.client
+package org.particleframework.http.client.rxjava2
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.annotation.Argument
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
@@ -24,6 +25,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Header
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.web.router.annotation.Head
 import org.particleframework.web.router.annotation.Post
@@ -31,6 +33,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -40,17 +44,17 @@ class HttpPostSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+    @Shared @AutoCleanup RxHttpClient client = context.createBean(RxHttpClient, [url:embeddedServer.getURL()])
 
-    void "test simple post request with JSON"() {
+    void "test simple post exchange request with JSON"() {
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flowable<HttpResponse<Book>> flowable = client.exchange(
                 HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
-                           .accept(MediaType.APPLICATION_JSON_TYPE)
-                           .header("X-My-Header", "Foo"),
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
 
                 Book
-        ))
+        )
         HttpResponse<Book> response = flowable.blockingFirst()
         Optional<Book> body = response.getBody()
 
@@ -61,6 +65,21 @@ class HttpPostSpec extends Specification {
         body.isPresent()
         body.get() instanceof Book
         body.get().title == 'The Stand'
+    }
+
+    void "test simple post retrieve request with JSON"() {
+        when:
+        Flowable<Book> flowable = client.retrieve(
+                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        )
+        Book book = flowable.blockingFirst()
+
+        then:
+        book.title == "The Stand"
     }
 
     @Controller('/post')
