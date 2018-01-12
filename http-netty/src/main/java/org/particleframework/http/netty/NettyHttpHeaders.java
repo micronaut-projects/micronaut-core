@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.netty;
 
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
@@ -39,6 +40,11 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public NettyHttpHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
         this.nettyHeaders = nettyHeaders;
         this.conversionService = conversionService;
+    }
+
+    public NettyHttpHeaders() {
+        this.nettyHeaders = new DefaultHttpHeaders(false);
+        this.conversionService = ConversionService.SHARED;
     }
 
     /**

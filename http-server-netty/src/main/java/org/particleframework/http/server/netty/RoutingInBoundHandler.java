@@ -44,7 +44,7 @@ import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
-import org.particleframework.http.server.codec.TextPlainCodec;
+import org.particleframework.http.common.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
@@ -607,7 +607,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 } else {
                     codec = mediaTypeCodecRegistry.findCodec(
                             responseType, bodyType
-                    ).orElse(new TextPlainCodec(serverConfiguration));
+                    ).orElse(new TextPlainCodec(serverConfiguration.getDefaultCharset()));
                     publisher = Publishers.fromCompletableFuture(() -> {
                         if (body instanceof byte[] || body instanceof ByteBuf) {
                             return CompletableFuture.completedFuture(body);
@@ -696,7 +696,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             codecToUse = mediaTypeCodecRegistry.findCodec(
                     responseType,
                     body.getClass()
-            ).orElse(new TextPlainCodec(serverConfiguration));
+            ).orElse(new TextPlainCodec(serverConfiguration.getDefaultCharset()));
         }
         writeMessage(context, request, nativeResponse, body, codecToUse, responseType);
     }
@@ -730,7 +730,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         MediaTypeCodec codec;
         codec = mediaTypeCodecRegistry.findCodec(
                 responseType, bodyType
-        ).orElse(new TextPlainCodec(serverConfiguration));
+        ).orElse(new TextPlainCodec(serverConfiguration.getDefaultCharset()));
         return codec;
     }
 

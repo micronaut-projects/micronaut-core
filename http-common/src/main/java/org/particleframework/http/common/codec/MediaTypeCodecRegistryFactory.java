@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.codec;
+package org.particleframework.http.common.codec;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
@@ -30,7 +30,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Factory
-public class ServerMediaTypeCodecRegistry {
+public class MediaTypeCodecRegistryFactory {
 
     @Singleton
     @Primary

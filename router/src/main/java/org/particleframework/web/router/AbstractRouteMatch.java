@@ -27,6 +27,7 @@ import org.particleframework.core.convert.exceptions.ConversionErrorException;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.annotation.Body;
 import org.particleframework.http.sse.Event;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.core.type.ReturnType;
@@ -93,7 +94,17 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
     @Override
     public Optional<Argument<?>> getBodyArgument() {
         String bodyArgument = abstractRoute.bodyArgument;
-        return Optional.ofNullable(requiredInputs.get(bodyArgument));
+        if(bodyArgument != null) {
+            return Optional.ofNullable(requiredInputs.get(bodyArgument));
+        }
+        else {
+            for (Argument argument : getArguments()) {
+                if(argument.getAnnotation(Body.class) != null) {
+                    return Optional.of(argument);
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -114,6 +125,12 @@ abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
             Object value = variables.get(argument.getName());
             if( value == null || value instanceof UnresolvedArgument)
                 return false;
+        }
+
+        Optional<Argument<?>> bodyArgument = getBodyArgument();
+        if(bodyArgument.isPresent()) {
+            Object value = variables.get(bodyArgument.get().getName());
+            return value != null && !(value instanceof UnresolvedArgument);
         }
         return true;
     }

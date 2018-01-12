@@ -1,5 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
+    compile project(":http-common")
     compile project(":http-netty")
     compile "io.netty:netty-handler-proxy:$nettyVersion"
     testCompile project(":inject-groovy")

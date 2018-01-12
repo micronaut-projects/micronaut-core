@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.codec;
+package org.particleframework.http.common.codec;
 
+import org.particleframework.context.annotation.Value;
 import org.particleframework.core.io.IOUtils;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
@@ -22,10 +23,14 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
-import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.runtime.ApplicationConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
  * A codec that handles {@link MediaType#TEXT_PLAIN}
@@ -36,10 +41,14 @@ import java.io.*;
 @Singleton
 public class TextPlainCodec implements MediaTypeCodec{
 
-    private final HttpServerConfiguration serverConfiguration;
+    private final Charset defaultCharset;
 
-    public TextPlainCodec(HttpServerConfiguration serverConfiguration) {
-        this.serverConfiguration = serverConfiguration;
+    @Inject public TextPlainCodec(@Value(ApplicationConfiguration.DEFAULT_CHARSET) Optional<Charset> defaultCharset) {
+        this.defaultCharset = defaultCharset.orElse(StandardCharsets.UTF_8);
+    }
+
+    public TextPlainCodec(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset != null ? defaultCharset : StandardCharsets.UTF_8;
     }
 
     @Override
@@ -51,7 +60,7 @@ public class TextPlainCodec implements MediaTypeCodec{
     public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
         if(CharSequence.class.isAssignableFrom(type.getType())) {
             try {
-                return (T) IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, serverConfiguration.getDefaultCharset())));
+                return (T) IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, defaultCharset)));
             } catch (IOException e) {
                 throw new CodecException("Error decoding string from stream: " + e.getMessage());
             }
@@ -71,7 +80,7 @@ public class TextPlainCodec implements MediaTypeCodec{
 
     @Override
     public <T> byte[] encode(T object) throws CodecException {
-        return object.toString().getBytes(serverConfiguration.getDefaultCharset());
+        return object.toString().getBytes(defaultCharset);
     }
 
     @Override
@@ -79,6 +88,6 @@ public class TextPlainCodec implements MediaTypeCodec{
         String string = object.toString();
         int len = string.length();
         return allocator.buffer(len, len)
-                        .write(string.getBytes(serverConfiguration.getDefaultCharset()));
+                        .write(string.getBytes(defaultCharset));
     }
 }

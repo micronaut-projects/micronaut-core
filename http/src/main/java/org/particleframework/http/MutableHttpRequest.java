@@ -15,8 +15,12 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.util.ArrayUtils;
+
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * An extended version of {@link HttpRequest} that allows mutating headers, the body etc.
@@ -27,6 +31,19 @@ import java.util.function.Consumer;
 public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessage<B> {
     @Override
     MutableHttpRequest<B> body(B body);
+
+    /**
+     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header
+     * @param mediaTypes The media types
+     * @return This request
+     */
+    default MutableHttpRequest<B> accept(MediaType...mediaTypes) {
+        if(ArrayUtils.isNotEmpty(mediaTypes)) {
+            String acceptString = Arrays.stream(mediaTypes).collect(Collectors.joining(","));
+            header(HttpHeaders.ACCEPT, acceptString);
+        }
+        return this;
+    }
 
     @Override
     default MutableHttpRequest<B> headers(Consumer<MutableHttpHeaders> headers) {

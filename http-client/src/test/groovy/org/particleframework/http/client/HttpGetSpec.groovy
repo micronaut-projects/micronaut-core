@@ -126,7 +126,7 @@ class HttpGetSpec extends Specification {
     @Controller("/get")
     static class GetController {
 
-        @Get("/simple")
+        @Get(uri = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
             return "success"
         }
