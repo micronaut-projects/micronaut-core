@@ -18,6 +18,7 @@ package org.particleframework.http.client;
 import com.typesafe.netty.http.DefaultStreamedHttpRequest;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.*;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
@@ -38,9 +39,12 @@ import java.nio.charset.Charset;
 import java.util.Optional;
 
 /**
+ * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
 
     private final NettyHttpHeaders headers = new NettyHttpHeaders();

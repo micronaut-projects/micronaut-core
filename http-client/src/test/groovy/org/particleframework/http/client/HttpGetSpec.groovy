@@ -44,7 +44,7 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/simple")
+                HttpRequest.GET("/get/simple")
         ))
         Optional<String> body = flowable.map({res -> res.getBody(String)}).blockingFirst()
 
@@ -60,7 +60,7 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/simple"), String
+                HttpRequest.GET("/get/simple"), String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
         def body = response.getBody()
@@ -71,14 +71,14 @@ class HttpGetSpec extends Specification {
         body.get() == 'success'
     }
 
-    void "test simple get request with POJO"() {
+    void "test simple exchange request with POJO"() {
         given:
         def context = ApplicationContext.run()
         HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/pojo"), Book
+                HttpRequest.GET("/get/pojo"), Book
         ))
 
         HttpResponse<Book> response = flowable.blockingFirst()
@@ -93,6 +93,23 @@ class HttpGetSpec extends Specification {
 
     }
 
+    void "test simple retrieve request with POJO"() {
+        given:
+        def context = ApplicationContext.run()
+        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+
+        when:
+        Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
+                HttpRequest.GET("/get/pojo"), Book
+        ))
+
+        Book book = flowable.blockingFirst()
+
+        then:
+        book != null
+        book.title == "The Stand"
+    }
+
     void "test simple get request with POJO list"() {
         given:
         def context = ApplicationContext.run()
@@ -100,7 +117,7 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.get("/get/pojoList"), Argument.of(List, Book)
+                HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockingFirst()
