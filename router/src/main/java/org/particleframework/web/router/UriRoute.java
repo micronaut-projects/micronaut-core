@@ -31,7 +31,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriRoute extends MethodBasedRoute, UriMatcher, Comparable<UriRoute> {
+public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
 
     /**
      * Defines routes nested within this route

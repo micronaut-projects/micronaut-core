@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriRouteMatch<R> extends UriMatchInfo, RouteMatch<R> {
+public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R> {
 
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
