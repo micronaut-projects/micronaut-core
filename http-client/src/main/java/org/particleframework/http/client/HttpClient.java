@@ -21,10 +21,14 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.MutableHttpRequest;
+import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.sse.Event;
 import org.reactivestreams.Publisher;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -109,11 +113,10 @@ public interface HttpClient {
      *
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
-     * @param <O>     The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request) {
-        return exchange(request, (Argument<O>) null);
+    default <I> Publisher<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
+        return exchange(request, ByteBuffer.class);
     }
 
     /**
@@ -174,5 +177,15 @@ public interface HttpClient {
      */
     default <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Class<O> bodyType) {
         return jsonStream(request, Argument.of(bodyType));
+    }
+
+    /**
+     * Create a new {@link HttpClient}
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static HttpClient create(URL url) {
+        return new DefaultHttpClient(url);
     }
 }

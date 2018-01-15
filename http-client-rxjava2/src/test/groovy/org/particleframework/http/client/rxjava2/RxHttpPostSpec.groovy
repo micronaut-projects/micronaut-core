@@ -41,7 +41,7 @@ import javax.inject.Inject
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpPostSpec extends Specification {
+class RxHttpPostSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()

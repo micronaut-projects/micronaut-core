@@ -15,9 +15,13 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.core.beans.BeanMap;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequestFactory;
 import org.particleframework.http.MutableHttpRequest;
+import org.particleframework.http.uri.UriTemplate;
+
+import java.util.Map;
 
 /**
  * Implementation of the {@link HttpRequestFactory} interface for Netty
@@ -33,19 +37,36 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
 
     @Override
     public <T> MutableHttpRequest<T> post(String uri, T body) {
-        return new NettyClientHttpRequest<T>(HttpMethod.POST, uri)
-                    .body(body);
+        HttpMethod method = HttpMethod.POST;
+        return buildRequest(uri, body, method);
     }
 
     @Override
     public <T> MutableHttpRequest<T> put(String uri, T body) {
-        return new NettyClientHttpRequest<T>(HttpMethod.PUT, uri)
-                .body(body);
+        return buildRequest(uri, body, HttpMethod.PUT);
     }
 
     @Override
     public <T> MutableHttpRequest<T> patch(String uri, T body) {
-        return new NettyClientHttpRequest<T>(HttpMethod.PATCH, uri)
+        return buildRequest(uri, body, HttpMethod.PATCH);
+    }
+
+    @Override
+    public <T> MutableHttpRequest<T> head(String uri) {
+        return new NettyClientHttpRequest<>(HttpMethod.HEAD, uri);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> MutableHttpRequest<T> buildRequest(String uri, T body, HttpMethod method) {
+        if(uri.indexOf('{') > -1 && body != null) {
+            if(body instanceof Map) {
+                uri = UriTemplate.of(uri).expand((Map<String, Object>) body);
+            }
+            else {
+                uri = UriTemplate.of(uri).expand(BeanMap.of(body));
+            }
+        }
+        return new NettyClientHttpRequest<T>(method, uri)
                 .body(body);
     }
 }

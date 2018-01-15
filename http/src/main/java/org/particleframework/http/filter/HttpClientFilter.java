@@ -41,14 +41,17 @@ public interface HttpClientFilter extends HttpFilter {
      * @return The publisher of the response
      * @see HttpFilter
      */
-    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, FilterChain chain);
+    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain);
 
     @Override
     default Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
         if(!(request instanceof MutableHttpRequest)) {
             throw new IllegalArgumentException("Passed request must be an instance of " + MutableHttpRequest.class.getName());
         }
+        if(!(chain instanceof ClientFilterChain)) {
+            throw new IllegalArgumentException("Passed chain must be an instance of " + ClientFilterChain.class.getName());
+        }
 
-        return doFilter((MutableHttpRequest)request, chain);
+        return doFilter((MutableHttpRequest)request, (ClientFilterChain)chain);
     }
 }

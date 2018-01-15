@@ -52,8 +52,8 @@ dependencies {
     }
 
     compileOnly "org.codehaus.groovy:groovy:$groovyVersion"
-    compileOnly 'org.ow2.asm:asm:5.2'
-    compileOnly 'org.ow2.asm:asm-commons:5.2'
+    compileOnly "org.ow2.asm:asm:$asmVersion"
+    compileOnly "org.ow2.asm:asm-commons:$asmVersion"
     ['javax.validation:validation-api:1.1.0.Final',
      'org.yaml:snakeyaml:1.18'].each { String dep ->
         compileOnly dep
@@ -62,10 +62,10 @@ dependencies {
 
 }
 
-
+// This logic handles rewriting the dependencies on org.objectweb.asm.** to org.particleframework.asm.**
 
 def targetDir = new File(project.buildDir, "jarjar")
-def targetFile = new File(targetDir, "asm.jar")
+def targetFile = new File(targetDir, "jarjar.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
     classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"

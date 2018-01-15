@@ -57,7 +57,7 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     @Override
-    public URI getPath() {
+    public String getPath() {
         return getDelegate().getPath();
     }
 

@@ -16,8 +16,11 @@
 package org.particleframework.http.client.exceptions;
 
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 
 /**
+ * An exception that occurs when a response returns an error code equal to or greater than 400
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -35,9 +38,16 @@ public class HttpClientResponseException extends HttpClientException{
     }
 
     /**
-     * @return The response
+     * @return The {@link HttpResponse}
      */
     public HttpResponse<?> getResponse() {
         return response;
+    }
+
+    /**
+     * @return The {@link HttpStatus} returned
+     */
+    public HttpStatus getStatus() {
+        return getResponse().getStatus();
     }
 }

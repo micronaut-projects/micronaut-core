@@ -23,6 +23,7 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpHeaders;
@@ -57,7 +58,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             FullHttpResponse fullHttpResponse,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator,
-            ByteBuf> byteBufferFactory,
+                    ByteBuf> byteBufferFactory,
             Argument<B> bodyType) {
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
@@ -90,36 +91,54 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
 
     @Override
     public <T> Optional<T> getBody(Class<T> type) {
-        if(type == null) return Optional.empty();
+        if (type == null) return Optional.empty();
         return getBody(Argument.of(type));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        if(type == null) return Optional.empty();
+        if (type == null) return Optional.empty();
+
+        if (type.getType() == ByteBuffer.class) {
+            return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
+        }
+
+        if (type.getType() == ByteBuf.class) {
+            return Optional.of((T) nettyHttpResponse.content());
+        }
 
         return (Optional<T>) convertedBodies.computeIfAbsent(type, argument -> {
                     Optional<B> existing = getBody();
-                    if(existing.isPresent()) {
-                        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+                    if (existing.isPresent()) {
+                        return getBody().flatMap(b -> {
+                            if (b instanceof ByteBuffer) {
+                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                                return convertByteBuf(bytebuf, argument);
+                            }
+                            return ConversionService.SHARED.convert(b, ConversionContext.of(type));
+                        });
                     }
-                    Optional<MediaType> contentType = getContentType();
                     ByteBuf content = nettyHttpResponse.content();
-                    if(content.refCnt() == 0 || content.readableBytes() == 0) {
-                        return Optional.empty();
-                    }
-                    if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
-                        Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
-                        if (foundCodec.isPresent()) {
-                            MediaTypeCodec codec = foundCodec.get();
-                            return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
-                        }
-                    }
-                    // last chance, try type conversion
-                    return ConversionService.SHARED.convert(content, ConversionContext.of(type));
+            return convertByteBuf(content, type);
                 }
 
         );
+    }
+
+    private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
+        Optional<MediaType> contentType = getContentType();
+        if (content.refCnt() == 0 || content.readableBytes() == 0) {
+            return Optional.empty();
+        }
+        if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
+            Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+            if (foundCodec.isPresent()) {
+                MediaTypeCodec codec = foundCodec.get();
+                return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+            }
+        }
+        // last chance, try type conversion
+        return ConversionService.SHARED.convert(content, ConversionContext.of(type));
     }
 }

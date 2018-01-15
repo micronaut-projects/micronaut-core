@@ -28,6 +28,7 @@ public interface ServerSelector {
     /**
      *
      * @return The selected server URL
+     * @param discriminator An object used to discriminate the server to select
      */
-    URL select();
+    URL select(Object discriminator);
 }

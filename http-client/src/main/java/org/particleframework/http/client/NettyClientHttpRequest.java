@@ -125,8 +125,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
     }
 
     @Override
-    public URI getPath() {
-        return URI.create(uri.getPath());
+    public String getPath() {
+        return uri.getPath();
     }
 
     @Override

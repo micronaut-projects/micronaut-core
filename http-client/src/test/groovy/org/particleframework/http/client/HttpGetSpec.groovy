@@ -23,10 +23,10 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.web.router.annotation.Get
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -40,13 +40,15 @@ class HttpGetSpec extends Specification {
 
     void "test simple get request"() {
         given:
-        HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.GET("/get/simple")
         ))
-        Optional<String> body = flowable.map({res -> res.getBody(String)}).blockingFirst()
+        Optional<String> body = flowable.map({res ->
+            res.getBody(String)}
+        ).blockingFirst()
 
         then:
         body.isPresent()
@@ -54,9 +56,50 @@ class HttpGetSpec extends Specification {
 
     }
 
+
+    void "test simple 404 request"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/doesntexist")
+        ))
+
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Not Found"
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    void "test simple 404 request as VndError"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/doesntexist")
+        ))
+
+        def response = flowable.onErrorReturn({ error ->
+            if (error instanceof HttpClientResponseException) {
+                return HttpResponse.status(error.status).body(error.response.getBody(Map).orElse(null))
+            }
+            throw error
+        }).blockingFirst()
+
+        def body = response.body
+
+        then:
+        body.isPresent()
+        body.get().message == "Page Not Found"
+    }
+
     void "test simple blocking get request"() {
         given:
-        BlockingHttpClient client = new DefaultHttpClient(embeddedServer.getURL()).toBlocking()
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
 
         when:
         HttpResponse<String> response = client.exchange(

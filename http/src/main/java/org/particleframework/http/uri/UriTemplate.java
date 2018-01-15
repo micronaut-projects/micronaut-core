@@ -267,6 +267,15 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * Create a new {@link UriTemplate} for the given URI
+     * @param uri The URI
+     * @return The template
+     */
+    public static UriTemplate of(String uri) {
+        return new UriTemplate(uri);
+    }
+
+    /**
      * Represents an expandable path segment
      */
     protected interface PathSegment {

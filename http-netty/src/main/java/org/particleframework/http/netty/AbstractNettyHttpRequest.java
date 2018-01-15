@@ -45,7 +45,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     private MediaType mediaType;
     private Charset charset;
     private Locale locale;
-    private URI path;
+    private String path;
 
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
@@ -139,8 +139,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     @Override
-    public URI getPath() {
-        URI path = this.path;
+    public String getPath() {
+        String path = this.path;
         if (path == null) {
             synchronized (this) { // double check
                 path = this.path;
@@ -152,9 +152,9 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return path;
     }
 
-    private URI decodePath(String uri) {
+    private String decodePath(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return URI.create(queryStringDecoder.path());
+        return queryStringDecoder.path();
     }
 
     protected abstract Charset initCharset(Charset characterEncoding);

@@ -618,7 +618,7 @@ class StandardBeanInfo extends SimpleBeanInfo {
         Method[] basicMethods = includeSuper ? introspectorClass.getMethods()
                 : introspectorClass.getDeclaredMethods();
 
-        if (ArrayUtils.isNotEmpty(basicMethods))
+        if (ArrayUtils.isEmpty(basicMethods))
             return null;
 
         ArrayList<MethodDescriptor> methodList = new ArrayList<>(
@@ -627,7 +627,7 @@ class StandardBeanInfo extends SimpleBeanInfo {
         // Loop over the methods found, looking for public non-static methods
         for (Method basicMethod : basicMethods) {
             int modifiers = basicMethod.getModifiers();
-            if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
+            if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers) && !basicMethod.isBridge() && !basicMethod.isSynthetic() && basicMethod.getName().indexOf('$') == -1) {
                 // Allocate a MethodDescriptor for this method
                 MethodDescriptor theDescriptor = new MethodDescriptor(
                         basicMethod);
@@ -1430,7 +1430,7 @@ class StandardBeanInfo extends SimpleBeanInfo {
     }
 
     private static boolean isValidProperty(String propertyName) {
-        return (propertyName != null) && (propertyName.length() != 0);
+        return (propertyName != null) && (propertyName.length() != 0) && !propertyName.equals("metaClass");
     }
 
     private static class PropertyComparator implements

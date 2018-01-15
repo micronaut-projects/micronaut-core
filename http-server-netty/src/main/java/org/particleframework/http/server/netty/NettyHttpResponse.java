@@ -21,10 +21,12 @@ import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpResponse;
@@ -118,13 +120,19 @@ public class NettyHttpResponse<B> implements MutableHttpResponse<B> {
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
-        return convertedBodies.computeIfAbsent(type, aClass -> getBody().flatMap(b -> conversionService.convert(b, type)));
+        return getBody(Argument.of(type));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
-        return convertedBodies.computeIfAbsent(type.getType(), aClass -> getBody().flatMap(b -> conversionService.convert(b, ConversionContext.of(type))));
+        return convertedBodies.computeIfAbsent(type.getType(), aClass -> getBody().flatMap(b -> {
+            ArgumentConversionContext<T> context = ConversionContext.of(type);
+            if(b instanceof ByteBuffer) {
+                return conversionService.convert(((ByteBuffer)b).asNativeBuffer(), context);
+            }
+            return conversionService.convert(b, context);
+        }));
     }
 
     @Override

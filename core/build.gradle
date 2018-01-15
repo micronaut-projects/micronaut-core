@@ -56,40 +56,38 @@ dependencies {
 
 // ##########################
 // JARJAR handling
-
-def asmjar = project.fileTree('src/jarjar')
-
 def targetDir = new File(project.buildDir, "jarjar")
-def targetFile = new File(targetDir, "asm.jar")
-def asmjarjarTask = task("asmjarjarTask", type: JarjarTask) {
-    from(asmjar)
-    classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
-    destinationDir = targetDir
-    destinationName = targetFile.name
-}
-asmjarjarTask.inputs.files(asmjar)
-asmjarjarTask.outputs.files(targetDir)
 
-def jarjarOutput = task("asmjarjarOutput")
-jarjarOutput.doLast {
-    copy {
-        from(zipTree(targetFile)) {
-            include "org/particleframework/asm/**"
-        }
-        into(new File(project.buildDir, "classes/java/main"))
-    }
-}
-jarjarOutput.dependsOn(asmjarjarTask)
-classes {
-    dependsOn(jarjarOutput)
-}
+// ##########################
+// ASM JARJAR handling
+def asmDependencies = [
+        [group:'org.ow2.asm', name: 'asm', version:asmVersion],
+        [group:'org.ow2.asm', name: 'asm-commons', version:asmVersion],
+        [group:'org.ow2.asm', name: 'asm-tree', version:asmVersion]
+
+]
+Task taskAsmDownload = buildDownloadTask("asm", asmDependencies, asmVersion)
+buildJarJarTask(targetDir, taskAsmDownload, "asm", ["org.objectweb.asm": "org.particleframework.asm"])
 
 
+// ##########################
+// Cglib JARJAR handling
+//def cglibDependencies = [
+//        [group:'cglib', name: 'cglib', version:cglibVersion]
+//
+//]
+//Task cglibDownload = buildDownloadTask("cglib", cglibDependencies, cglibVersion)
+//buildJarJarTask(targetDir, cglibDownload, "cglib", ["net.sf.cglib": "org.particleframework.cglib"])
+
+// ##########################
+// Project JARJAR handling
+def jarjarOutputJar = new File(targetDir, "jarjar-output.jar")
 def jarjarTask = task("jarjarTask", type: JarjarTask) {
     from(project.files(jar.archivePath))
     classRename "org.objectweb.asm.**", "org.particleframework.asm.@1"
+//    classRename "net.sf.cglib.**", "org.particleframework.cglib.@1"
     destinationDir = targetDir
-    destinationName = targetFile.name
+    destinationName = jarjarOutputJar.name
 }
 jarjarTask.dependsOn(jar)
 
@@ -100,8 +98,59 @@ def jarjarOutputs = task("jarjarOutputs").doLast {
     }
     delete(jarjarTask.destinationPath)
 }
+
 jarjarOutputs.dependsOn(jarjarTask)
 task("rejar", type:Jar, dependsOn: jarjarOutputs) {
     from(targetDir)
     archiveName = "rejar.jar"
+}
+
+protected Task buildDownloadTask(String name, List dependencies, String version) {
+    Task taskAsmDownload = task("${name}Download")
+    File downloadDir = new File(project.buildDir, "artifact-download")
+    File targetDir = new File(downloadDir, name)
+    taskAsmDownload.doLast {
+        URI mavenCentralURL = repositories.find(){
+            println it.name
+            it.name == 'maven'
+        }.url
+        ant.mkdir(dir:targetDir)
+        for(dep in dependencies) {
+
+            ant.get(src:"${mavenCentralURL}/${dep.group.replace('.','/')}/${dep.name}/${dep.version}/${dep.name}-${dep.version}.jar", dest: targetDir)
+        }
+    }
+    taskAsmDownload.inputs.properties(version: version)
+    taskAsmDownload.outputs.dir(targetDir)
+
+    return taskAsmDownload
+}
+
+protected void buildJarJarTask(File targetDir, Task jars, String name, Map mappings) {
+    File targetJarFile = new File(targetDir, "${name}.jar")
+    Task jarjarTask = task("${name}jarjarTask", type: JarjarTask) {
+        from(fileTree(jars.outputs.files.first()))
+        for(entry in mappings) {
+            classRename "${entry.key}.**", "${entry.value}.@1"
+        }
+        destinationDir = targetDir
+        destinationName = targetJarFile.name
+    }
+    jarjarTask.inputs.files(jars)
+    jarjarTask.outputs.files(targetJarFile)
+
+    Task jarjarOutput = task("${name}jarjarOutput")
+    jarjarOutput.doLast {
+        copy {
+            from(zipTree(targetJarFile)) {
+                for(v in mappings.values())
+                    include "${v.replace('.','/')}/**"
+            }
+            into(new File(project.buildDir, "classes/java/main"))
+        }
+    }
+    jarjarOutput.dependsOn(jarjarTask)
+    classes {
+        dependsOn(jarjarOutput)
+    }
 }
