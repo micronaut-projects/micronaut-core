@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.core.annotation.Blocking;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
@@ -28,6 +29,7 @@ import org.reactivestreams.Publisher;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Blocking
 public interface BlockingHttpClient {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting

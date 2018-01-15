@@ -10,7 +10,7 @@ This module provides a Reactive HTTP client based on the Particle and Reactive s
 * JSON Stream support
 * HTTP Redirect Handling
 * CONTINUE request handling
-* Read Timeout / Request Max Size handling
+* Request Max Size handling
 * Load balancing / Ribbon support
 * Review HTTPS support
 * @Inject / @Argument extensions
