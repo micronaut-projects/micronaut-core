@@ -46,8 +46,8 @@ class HttpPostSpec extends Specification {
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
-                           .accept(MediaType.APPLICATION_JSON_TYPE)
-                           .header("X-My-Header", "Foo"),
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
 
                 Book
         ))
@@ -63,6 +63,66 @@ class HttpPostSpec extends Specification {
         body.get().title == 'The Stand'
     }
 
+    void "test simple post request with URI template and JSON"() {
+        when:
+        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/post/title/{title}", new Book(title: "The Stand"))
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        ))
+        HttpResponse<Book> response = flowable.blockingFirst()
+        Optional<Book> body = response.getBody()
+
+        then:
+        response.status == HttpStatus.OK
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.contentLength == 21
+        body.isPresent()
+        body.get() instanceof Book
+        body.get().title == 'The Stand'
+    }
+
+
+    void "test simple post request with Form data"() {
+        when:
+        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/post/form", new Book(title: "The Stand"))
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        ))
+        HttpResponse<Book> response = flowable.blockingFirst()
+        Optional<Book> body = response.getBody()
+
+        then:
+        response.status == HttpStatus.OK
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.contentLength == 21
+        body.isPresent()
+        body.get() instanceof Book
+        body.get().title == 'The Stand'
+    }
+
+    void "test simple post retrieve blocking request with JSON"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        )
+
+        then:
+        book.title == "The Stand"
+    }
+
+
     @Controller('/post')
     static class PostController {
 
@@ -75,6 +135,24 @@ class HttpPostSpec extends Specification {
             return book
         }
 
+        @Post('/title/{title}')
+        Book title(@Body Book book, String title, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
+            assert title == book.title
+            assert contentType == MediaType.APPLICATION_JSON
+            assert contentLength == 21
+            assert accept == MediaType.APPLICATION_JSON
+            assert custom == 'Foo'
+            return book
+        }
+
+        @Post(uri = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        Book form(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
+            assert contentType == MediaType.APPLICATION_FORM_URLENCODED
+            assert contentLength == 81
+            assert accept == MediaType.APPLICATION_JSON
+            assert custom == 'Foo'
+            return book
+        }
     }
     static class Book {
         String title

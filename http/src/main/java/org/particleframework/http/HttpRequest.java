@@ -42,7 +42,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return Get the path without any parameters
      */
-    URI getPath();
+    String getPath();
 
     /**
      * @return Obtain the remote address
@@ -106,6 +106,21 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static MutableHttpRequest<?> HEAD(String uri) {
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.head(uri);
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#POST} request for the given URI
      *
      * @param uri The URI
@@ -120,5 +135,39 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         );
 
         return factory.post(uri, body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PUT} request for the given URI
+     *
+     * @param uri The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> PUT(String uri, T body) {
+        Objects.requireNonNull(body, "Argument [body] cannot be null");
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.put(uri, body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#PATCH} request for the given URI
+     *
+     * @param uri The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
+        Objects.requireNonNull(body, "Argument [body] cannot be null");
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.patch(uri, body);
     }
 }

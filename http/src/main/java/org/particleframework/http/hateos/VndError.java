@@ -38,6 +38,8 @@ public class VndError extends AbstractResource<VndError> {
         this.message = message;
     }
 
+
+
     /**
      * @return The message
      */

@@ -23,6 +23,7 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
@@ -34,18 +35,26 @@ import org.particleframework.context.annotation.Prototype;
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
+import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
+import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.HttpResponse;
-import org.particleframework.http.MediaType;
 import org.particleframework.http.MutableHttpRequest;
+import org.particleframework.http.MutableHttpResponse;
+import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
+import org.particleframework.http.filter.ClientFilterChain;
+import org.particleframework.http.filter.HttpClientFilter;
+import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.sse.Event;
 import org.particleframework.jackson.ObjectMapperFactory;
@@ -67,13 +76,12 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.time.Duration;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
@@ -92,12 +100,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     private final Charset charset;
     protected final Bootstrap bootstrap;
     protected final EventLoopGroup group;
+    private final HttpClientFilter[] filters;
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     @Inject
-    public DefaultHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry) {
-        this(()-> url, configuration, codecRegistry);
+    public DefaultHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+        this((Object discriminator)-> url, configuration, codecRegistry, filters);
     }
 
     /**
@@ -107,7 +116,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @param configuration The {@link HttpClientConfiguration} object
      * @param codecRegistry The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
-    public DefaultHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry) {
+    public DefaultHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
@@ -137,6 +146,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
         this.charset = configuration.getEncoding();
         this.mediaTypeCodecRegistry = codecRegistry;
+        this.filters = filters;
     }
 
     public DefaultHttpClient(ServerSelector serverSelector) {
@@ -146,7 +156,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     public DefaultHttpClient(@Argument URL url) {
-        this(()-> url);
+        this((Object discriminator)-> url);
     }
 
 
@@ -158,6 +168,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 Publisher<HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
                 CompletableFuture<HttpResponse<O>> future = new CompletableFuture<>();
                 publisher.subscribe(new CompletionAwareSubscriber<HttpResponse<O>>() {
+                    boolean messageReceived = false;
+
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
                         subscription.request(1);
@@ -165,6 +177,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                     @Override
                     protected void doOnNext(HttpResponse<O> message) {
+                        messageReceived = true;
                         future.complete(message);
                     }
 
@@ -175,6 +188,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                     @Override
                     protected void doOnComplete() {
+                        if(!messageReceived) {
+                            future.completeExceptionally(new HttpClientException("Empty response"));
+                        }
                     }
                 });
                 try {
@@ -212,13 +228,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     @Override
-    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request) {
-        return exchange(request, (org.particleframework.core.type.Argument<O>)null);
-    }
-
-    @Override
     public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        URL server = serverSelector.select();
+        URL server = serverSelector.select(null);
         URI requestURI;
         try {
             requestURI = server.toURI().resolve(request.getUri());
@@ -227,26 +238,52 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
         SslContext sslContext = buildSslContext(requestURI);
 
-        return Publishers.fromCompletableFuture(() -> {
+
+        Publisher<HttpResponse<O>> responsePublisher = Publishers.fromCompletableFuture(() -> {
             CompletableFuture<HttpResponse<O>> completableFuture = new CompletableFuture<>();
             ChannelFuture connectionFuture = doConnect(requestURI, sslContext);
             connectionFuture.addListener(future -> {
-                if(future.isSuccess()) {
+                if (future.isSuccess()) {
                     try {
                         Channel channel = connectionFuture.channel();
                         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
+                        MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+
+                        io.netty.handler.codec.http.HttpRequest nettyRequest;
                         Optional body = clientHttpRequest.getBody();
-                        ByteBuf bodyContent = null;
-                        if(body.isPresent() && mediaTypeCodecRegistry != null) {
-                            Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE));
-                            bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer())
-                                                         .orElse(null);
-                            if(bodyContent == null) {
-                                bodyContent = ConversionService.SHARED.convert(body.get(), ByteBuf.class).orElse(null);
+                        if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && body.isPresent()) {
+                            HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
+                            Object requestBody = body.get();
+                            Map<String, Object> formData;
+                            if (requestBody instanceof Map) {
+                                formData = (Map<String, Object>) requestBody;
+                            } else {
+                                formData = BeanMap.of(requestBody);
                             }
+                            for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                                Object value = entry.getValue();
+                                if (value != null) {
+                                    Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+                                    if (converted.isPresent()) {
+                                        postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                                    }
+                                }
+                            }
+                            nettyRequest = postRequestEncoder.finalizeRequest();
+                        } else {
+                            ByteBuf bodyContent = null;
+                            if (body.isPresent() && mediaTypeCodecRegistry != null) {
+                                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
+                                bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer())
+                                        .orElse(null);
+                                if (bodyContent == null) {
+                                    bodyContent = ConversionService.SHARED.convert(body.get(), ByteBuf.class).orElse(null);
+                                }
+                            }
+
+                            nettyRequest = clientHttpRequest.getNettyRequest(bodyContent);
                         }
 
-                        io.netty.handler.codec.http.HttpRequest nettyRequest = clientHttpRequest.getNettyRequest(bodyContent);
 
                         prepareHttpHeaders(requestURI, request, nettyRequest);
 
@@ -255,7 +292,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse streamedResponse) {
                                 FullNettyClientHttpResponse<O> response
                                         = new FullNettyClientHttpResponse<>(streamedResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
-                                completableFuture.complete(response);
+
+                                HttpStatus status = response.getStatus();
+                                if (status.getCode() >= 400) {
+                                    completableFuture.completeExceptionally(new HttpClientResponseException(status.getReason(), response));
+                                } else {
+                                    completableFuture.complete(response);
+                                }
                             }
 
                             @Override
@@ -266,9 +309,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                         channel.writeAndFlush(nettyRequest).addListener(f -> {
                             ChannelFuture closeFuture = channel.closeFuture();
-                            closeFuture.addListener(f2->{
-                                if(!f2.isSuccess()) {
-                                    if(LOG.isErrorEnabled()) {
+                            closeFuture.addListener(f2 -> {
+                                if (!f2.isSuccess()) {
+                                    if (LOG.isErrorEnabled()) {
                                         Throwable cause = f2.cause();
                                         LOG.error("Error closing request connection: " + cause.getMessage(), cause);
                                     }
@@ -278,14 +321,27 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                     } catch (Exception e) {
                         completableFuture.completeExceptionally(e);
                     }
-                }
-                else {
+                } else {
                     completableFuture.completeExceptionally(future.cause());
                 }
             });
             return completableFuture;
         });
+        if(filters.length > 0) {
+            List<HttpClientFilter> httpClientFilters = Arrays.asList(this.filters);
+            OrderUtil.reverseSort(httpClientFilters);
+            httpClientFilters.add((req, chain) -> responsePublisher);
+
+            ClientFilterChain filterChain = buildChain(httpClientFilters);
+            return (Publisher<HttpResponse<O>>) httpClientFilters.get(0)
+                                                                 .doFilter(request, filterChain);
+        }
+        else {
+
+            return responsePublisher;
+        }
     }
+
 
     private <I> Publisher<HttpContent> buildSingleBodyPublisher(Channel channel, HttpRequest<I> request) {
         Optional<I> body = request.getBody();
@@ -384,11 +440,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @param proxyAddress The proxy address
      */
     protected void configureProxy(ChannelPipeline pipeline, Type proxyType, SocketAddress proxyAddress) {
-        String type = proxyType.name().toLowerCase();
-
-        // TODO: move to configuration class
-        String username = System.getProperty(type + ".proxyUser");
-        String password = System.getProperty(type + ".proxyPassword");
+        String username = configuration.getProxyUsername().orElse(null);
+        String password = configuration.getProxyPassword().orElse(null);
 
         if(StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             switch(proxyType) {
@@ -422,6 +475,23 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         });
     }
 
+    private ClientFilterChain buildChain(List<HttpClientFilter> filters) {
+
+        AtomicInteger integer = new AtomicInteger();
+        int len = filters.size();
+        return new ClientFilterChain () {
+            @SuppressWarnings("unchecked")
+            @Override
+            public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
+                int pos = integer.incrementAndGet();
+                if(pos > len) {
+                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                }
+                HttpClientFilter httpFilter = filters.get(pos);
+                return httpFilter.doFilter(request, this);
+            }
+        };
+    }
 
     private <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();

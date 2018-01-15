@@ -52,15 +52,13 @@ class BeansUtils {
     static String toASCIIUpperCase(String string) {
         char[] charArray = string.toCharArray();
         StringBuilder sb = new StringBuilder(charArray.length);
-        for (int index = 0; index < charArray.length; index++) {
-            if ('a' <= charArray[index] && charArray[index] <= 'z') {
-                sb.append((char) (charArray[index] - ('a' - 'A')));
+        for (char aCharArray : charArray) {
+            if ('a' <= aCharArray && aCharArray <= 'z') {
+                sb.append((char) (aCharArray - ('a' - 'A')));
             } else {
-                sb.append(charArray[index]);
+                sb.append(aCharArray);
             }
         }
         return sb.toString();
     }
-
-
 }

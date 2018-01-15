@@ -19,10 +19,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 
 import javax.inject.Singleton;
+import java.util.function.Function;
 
 /**
  * A {@link ByteBufferFactory} implementation for Netty
@@ -33,6 +35,18 @@ import javax.inject.Singleton;
 @Internal
 @Singleton
 public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
+
+    public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
+
+    static {
+        ConversionService.SHARED.addConverter(ByteBuf.class, ByteBuffer.class, (Function<ByteBuf, ByteBuffer>) DEFAULT::wrap);
+        ConversionService.SHARED.addConverter(ByteBuffer.class, ByteBuf.class, (Function<ByteBuffer, ByteBuf>) byteBuffer -> {
+            if(byteBuffer instanceof NettyByteBuffer) {
+                return (ByteBuf) byteBuffer.asNativeBuffer();
+            }
+            throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
+        });
+    }
 
     private final ByteBufAllocator allocator;
 

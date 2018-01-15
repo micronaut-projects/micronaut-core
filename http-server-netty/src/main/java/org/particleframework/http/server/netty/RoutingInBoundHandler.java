@@ -129,7 +129,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     protected void channelRead0(ChannelHandlerContext ctx, HttpRequest<?> request) throws Exception {
         ctx.channel().config().setAutoRead(false);
         HttpMethod httpMethod = request.getMethod();
-        URI requestPath = request.getPath();
+        String requestPath = request.getPath();
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Matching route {} - {}", httpMethod, requestPath);
@@ -215,9 +215,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     }
 
     private VndError newError(HttpRequest<?> request, String message) {
-        URI path = request.getPath();
+        URI uri = request.getUri();
         return new VndError(message)
-                     .link(Link.SELF, Link.of(path));
+                     .link(Link.SELF, Link.of(uri));
     }
 
     @Override
@@ -667,7 +667,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                         NettyHttpResponse<?> responseMessage = (NettyHttpResponse<?>) this.message;
                                         writeHttpResponse(context, request, responseMessage, responseMessage.getNativeResponse(), codec, responseType);
                                     } else {
-                                        writeMessage(context, request, nativeResponse, message, codec, responseType);
+                                        writeSingleMessage(context, request, nativeResponse, message, codec, responseType);
                                     }
                                 } else {
                                     // no body emitted so return a 404
@@ -680,6 +680,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         }
                     });
                 } else {
+                    // unbound publisher, we cannot know the content length, so we write chunk by chunk
                     writeHttpContentChunkByChunk(context, request, nativeResponse, responseType, codec, publisher);
                 }
             }
@@ -698,7 +699,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     body.getClass()
             ).orElse(new TextPlainCodec(serverConfiguration.getDefaultCharset()));
         }
-        writeMessage(context, request, nativeResponse, body, codecToUse, responseType);
+        writeSingleMessage(context, request, nativeResponse, body, codecToUse, responseType);
     }
 
     @SuppressWarnings("unchecked")
@@ -827,7 +828,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         );
     }
 
-    private void writeMessage(
+    private void writeSingleMessage(
             ChannelHandlerContext context,
             HttpRequest<?> request,
             FullHttpResponse nativeResponse,

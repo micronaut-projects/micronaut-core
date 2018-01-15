@@ -59,7 +59,7 @@ public class RxHttpClient extends DefaultHttpClient {
     }
 
     @Override
-    public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request) {
+    public <I> Flowable<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
         return Flowable.fromPublisher(super.exchange(request));
     }
 

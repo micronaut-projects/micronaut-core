@@ -68,4 +68,12 @@ public interface HttpRequestFactory {
      * @return The {@link MutableHttpRequest} instance
      */
     <T> MutableHttpRequest<T> patch(String uri, T body);
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#HEAD} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     */
+    <T> MutableHttpRequest<T> head(String uri);
 }

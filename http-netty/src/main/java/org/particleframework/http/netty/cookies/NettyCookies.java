@@ -37,18 +37,17 @@ public class NettyCookies implements Cookies {
     private final ConversionService<?> conversionService;
     private final Map<CharSequence, Cookie> cookies;
 
-    public NettyCookies(URI path, HttpHeaders nettyHeaders, ConversionService conversionService) {
+    public NettyCookies(String path, HttpHeaders nettyHeaders, ConversionService conversionService) {
 
         this.conversionService = conversionService;
         String value = nettyHeaders.get(HttpHeaderNames.COOKIE);
         if(value != null) {
             cookies = new LinkedHashMap<>();
-            String pathStr = path.toString();
             Set<io.netty.handler.codec.http.cookie.Cookie> nettyCookies = ServerCookieDecoder.LAX.decode(value);
             for (io.netty.handler.codec.http.cookie.Cookie nettyCookie : nettyCookies) {
                 String cookiePath = nettyCookie.path();
                 if(cookiePath != null) {
-                    if( pathStr.startsWith(cookiePath) ) {
+                    if( path.startsWith(cookiePath) ) {
                         cookies.put(nettyCookie.name(), new NettyCookie(nettyCookie));
                     }
                 }

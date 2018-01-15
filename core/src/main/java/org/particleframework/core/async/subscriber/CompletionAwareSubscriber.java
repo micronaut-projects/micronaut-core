@@ -39,6 +39,10 @@ public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emi
         doOnSubscribe(subscription);
     }
 
+    public boolean isComplete() {
+        return complete.get();
+    }
+
     @Override
     public final void onNext(T t) {
         if(!complete.get()) {

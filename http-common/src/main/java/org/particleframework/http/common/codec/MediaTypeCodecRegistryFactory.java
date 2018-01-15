@@ -35,7 +35,7 @@ public class MediaTypeCodecRegistryFactory {
     @Singleton
     @Primary
     @Bean
-    MediaTypeCodecRegistry serverMediaTypeDecoderRegistry(MediaTypeCodec...codecs) {
+    MediaTypeCodecRegistry mediaTypeCodecRegistry(MediaTypeCodec...codecs) {
         return MediaTypeCodecRegistry.of(codecs);
     }
 }

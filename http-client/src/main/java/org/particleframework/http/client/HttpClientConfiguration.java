@@ -68,9 +68,7 @@ public class HttpClientConfiguration {
      */
     private Duration sslSessionTimeout;
 
-    /**
-     * The default read timeout
-     */
+
     private Duration readTimeout;
 
     /**
@@ -80,19 +78,13 @@ public class HttpClientConfiguration {
 
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
 
-    /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
-     *
-     * Alternatively configure a java.net.ProxySelector
-     */
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
-    /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
-     *
-     * Alternatively configure a java.net.ProxySelector
-     */
     private SocketAddress proxyAddress;
+
+    private String proxyUsername;
+
+    private String proxyPassword;
 
     /**
      * @return The Netty channel options.
@@ -102,6 +94,9 @@ public class HttpClientConfiguration {
         return channelOptions;
     }
 
+    /**
+     * The default read timeout
+     */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
     }
@@ -144,12 +139,47 @@ public class HttpClientConfiguration {
         return maxContentLength;
     }
 
+    /**
+     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     *
+     * Alternatively configure a java.net.ProxySelector
+     */
     public Proxy.Type getProxyType() {
         return proxyType;
     }
 
+    /**
+     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties
+     *
+     * Alternatively configure a java.net.ProxySelector
+     */
     public Optional<SocketAddress> getProxyAddress() {
         return Optional.ofNullable(proxyAddress);
+    }
+
+    /**
+     * @return The proxy user name to use
+     */
+    public Optional<String> getProxyUsername() {
+        String type = proxyType.name().toLowerCase();
+        return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(System.getProperty(type + ".proxyUser"));
+    }
+
+    public void setProxyUsername(String proxyUsername) {
+        this.proxyUsername = proxyUsername;
+    }
+
+    /**
+     * @return The proxy password to use
+     */
+    public Optional<String> getProxyPassword() {
+        String type = proxyType.name().toLowerCase();
+        return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));
+
+    }
+
+    public void setProxyPassword(String proxyPassword) {
+        this.proxyPassword = proxyPassword;
     }
 
     public void setChannelOptions(Map<ChannelOption, Object> channelOptions) {
