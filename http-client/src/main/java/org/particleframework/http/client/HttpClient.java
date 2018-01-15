@@ -180,7 +180,9 @@ public interface HttpClient {
     }
 
     /**
-     * Create a new {@link HttpClient}
+     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
+     * {@link javax.inject.Inject} to inject a client instead
+     *
      *
      * @param url The base URL
      * @return The client

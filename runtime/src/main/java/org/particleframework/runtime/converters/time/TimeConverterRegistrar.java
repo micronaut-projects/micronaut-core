@@ -21,14 +21,18 @@ import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverterRegistrar;
 import org.particleframework.core.convert.format.Format;
+import org.particleframework.core.util.StringUtils;
 
 import javax.inject.Singleton;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Registers data time converters
@@ -40,8 +44,43 @@ import java.util.Optional;
 @Requires(notEnv = Environment.ANDROID) // Android doesn't support java.time
 public class TimeConverterRegistrar implements TypeConverterRegistrar{
 
+    private static final Pattern DURATION_MATCHER = Pattern.compile("(\\d+)([s|m|h|d])(s?)");
     @Override
     public void register(ConversionService<?> conversionService) {
+        conversionService.addConverter(
+                CharSequence.class,
+                Duration.class,
+                (object, targetType, context) -> {
+                    String value = object.toString();
+                    Matcher matcher = DURATION_MATCHER.matcher(value);
+                    if(matcher.find()) {
+                        String amount = matcher.group(1);
+                        char type = matcher.group(2).charAt(0);
+                        try {
+                            switch (type) {
+                                case 's':
+                                    return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
+                                case 'm':
+                                    String ms = matcher.group(3);
+                                    if(StringUtils.hasText(ms)) {
+                                        return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
+                                    }
+                                    else {
+                                        return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
+                                    }
+                                case 'h':
+                                    return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
+                                case 'd':
+                                    return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                            }
+                        } catch (NumberFormatException e) {
+                            context.reject(e);
+                        }
+                    }
+                    return Optional.empty();
+                }
+        );
+
         // CharSequence -> LocalDataTime
         conversionService.addConverter(
                 CharSequence.class,

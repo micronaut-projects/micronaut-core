@@ -27,10 +27,8 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Header
 import org.particleframework.http.client.exceptions.HttpClientException
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Head
 import org.particleframework.web.router.annotation.Post
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
