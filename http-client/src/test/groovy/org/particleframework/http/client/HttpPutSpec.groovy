@@ -27,10 +27,9 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Header
 import org.particleframework.http.client.exceptions.HttpClientException
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Head
 import org.particleframework.web.router.annotation.Post
+import org.particleframework.web.router.annotation.Put
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -38,7 +37,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpPostSpec extends Specification {
+class HttpPutSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -50,7 +49,7 @@ class HttpPostSpec extends Specification {
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.PATCH("/post/simple", book)
+                HttpRequest.PATCH("/put/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
@@ -62,14 +61,13 @@ class HttpPostSpec extends Specification {
         def e = thrown(HttpClientException)
         e.message == "Method Not Allowed"
     }
-
     void "test simple post request with JSON"() {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/post/simple", book)
+                HttpRequest.PUT("/put/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
@@ -87,14 +85,12 @@ class HttpPostSpec extends Specification {
         body.get() == book
     }
 
-
-
     void "test simple post request with URI template and JSON"() {
         given:
         def book = new Book(title: "The Stand",pages: 1000)
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/post/title/{title}", book)
+                HttpRequest.PUT("/put/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
@@ -112,35 +108,13 @@ class HttpPostSpec extends Specification {
         body.get().title == 'The Stand'
     }
 
-    void "test simple post request with URI template and JSON Map"() {
-        given:
-        def book = [title: "The Stand",pages: 1000]
-        when:
-        Flowable<HttpResponse<Map>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/post/title/{title}", book)
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
-                        .header("X-My-Header", "Foo"),
-
-                Map
-        ))
-        HttpResponse<Map> response = flowable.blockingFirst()
-        Optional<Map> body = response.getBody()
-
-        then:
-        response.status == HttpStatus.OK
-        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
-        response.contentLength == 34
-        body.isPresent()
-        body.get() instanceof Map
-        body.get() == book
-    }
 
     void "test simple post request with Form data"() {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.POST("/post/form", book)
+                HttpRequest.PUT("/put/form", book)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
@@ -165,7 +139,7 @@ class HttpPostSpec extends Specification {
         when:
         BlockingHttpClient blockingHttpClient = client.toBlocking()
         Book book = blockingHttpClient.retrieve(
-                HttpRequest.POST("/post/simple", toSend)
+                HttpRequest.PUT("/put/simple", toSend)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
@@ -177,10 +151,10 @@ class HttpPostSpec extends Specification {
     }
 
 
-    @Controller('/post')
+    @Controller('/put')
     static class PostController {
 
-        @Post('/simple')
+        @Put('/simple')
         Book simple(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
             assert contentType == MediaType.APPLICATION_JSON
             assert contentLength == 34
@@ -189,7 +163,7 @@ class HttpPostSpec extends Specification {
             return book
         }
 
-        @Post('/title/{title}')
+        @Put('/title/{title}')
         Book title(@Body Book book, String title, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
             assert title == book.title
             assert contentType == MediaType.APPLICATION_JSON
@@ -199,10 +173,10 @@ class HttpPostSpec extends Specification {
             return book
         }
 
-        @Post(uri = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        @Put(uri = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
         Book form(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
             assert contentType == MediaType.APPLICATION_FORM_URLENCODED
-            assert contentLength == 92
+            assert contentLength == 91
             assert accept == MediaType.APPLICATION_JSON
             assert custom == 'Foo'
             return book
