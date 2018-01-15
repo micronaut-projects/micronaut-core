@@ -22,6 +22,7 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.convert.format.ReadableBytes;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.net.Proxy;
@@ -38,14 +39,10 @@ import java.util.concurrent.ThreadFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.http.client")
-public class HttpClientConfiguration {
+@ConfigurationProperties("http.client")
+public class HttpClientConfiguration extends ApplicationConfiguration {
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
-    /**
-     * The encoding to use
-     */
-    private Charset encoding = StandardCharsets.UTF_8;
 
     private Integer numOfThreads = null;
 
@@ -69,7 +66,7 @@ public class HttpClientConfiguration {
     private Duration sslSessionTimeout;
 
 
-    private Duration readTimeout;
+    private Duration readTimeout = Duration.ofSeconds(10);
 
     /**
      * The default trust manager factory
@@ -95,15 +92,12 @@ public class HttpClientConfiguration {
     }
 
     /**
-     * The default read timeout
+     * The default read timeout. Defaults to 10 seconds.
      */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
     }
 
-    public Charset getEncoding() {
-        return encoding;
-    }
 
     /**
      * The number of threads the client should use for requests
@@ -184,10 +178,6 @@ public class HttpClientConfiguration {
 
     public void setChannelOptions(Map<ChannelOption, Object> channelOptions) {
         this.channelOptions = channelOptions;
-    }
-
-    public void setEncoding(Charset encoding) {
-        this.encoding = encoding;
     }
 
     /**

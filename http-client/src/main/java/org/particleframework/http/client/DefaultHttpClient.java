@@ -29,6 +29,7 @@ import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
@@ -144,7 +145,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 bootstrap.option(channelOption, v);
             }
         }
-        this.charset = configuration.getEncoding();
+        this.charset = configuration.getDefaultCharset();
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
     }
@@ -195,8 +196,16 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 });
                 try {
                     return future.get();
-                } catch (InterruptedException | ExecutionException e) {
+                } catch (InterruptedException e) {
                     throw new HttpClientException("Request execution exception: " + e.getMessage(), e);
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if(cause instanceof RuntimeException) {
+                        throw ((RuntimeException)cause);
+                    }
+                    else {
+                        throw new HttpClientException("Request execution exception: " + e.getMessage(), e);
+                    }
                 }
             }
         };
@@ -303,7 +312,12 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                                completableFuture.completeExceptionally(cause);
+                                if(cause instanceof ReadTimeoutException) {
+                                    completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
+                                }
+                                else {
+                                    completableFuture.completeExceptionally(cause);
+                                }
                             }
                         });
 
@@ -342,19 +356,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
     }
 
-
-    private <I> Publisher<HttpContent> buildSingleBodyPublisher(Channel channel, HttpRequest<I> request) {
-        Optional<I> body = request.getBody();
-        Publisher<HttpContent> bodyPublisher = null;
-        if(body.isPresent() && mediaTypeCodecRegistry != null) {
-            Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(request.getContentType().orElse(MediaType.APPLICATION_HAL_JSON_TYPE));
-            bodyPublisher = registeredCodec.map(codec -> new AsyncSingleResultPublisher<>(channel.eventLoop(), (Supplier<HttpContent>) () -> {
-                ByteBuf byteBuf = (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer();
-                return new DefaultHttpContent(byteBuf);
-            })).orElse(null);
-        }
-        return bodyPublisher;
-    }
 
     /**
      * Creates an initial connection to the given remote host

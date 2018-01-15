@@ -16,6 +16,7 @@
 package org.particleframework.runtime;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.context.annotation.Primary;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
  * @since 1.0
  */
 @ConfigurationProperties("particle")
+@Primary
 public class ApplicationConfiguration {
 
     public static final String DEFAULT_CHARSET = "particle.defaultCharset";
