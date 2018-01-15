@@ -23,6 +23,7 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
@@ -33,7 +34,6 @@ import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
-import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
@@ -44,18 +44,14 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.MutableHttpRequest;
-import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.HttpStatus;
-import org.particleframework.http.MediaType;
+import org.particleframework.http.*;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.ClientFilterChain;
 import org.particleframework.http.filter.HttpClientFilter;
-import org.particleframework.http.filter.HttpServerFilter;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.sse.Event;
 import org.particleframework.jackson.ObjectMapperFactory;
@@ -75,7 +71,6 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -83,7 +78,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty
@@ -98,7 +92,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     private final ServerSelector serverSelector;
     private final HttpClientConfiguration configuration;
-    private final Charset charset;
     protected final Bootstrap bootstrap;
     protected final EventLoopGroup group;
     private final HttpClientFilter[] filters;
@@ -145,7 +138,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 bootstrap.option(channelOption, v);
             }
         }
-        this.charset = configuration.getDefaultCharset();
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
     }
@@ -259,42 +251,49 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                         MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
 
                         io.netty.handler.codec.http.HttpRequest nettyRequest;
-                        Optional body = clientHttpRequest.getBody();
-                        if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && body.isPresent()) {
-                            HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
-                            Object requestBody = body.get();
-                            Map<String, Object> formData;
-                            if (requestBody instanceof Map) {
-                                formData = (Map<String, Object>) requestBody;
-                            } else {
-                                formData = BeanMap.of(requestBody);
-                            }
-                            for (Map.Entry<String, Object> entry : formData.entrySet()) {
-                                Object value = entry.getValue();
-                                if (value != null) {
-                                    Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
-                                    if (converted.isPresent()) {
-                                        postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                        boolean permitsBody = org.particleframework.http.HttpMethod.permitsRequestBody(request.getMethod());
+                        if(permitsBody) {
+
+                            Optional body = clientHttpRequest.getBody();
+                            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && body.isPresent()) {
+                                HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
+                                Object requestBody = body.get();
+                                Map<String, Object> formData;
+                                if (requestBody instanceof Map) {
+                                    formData = (Map<String, Object>) requestBody;
+                                } else {
+                                    formData = BeanMap.of(requestBody);
+                                }
+                                for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                                    Object value = entry.getValue();
+                                    if (value != null) {
+                                        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+                                        if (converted.isPresent()) {
+                                            postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                                        }
                                     }
                                 }
-                            }
-                            nettyRequest = postRequestEncoder.finalizeRequest();
-                        } else {
-                            ByteBuf bodyContent = null;
-                            if (body.isPresent() && mediaTypeCodecRegistry != null) {
-                                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer())
-                                        .orElse(null);
-                                if (bodyContent == null) {
-                                    bodyContent = ConversionService.SHARED.convert(body.get(), ByteBuf.class).orElse(null);
+                                nettyRequest = postRequestEncoder.finalizeRequest();
+                            } else {
+                                ByteBuf bodyContent = null;
+                                if (body.isPresent() && mediaTypeCodecRegistry != null) {
+                                    Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
+                                    bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer())
+                                            .orElse(null);
+                                    if (bodyContent == null) {
+                                        bodyContent = ConversionService.SHARED.convert(body.get(), ByteBuf.class).orElse(null);
+                                    }
                                 }
-                            }
 
-                            nettyRequest = clientHttpRequest.getNettyRequest(bodyContent);
+                                nettyRequest = clientHttpRequest.getNettyRequest(bodyContent);
+                            }
+                        }
+                        else {
+                            nettyRequest = clientHttpRequest.getNettyRequest((ByteBuf)null);
                         }
 
 
-                        prepareHttpHeaders(requestURI, request, nettyRequest);
+                        prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
 
                         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
                             @Override
@@ -320,6 +319,22 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                                 }
                             }
                         });
+
+                        if(LOG.isTraceEnabled()) {
+                            LOG.trace("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                            HttpHeaders headers = nettyRequest.headers();
+                            for (String name : headers.names()) {
+                                List<String> all = headers.getAll(name);
+                                if(all.size() > 1) {
+                                    for (String value : all) {
+                                        LOG.trace("{}: {}", name, value);
+                                    }
+                                }
+                                else if(!all.isEmpty()) {
+                                    LOG.trace("{}: {}", name, all.get(0));
+                                }
+                            }
+                        }
 
                         channel.writeAndFlush(nettyRequest).addListener(f -> {
                             ChannelFuture closeFuture = channel.closeFuture();
@@ -494,21 +509,23 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         };
     }
 
-    private <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
+    private <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
         HttpHeaders headers = nettyRequest.headers();
         headers.set(HttpHeaderNames.HOST, requestURI.getHost());
         headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
 
-        Optional<I> body = request.getBody();
-        if(body.isPresent()) {
-            MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-            headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
-            if(nettyRequest instanceof FullHttpRequest) {
-                FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
-                headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
-            }
-            else {
-                headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        if(permitsBody) {
+            Optional<I> body = request.getBody();
+            if(body.isPresent()) {
+                MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+                headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                if(nettyRequest instanceof FullHttpRequest) {
+                    FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+                    headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
+                }
+                else {
+                    headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                }
             }
         }
     }
