@@ -22,6 +22,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
@@ -46,6 +47,7 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.*;
+import org.particleframework.http.client.exceptions.ContentLengthExceededException;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -311,7 +313,10 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                                if(cause instanceof ReadTimeoutException) {
+                                if(cause instanceof TooLongFrameException) {
+                                    completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                                }
+                                else if(cause instanceof ReadTimeoutException) {
                                     completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
                                 }
                                 else {
@@ -561,7 +566,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             Optional<Duration> readTimeout = configuration.getReadTimeout();
             readTimeout.ifPresent(duration -> p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS)));
             p.addLast("codec", new HttpClientCodec());
-            p.addLast("aggregator", new HttpObjectAggregator(configuration.getMaxContentLength()));
+            int maxContentLength = configuration.getMaxContentLength();
+            p.addLast("aggregator", new HttpObjectAggregator(maxContentLength));
             p.addLast("stream-handler", new HttpStreamsClientHandler());
         }
     }

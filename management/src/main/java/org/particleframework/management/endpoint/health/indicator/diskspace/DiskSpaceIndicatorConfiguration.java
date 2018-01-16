@@ -32,7 +32,6 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
 
     private boolean enabled = true;
     private File path = new File(".");
-    @ReadableBytes
     private long threshold = 1024 * 1024 * 10; // 10MB
 
     @Override
@@ -56,7 +55,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
         this.path = path;
     }
 
-    void setThreshold(long threshold) {
+    void setThreshold(@ReadableBytes long threshold) {
         this.threshold = threshold;
     }
 }
