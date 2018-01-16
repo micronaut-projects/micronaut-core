@@ -27,8 +27,6 @@ import org.particleframework.runtime.ApplicationConfiguration;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.Proxy;
 import java.net.SocketAddress;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
@@ -214,8 +212,7 @@ public class HttpClientConfiguration extends ApplicationConfiguration {
     /**
      * The maximum content length the client can consume
      */
-    @ReadableBytes
-    public void setMaxContentLength(int maxContentLength) {
+    public void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
 

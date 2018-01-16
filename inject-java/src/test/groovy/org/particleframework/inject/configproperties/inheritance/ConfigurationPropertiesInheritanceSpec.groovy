@@ -40,6 +40,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         MyConfig parent = applicationContext.getBean(MyConfig)
 
         expect:
+        parent.is(config)
         parent.host == 'localhost'
         parent.port == 8080
         config.port == 8080
