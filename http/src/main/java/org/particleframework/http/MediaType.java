@@ -168,6 +168,16 @@ public class MediaType implements CharSequence {
      */
     public static final MediaType TEXT_EVENT_STREAM_TYPE = new MediaType(TEXT_EVENT_STREAM);
 
+    /**
+     * JSON Stream: application/x-json-stream
+     */
+    public final static String APPLICATION_JSON_STREAM = "application/x-json-stream";
+
+    /**
+     * JSON Stream: application/x-json-stream
+     */
+    public final static MediaType APPLICATION_JSON_STREAM_TYPE = new MediaType("application/x-json-stream");
+
     public static final String CHARSET_PARAMETER = "charset";
     public static final String Q_PARAMETER = "q";
     public static final String V_PARAMETER = "v";
