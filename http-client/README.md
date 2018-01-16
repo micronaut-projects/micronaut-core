@@ -2,7 +2,6 @@
 
 This module provides a Reactive HTTP client based on the Particle and Reactive streams APIs.
 
-
 # TODO Items
 
 * multi part requests / file uploads
@@ -10,7 +9,6 @@ This module provides a Reactive HTTP client based on the Particle and Reactive s
 * JSON Stream support
 * HTTP Redirect Handling
 * CONTINUE request handling
-* Request Max Size handling
 * Load balancing / Ribbon support
 * Review HTTPS support
 * @Inject / @Argument extensions
