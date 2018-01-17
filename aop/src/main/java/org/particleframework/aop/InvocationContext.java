@@ -22,6 +22,8 @@ import org.particleframework.core.type.Executable;
 import org.particleframework.core.type.MutableArgumentValue;
 
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * <p>An InvocationContext passed to one or many {@link Interceptor} instances. Attributes can be stored within the context and
@@ -44,6 +46,8 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return The bound {@link ArgumentValue} instances
      */
     Map<String, MutableArgumentValue<?>> getParameters();
+
+
 
     /**
      * @return The target object
@@ -69,5 +73,21 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
                 .stream()
                 .map(ArgumentValue::getValue)
                 .toArray();
+    }
+
+    /**
+     * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
+     * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
+     *
+     * @return The bound {@link ArgumentValue} instances
+     */
+    default Map<String,Object> getParameterValueMap() {
+        return getParameters()
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        (Function<Map.Entry<String, MutableArgumentValue<?>>, Object>) entry -> entry.getValue().getValue()
+                ));
     }
 }

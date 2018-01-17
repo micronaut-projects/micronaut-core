@@ -71,6 +71,13 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     }
 
     /**
+     * @return The variables this template expects
+     */
+    public List<String> getVariables() {
+        return Arrays.asList(variables);
+    }
+
+    /**
      * Match the given URI string
      *
      * @param uri The uRI
@@ -106,6 +113,15 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     @Override
     public UriMatchTemplate nest(CharSequence uriTemplate) {
         return (UriMatchTemplate) super.nest(uriTemplate);
+    }
+
+    /**
+     * Create a new {@link UriTemplate} for the given URI
+     * @param uri The URI
+     * @return The template
+     */
+    public static UriMatchTemplate of(String uri) {
+        return new UriMatchTemplate(uri);
     }
 
     @Override

@@ -250,6 +250,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
     @Requires(property = 'spec.name', value = 'NettyCorsSpec')
     static class TestController {
 
+        @Get('/')
         HttpResponse index() {
             HttpResponse.noContent()
         }

@@ -485,7 +485,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         Object result = routeMatch.execute();
 
                         if (result == null) {
-                            response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                            if( routeMatch.getReturnType().getType() != void.class) {
+                                // handle re-mapping of errors
+                                result = router.route(HttpStatus.NOT_FOUND)
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
+                                        .filter(RouteMatch::isExecutable)
+                                        .map(RouteMatch::execute)
+                                        .orElse(NettyHttpResponse.getOr(request, HttpResponse.notFound()));
+                                if (result instanceof MutableHttpResponse) {
+                                    response = (MutableHttpResponse<?>) result;
+                                } else {
+                                    response = HttpResponse.status(HttpStatus.NOT_FOUND)
+                                            .body(result);
+                                }
+                            }
+                            else {
+                                response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                            }
                         } else if (result instanceof HttpResponse) {
                             HttpStatus status = ((HttpResponse) result).getStatus();
                             if (status.getCode() >= 300) {
@@ -500,7 +516,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 response = (MutableHttpResponse<?>) result;
                             } else {
                                 response = HttpResponse.status(status)
-                                        .body(result);
+                                                       .body(result);
                             }
                         } else {
                             response = HttpResponse.ok(result);

@@ -45,7 +45,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "Invalid JSON"
+        response.message() == "No!! Invalid JSON"
 
     }
 
