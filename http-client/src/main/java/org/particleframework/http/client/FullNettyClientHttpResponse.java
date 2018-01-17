@@ -34,6 +34,8 @@ import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.netty.NettyHttpHeaders;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -132,10 +134,16 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             return Optional.empty();
         }
         if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
-            Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
-            if (foundCodec.isPresent()) {
-                MediaTypeCodec codec = foundCodec.get();
-                return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+            if(CharSequence.class.isAssignableFrom(type.getType())) {
+                Charset charset = getContentType().flatMap(ct -> ct.getCharset()).orElse(StandardCharsets.UTF_8);
+                return Optional.of(content.toString(charset));
+            }
+            else {
+                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+                if (foundCodec.isPresent()) {
+                    MediaTypeCodec codec = foundCodec.get();
+                    return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+                }
             }
         }
         // last chance, try type conversion

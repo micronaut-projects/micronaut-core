@@ -345,9 +345,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if(isCandidateMethod) {
                                 Element e = method.getEnclosingElement();
                                 if(e instanceof TypeElement && !e.equals(classElement)) {
-                                    if(!annotationUtils.hasStereotype(e, ConfigurationProperties.class)) {
-                                        visitConfigurationPropertySetter(method);
-                                    }
+                                    visitConfigurationPropertySetter(method);
                                 }
                             }
                         });
@@ -407,7 +405,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
             }
-            else if(isConfigurationPropertiesType && modelUtils.isPublic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
+            else if(isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
                 visitConfigurationPropertySetter(method);
             }
 
@@ -836,7 +834,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     if (setterMethod.isPresent()) {
                         ExecutableElement method = setterMethod.get();
-                        // visit the field metadata
+                        // Just visit the field metadata, the setter will be processed
                         String docComment = elementUtils.getDocComment(method);
                         metadataBuilder.visitProperty(
                                 concreteClass,
@@ -844,16 +842,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 fieldName,
                                 docComment,null
                         );
-
-                        writer.visitSetterValue(
-                                modelUtils.resolveTypeReference(declaringClass),
-                                qualifierRef,
-                                modelUtils.requiresReflection(method),
-                                fieldType,
-                                fieldName,
-                                method.getSimpleName().toString(),
-                                genericTypes,
-                                isConfigurationPropertiesType);
                     } else {
                         boolean isPrivate = modelUtils.isPrivate(field);
                         boolean requiresReflection = isInheritedAndNotPublic(modelUtils.classElementFor(field), field.getModifiers());

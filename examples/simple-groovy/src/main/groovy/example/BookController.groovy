@@ -16,7 +16,10 @@
 package example
 
 import grails.gorm.transactions.Transactional
+import org.particleframework.context.annotation.Value
+import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Get
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject
@@ -33,9 +36,20 @@ class BookController {
     @Inject
     BookService bookService
 
+    @Value('galecino.servo.trim:0.0')
+    Float trim
+
+    @Get('/')
     List<Book> index() {
         bookService.list()
     }
+
+    @Get(uri = '/trim', produces = MediaType.TEXT_PLAIN)
+    String trim() {
+        trim.toString()
+    }
+
+
 
     @Transactional
     @PostConstruct

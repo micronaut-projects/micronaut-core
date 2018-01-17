@@ -19,7 +19,7 @@ package org.particleframework.docs.server.sse;
 import io.reactivex.Flowable;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.http.sse.Event;
-import org.particleframework.web.router.annotation.Get;
+import org.particleframework.http.annotation.Get;
 import org.reactivestreams.Publisher;
 // end::imports[]
 
@@ -31,7 +31,7 @@ import org.reactivestreams.Publisher;
 @Controller("/headlines")
 public class HeadlineController {
 
-    @Get
+    @Get("/")
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = new String[]{ "1.0", "2.0" }; // <2>
 

@@ -17,6 +17,7 @@ package org.particleframework.http.server.netty.interceptor;
 
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.annotation.Controller;
+import org.particleframework.http.annotation.Get;
 
 /**
  * @author Graeme Rocher
@@ -25,6 +26,7 @@ import org.particleframework.http.annotation.Controller;
 @Controller
 public class SecureController {
 
+    @Get("/")
     public HttpResponse index(String username) {
         return HttpResponse.ok("Authenticated: " + username);
     }

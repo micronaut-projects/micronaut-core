@@ -23,8 +23,7 @@ import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.*;
 import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
-import org.particleframework.web.router.annotation.*;
-import org.particleframework.web.router.annotation.Error;
+import org.particleframework.http.annotation.Error;
 
 import javax.inject.Singleton;
 import java.util.*;

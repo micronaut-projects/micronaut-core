@@ -16,6 +16,7 @@
 package org.particleframework.http.server.greenlightning;
 
 import com.ociweb.gl.api.GreenRuntime;
+import org.particleframework.context.ApplicationContext;
 import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.inject.Inject;
@@ -67,6 +68,11 @@ public class GreenLightningHttpServer implements EmbeddedServer {
 
     @Override
     public URI getURI() {
+        return null;
+    }
+
+    @Override
+    public ApplicationContext getApplicationContext() {
         return null;
     }
 }

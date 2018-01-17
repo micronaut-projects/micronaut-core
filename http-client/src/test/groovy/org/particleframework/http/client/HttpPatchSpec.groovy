@@ -26,7 +26,7 @@ import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Header
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Patch
+import org.particleframework.http.annotation.Patch
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

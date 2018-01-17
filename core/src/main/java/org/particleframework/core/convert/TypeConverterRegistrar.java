@@ -16,6 +16,8 @@
 package org.particleframework.core.convert;
 
 /**
+ * An interface for classes that register type conversions with the {@link ConversionService}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

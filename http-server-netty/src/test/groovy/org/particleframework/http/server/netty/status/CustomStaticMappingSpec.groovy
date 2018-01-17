@@ -10,9 +10,9 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Consumes
-import org.particleframework.web.router.annotation.Error
-import org.particleframework.web.router.annotation.Get
-import org.particleframework.web.router.annotation.Post
+import org.particleframework.http.annotation.Error
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Post
 
 /**
  * Created by graemerocher on 13/09/2017.

@@ -84,7 +84,7 @@ class AstAnnotationUtils {
      */
     static boolean isAnnotated(AnnotatedNode annotatedNode) {
         for(ann in annotatedNode.annotations) {
-            if(AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
+            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
                 return true
             }
         }

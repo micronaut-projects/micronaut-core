@@ -18,17 +18,15 @@ package org.particleframework.aop.internal;
 import org.particleframework.aop.*;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.core.annotation.AnnotationMetadata;
-import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.order.OrderUtil;
-import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.type.Argument;
-import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.core.type.MutableArgumentValue;
+import org.particleframework.core.util.ArrayUtils;
+import org.particleframework.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -186,7 +184,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
                 ).collect(Collectors.toSet());
 
         Interceptor[] interceptorArray = Arrays.stream(interceptors)
-                .filter(i -> applicableClasses.contains(i.getClass()))
+                .filter(i -> applicableClasses.stream().anyMatch((t)->t.isInstance(i)))
                 .toArray(Interceptor[]::new);
         OrderUtil.sort(interceptors);
         return interceptorArray;

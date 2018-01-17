@@ -15,6 +15,7 @@
  */
 package org.particleframework.runtime.context.scope;
 
+import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.inject.BeanDefinition;
@@ -43,7 +44,7 @@ class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycle<Thre
     }
 
     @Override
-    public <T> T get(BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
+    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
         Map<String, Object> values = threadScope.get();
         String key = identifier.toString();
         T bean = (T) values.get(key);

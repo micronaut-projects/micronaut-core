@@ -22,7 +22,7 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.session.Session
 import org.particleframework.session.annotation.SessionValue
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -149,7 +149,7 @@ class SessionBindingSpec extends Specification {
     @Singleton
     static class SessionController {
 
-        @Get
+        @Get("/simple")
         String simple(Session session) {
             return session.get("myValue", String).orElseGet({
                 session.put("myValue", "value in session")
@@ -157,7 +157,7 @@ class SessionBindingSpec extends Specification {
             })
         }
 
-        @Get
+        @Get("/value")
         String value(@SessionValue Optional<String> myValue) {
             return myValue.orElse(
                     "no value in session"
@@ -165,7 +165,7 @@ class SessionBindingSpec extends Specification {
         }
 
 
-        @Get
+        @Get("/optional")
         String optional(Optional<Session> session) {
             if(session.isPresent()) {
                 def s = session.get()

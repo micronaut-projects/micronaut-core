@@ -32,7 +32,7 @@ public interface HttpRequestFactory {
      * The default {@link CookieFactory} instance
      */
     Optional<HttpRequestFactory> INSTANCE = SoftServiceLoader.load(HttpRequestFactory.class)
-            .firstOr("org.particleframework.http.client.netty.NettyHttpRequestFactory",
+            .firstOr("org.particleframework.http.client.NettyClientHttpRequestFactory",
                     HttpRequestFactory.class.getClassLoader()
             )
             .map(ServiceDefinition::load);
@@ -76,4 +76,29 @@ public interface HttpRequestFactory {
      * @return The {@link MutableHttpRequest} instance
      */
     <T> MutableHttpRequest<T> head(String uri);
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#OPTIONS} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     */
+    <T> MutableHttpRequest<T> options(String uri);
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     *
+     * @param uri The URI
+     * @param body an optional body
+     * @return The {@link MutableHttpRequest} instance
+     */
+    <T> MutableHttpRequest<T> delete(String uri, T body);
+    /**
+     * Create a new {@link MutableHttpRequest} for the given method and URI
+     * @param httpMethod The method
+     * @param uri The URI
+     * @param <T>
+     * @return The request
+     */
+    <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri);
 }

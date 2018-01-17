@@ -7,7 +7,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 
 import static org.particleframework.http.HttpHeaders.*
 
@@ -250,6 +250,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
     @Requires(property = 'spec.name', value = 'NettyCorsSpec')
     static class TestController {
 
+        @Get('/')
         HttpResponse index() {
             HttpResponse.noContent()
         }

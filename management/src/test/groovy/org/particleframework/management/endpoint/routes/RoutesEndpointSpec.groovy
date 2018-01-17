@@ -24,9 +24,9 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Get
-import org.particleframework.web.router.annotation.Post
-import org.particleframework.web.router.annotation.Put
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Post
+import org.particleframework.http.annotation.Put
 import spock.lang.Specification
 
 /**
@@ -60,7 +60,7 @@ class RoutesEndpointSpec extends Specification {
     @Requires(property = 'spec.name', value = 'RoutesEndpointSpec')
     static class TestController {
 
-        @Get
+        @Get('/')
         String index() {
             ""
         }

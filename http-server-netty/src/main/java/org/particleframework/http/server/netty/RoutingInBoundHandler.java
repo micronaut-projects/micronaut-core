@@ -43,7 +43,7 @@ import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
-import org.particleframework.http.common.codec.TextPlainCodec;
+import org.particleframework.runtime.http.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.async.ContextCompletionAwareSubscriber;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
@@ -259,6 +259,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
         if (errorRoute != null) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
+            }
             errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
@@ -501,7 +504,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         Object result = routeMatch.execute();
 
                         if (result == null) {
-                            response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                            if( routeMatch.getReturnType().getType() != void.class) {
+                                // handle re-mapping of errors
+                                result = router.route(HttpStatus.NOT_FOUND)
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
+                                        .filter(RouteMatch::isExecutable)
+                                        .map(RouteMatch::execute)
+                                        .orElse(NettyHttpResponse.getOr(request, HttpResponse.notFound()));
+                                if (result instanceof MutableHttpResponse) {
+                                    response = (MutableHttpResponse<?>) result;
+                                } else {
+                                    response = HttpResponse.status(HttpStatus.NOT_FOUND)
+                                            .body(result);
+                                }
+                            }
+                            else {
+                                response = NettyHttpResponse.getOr(request, HttpResponse.ok());
+                            }
                         } else if (result instanceof HttpResponse) {
                             HttpStatus status = ((HttpResponse) result).getStatus();
                             if (status.getCode() >= 300) {
@@ -516,7 +535,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 response = (MutableHttpResponse<?>) result;
                             } else {
                                 response = HttpResponse.status(status)
-                                        .body(result);
+                                                       .body(result);
                             }
                         } else {
                             response = HttpResponse.ok(result);
