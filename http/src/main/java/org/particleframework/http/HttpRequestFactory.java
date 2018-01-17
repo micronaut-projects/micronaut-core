@@ -93,4 +93,12 @@ public interface HttpRequestFactory {
      * @return The {@link MutableHttpRequest} instance
      */
     <T> MutableHttpRequest<T> delete(String uri, T body);
+    /**
+     * Create a new {@link MutableHttpRequest} for the given method and URI
+     * @param httpMethod The method
+     * @param uri The URI
+     * @param <T>
+     * @return The request
+     */
+    <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri);
 }

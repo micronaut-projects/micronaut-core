@@ -1,6 +1,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.annotation.*;
+import org.particleframework.context.annotation.Type;
 import org.particleframework.context.condition.Condition;
 import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.AnnotationMetadata;
@@ -1468,6 +1469,9 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {
         Qualifier qualifier = null;
         Annotation ann = injectionPoint.getQualifier();
+        if(ann == null) {
+            ann = injectionPoint.getAnnotation(Type.class);
+        }
         if (ann != null) {
             qualifier = Qualifiers.byAnnotation(ann);
         }
@@ -1483,9 +1487,15 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         }
 
         if (qualifier == null) {
-            Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
-                    .map(map -> (Qualifier) map.get(argument));
-            qualifier = optional.orElse(null);
+            Type typeAnn = argument.getAnnotation(Type.class);
+            if(typeAnn != null) {
+               qualifier = Qualifiers.byAnnotation(typeAnn);
+            }
+            else {
+                Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
+                        .map(map -> (Qualifier) map.get(argument));
+                qualifier = optional.orElse(null);
+            }
         }
         return qualifier;
     }

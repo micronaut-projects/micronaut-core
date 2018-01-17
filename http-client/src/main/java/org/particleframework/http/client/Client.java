@@ -15,9 +15,13 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.aop.Introduction;
+import org.particleframework.context.annotation.Type;
+import org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice;
 import org.particleframework.runtime.context.scope.ScopedProxy;
 
 import javax.inject.Scope;
+import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
@@ -32,6 +36,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @ScopedProxy
+@Introduction
+@Type(HttpClientIntroductionAdvice.class)
+@Singleton
 public @interface Client {
     /**
      * @return The URL or service ID of the remote service

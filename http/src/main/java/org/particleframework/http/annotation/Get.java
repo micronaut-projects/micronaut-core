@@ -51,4 +51,12 @@ public @interface Get {
      */
     @AliasFor(annotation = Produces.class, member = "value")
     String[] produces() default {};
+
+    /**
+     * The default consumes. Ignored for server request which never a consume a value for a GET request
+     * @return The default consumes, otherwise override from controller
+     */
+    @AliasFor(annotation = Consumes.class, member = "value")
+    String[] consumes() default {};
+
 }
