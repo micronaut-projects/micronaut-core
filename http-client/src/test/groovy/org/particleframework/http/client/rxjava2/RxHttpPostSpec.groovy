@@ -17,25 +17,16 @@ package org.particleframework.http.client.rxjava2
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.context.annotation.Argument
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
-import org.particleframework.http.annotation.Body
-import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Header
 import org.particleframework.http.client.BlockingHttpClient
-import org.particleframework.http.client.HttpClient
+import org.particleframework.http.client.HttpPostSpec
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Head
-import org.particleframework.web.router.annotation.Post
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -49,35 +40,35 @@ class RxHttpPostSpec extends Specification {
 
     void "test simple post exchange request with JSON"() {
         when:
-        Flowable<HttpResponse<Book>> flowable = client.exchange(
-                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+        Flowable<HttpResponse<HttpPostSpec.Book>> flowable = client.exchange(
+                HttpRequest.POST("/post/simple", new HttpPostSpec.Book(title: "The Stand", pages: 1000))
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
-                Book
+                HttpPostSpec.Book
         )
-        HttpResponse<Book> response = flowable.blockingFirst()
-        Optional<Book> body = response.getBody()
+        HttpResponse<HttpPostSpec.Book> response = flowable.blockingFirst()
+        Optional<HttpPostSpec.Book> body = response.getBody()
 
         then:
         response.status == HttpStatus.OK
         response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
-        response.contentLength == 21
+        response.contentLength == 34
         body.isPresent()
-        body.get() instanceof Book
+        body.get() instanceof HttpPostSpec.Book
         body.get().title == 'The Stand'
     }
 
     void "test simple post retrieve request with JSON"() {
         when:
-        Flowable<Book> flowable = client.retrieve(
-                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+        Flowable<HttpPostSpec.Book> flowable = client.retrieve(
+                HttpRequest.POST("/post/simple", new HttpPostSpec.Book(title: "The Stand", pages: 1000))
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
-                Book
+                HttpPostSpec.Book
         )
-        Book book = flowable.blockingFirst()
+        HttpPostSpec.Book book = flowable.blockingFirst()
 
         then:
         book.title == "The Stand"
@@ -86,32 +77,17 @@ class RxHttpPostSpec extends Specification {
     void "test simple post retrieve blocking request with JSON"() {
         when:
         BlockingHttpClient blockingHttpClient = client.toBlocking()
-        Book book = blockingHttpClient.retrieve(
-                HttpRequest.POST("/post/simple", new Book(title: "The Stand"))
+        HttpPostSpec.Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/simple", new HttpPostSpec.Book(title: "The Stand", pages: 1000))
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
-                Book
+                HttpPostSpec.Book
         )
 
         then:
         book.title == "The Stand"
     }
 
-    @Controller('/post')
-    static class PostController {
 
-        @Post('/simple')
-        Book simple(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
-            assert contentType == MediaType.APPLICATION_JSON
-            assert contentLength == 21
-            assert accept == MediaType.APPLICATION_JSON
-            assert custom == 'Foo'
-            return book
-        }
-
-    }
-    static class Book {
-        String title
-    }
 }

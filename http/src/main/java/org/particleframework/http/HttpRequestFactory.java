@@ -76,4 +76,21 @@ public interface HttpRequestFactory {
      * @return The {@link MutableHttpRequest} instance
      */
     <T> MutableHttpRequest<T> head(String uri);
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#OPTIONS} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     */
+    <T> MutableHttpRequest<T> options(String uri);
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     *
+     * @param uri The URI
+     * @param body an optional body
+     * @return The {@link MutableHttpRequest} instance
+     */
+    <T> MutableHttpRequest<T> delete(String uri, T body);
 }
