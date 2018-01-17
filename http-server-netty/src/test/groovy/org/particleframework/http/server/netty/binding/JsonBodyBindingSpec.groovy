@@ -12,6 +12,7 @@ import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
+import org.particleframework.http.annotation.Error
 import org.particleframework.http.hateos.Link
 import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
@@ -361,6 +362,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
         }
 
 
+        @Error(JsonParseException)
         HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
             def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
             def error = new VndError("Invalid JSON: ${jsonParseException.message}")

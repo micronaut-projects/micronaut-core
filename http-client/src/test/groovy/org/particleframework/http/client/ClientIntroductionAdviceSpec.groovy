@@ -36,11 +36,7 @@ import javax.inject.Singleton
  */
 class ClientIntroductionAdviceSpec extends Specification {
 
-    @Shared int port = SocketUtils.findAvailableTcpPort()
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            'particle.server.port':port,
-            'particle.http.clients.myService.url': "http://localhost:$port"
-    )
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
 
@@ -62,11 +58,11 @@ class ClientIntroductionAdviceSpec extends Specification {
 
 
     static interface MyApi {
-        @Get(uri = "/aop", produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        @Get(value = '/',produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
         String index()
     }
 
-    @Client('/')
+    @Client('/aop')
     static interface MyClient extends MyApi {
     }
 }

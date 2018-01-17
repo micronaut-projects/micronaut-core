@@ -57,7 +57,7 @@ class ParameterBindingSpec extends AbstractParticleSpec {
 
     @Controller(produces = MediaType.TEXT_PLAIN)
     static class ParameterController {
-        @Get
+        @Get('/')
         String index(Integer max) {
             "Parameter Value: $max"
         }

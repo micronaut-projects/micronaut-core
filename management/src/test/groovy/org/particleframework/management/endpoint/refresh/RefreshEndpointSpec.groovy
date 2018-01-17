@@ -23,6 +23,7 @@ import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.Value
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Get
 import org.particleframework.runtime.context.scope.Refreshable
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -83,6 +84,7 @@ class RefreshEndpointSpec extends Specification {
             this.refreshBean = refreshBean
         }
 
+        @Get('/')
         String index() {
             refreshBean.testConfigProps() + ' ' + refreshBean.testValue()
         }

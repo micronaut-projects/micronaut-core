@@ -60,7 +60,7 @@ class RoutesEndpointSpec extends Specification {
     @Requires(property = 'spec.name', value = 'RoutesEndpointSpec')
     static class TestController {
 
-        @Get
+        @Get('/')
         String index() {
             ""
         }
