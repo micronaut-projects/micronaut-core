@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.server.netty.upload
+package org.particleframework.upload
 
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.AbstractParticleSpec
 import org.particleframework.http.HttpStatus
-import org.particleframework.http.server.netty.AbstractParticleSpec
 import spock.lang.Ignore
 
 /**

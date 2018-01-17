@@ -440,6 +440,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            return builder.append(' ')
+                    .append(error.getName())
+                    .append(" -> ")
+                    .append(targetMethod.getDeclaringType().getSimpleName())
+                    .append('#')
+                    .append(targetMethod)
+                    .toString();
+
+        }
+        @Override
         public int compareTo(ErrorRoute o) {
             if (o == this) {
                 return 0;

@@ -16,6 +16,7 @@
 package org.particleframework.http.client
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
@@ -27,6 +28,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -34,11 +36,14 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class ClientScopeSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared int port = SocketUtils.findAvailableTcpPort()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+            'particle.server.port':port,
+            'particle.http.clients.myService.url': "http://localhost:$port"
+    )
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
 
-    @Ignore // not yet implemented
     void "test client scope annotation"() {
         given:
         MyService myService = context.getBean(MyService)
@@ -58,8 +63,9 @@ class ClientScopeSpec extends Specification {
 
     @Singleton
     static class MyService {
-        @Inject @Client('${scope.server}')
+        @Inject @Client('/')
         HttpClient client
+
 
         String get() {
             client.toBlocking().retrieve(
@@ -67,4 +73,5 @@ class ClientScopeSpec extends Specification {
             )
         }
     }
+
 }

@@ -13,28 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.inject;
 
-import org.particleframework.runtime.context.scope.ScopedProxy;
-
-import javax.inject.Scope;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import javax.inject.Provider;
+import java.util.Map;
 
 /**
- * A custom {@link Scope} for injecting {@link HttpClient} implementations
+ * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@ScopedProxy
-public @interface Client {
+public interface ParametrizedProvider<T> extends Provider<T> {
+
     /**
-     * @return The URL or service ID of the remote service
+     * @param argumentValues The argument values to use
+     * @return The bean
      */
-    String[] value();
+    T get(Map<String, Object> argumentValues);
+
+    @Override
+    default T get() {
+        return get(null);
+    }
+
 }
