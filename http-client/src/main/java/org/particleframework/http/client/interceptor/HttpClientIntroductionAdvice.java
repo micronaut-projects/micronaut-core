@@ -41,6 +41,7 @@ import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.http.uri.UriTemplate;
 import org.particleframework.runtime.server.EmbeddedServer;
+import org.reactivestreams.Publisher;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -90,59 +91,78 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             HttpMethod httpMethod = HttpMethod.valueOf(annotationType.getSimpleName().toUpperCase());
 
             ReturnType returnType = context.getReturnType();
-            Class javaReturnType = returnType.getType();
+            Class<?> javaReturnType = returnType.getType();
+
+
+            String contextPath = reg.contextPath;
+            UriMatchTemplate uriTemplate = UriMatchTemplate.of(contextPath != null ? contextPath : "/");
+            if(!(uri.length() == 1 && uri.charAt(0) == '/')) {
+                uriTemplate = uriTemplate.nest(uri);
+            }
+
+            uri = uriTemplate.expand(context.getParameterValueMap());
+            MutableHttpRequest<Object> request = HttpRequest.create(httpMethod, uri);
+            Object body = null;
+            Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
+            List<String> uriVariables = uriTemplate.getVariables();
+
+            if(HttpMethod.permitsRequestBody(httpMethod)) {
+                Argument[] arguments = context.getArguments();
+                List<Argument> bodyArguments = new ArrayList<>();
+                for (Argument argument : arguments) {
+                    String argumentName = argument.getName();
+                    if(argument.isAnnotationPresent(Body.class)) {
+                        body = parameters.get(argumentName).getValue();
+                        break;
+                    }
+                    else if(argument.isAnnotationPresent(Header.class)) {
+                        MutableArgumentValue<?> value = parameters.get(argumentName);
+                        ConversionService.SHARED.convert(value.getValue(), String.class)
+                                .ifPresent(o -> request.header(NameUtils.hyphenate(argumentName), o));
+                    }
+                    else if(!uriVariables.contains(argumentName)){
+                        bodyArguments.add(argument);
+                    }
+                }
+                if(body == null && !bodyArguments.isEmpty()) {
+                    Map<String,Object> bodyMap = new LinkedHashMap<>();
+
+                    for (Argument bodyArgument : bodyArguments) {
+                        String argumentName = bodyArgument.getName();
+                        MutableArgumentValue<?> value = parameters.get(argumentName);
+                        bodyMap.put(argumentName, value.getValue());
+                    }
+
+                    body = bodyMap;
+                }
+
+                if(body != null) {
+                    request.body(body);
+                }
+            }
+
+            HttpClient httpClient = reg.httpClient;
+
             if(Publishers.isPublisher(javaReturnType)) {
-                
+                Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                Class<?> argumentType = publisherArgument.getType();
+                Publisher<?> publisher;
+                if(HttpResponse.class.isAssignableFrom(argumentType)) {
+                    publisher = httpClient.exchange(
+                            request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                    );
+                }
+                else {
+                    publisher = httpClient.retrieve(
+                            request, publisherArgument
+                    );
+                }
+                return ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(()->
+                    new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
+                );
             }
             else {
-
-                BlockingHttpClient blockingHttpClient = reg.httpClient.toBlocking();
-                String contextPath = reg.contextPath;
-                UriMatchTemplate uriTemplate = UriMatchTemplate.of(contextPath != null ? contextPath : "/");
-                if(!(uri.length() == 1 && uri.charAt(0) == '/')) {
-                    uriTemplate = uriTemplate.nest(uri);
-                }
-
-                uri = uriTemplate.expand(context.getParameterValueMap());
-                MutableHttpRequest<Object> request = HttpRequest.create(httpMethod, uri);
-                Object body = null;
-                Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
-                List<String> uriVariables = uriTemplate.getVariables();
-
-                if(HttpMethod.permitsRequestBody(httpMethod)) {
-                    Argument[] arguments = context.getArguments();
-                    List<Argument> bodyArguments = new ArrayList<>();
-                    for (Argument argument : arguments) {
-                        String argumentName = argument.getName();
-                        if(argument.isAnnotationPresent(Body.class)) {
-                            body = parameters.get(argumentName).getValue();
-                            break;
-                        }
-                        else if(argument.isAnnotationPresent(Header.class)) {
-                            MutableArgumentValue<?> value = parameters.get(argumentName);
-                            ConversionService.SHARED.convert(value.getValue(), String.class)
-                                    .ifPresent(o -> request.header(NameUtils.hyphenate(argumentName), o));
-                        }
-                        else if(!uriVariables.contains(argumentName)){
-                            bodyArguments.add(argument);
-                        }
-                    }
-                    if(body == null && !bodyArguments.isEmpty()) {
-                        Map<String,Object> bodyMap = new LinkedHashMap<>();
-
-                        for (Argument bodyArgument : bodyArguments) {
-                            String argumentName = bodyArgument.getName();
-                            MutableArgumentValue<?> value = parameters.get(argumentName);
-                            bodyMap.put(argumentName, value.getValue());
-                        }
-
-                        body = bodyMap;
-                    }
-
-                    if(body != null) {
-                        request.body(body);
-                    }
-                }
+                BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
                 if(HttpResponse.class.isAssignableFrom(javaReturnType)) {
                     return blockingHttpClient.exchange(
                             request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
@@ -168,7 +188,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                 }
             }
-
         }
         throw new UnsupportedOperationException("Cannot implement method that is not annotated with an HTTP method type");
     }
