@@ -26,6 +26,7 @@ import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.sse.Event;
 import org.reactivestreams.Publisher;
 
+import java.io.Closeable;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -38,7 +39,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpClient {
+public interface HttpClient extends Closeable{
 
     /**
      * @return A blocking HTTP client suitable for testing and non-production scenarios.

@@ -6,6 +6,7 @@ import org.particleframework.inject.*;
 
 import java.util.Deque;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Represents the resolution context for a current resolve of a given bean
@@ -69,6 +70,11 @@ public interface BeanResolutionContext extends Map<String, Object>, ValueResolve
          * @return The circular string
          */
         String toCircularString();
+
+        /**
+         * @return The current path segment
+         */
+        Optional<Segment> currentSegment();
     }
 
 

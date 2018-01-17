@@ -59,4 +59,9 @@ class ErrorRouteMatch<T> extends StatusRouteMatch<T> {
     public Map<String, Object> getVariables() {
         return variables;
     }
+
+    @Override
+    public String toString() {
+        return abstractRoute.toString();
+    }
 }

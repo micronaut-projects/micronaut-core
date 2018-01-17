@@ -13,28 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.runtime.context.el;
 
-import org.particleframework.runtime.context.scope.ScopedProxy;
+import org.particleframework.context.el.ExpressionEvaluator;
 
-import javax.inject.Scope;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.util.Map;
 
 /**
- * A custom {@link Scope} for injecting {@link HttpClient} implementations
+ * TODO: Javadoc description
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RUNTIME)
-@ScopedProxy
-public @interface Client {
-    /**
-     * @return The URL or service ID of the remote service
-     */
-    String[] value();
+public class JavaExpressionEvaluator implements ExpressionEvaluator {
+    @Override
+    public <T> T evaluate(Class<?> bindingBean, String expression, Class<T> expectedType) {
+        return null;
+    }
+
+    @Override
+    public <T> T evaluate(Map<String, Object> variables, String expression, Class<T> expectedType) {
+        return null;
+    }
 }

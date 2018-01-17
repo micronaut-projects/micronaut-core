@@ -105,6 +105,11 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         }
 
         @Override
+        public Optional<Segment> currentSegment() {
+            return Optional.ofNullable(peekLast());
+        }
+
+        @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorInjectionPoint constructor = declaringType.getConstructor();
             if(constructor instanceof MethodConstructorInjectionPoint) {
@@ -201,7 +206,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
-                    Argument.of(fieldInjectionPoint.getType(), fieldInjectionPoint.getName(), fieldInjectionPoint.getQualifier()));
+                    Argument.of(fieldInjectionPoint.getField()));
         }
         @Override
         public String toString() {

@@ -17,20 +17,20 @@ import java.util.stream.Stream;
 public interface Qualifier<T> {
 
     /**
-     * Qualify the candidate from the stream of candidates
-     *
-     * @param candidates The candidates
-     * @return The qualified candidate or null it it cannot be qualified
-     */
-    default <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
-        return reduce(beanType, candidates).findFirst();
-    }
-
-    /**
      * Reduces the list of candidates
      *
      * @param candidates The candidates
      * @return The qualified candidate or null it it cannot be qualified
      */
     <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates);
+
+    /**
+     * Qualify the candidate from the stream of candidates
+     *
+     * @param candidates The candidates
+     * @return The qualified candidate or {@link Optional#empty()}
+     */
+    default <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
+        return reduce(beanType, candidates).findFirst();
+    }
 }

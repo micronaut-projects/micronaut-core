@@ -17,6 +17,7 @@ package org.particleframework.runtime.context.scope.refresh;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanRegistration;
+import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.ConfigurationReader;
@@ -73,7 +74,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T get(BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
+    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
         BeanRegistration beanRegistration = refreshableBeans.computeIfAbsent(identifier.toString(), key -> {
             T bean = provider.get();
             BeanRegistration registration = new BeanRegistration(identifier, beanDefinition, bean);

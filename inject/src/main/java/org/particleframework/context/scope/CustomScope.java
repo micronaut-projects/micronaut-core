@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.scope;
 
+import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanIdentifier;
 
@@ -41,13 +42,19 @@ public interface CustomScope<A extends Annotation> {
     /**
      * Resolve an object from the given scope
      *
+     * @param <T> The bean generic type
+     * @param resolutionContext The bean resolution context
      * @param beanDefinition The bean definition
      * @param identifier The {@link BeanIdentifier}
      * @param provider The provider that will build the bean definition
-     * @param <T> The bean generic type
      * @return The bean instance
      */
-    <T> T get(BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider);
+    <T> T get(
+            BeanResolutionContext resolutionContext,
+            BeanDefinition<T> beanDefinition,
+            BeanIdentifier identifier,
+            Provider<T> provider
+    );
 
     /**
      * Remove a bean definition from the scope

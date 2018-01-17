@@ -244,6 +244,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
         if (errorRoute != null) {
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
+            }
             errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
