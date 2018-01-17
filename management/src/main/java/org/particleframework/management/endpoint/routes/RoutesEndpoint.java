@@ -18,12 +18,13 @@ package org.particleframework.management.endpoint.routes;
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
 import org.particleframework.web.router.Router;
+import org.particleframework.http.annotation.HttpMethodMapping;
 import org.reactivestreams.Publisher;
 
 /**
  * <p>Exposes an {@link Endpoint} to display application routes</p>
  *
- * @see org.particleframework.web.router.annotation.Action
+ * @see HttpMethodMapping
  *
  * @author James Kleeh
  * @since 1.0

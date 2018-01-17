@@ -23,7 +23,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Post
+import org.particleframework.http.annotation.Post
 
 /**
  * @author Graeme Rocher

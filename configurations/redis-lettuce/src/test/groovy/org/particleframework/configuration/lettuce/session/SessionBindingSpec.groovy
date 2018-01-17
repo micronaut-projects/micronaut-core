@@ -22,7 +22,7 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.session.Session
 import org.particleframework.session.annotation.SessionValue
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.Specification
 
 import javax.inject.Singleton

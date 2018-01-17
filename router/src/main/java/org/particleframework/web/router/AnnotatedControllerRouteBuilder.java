@@ -27,7 +27,7 @@ import org.particleframework.http.annotation.Produces;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Action;
+import org.particleframework.http.annotation.HttpMethodMapping;
 import org.particleframework.http.annotation.Consumes;
 
 import javax.inject.Singleton;
@@ -50,7 +50,7 @@ public class AnnotatedControllerRouteBuilder extends DefaultRouteBuilder impleme
     @Override
     public void process(BeanDefinition beanDefinition, ExecutableMethod method) {
         Class<?> declaringType = method.getDeclaringType();
-        if (beanDefinition.hasStereotype(Controller.class) && !method.hasDeclaredStereotype(Action.class)) {
+        if (beanDefinition.hasStereotype(Controller.class) && !method.hasDeclaredStereotype(HttpMethodMapping.class)) {
             MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
             MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
 

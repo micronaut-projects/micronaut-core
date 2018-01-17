@@ -20,7 +20,7 @@ import io.reactivex.Single;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.http.multipart.FileUpload;
-import org.particleframework.web.router.annotation.Post;
+import org.particleframework.http.annotation.Post;
 import org.reactivestreams.Publisher;
 
 import java.util.Optional;

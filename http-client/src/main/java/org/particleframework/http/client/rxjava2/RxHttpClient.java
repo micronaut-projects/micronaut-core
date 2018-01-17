@@ -88,32 +88,6 @@ public class RxHttpClient extends DefaultHttpClient {
         return Flowable.fromPublisher(super.retrieve(request, bodyType));
     }
 
-    @Override
-    public <I> Flowable<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(super.eventStream(request));
-    }
-
-    @Override
-    public <I, O> Flowable<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        return Flowable.fromPublisher(super.eventStream(request, bodyType));
-    }
-
-    @Override
-    public <I> Flowable<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(super.dataStream(request));
-    }
-
-    @Override
-    public <I> Flowable<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request) {
-        return Flowable.fromPublisher(super.jsonStream(request));
-    }
-
-    @Override
-    public <I, O> Flowable<HttpResponse<O>> jsonStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        return Flowable.fromPublisher(super.jsonStream(request, bodyType));
-    }
-
-
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead

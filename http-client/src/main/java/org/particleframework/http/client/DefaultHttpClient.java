@@ -206,31 +206,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     @Override
-    public <I> Publisher<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    @Override
-    public <I, O> Publisher<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    @Override
-    public <I> Publisher<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    @Override
-    public <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    @Override
     public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
         URL server = serverSelector.select(null);
         URI requestURI;

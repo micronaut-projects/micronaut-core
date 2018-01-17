@@ -47,53 +47,6 @@ public interface HttpClient extends Closeable{
     BlockingHttpClient toBlocking();
 
     /**
-     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
-     */
-    <I> Publisher<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request);
-
-    /**
-     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @param <O>     The event type
-     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
-     */
-    <I, O> Publisher<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, Argument<O> bodyType);
-
-    /**
-     * Perform an HTTP request and receive data chunk by chunk as it becomes available
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request);
-
-    /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request The {@link HttpRequest} to execute
-     * @param <I>     The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I> Publisher<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request);
-
-    /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request  The {@link HttpRequest} to execute
-     * @param bodyType The body type
-     * @param <I>      The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Argument<O> bodyType);
-
-    /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type</p>
      * <p>
@@ -169,18 +122,6 @@ public interface HttpClient extends Closeable{
     }
 
     /**
-     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-     *
-     * @param request  The {@link HttpRequest} to execute
-     * @param bodyType The body type
-     * @param <I>      The request body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-     */
-    default <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Class<O> bodyType) {
-        return jsonStream(request, Argument.of(bodyType));
-    }
-
-    /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead
      *
@@ -191,4 +132,64 @@ public interface HttpClient extends Closeable{
     static HttpClient create(URL url) {
         return new DefaultHttpClient(url);
     }
+
+//  The following methods to be added in future streaming support
+
+//    /**
+//     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
+//     *
+//     * @param request The {@link HttpRequest} to execute
+//     * @param <I>     The request body type
+//     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
+//     */
+//    <I> Publisher<HttpResponse<Event<ByteBuffer<?>>>> eventStream(HttpRequest<I> request);
+//
+//    /**
+//     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
+//     *
+//     * @param request The {@link HttpRequest} to execute
+//     * @param <I>     The request body type
+//     * @param <O>     The event type
+//     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
+//     */
+//    <I, O> Publisher<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, Argument<O> bodyType);
+//
+//    /**
+//     * Perform an HTTP request and receive data chunk by chunk as it becomes available
+//     *
+//     * @param request The {@link HttpRequest} to execute
+//     * @param <I>     The request body type
+//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+//     */
+//    <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request);
+//
+//    /**
+//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
+//     *
+//     * @param request The {@link HttpRequest} to execute
+//     * @param <I>     The request body type
+//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+//     */
+//    <I> Publisher<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request);
+//
+//    /**
+//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
+//     *
+//     * @param request  The {@link HttpRequest} to execute
+//     * @param bodyType The body type
+//     * @param <I>      The request body type
+//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+//     */
+//    <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Argument<O> bodyType);
+//    /**
+//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
+//     *
+//     * @param request  The {@link HttpRequest} to execute
+//     * @param bodyType The body type
+//     * @param <I>      The request body type
+//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+//     */
+//    default <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Class<O> bodyType) {
+//        return jsonStream(request, Argument.of(bodyType));
+//    }
 }

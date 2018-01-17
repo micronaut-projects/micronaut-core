@@ -4,8 +4,8 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Get
-import org.particleframework.web.router.annotation.Put
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Put
 import spock.lang.Specification
 
 class GreenLightningHttpServerSpec extends Specification {

@@ -6,7 +6,7 @@ import org.particleframework.http.annotation.Cookie
 import org.particleframework.http.cookie.Cookies
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.Unroll
 
 /**

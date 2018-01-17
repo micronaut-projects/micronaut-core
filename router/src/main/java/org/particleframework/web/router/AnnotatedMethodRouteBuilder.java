@@ -22,13 +22,10 @@ import org.particleframework.core.naming.conventions.MethodConvention;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.annotation.Consumes;
-import org.particleframework.http.annotation.Produces;
+import org.particleframework.http.annotation.*;
+import org.particleframework.http.annotation.Error;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.*;
-import org.particleframework.web.router.annotation.Error;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -52,7 +49,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
                 Route route = GET(resolveUri(val,
@@ -68,7 +65,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Post.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
@@ -86,7 +83,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Put.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
@@ -104,7 +101,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Patch.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
@@ -122,7 +119,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Delete.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
@@ -141,7 +138,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
 
         httpMethodsHandlers.put(Head.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 Route route = HEAD(resolveUri(val,
                         method,
@@ -156,7 +153,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Options.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 MediaType[] consumes = method.getValue(Consumes.class, MediaType[].class).orElse(null);
                 MediaType[] produces = method.getValue(Produces.class, MediaType[].class).orElse(null);
@@ -174,7 +171,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Trace.class, (ExecutableMethod method) -> {
-            Optional<String> uri = method.getValue(Action.class, String.class);
+            Optional<String> uri = method.getValue(HttpMethodMapping.class, String.class);
             uri.ifPresent(val -> {
                 Route route = TRACE(resolveUri(val,
                         method,
@@ -229,7 +226,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(Action.class);
+        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         actionAnn.ifPresent(annotationClass -> {
                     Consumer<ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
                     if (handler != null) {

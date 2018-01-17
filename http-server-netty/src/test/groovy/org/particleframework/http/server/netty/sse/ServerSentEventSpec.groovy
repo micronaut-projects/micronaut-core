@@ -23,7 +23,7 @@ import org.particleframework.context.annotation.Requires
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.sse.Event
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import org.reactivestreams.Publisher
 
 import java.time.Duration
