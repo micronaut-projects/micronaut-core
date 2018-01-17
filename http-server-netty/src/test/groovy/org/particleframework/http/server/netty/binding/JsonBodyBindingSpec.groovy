@@ -16,7 +16,7 @@ import org.particleframework.http.hateos.Link
 import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Post
+import org.particleframework.http.annotation.Post
 import org.reactivestreams.Publisher
 
 import java.util.concurrent.CompletableFuture

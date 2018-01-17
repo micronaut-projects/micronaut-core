@@ -24,7 +24,7 @@ import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Consumes
 import org.particleframework.inject.annotation.AnnotationMetadataWriter
-import org.particleframework.web.router.annotation.Error
+import org.particleframework.http.annotation.Error
 import spock.lang.Specification
 
 /**

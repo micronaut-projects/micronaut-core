@@ -1,4 +1,4 @@
-package org.particleframework.web.router.annotation;
+package org.particleframework.http.annotation;
 
 
 import org.particleframework.context.annotation.AliasFor;
@@ -20,7 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
-@Action
+@HttpMethodMapping
 public @interface Error {
     /**
      * @return The exception to map to

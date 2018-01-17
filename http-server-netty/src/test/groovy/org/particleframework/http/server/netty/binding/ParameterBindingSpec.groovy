@@ -7,7 +7,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Parameter
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.Unroll
 
 /**

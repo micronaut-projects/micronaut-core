@@ -25,7 +25,7 @@ import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Part;
 import org.particleframework.http.multipart.FileUpload;
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Post;
+import org.particleframework.http.annotation.Post;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;

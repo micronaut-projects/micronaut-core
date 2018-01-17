@@ -20,7 +20,7 @@ import io.reactivex.Flowable;
 import io.reactivex.Single;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.*;
-import org.particleframework.web.router.annotation.Post;
+import org.particleframework.http.annotation.Post;
 
 import javax.inject.Singleton;
 import javax.validation.constraints.Size;

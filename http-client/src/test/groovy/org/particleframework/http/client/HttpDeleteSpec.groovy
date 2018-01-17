@@ -17,16 +17,14 @@ package org.particleframework.http.client
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.buffer.ByteBuffer
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Produces
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Delete
+import org.particleframework.http.annotation.Delete
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

@@ -16,7 +16,7 @@
 package org.particleframework.validation;
 
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Post;
+import org.particleframework.http.annotation.Post;
 import javax.validation.constraints.Digits;
 
 /**

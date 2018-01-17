@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation;
+package org.particleframework.http.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
-import org.particleframework.http.MediaType;
-import org.particleframework.http.annotation.Consumes;
-import org.particleframework.http.annotation.Produces;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -28,7 +25,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation that can be applied to method to signify the method receives a {@link org.particleframework.http.HttpMethod#POST}
+ * Annotation that can be applied to method to signify the method receives a {@link org.particleframework.http.HttpMethod#OPTIONS}
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,18 +33,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
-@Action
-public @interface Post {
+@HttpMethodMapping
+public @interface Options {
     /**
-     * @return The URI of the POST route if not specified inferred from the method name and arguments
+     * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
      */
-    @AliasFor(annotation = Action.class, member = "value")
+    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     String value() default "";
 
     /**
-     * @return The URI of the POST route if not specified inferred from the method name and arguments
+     * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
      */
-    @AliasFor(annotation = Action.class, member = "value")
+    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     String uri() default "";
 
     /**
@@ -55,11 +52,4 @@ public @interface Post {
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
-
-
-    /**
-     * @return The default produces, otherwise override from controller
-     */
-    @AliasFor(annotation = Produces.class, member = "value")
-    String[] produces() default {};
 }

@@ -17,7 +17,7 @@ package org.particleframework.http.server.netty.java;
 
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Get;
+import org.particleframework.http.annotation.Get;
 
 /**
  * @author Graeme Rocher

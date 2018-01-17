@@ -17,7 +17,7 @@ package org.particleframework.docs.server.routes;
 
 // tag::imports[]
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Get;
+import org.particleframework.http.annotation.Get;
 import javax.inject.Singleton;
 // end::imports[]
 

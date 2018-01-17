@@ -21,14 +21,12 @@ import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
 import org.particleframework.runtime.server.EmbeddedServer
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 /**

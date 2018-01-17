@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.web.router.annotation;
+package org.particleframework.http.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
-import org.particleframework.http.annotation.Produces;
+import org.particleframework.context.annotation.Executable;
+import org.particleframework.http.annotation.Controller;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -26,30 +27,26 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Annotation that can be applied to method to signify the method receives a {@link org.particleframework.http.HttpMethod#GET}
+ * <p>A meta annotation for HTTP {@link Controller} actions</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.METHOD})
-@Action
-public @interface Get {
+@Target({ElementType.ANNOTATION_TYPE})
+@Executable
+public @interface HttpMethodMapping {
+
     /**
-     * @return The URI of the GET route if not specified inferred from the method name and arguments
+     * @return The URI of the action if not specified inferred from the method name and arguments
      */
-    @AliasFor(annotation = Action.class, member = "value")
     String value() default "";
 
     /**
-     * @return The URI of the TRACE route if not specified inferred from the method name and arguments
+     * @return The URI of the PATCH route if not specified inferred from the method name and arguments
      */
-    @AliasFor(annotation = Action.class, member = "value")
+    @AliasFor(member = "value")
     String uri() default "";
-    /**
-     * @return The default produces, otherwise override from controller
-     */
-    @AliasFor(annotation = Produces.class, member = "value")
-    String[] produces() default {};
+
 }
