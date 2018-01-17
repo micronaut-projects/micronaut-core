@@ -145,6 +145,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> POST(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")
@@ -162,6 +163,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")
@@ -179,6 +181,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")
@@ -196,6 +199,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
         HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
                 new IllegalStateException("No HTTP client implementation found on classpath")
         );
@@ -212,5 +216,22 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> DELETE(String uri) {
         return DELETE(uri, null);
+    }
+
+    /**
+     * Create a new {@link MutableHttpRequest} for the given method and URI
+     * @param httpMethod The method
+     * @param uri The URI
+     * @param <T>
+     * @return The request
+     */
+    static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
+        Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
+        Objects.requireNonNull(uri, "Argument [uri] is required");
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.create(httpMethod, uri);
     }
 }
