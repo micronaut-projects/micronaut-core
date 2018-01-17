@@ -18,8 +18,8 @@ package org.particleframework.context.router
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.http.annotation.Controller
 import org.particleframework.web.router.Router
-import org.particleframework.web.router.annotation.Get
-import org.particleframework.web.router.annotation.Post
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Post
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -57,6 +57,7 @@ class AnnotationRouteBuilderSpec extends Specification {
 
     @Controller('/')
     static class ApplicationController {
+        @Get('/')
         String index() {
             'welcome'
         }

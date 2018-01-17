@@ -20,6 +20,7 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.http.annotation.Produces;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -167,6 +168,16 @@ public class MediaType implements CharSequence {
      * Server Sent Event: text/event-stream
      */
     public static final MediaType TEXT_EVENT_STREAM_TYPE = new MediaType(TEXT_EVENT_STREAM);
+
+    /**
+     * JSON Stream: application/x-json-stream
+     */
+    public final static String APPLICATION_JSON_STREAM = "application/x-json-stream";
+
+    /**
+     * JSON Stream: application/x-json-stream
+     */
+    public final static MediaType APPLICATION_JSON_STREAM_TYPE = new MediaType("application/x-json-stream");
 
     public static final String CHARSET_PARAMETER = "charset";
     public static final String Q_PARAMETER = "q";
@@ -327,6 +338,12 @@ public class MediaType implements CharSequence {
         return parameters.getOrDefault(V_PARAMETER, null);
     }
 
+    /**
+     * @return The charset of the media type if specified
+     */
+    public Optional<Charset> getCharset() {
+        return getParameters().get("charset").map(Charset::forName);
+    }
 
     @Override
     public int length() {
@@ -415,4 +432,6 @@ public class MediaType implements CharSequence {
             return bd;
         }
     }
+
+
 }

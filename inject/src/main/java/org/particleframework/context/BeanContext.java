@@ -91,6 +91,37 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType The bean type
+     * @param qualifier The qualifier
+     * @param args The argument values
+     * @param <T> The bean generic type
+     * @return The instance
+     */
+    <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Object...args);
+
+    /**
+     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     *
+     * <p>If the bean defines any {@link org.particleframework.context.annotation.Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     *
+     * <p>Note that the instance returned is not saved as a singleton in the context.</p>
+     *
+     * @param beanType The bean type
+     * @param args The argument values
+     * @param <T> The bean generic type
+     * @return The instance
+     */
+    default <T> T createBean(Class<T> beanType, Object...args) {
+        return createBean(beanType, null, args);
+    }
+
+    /**
+     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     *
+     * <p>If the bean defines any {@link org.particleframework.context.annotation.Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     *
+     * <p>Note that the instance returned is not saved as a singleton in the context.</p>
+     *
+     * @param beanType The bean type
      * @param argumentValues The argument values
      * @param <T> The bean generic type
      * @return The instance

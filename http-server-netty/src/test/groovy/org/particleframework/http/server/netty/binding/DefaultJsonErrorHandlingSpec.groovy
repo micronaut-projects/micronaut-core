@@ -22,7 +22,7 @@ import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Post
+import org.particleframework.http.annotation.Post
 
 /**
  * @author Graeme Rocher
@@ -45,7 +45,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "Invalid JSON"
+        response.message() == "No!! Invalid JSON"
 
     }
 

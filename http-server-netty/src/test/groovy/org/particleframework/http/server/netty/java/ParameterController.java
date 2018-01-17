@@ -18,7 +18,7 @@ package org.particleframework.http.server.netty.java;
 import org.particleframework.http.HttpParameters;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.annotation.Controller;
-import org.particleframework.web.router.annotation.Get;
+import org.particleframework.http.annotation.Get;
 
 import java.util.List;
 import java.util.Map;
@@ -30,7 +30,7 @@ import java.util.Optional;
  */
 @Controller("/java/parameter")
 public class ParameterController {
-    @Get
+    @Get("/")
     String index(Integer max) {
         return "Parameter Value: " + max;
     }

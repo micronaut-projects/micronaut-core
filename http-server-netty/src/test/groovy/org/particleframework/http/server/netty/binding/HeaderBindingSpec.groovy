@@ -22,7 +22,7 @@ import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Header
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
-import org.particleframework.web.router.annotation.Get
+import org.particleframework.http.annotation.Get
 import spock.lang.Shared
 import spock.lang.Unroll
 

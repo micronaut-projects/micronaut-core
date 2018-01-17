@@ -41,7 +41,8 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Singleton
-@Requires(notEnv = Environment.ANDROID) // Android doesn't support java.time
+// Android doesn't support java.time
+@Requires(notEnv = Environment.ANDROID)
 public class TimeConverterRegistrar implements TypeConverterRegistrar{
 
     private static final Pattern DURATION_MATCHER = Pattern.compile("(\\d+)([s|m|h|d])(s?)");

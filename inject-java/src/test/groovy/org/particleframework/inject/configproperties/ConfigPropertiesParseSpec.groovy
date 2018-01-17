@@ -16,6 +16,7 @@
 package org.particleframework.inject.configproperties
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.convert.format.ReadableBytes
 import org.particleframework.inject.AbstractTypeElementSpec
 import org.particleframework.inject.BeanDefinition
 import org.particleframework.inject.BeanFactory
@@ -25,6 +26,108 @@ import org.particleframework.inject.BeanFactory
  * @since 1.0
  */
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    void "test inheritance with setters"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.ChildConfig', '''
+package test;
+
+import org.particleframework.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    String host;
+
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+}
+
+@ConfigurationProperties("baz")
+class ChildConfig extends MyConfig {
+    String stuff;
+
+    public String getStuff() {
+        return stuff;
+    }
+
+    public void setStuff(String stuff) {
+        this.stuff = stuff;
+    }
+}
+
+
+
+
+''')
+        then:
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedMethods.find { it.name == 'setHost'}
+        beanDefinition.injectedMethods.find { it.name == 'setStuff'}
+    }
+
+    void "test annotation on package scope setters arguments"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.HttpClientConfiguration', '''
+package test;
+
+import org.particleframework.core.convert.format.*;
+import org.particleframework.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("http.client")
+public class HttpClientConfiguration {
+    private int maxContentLength = 1024 * 1024 * 10; // 10MB;
+    
+    void setMaxContentLength(@ReadableBytes int maxContentLength) {
+        this.maxContentLength = maxContentLength;
+    }
+    public int getMaxContentLength() {
+        return maxContentLength;
+    }
+
+}
+''')
+        then:
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(ReadableBytes)
+    }
+
+    void "test annotation on setters arguments"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.HttpClientConfiguration', '''
+package test;
+
+import org.particleframework.core.convert.format.*;
+import org.particleframework.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("http.client")
+public class HttpClientConfiguration {
+    private int maxContentLength = 1024 * 1024 * 10; // 10MB;
+    
+    public void setMaxContentLength(@ReadableBytes int maxContentLength) {
+        this.maxContentLength = maxContentLength;
+    }
+    public int getMaxContentLength() {
+        return maxContentLength;
+    }
+
+}
+''')
+        then:
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(ReadableBytes)
+    }
 
     void "test different inject types for config properties"() {
         when:

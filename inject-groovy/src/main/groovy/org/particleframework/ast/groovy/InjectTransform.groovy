@@ -232,7 +232,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     AnnotationMetadata annotationMetadata
                     if (AstAnnotationUtils.isAnnotated(methodNode)) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode);
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,

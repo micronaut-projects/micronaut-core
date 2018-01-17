@@ -28,6 +28,7 @@ import org.particleframework.context.exceptions.NoSuchBeanException;
 import org.particleframework.context.exceptions.NonUniqueBeanException;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
+import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.service.StreamSoftServiceLoader;
 import org.particleframework.core.naming.Named;
@@ -43,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
+import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -399,6 +401,36 @@ public class DefaultBeanContext implements BeanContext {
         Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false);
         if (candidate.isPresent()) {
             T createdBean = doCreateBean(new DefaultBeanResolutionContext(this, candidate.get()), candidate.get(), qualifier, false, argumentValues);
+            if (createdBean == null) {
+                throw new NoSuchBeanException(beanType);
+            }
+            return createdBean;
+        }
+        throw new NoSuchBeanException(beanType);
+    }
+
+    @Override
+    public <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Object... args) {
+        Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false);
+        if (candidate.isPresent()) {
+            BeanDefinition<T> definition = candidate.get();
+            DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition);
+            Map<String,Object> argumentValues;
+            if(definition instanceof ParametrizedBeanFactory) {
+                Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
+                if(args.length != requiredArguments.length) {
+                    throw new BeanInstantiationException(resolutionContext, "Invalid number of bean arguments. Required " +requiredArguments.length + " but received " + args.length );
+                }
+                argumentValues = new LinkedHashMap<>(requiredArguments.length);
+                for (int i = 0; i < requiredArguments.length; i++) {
+                    Argument requiredArgument = requiredArguments[i];
+                    argumentValues.put(requiredArgument.getName(), args[i]);
+                }
+            }
+            else {
+                argumentValues = Collections.emptyMap();
+            }
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
             if (createdBean == null) {
                 throw new NoSuchBeanException(beanType);
             }
@@ -856,6 +888,10 @@ public class DefaultBeanContext implements BeanContext {
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> definition = concreteCandidate.get();
 
+            if(resolutionContext == null) {
+                resolutionContext = new DefaultBeanResolutionContext(this, definition);
+            }
+
             if (definition.isProvided() && beanType == definition.getBeanType()) {
                 if (throwNoSuchBean) {
                     throw new NoSuchBeanException(beanType, qualifier);
@@ -891,7 +927,15 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
         boolean isProxy = definition instanceof ProxyBeanDefinition;
-        Optional<Class<? extends Annotation>> scope = isProxy ? Optional.empty() : definition.getScope();
+        Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
+        Optional<Class<? extends Annotation>> scope = Optional.empty();
+        if(currentSegment.isPresent()) {
+            scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, currentSegment.get().getArgument().getAnnotations()).map(Annotation::annotationType);
+        }
+        if(!scope.isPresent()) {
+            scope = isProxy ? Optional.empty() : definition.getScope();
+        }
+
         Optional<CustomScope> registeredScope = scope.flatMap(customScopeRegistry::findScope);
         if (registeredScope.isPresent()) {
             CustomScope customScope = registeredScope.get();
@@ -900,10 +944,11 @@ public class DefaultBeanContext implements BeanContext {
             }
             BeanDefinition<T> finalDefinition = definition;
             return (T) customScope.get(
+                    resolutionContext,
                     finalDefinition,
                     new BeanKey(beanType, qualifier),
-                    () -> {
-                        T createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, null);
+                    (ParametrizedProvider<T>) argumentValues -> {
+                        T createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, argumentValues);
                         if (createBean == null && throwNoSuchBean) {
                             throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
                         }

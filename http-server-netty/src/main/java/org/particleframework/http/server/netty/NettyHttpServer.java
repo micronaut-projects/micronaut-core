@@ -85,6 +85,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final int serverPort;
+    private final ApplicationContext applicationContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
 
@@ -104,6 +105,7 @@ public class NettyHttpServer implements EmbeddedServer {
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
+        this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.specialTypeHandlerRegistry = specialTypeHandlerRegistry;
         this.beanLocator = applicationContext;
@@ -193,11 +195,8 @@ public class NettyHttpServer implements EmbeddedServer {
                            .addListener(this::logShutdownErrorIfNecessary);
                 parentGroup.shutdownGracefully()
                            .addListener(this::logShutdownErrorIfNecessary);
-                if(beanLocator instanceof LifeCycle) {
-                    LifeCycle lifeCycle = (LifeCycle) beanLocator;
-                    if(lifeCycle.isRunning()) {
-                        lifeCycle.stop();
-                    }
+                if(applicationContext.isRunning()) {
+                    applicationContext.stop();
                 }
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
@@ -245,6 +244,11 @@ public class NettyHttpServer implements EmbeddedServer {
         } catch (URISyntaxException e) {
             throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public ApplicationContext getApplicationContext() {
+        return applicationContext;
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {
