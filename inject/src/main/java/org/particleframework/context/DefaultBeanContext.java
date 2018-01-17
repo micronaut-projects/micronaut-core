@@ -410,6 +410,36 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> T createBean(Class<T> beanType, Qualifier<T> qualifier, Object... args) {
+        Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false);
+        if (candidate.isPresent()) {
+            BeanDefinition<T> definition = candidate.get();
+            DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition);
+            Map<String,Object> argumentValues;
+            if(definition instanceof ParametrizedBeanFactory) {
+                Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
+                if(args.length != requiredArguments.length) {
+                    throw new BeanInstantiationException(resolutionContext, "Invalid number of bean arguments. Required " +requiredArguments.length + " but received " + args.length );
+                }
+                argumentValues = new LinkedHashMap<>(requiredArguments.length);
+                for (int i = 0; i < requiredArguments.length; i++) {
+                    Argument requiredArgument = requiredArguments[i];
+                    argumentValues.put(requiredArgument.getName(), args[i]);
+                }
+            }
+            else {
+                argumentValues = Collections.emptyMap();
+            }
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
+            if (createdBean == null) {
+                throw new NoSuchBeanException(beanType);
+            }
+            return createdBean;
+        }
+        throw new NoSuchBeanException(beanType);
+    }
+
+    @Override
     public <T> T destroyBean(Class<T> beanType) {
         T bean = null;
         BeanKey<T> beanKey = new BeanKey<>(beanType, null);
