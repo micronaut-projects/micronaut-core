@@ -15,12 +15,10 @@
  */
 package org.particleframework.docs.server.body
 
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
-import okhttp3.Response
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.MediaType
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -34,31 +32,33 @@ class MessageControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer) // <1>
-
+    @Shared @AutoCleanup HttpClient httpClient =
+            embeddedServer.getApplicationContext()
+                          .createBean(HttpClient, embeddedServer.getURL())
+    
     void "test echo response"() {
         given:
-        OkHttpClient client = new OkHttpClient()
         String body = "My Text"
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/receive/echo"))
-                .post(RequestBody.create(MediaType.parse("text/plain"), body))// <2>
-        Response response = client.newCall(request.build()).execute()
+        String response = httpClient.toBlocking().retrieve(
+                HttpRequest.POST('/receive/echo', body)
+                           .contentType(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
 
         expect:
-        response.body().string() == body // <2>
+        response == body // <2>
     }
 
 
     void "test echo reactive response"() {
         given:
-        OkHttpClient client = new OkHttpClient()
         String body = "My Text"
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/receive/echoFlow"))
-                .post(RequestBody.create(MediaType.parse("text/plain"), body))// <2>
-        Response response = client.newCall(request.build()).execute()
-
+        String response = httpClient.toBlocking().retrieve(
+                HttpRequest.POST('/receive/echoFlow', body)
+                        .contentType(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
         expect:
-        response.body().string() == body // <2>
+        response == body // <2>
     }
 }

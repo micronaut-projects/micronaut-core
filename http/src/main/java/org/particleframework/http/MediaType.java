@@ -20,6 +20,7 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.http.annotation.Produces;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -337,6 +338,12 @@ public class MediaType implements CharSequence {
         return parameters.getOrDefault(V_PARAMETER, null);
     }
 
+    /**
+     * @return The charset of the media type if specified
+     */
+    public Optional<Charset> getCharset() {
+        return getParameters().get("charset").map(Charset::forName);
+    }
 
     @Override
     public int length() {
@@ -425,4 +432,6 @@ public class MediaType implements CharSequence {
             return bd;
         }
     }
+
+
 }
