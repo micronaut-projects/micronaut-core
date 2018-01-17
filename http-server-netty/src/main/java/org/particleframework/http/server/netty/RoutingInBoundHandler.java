@@ -44,7 +44,7 @@ import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
-import org.particleframework.http.common.codec.TextPlainCodec;
+import org.particleframework.runtime.http.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;

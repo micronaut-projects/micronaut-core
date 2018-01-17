@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.http.common.codec;
+package org.particleframework.runtime.http.codec;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
