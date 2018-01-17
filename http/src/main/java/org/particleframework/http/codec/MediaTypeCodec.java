@@ -59,6 +59,7 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be decoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
+
     /**
      * Encode the given type returning the object as a byte[]
      *
@@ -92,6 +93,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
         return decode(Argument.of(type), inputStream);
     }
+
     /**
      * Decode the given type from the given bytes
      *
@@ -105,6 +107,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, byte[] bytes) throws CodecException {
         return decode(type, new ByteArrayInputStream(bytes));
     }
+
     /**
      * Decode the given type from the given bytes
      *
@@ -118,6 +121,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
         return decode(type, new ByteArrayInputStream(bytes));
     }
+
     /**
      * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
      *
@@ -131,6 +135,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, ByteBuffer<?> buffer) throws CodecException {
         return decode(type, buffer.toInputStream());
     }
+
     /**
      * Decode the given type from the given buffer. Implementations optimized to handle {@link ByteBuffer} instances should override this method.
      *
@@ -144,6 +149,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
         return decode(type, buffer.toInputStream());
     }
+
     /**
      * Decode the given type from the given bytes
      *
@@ -157,6 +163,7 @@ public interface MediaTypeCodec {
     default <T> T decode(Class<T> type, String data) throws CodecException {
         return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
     }
+
     /**
      * Decode the given type from the given bytes
      *
@@ -179,5 +186,6 @@ public interface MediaTypeCodec {
     default boolean supportsType(Class<?> type) {
         return true;
     }
+
 }
 

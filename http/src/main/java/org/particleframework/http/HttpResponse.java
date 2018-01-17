@@ -165,6 +165,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return an {@link HttpStatus#NOT_MODIFIED} response with an empty body
+     *
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> notModified() {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No Server implementation found on classpath")
+        );
+
+        return factory.status(HttpStatus.NOT_MODIFIED);
+    }
+
+    /**
      * Return an {@link HttpStatus#OK} response with a body
      *
      * @return The ok response
