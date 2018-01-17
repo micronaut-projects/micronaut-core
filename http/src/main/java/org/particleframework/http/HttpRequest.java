@@ -106,6 +106,22 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a {@link MutableHttpRequest} for a {@link HttpMethod#OPTIONS} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> OPTIONS(String uri) {
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.options(uri);
+    }
+
+
+    /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#HEAD} request for the given URI
      *
      * @param uri The URI
@@ -169,5 +185,32 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         );
 
         return factory.patch(uri, body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     *
+     * @param uri The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON}
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
+        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No HTTP client implementation found on classpath")
+        );
+
+        return factory.delete(uri, body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI
+     *
+     * @param uri The URI
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> DELETE(String uri) {
+        return DELETE(uri, null);
     }
 }

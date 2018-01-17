@@ -17,6 +17,7 @@ package org.particleframework.web.router.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.http.annotation.Consumes;
+import org.particleframework.http.annotation.Produces;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -53,4 +54,10 @@ public @interface Delete {
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
+
+    /**
+     * @return The default produces, otherwise override from controller
+     */
+    @AliasFor(annotation = Produces.class, member = "value")
+    String[] produces() default {};
 }
