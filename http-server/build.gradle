@@ -1,5 +1,5 @@
 dependencies {
-    compile project(":http-common")
+    compile project(":runtime")
     compileOnly project(":inject-java")
     testCompile project(":inject-java")
 }
