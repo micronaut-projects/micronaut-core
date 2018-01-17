@@ -50,7 +50,6 @@ class RxJavaCrudSpec extends Specification {
 
         when:
         Book book = client.get(99)
-                          .onErrorResumeNext(Maybe.empty())
                           .blockingGet()
         List<Book> books = client.list().blockingGet()
 
@@ -90,7 +89,6 @@ class RxJavaCrudSpec extends Specification {
 
         when:
         book = client.get(book.id)
-                .onErrorResumeNext(Maybe.empty())
                 .blockingGet()
         then:
         book == null

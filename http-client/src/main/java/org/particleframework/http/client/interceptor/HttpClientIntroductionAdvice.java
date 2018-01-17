@@ -55,14 +55,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * TODO: Javadoc description
+ * Introduction advice that implements the {@link Client} annotation
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
-
 
     final BeanContext beanContext;
     private final Optional<EmbeddedServer> embeddedServer;
@@ -157,9 +156,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             request, publisherArgument
                     );
                 }
-                return ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(()->
-                    new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
+                Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
+                        new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
                 );
+                finalPublisher = finalizePublisher(finalPublisher);
+
+                return finalPublisher;
             }
             else {
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
@@ -190,6 +192,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         }
         throw new UnsupportedOperationException("Cannot implement method that is not annotated with an HTTP method type");
+    }
+
+    /**
+     * Hook to allow dealing with the final converted Publisher type
+     *
+     * @param finalPublisher The final publisher
+     * @return The resulting publisher. Never null
+     */
+    protected Object finalizePublisher(Object finalPublisher) {
+        return finalPublisher;
     }
 
     private ClientRegistration getClient(String[] clientId) {
