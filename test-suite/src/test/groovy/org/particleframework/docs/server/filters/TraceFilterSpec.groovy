@@ -15,10 +15,10 @@
  */
 package org.particleframework.docs.server.filters
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -32,18 +32,19 @@ class TraceFilterSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup HttpClient httpClient =
+            embeddedServer.getApplicationContext()
+                    .createBean(HttpClient, embeddedServer.getURL())
+
 
     void "test trace filter"() {
         given:
-        // TODO: Replace with Particle HTTP client when written
-        OkHttpClient client = new OkHttpClient()
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/hello"))
-        Response response = client.newCall(request.build()).execute()
+        HttpResponse response = httpClient.toBlocking()
+                                      .exchange(HttpRequest.GET('/hello'))
 
 
         expect:
-        response.header('X-Trace-Enabled') == 'true'
+        response.headers.get('X-Trace-Enabled') == 'true'
     }
 }
 

@@ -104,25 +104,31 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Object body = null;
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
             List<String> uriVariables = uriTemplate.getVariables();
-
-            if(HttpMethod.permitsRequestBody(httpMethod)) {
-                Argument[] arguments = context.getArguments();
-                List<Argument> bodyArguments = new ArrayList<>();
-                for (Argument argument : arguments) {
-                    String argumentName = argument.getName();
-                    if(argument.isAnnotationPresent(Body.class)) {
-                        body = parameters.get(argumentName).getValue();
-                        break;
-                    }
-                    else if(argument.isAnnotationPresent(Header.class)) {
-                        MutableArgumentValue<?> value = parameters.get(argumentName);
-                        ConversionService.SHARED.convert(value.getValue(), String.class)
-                                .ifPresent(o -> request.header(NameUtils.hyphenate(argumentName), o));
-                    }
-                    else if(!uriVariables.contains(argumentName)){
-                        bodyArguments.add(argument);
-                    }
+            Argument[] arguments = context.getArguments();
+            List<Argument> bodyArguments = new ArrayList<>();
+            for (Argument argument : arguments) {
+                String argumentName = argument.getName();
+                if(argument.isAnnotationPresent(Body.class)) {
+                    body = parameters.get(argumentName).getValue();
+                    break;
                 }
+                else if(argument.isAnnotationPresent(Header.class)) {
+
+                    String headerName = argument.getAnnotation(Header.class).value();
+                    if(StringUtils.isEmpty(headerName)) {
+                        headerName = NameUtils.hyphenate(argumentName);
+                    }
+                    MutableArgumentValue<?> value = parameters.get(argumentName);
+                    String finalHeaderName = headerName;
+                    ConversionService.SHARED.convert(value.getValue(), String.class)
+                            .ifPresent(o -> request.header(finalHeaderName, o));
+                }
+                else if(!uriVariables.contains(argumentName)){
+                    bodyArguments.add(argument);
+                }
+            }
+            if(HttpMethod.permitsRequestBody(httpMethod)) {
+
                 if(body == null && !bodyArguments.isEmpty()) {
                     Map<String,Object> bodyMap = new LinkedHashMap<>();
 
