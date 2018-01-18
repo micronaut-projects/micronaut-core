@@ -34,7 +34,6 @@ import javax.sql.DataSource
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
 class GormConfigSpec extends Specification {
 
     void "test gorm config configures gorm"() {
@@ -60,7 +59,7 @@ class GormConfigSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         then:
-//        bookService.dbCreate TODO: fix me!
+        bookService.dbCreate
         bookService.list().size() == 0
 
         cleanup:

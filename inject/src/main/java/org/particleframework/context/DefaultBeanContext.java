@@ -21,10 +21,7 @@ import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
-import org.particleframework.context.exceptions.BeanInstantiationException;
-import org.particleframework.context.exceptions.DependencyInjectionException;
-import org.particleframework.context.exceptions.NoSuchBeanException;
-import org.particleframework.context.exceptions.NonUniqueBeanException;
+import org.particleframework.context.exceptions.*;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
 import org.particleframework.core.annotation.AnnotationUtil;
@@ -51,6 +48,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -382,11 +380,17 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> T inject(T instance) {
-        @SuppressWarnings("unchecked") Class<T> beanType = (Class<T>) instance.getClass();
-        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, null, true, true);
-        concreteCandidate.ifPresent(def ->
-                def.inject(this, instance)
-        );
+        Objects.requireNonNull(instance, "Instance cannot be null");
+        
+        Collection<BeanDefinition> candidates = findBeanCandidates(instance);
+        if(candidates.size() == 1) {
+            BeanDefinition<T> beanDefinition = candidates.stream().findFirst().get();
+            beanDefinition.inject(new DefaultBeanResolutionContext(this, beanDefinition), this, instance);
+
+        }
+        else if(!candidates.isEmpty()) {
+            throw new BeanContextException("Multiple possible bean candidates found for injection: " + candidates);
+        }
         return instance;
     }
 
@@ -736,6 +740,48 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
+     * Find bean candidates for the given type
+     *
+     * @param instance The bean instance
+     * @param <T>      The bean generic type
+     * @return The candidates
+     */
+    protected <T> Collection<BeanDefinition> findBeanCandidates(T instance) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Finding candidate beans for instance: {}", instance);
+        }
+        Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
+        return beanCandidateCache.get(instance.getClass(), aClass -> {
+            // first traverse component definition classes and load candidates
+
+            if (!beanDefinitionsClasses.isEmpty()) {
+
+                List<BeanDefinition> candidates = beanDefinitionsClasses
+                        .parallelStream()
+                        .filter(reference -> {
+                            Class<?> candidateType = reference.getBeanType();
+
+                            return candidateType != null && candidateType.isInstance(instance);
+                        })
+                        .map(BeanDefinitionReference::load)
+                        .filter(candidate -> candidate.isEnabled(this))
+                        .collect(Collectors.toList());
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Resolved bean candidates {} for instance: {}", candidates, instance);
+                }
+                return candidates;
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("No bean candidates found for instance: {}", instance);
+                }
+                return Collections.emptySet();
+            }
+        });
+
+    }
+
+    /**
      * Registers an active configuration
      *
      * @param configuration The configuration to register
@@ -1057,7 +1103,7 @@ public class DefaultBeanContext implements BeanContext {
                 definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
             } else {
                 candidates.removeIf(BeanDefinition::isAbstract);
-                if (size == 1) {
+                if (candidates.size() == 1) {
                     definition = candidates.iterator().next();
                 } else {
 
