@@ -43,10 +43,12 @@ import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
+import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.*;
+import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.client.exceptions.ContentLengthExceededException;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
@@ -337,7 +339,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             return completableFuture;
         });
         if(filters.length > 0) {
-            List<HttpClientFilter> httpClientFilters = Arrays.asList(this.filters);
+            List<HttpClientFilter> httpClientFilters = resolveFilters(request.getPath());
             OrderUtil.reverseSort(httpClientFilters);
             httpClientFilters.add((req, chain) -> responsePublisher);
 
@@ -408,6 +410,35 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             sslCtx = null;
         }
         return sslCtx;
+    }
+
+    /**
+     * Resolve the filters for the request path
+     * @param path The path
+     * @return The filters
+     */
+    protected List<HttpClientFilter> resolveFilters(String path) {
+        List<HttpClientFilter> filterList = new ArrayList<>();
+        for (HttpClientFilter filter : filters) {
+            Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
+            if(filterAnn != null) {
+                String[] value = filterAnn.value();
+                if(value.length == 0) {
+                    filterList.add(filter);
+                }
+                else {
+                    for (String pathPattern : value) {
+                        if(PathMatcher.ANT.matches(pathPattern, path)) {
+                            filterList.add(filter);
+                        }
+                    }
+                }
+            }
+            else {
+                filterList.add(filter);
+            }
+        }
+        return filterList;
     }
     /**
      * Builds an {@link SslContext} from the {@link HttpClientConfiguration}
