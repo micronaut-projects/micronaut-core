@@ -75,6 +75,7 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -99,6 +100,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     protected final Bootstrap bootstrap;
     protected final EventLoopGroup group;
     private final HttpClientFilter[] filters;
+    private final Charset defaultCharset;
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
@@ -116,6 +118,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      */
     public DefaultHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
+        this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
         OptionalInt numOfThreads = configuration.getNumOfThreads();
@@ -235,8 +238,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
                             Optional body = clientHttpRequest.getBody();
                             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && body.isPresent()) {
+                                Object bodyValue = body.get();
                                 HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
-                                Object requestBody = body.get();
+                                Object requestBody = bodyValue;
                                 Map<String, Object> formData;
                                 if (requestBody instanceof Map) {
                                     formData = (Map<String, Object>) requestBody;
@@ -255,12 +259,23 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                                 nettyRequest = postRequestEncoder.finalizeRequest();
                             } else {
                                 ByteBuf bodyContent = null;
-                                if (body.isPresent() && mediaTypeCodecRegistry != null) {
-                                    Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                    bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(body.get(), byteBufferFactory).asNativeBuffer())
-                                            .orElse(null);
+                                if (body.isPresent()) {
+                                    Object bodyValue = body.get();
+                                    if(CharSequence.class.isAssignableFrom(bodyValue.getClass())) {
+                                        CharSequence charSequence = (CharSequence) bodyValue;
+                                        bodyContent = byteBufferFactory.copiedBuffer(
+                                                charSequence.toString().getBytes(
+                                                    requestContentType.getCharset().orElse(defaultCharset)
+                                                )
+                                        ).asNativeBuffer();
+                                    }
+                                    else if(mediaTypeCodecRegistry != null) {
+                                        Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
+                                        bodyContent = registeredCodec.map(codec -> (ByteBuf) codec.encode(bodyValue, byteBufferFactory).asNativeBuffer())
+                                                .orElse(null);
+                                    }
                                     if (bodyContent == null) {
-                                        bodyContent = ConversionService.SHARED.convert(body.get(), ByteBuf.class).orElse(null);
+                                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElse(null);
                                     }
                                 }
 

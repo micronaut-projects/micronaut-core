@@ -15,14 +15,13 @@
  */
 package org.particleframework.docs.server.json
 
-import groovy.json.JsonSlurper
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
-import okhttp3.Response
+import okhttp3.*
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.exceptions.HttpClientResponseException
+import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -39,90 +38,80 @@ class PersonControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
 
+    @Shared @AutoCleanup RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
+
     void "test global error handler"() {
-        given:
-        // TODO: Replace with Particle HTTP client when written
-        OkHttpClient client = new OkHttpClient()
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/people/error"))
 
         when:
-        Response response = client.newCall(request.build()).execute()
-
+        client.exchange("/people/error", Map.class)
+              .blockingFirst()
 
         then:
-        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        def e = thrown(HttpClientResponseException)
 
         when:
-        def json = new JsonSlurper().parseText(response.body().string())
+        def response = e.response
 
         then:
+        response.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        when:
+        def json = response.body.orElse(null)
+
+        then:
+        json
         json.message == 'Bad Things Happened: Something went wrong'
     }
 
     void "test save person"() {
         given:
-        // TODO: Replace with Particle HTTP client when written
-        OkHttpClient client = new OkHttpClient()
         String body = '{"firstName":"Fred","lastName":"Flintstone","age":45}'
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/people"))
-                .post(RequestBody.create(MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), body))// <2>
-        Response response = client.newCall(request.build()).execute()
-
+        HttpResponse<String> response = client.exchange(HttpRequest.POST('/people', body), String)
+                                              .blockingFirst()
 
         expect:
-        response.body().string() == body // <2>
-        response.code() == HttpStatus.CREATED.code
+        response.body.isPresent()
+        response.body.get() == body
+        response.status == HttpStatus.CREATED
     }
 
 
 
     void "test retrieve person"() {
-        given:
-        // TODO: Replace with Particle HTTP client when written
-        OkHttpClient client = new OkHttpClient()
 
         when:
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/people/Fred"))
-
-        Response response = client.newCall(request.build()).execute()
-
+        HttpResponse<Map> response = client.exchange('/people/Fred', Map).blockingFirst()
 
         then:
-        response.code() == HttpStatus.OK.code
+        response.status == HttpStatus.OK
 
         when:
-        def json = new JsonSlurper().parseText(response.body().string())
+        def json = response.body
+                        .orElseThrow({-> new AssertionError("body expected")})
 
         then:
         json.firstName == "Fred"
 
         when:
-        request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/people/Barney"))
-
-        response = client.newCall(request.build()).execute()
+        client.exchange('/people/Barney')
+              .blockingFirst()
 
         then:
-        response.code() == HttpStatus.NOT_FOUND.code
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.NOT_FOUND
 
     }
 
     void "test save person with args"() {
         given:
-        // TODO: Replace with Particle HTTP client when written
-        OkHttpClient client = new OkHttpClient()
         String body = '{"firstName":"Fred","lastName":"Flintstone","age":45}'
-        Request.Builder request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/people/saveWithArgs"))
-                .post(RequestBody.create(MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), body))// <2>
-        Response response = client.newCall(request.build()).execute()
-
+        HttpResponse<String> response = client.exchange(
+                HttpRequest.POST("/people/saveWithArgs", body), String
+        ).blockingFirst()
 
         expect:
-        response.body().string() == body // <2>
-        response.code() == HttpStatus.CREATED.code
+        response.body.isPresent()
+        response.body.get() == body 
+        response.status == HttpStatus.CREATED
     }
 }

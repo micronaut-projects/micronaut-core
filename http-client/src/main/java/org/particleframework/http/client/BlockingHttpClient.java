@@ -43,7 +43,7 @@ public interface BlockingHttpClient {
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return The full {@link HttpResponse} object
      */
     <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType);
 
@@ -53,7 +53,7 @@ public interface BlockingHttpClient {
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
      * @param <O>     The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return The full {@link HttpResponse} object
      */
     default <I, O> HttpResponse<O> exchange(HttpRequest<I> request) {
         return exchange(request, (Argument<O>) null);
@@ -67,7 +67,7 @@ public interface BlockingHttpClient {
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return The full {@link HttpResponse} object
      */
     default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Class<O> bodyType) {
         return exchange(request, Argument.of(bodyType));
@@ -81,7 +81,8 @@ public interface BlockingHttpClient {
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return A result of the given type or null the URI returns a 404
+     * @throws HttpClientResponseException if an error status is returned
      */
     default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         HttpResponse<O> response = exchange(request, bodyType);
@@ -102,10 +103,57 @@ public interface BlockingHttpClient {
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return A result of the given type or null the URI returns a 404
+     * @throws HttpClientResponseException if an error status is returned
      */
     default <I, O> O retrieve(HttpRequest<I> request, Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
+    }
+
+    /**
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
+     * the response body to the specified type
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param <I>      The request body type
+     * @return A string result or null if a 404 is returned
+     * @throws HttpClientResponseException if an error status is returned
+     */
+    default <I> String retrieve(HttpRequest<I> request) {
+        return retrieve(request, String.class);
+    }
+
+    /**
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
+     * the response body to the specified type
+     *
+     * @param uri The URI
+     * @return A string result or null if a 404 is returned
+     * @throws HttpClientResponseException if an error status is returned
+     */
+    default String retrieve(String uri) {
+        return retrieve(HttpRequest.GET(uri), String.class);
+    }
+    /**
+     * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     *
+     * @param uri The URI of the GET request
+     * @param <O>     The response body type
+     * @return The full {@link HttpResponse} object
+     */
+    default <O> HttpResponse<O> exchange(String uri) {
+        return exchange(HttpRequest.GET(uri), (Argument<O>) null);
+    }
+
+    /**
+     * Perform a GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     *
+     * @param uri The URI of the GET request
+     * @param <O>     The response body type
+     * @return The full {@link HttpResponse} object
+     */
+    default <O> HttpResponse<O> exchange(String uri, Class<O> bodyType) {
+        return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
     }
 
 }

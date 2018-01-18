@@ -74,6 +74,26 @@ public interface HttpClient extends Closeable{
     }
 
     /**
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     *
+     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     */
+    default Publisher<HttpResponse<ByteBuffer>> exchange(String uri) {
+        return exchange(HttpRequest.GET(uri), ByteBuffer.class);
+    }
+
+    /**
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher}
+     * @param uri The request URI
+     * @param bodyType The body type
+     * @param <O>      The response body type
+
+     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     */
+    default <O> Publisher<HttpResponse<O>> exchange(String uri, Class<O> bodyType) {
+        return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
+    }
+    /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
      * the response body to the specified type
      *
@@ -95,7 +115,7 @@ public interface HttpClient extends Closeable{
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return A {@link Publisher} that emits a result of the given type
      */
     default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         return Publishers.map(exchange(request, bodyType), response ->
@@ -115,12 +135,35 @@ public interface HttpClient extends Closeable{
      * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
-     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     * @return A {@link Publisher} that emits a result of the given type
      */
     default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
     }
 
+    /**
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
+     * the response body to the specified type
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param <I>      The request body type
+     * @return A {@link Publisher} that emits String result
+     */
+    default <I> Publisher<String> retrieve(HttpRequest<I> request) {
+        return retrieve(request, String.class);
+    }
+
+    /**
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned {@link Publisher} and converting
+     * the response body to the specified type
+     *
+     * @param uri The URI
+     * @param <I>      The request body type
+     * @return A {@link Publisher} that emits String result
+     */
+    default <I> Publisher<String> retrieve(String uri) {
+        return retrieve(HttpRequest.GET(uri), String.class);
+    }
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead
