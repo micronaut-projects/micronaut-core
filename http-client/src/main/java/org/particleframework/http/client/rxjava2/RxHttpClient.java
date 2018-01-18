@@ -30,6 +30,7 @@ import org.particleframework.http.client.ServerSelector;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.sse.Event;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;
 import java.net.URL;
@@ -88,6 +89,26 @@ public class RxHttpClient extends DefaultHttpClient {
         return Flowable.fromPublisher(super.retrieve(request, bodyType));
     }
 
+    @Override
+    public Flowable<HttpResponse<ByteBuffer>> exchange(String uri) {
+        return Flowable.fromPublisher(super.exchange(uri));
+    }
+
+    @Override
+    public <O> Flowable<HttpResponse<O>> exchange(String uri, Class<O> bodyType) {
+        return Flowable.fromPublisher(super.exchange(uri, bodyType));
+    }
+
+    @Override
+    public <I> Flowable<String> retrieve(HttpRequest<I> request) {
+        return Flowable.fromPublisher(super.retrieve(request));
+    }
+
+    @Override
+    public <I> Flowable<String> retrieve(String uri) {
+        return Flowable.fromPublisher(super.retrieve(uri));
+    }
+
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead
@@ -96,7 +117,7 @@ public class RxHttpClient extends DefaultHttpClient {
      * @param url The base URL
      * @return The client
      */
-    static RxHttpClient create(URL url) {
+    public static RxHttpClient create(URL url) {
         return new RxHttpClient(url);
     }
 }
