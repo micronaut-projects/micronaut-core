@@ -55,8 +55,8 @@ class HibernateFactory {
         Class[] classes = entities.toArray() as Class[]
         HibernateDatastore datastore = new HibernateDatastore(new PropertyResolverAdapter(applicationContext),classes)
         for(o in datastore.getServices()) {
-            Service service = (Service)o
-            applicationContext.registerSingleton(service)
+            applicationContext.inject(o)
+            applicationContext.registerSingleton(o)
         }
         return datastore
     }

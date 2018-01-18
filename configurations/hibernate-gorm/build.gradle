@@ -4,7 +4,9 @@ dependencies {
     compile project(":runtime-groovy")
     compile project(":inject")
     compile project(":spring")
+    testCompile project(":inject-groovy")
     compile "org.grails:grails-datastore-gorm-hibernate5:$gormVersion"
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
 }
+//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

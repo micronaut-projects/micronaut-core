@@ -17,7 +17,6 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.event.BeanCreatedEvent;
@@ -63,7 +62,7 @@ import java.util.stream.Stream;
  */
 public class DefaultBeanContext implements BeanContext {
 
-    public static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
+    private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
 
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
@@ -875,18 +874,20 @@ public class DefaultBeanContext implements BeanContext {
             }
             return beanRegistration.bean;
         }
-        T bean = findExistingCompatibleSingleton(beanType, qualifier);
-        if (bean != null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
-            }
-            return bean;
-        }
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, throwNonUnique, false);
-
+        T bean;
 
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> definition = concreteCandidate.get();
+
+            bean = findExistingCompatibleSingleton(beanType, qualifier, definition);
+            if (bean != null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
+                }
+                return bean;
+            }
+
 
             if(resolutionContext == null) {
                 resolutionContext = new DefaultBeanResolutionContext(this, definition);
@@ -902,7 +903,7 @@ public class DefaultBeanContext implements BeanContext {
             }
 
         } else {
-            bean = findExistingCompatibleSingleton(beanType, qualifier);
+            bean = findExistingCompatibleSingleton(beanType, qualifier, null);
             if (bean == null && throwNoSuchBean) {
                 throw new NoSuchBeanException(beanType, qualifier);
             } else {
@@ -964,13 +965,19 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier) {
+    private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
         T bean = null;
         for (Map.Entry<BeanKey, BeanRegistration> entry : singletonObjects.entrySet()) {
             BeanKey key = entry.getKey();
             if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
                 if (beanType.isInstance(reg.bean)) {
+                    if(qualifier == null && definition != null) {
+                        if(!reg.beanDefinition.equals(definition)) {
+                            // different definition, so ignore
+                            return null;
+                        }
+                    }
                     synchronized (singletonObjects) {
                         bean = (T) reg.bean;
                         registerSingletonBean(reg.beanDefinition, beanType, bean, qualifier, true);
@@ -1035,7 +1042,8 @@ public class DefaultBeanContext implements BeanContext {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
-                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidates.stream());
+                Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> !c.isAbstract());
+                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream);
                 List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                 if (beanDefinitionList.isEmpty()) {
                     if (LOG.isDebugEnabled()) {
@@ -1048,6 +1056,7 @@ public class DefaultBeanContext implements BeanContext {
                         .findFirst();
                 definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
             } else {
+                candidates.removeIf(BeanDefinition::isAbstract);
                 if (size == 1) {
                     definition = candidates.iterator().next();
                 } else {
@@ -1362,7 +1371,9 @@ public class DefaultBeanContext implements BeanContext {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
-                List<BeanDefinition<T>> reduced = qualifier.reduce(beanType, candidates.stream())
+                Stream<BeanDefinition<T>> candidateStream = candidates.stream();
+                candidateStream = candidateStream.filter(c -> !c.isAbstract());
+                List<BeanDefinition<T>> reduced = qualifier.reduce(beanType, candidateStream)
                         .collect(Collectors.toList());
                 if (!reduced.isEmpty()) {
                     for (BeanDefinition<T> definition : reduced) {
@@ -1383,6 +1394,7 @@ public class DefaultBeanContext implements BeanContext {
                 boolean hasNonSingletonCandidate = false;
                 int candidateCount = candidates.size();
                 for (BeanDefinition<T> candidate : candidates) {
+                    if(candidate.isAbstract()) continue;
                     if (processedDefinitions.contains(candidate)) continue;
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
