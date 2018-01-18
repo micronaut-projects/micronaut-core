@@ -50,8 +50,8 @@ public class RouteBuilderTests {
 
         assertEquals("Hello World", router.GET("/message/World").get().invoke());
         assertEquals("Book 1", router.GET("/books/1").get().invoke());
-        assertEquals("not found", router.route(HttpStatus.NOT_FOUND).get().invoke());
-        assertEquals("class not found: error", router.route(new ClassNotFoundException("error")).get().invoke());
+        assertEquals("not found", ((MethodBasedRouteMatch) router.route(HttpStatus.NOT_FOUND).get()).invoke());
+        assertEquals("class not found: error", ((MethodBasedRouteMatch) router.route(new ClassNotFoundException("error")).get()).invoke());
 
         // test route state
 

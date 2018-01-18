@@ -4,6 +4,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.management.endpoint.routes.RouteData;
 import org.particleframework.management.endpoint.routes.RoutesEndpoint;
+import org.particleframework.web.router.MethodBasedRoute;
 import org.particleframework.web.router.UriRoute;
 
 import javax.inject.Singleton;
@@ -20,7 +21,9 @@ public class DefaultRouteData implements RouteData<Map<String, String>> {
     public Map<String, String> getData(UriRoute route) {
         Map<String, String> values = new LinkedHashMap<>(1);
 
-        values.put("method", getMethodString(route.getTargetMethod()));
+        if (route instanceof MethodBasedRoute) {
+            values.put("method", getMethodString(((MethodBasedRoute) route).getTargetMethod()));
+        }
 
         return values;
     }

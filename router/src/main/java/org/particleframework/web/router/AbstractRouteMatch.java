@@ -37,7 +37,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -46,7 +45,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractRouteMatch<R> implements RouteMatch<R> {
+abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
 
     protected final MethodExecutionHandle<R> executableMethod;
     protected final ConversionService<?> conversionService;

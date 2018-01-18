@@ -15,13 +15,12 @@
  */
 package org.particleframework.management.endpoint.stop
 
+import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.http.HttpStatus
-import org.particleframework.http.MediaType
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -54,7 +53,7 @@ class ServerStopEndpointSpec extends Specification {
         when:
         def response = client.newCall(new Request.Builder()
                 .url(new URL(embeddedServer.getURL(), "/stop"))
-                .post(RequestBody.create(okhttp3.MediaType.parse("text/plain"), "")).build()).execute()
+                .post(RequestBody.create(MediaType.parse("text/plain"), "")).build()).execute()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -62,7 +61,5 @@ class ServerStopEndpointSpec extends Specification {
         conditions.eventually {
             assert !embeddedServer.isRunning()
         }
-
-
     }
 }
