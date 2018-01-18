@@ -167,7 +167,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyShortName,
                 parent.isSingleton(),
                 parent.getAnnotationMetadata());
-        startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
+        startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
     }
 
     /**
@@ -193,7 +193,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.targetClassShortName = className;
         this.targetClassFullName = packageName + '.' + targetClassShortName;
         this.parentWriter = null;
-        this.proxyFullName = targetClassFullName + "$Intercepted";
+        this.proxyFullName = targetClassFullName + BeanDefinitionVisitor.PROXY_SUFFIX;
         this.proxyInternalName = getInternalName(this.proxyFullName);
         this.proxyType = getTypeReference(proxyFullName);
         this.interceptorTypes = new HashSet<>(Arrays.asList(interceptorTypes));

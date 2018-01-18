@@ -55,6 +55,7 @@ import java.util.stream.Stream;
 public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
     private final Class<T> type;
+    private final boolean isAbstract;
     private final boolean singleton;
     private final boolean isProvided;
     private final boolean isConfigurationProperties;
@@ -85,6 +86,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
         this.type = (Class<T>) method.getReturnType();
+        this.isAbstract = false; // factory beans are never abstract
         this.declaringType = method.getDeclaringClass();
         this.constructor = new MethodConstructorInjectionPoint(
                 this,
@@ -103,6 +105,7 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
                                      Argument... arguments) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         this.type = type;
+        this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
         this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
         this.singleton = singleton;
         this.declaringType = type;
@@ -110,6 +113,11 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.valuePrefixes = isConfigurationProperties ? new HashMap<>(2) : null;
         this.addRequiredComponents(arguments);
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return this.isAbstract;
     }
 
     @Override
@@ -169,12 +177,12 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
 
         AbstractBeanDefinition<?> that = (AbstractBeanDefinition<?>) o;
 
-        return type != null ? type.equals(that.type) : that.type == null;
+        return getClass().equals(that.getClass());
     }
 
     @Override
     public int hashCode() {
-        return type != null ? type.hashCode() : 0;
+        return getClass().hashCode();
     }
 
     @Override

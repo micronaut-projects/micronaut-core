@@ -8,6 +8,7 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -24,6 +25,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The scope of the component
      */
     Optional<Class<? extends Annotation>> getScope();
+
 
     /**
      * @return Whether the scope is singleton
@@ -145,4 +147,12 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The {@link ExecutableMethod} instances for this definition
      */
     Collection<ExecutableMethod<T,?>> getExecutableMethods();
+
+    /**
+     * @return Whether the bean definition is abstract
+     */
+    default boolean isAbstract() {
+        return Modifier.isAbstract( getBeanType().getModifiers() );
+    }
+
 }

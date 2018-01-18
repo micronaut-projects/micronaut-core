@@ -52,6 +52,11 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         this.definition = definition;
     }
 
+    @Override
+    public boolean isAbstract() {
+        return definition.isAbstract();
+    }
+
     BeanDefinition<T> getDelegate() {
         return definition;
     }
