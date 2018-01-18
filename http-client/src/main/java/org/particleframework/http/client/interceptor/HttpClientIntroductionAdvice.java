@@ -36,6 +36,7 @@ import org.particleframework.http.annotation.Header;
 import org.particleframework.http.annotation.HttpMethodMapping;
 import org.particleframework.http.client.BlockingHttpClient;
 import org.particleframework.http.client.Client;
+import org.particleframework.http.client.ClientPublisherResultTransformer;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
@@ -70,10 +71,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     final BeanContext beanContext;
     private final Optional<EmbeddedServer> embeddedServer;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
+    private final ClientPublisherResultTransformer[] transformers;
 
-    public HttpClientIntroductionAdvice(BeanContext beanContext, Optional<EmbeddedServer> embeddedServer) {
+    public HttpClientIntroductionAdvice(BeanContext beanContext, Optional<EmbeddedServer> embeddedServer, ClientPublisherResultTransformer...transformers) {
         this.beanContext = beanContext;
         this.embeddedServer = embeddedServer;
+        this.transformers = transformers != null ? transformers : new ClientPublisherResultTransformer[0];
     }
 
     @Override
@@ -207,7 +210,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
                             new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
                     );
-                    finalPublisher = finalizePublisher(finalPublisher);
+                    for (ClientPublisherResultTransformer transformer : transformers) {
+                        finalPublisher = transformer.transform(finalPublisher);
+                    }
                     return finalPublisher;
                 }
             }

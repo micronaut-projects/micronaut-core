@@ -17,37 +17,26 @@ package org.particleframework.http.client.rxjava2;
 
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
-import io.reactivex.MaybeSource;
-import io.reactivex.functions.Function;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.annotation.Replaces;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.http.HttpStatus;
+import org.particleframework.http.client.ClientPublisherResultTransformer;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
-import org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice;
-import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
- * Extended version of {@link HttpClientIntroductionAdvice} with RxJava 2.x specific extensions
+ * Adds custom support for {@link Maybe} to handle NOT_FOUND results
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
-@Replaces(HttpClientIntroductionAdvice.class)
 @Requires(classes = Flowable.class)
-public class RxHttpClientIntroductionAdvice extends HttpClientIntroductionAdvice {
-    public RxHttpClientIntroductionAdvice(BeanContext beanContext, Optional<EmbeddedServer> embeddedServer) {
-        super(beanContext, embeddedServer);
-    }
-
+public class RxClientPublisherResultTransformer implements ClientPublisherResultTransformer {
     @Override
-    protected Object finalizePublisher(Object finalPublisher) {
-        if(finalPublisher instanceof Maybe) {
-            Maybe<?> maybe = (Maybe) finalPublisher;
+    public Object transform(Object publisherResult) {
+        if(publisherResult instanceof Maybe) {
+            Maybe<?> maybe = (Maybe) publisherResult;
             // add 404 handling for maybe
             return maybe.onErrorResumeNext(throwable -> {
                 if(throwable instanceof HttpClientResponseException) {
@@ -60,7 +49,7 @@ public class RxHttpClientIntroductionAdvice extends HttpClientIntroductionAdvice
             });
         }
         else {
-            return super.finalizePublisher(finalPublisher);
+            return publisherResult;
         }
     }
 }
