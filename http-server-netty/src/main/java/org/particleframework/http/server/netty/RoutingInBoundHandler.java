@@ -504,7 +504,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         Object result = routeMatch.execute();
 
                         if (result == null) {
-                            if( routeMatch.getReturnType().getType() != void.class) {
+                            Class<?> javaReturnType = routeMatch.getReturnType().getType();
+                            if( javaReturnType != void.class) {
                                 // handle re-mapping of errors
                                 result = router.route(HttpStatus.NOT_FOUND)
                                         .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
