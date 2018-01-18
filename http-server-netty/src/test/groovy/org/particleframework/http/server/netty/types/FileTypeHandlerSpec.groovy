@@ -5,9 +5,9 @@ import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Get
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.server.netty.types.impl.FileTypeHandlerConfiguration
-import org.particleframework.web.router.annotation.Get
 
 import java.text.SimpleDateFormat
 import static org.particleframework.http.HttpHeaders.*
