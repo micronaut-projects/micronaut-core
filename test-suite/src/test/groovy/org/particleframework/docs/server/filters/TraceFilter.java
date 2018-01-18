@@ -42,9 +42,9 @@ public class TraceFilter implements HttpServerFilter { // <2>
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         return traceService.trace(request) // <1>
                            .switchMap(aBoolean -> chain.proceed(request)) // <2>
-                           .doAfterNext(res -> // <3>
+                           .doOnNext(res -> // <3>
                                 res.getHeaders().add("X-Trace-Enabled", "true")
-                           ) ;
+                           );
     }
     // end::doFilter[]
 }

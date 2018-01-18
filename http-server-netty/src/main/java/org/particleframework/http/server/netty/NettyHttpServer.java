@@ -23,7 +23,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.LifeCycle;
@@ -38,6 +37,7 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
+import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
@@ -78,6 +78,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final Environment environment;
     private final Router router;
@@ -95,6 +96,7 @@ public class NettyHttpServer implements EmbeddedServer {
             Router router,
             RequestBinderRegistry binderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             ChannelOutboundHandler... outboundHandlers
@@ -105,6 +107,7 @@ public class NettyHttpServer implements EmbeddedServer {
         );
         this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.specialTypeHandlerRegistry = specialTypeHandlerRegistry;
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
@@ -151,6 +154,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     beanLocator,
                                     router,
                                     mediaTypeCodecRegistry,
+                                    specialTypeHandlerRegistry,
                                     serverConfiguration,
                                     binderRegistry,
                                     executorSelector,

@@ -15,6 +15,7 @@
  */
 package org.particleframework.web.router;
 
+import org.particleframework.core.type.ReturnType;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
@@ -32,7 +33,7 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Predicate<HttpRequest> {
+public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
     /**
      * @return The variable values following a successful match
      */
@@ -85,13 +86,13 @@ public interface RouteMatch<R> extends MethodExecutionHandle<R>, Callable<R>, Pr
     /**
      * <p>Returns the required arguments for this RouteMatch</p>
      *
-     * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments excluding those that have been subtracted from the URI variables</p>
-     *
      * @return The required arguments in order to invoke this route
      */
     default Collection<Argument> getRequiredArguments() {
-        return Arrays.asList(getArguments());
+        return Collections.emptyList();
     }
+
+    ReturnType<R> getReturnType();
 
     /**
      * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}

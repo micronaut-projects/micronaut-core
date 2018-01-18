@@ -39,7 +39,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class TextPlainCodec implements MediaTypeCodec{
+public class TextPlainCodec implements MediaTypeCodec {
 
     private final Charset defaultCharset;
 
