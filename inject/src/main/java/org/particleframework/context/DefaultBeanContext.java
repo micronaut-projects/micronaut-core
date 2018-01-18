@@ -381,7 +381,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> T inject(T instance) {
         Objects.requireNonNull(instance, "Instance cannot be null");
-        
+
         Collection<BeanDefinition> candidates = findBeanCandidates(instance);
         if(candidates.size() == 1) {
             BeanDefinition<T> beanDefinition = candidates.stream().findFirst().get();
