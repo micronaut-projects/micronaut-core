@@ -22,6 +22,7 @@ import org.particleframework.context.annotation.Prototype;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.core.async.publisher.Publishers;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
@@ -42,6 +43,7 @@ import org.particleframework.http.uri.UriMatchTemplate;
 import org.particleframework.http.uri.UriTemplate;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -51,7 +53,9 @@ import java.lang.annotation.Annotation;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -148,7 +152,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             HttpClient httpClient = reg.httpClient;
 
-            if(Publishers.isPublisher(javaReturnType)) {
+            boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
+            if(Publishers.isPublisher(javaReturnType) || isFuture) {
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 Class<?> argumentType = publisherArgument.getType();
                 Publisher<?> publisher;
@@ -162,13 +167,51 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             request, publisherArgument
                     );
                 }
-                Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
-                        new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
-                );
-                finalPublisher = finalizePublisher(finalPublisher);
 
-                return finalPublisher;
+                if(isFuture) {
+                    CompletableFuture<Object> future = new CompletableFuture<>();
+                    publisher.subscribe(new CompletionAwareSubscriber<Object>() {
+                        AtomicReference<Object> reference = new AtomicReference<>();
+                        @Override
+                        protected void doOnSubscribe(Subscription subscription) {
+                            subscription.request(1);
+                        }
+
+                        @Override
+                        protected void doOnNext(Object message) {
+                            reference.set(message);
+                        }
+
+                        @Override
+                        protected void doOnError(Throwable t) {
+                            if(t instanceof HttpClientResponseException) {
+                                HttpClientResponseException e = (HttpClientResponseException) t;
+                                if( e.getStatus() == HttpStatus.NOT_FOUND) {
+                                    future.complete(null);
+                                }
+                                else {
+                                    future.completeExceptionally(t);
+                                }
+                            }
+                            future.completeExceptionally(t);
+                        }
+
+                        @Override
+                        protected void doOnComplete() {
+                            future.complete(reference.get());
+                        }
+                    });
+                    return future;
+                }
+                else {
+                    Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
+                            new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
+                    );
+                    finalPublisher = finalizePublisher(finalPublisher);
+                    return finalPublisher;
+                }
             }
+
             else {
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
                 if(HttpResponse.class.isAssignableFrom(javaReturnType)) {
