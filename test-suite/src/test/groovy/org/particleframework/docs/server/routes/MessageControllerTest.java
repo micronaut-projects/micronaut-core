@@ -19,6 +19,7 @@ package org.particleframework.docs.server.routes;
 import okhttp3.*;
 import org.junit.*;
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
 import java.net.URL;
 
@@ -35,10 +36,14 @@ public class MessageControllerTest {
 
     // tag::setup[]
     private static EmbeddedServer server;
+    private static HttpClient client;
 
     @BeforeClass // <1>
     public static void setupServer() {
         server = ApplicationContext.run(EmbeddedServer.class);
+        client = server
+                    .getApplicationContext()
+                    .createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass // <1>
@@ -46,21 +51,19 @@ public class MessageControllerTest {
         if(server != null) {
             server.stop();
         }
+        if(client != null) {
+            client.stop();
+        }
     }
     // end::setup[]
 
     // tag::test[]
     @Test
     public void testHello() throws Exception {
-        OkHttpClient client = new OkHttpClient();
-
-        Request.Builder request = new Request.Builder()
-                                        .url(new URL(server.getURL(), "/message/hello/John")); // <2>
-        Response response = client.newCall(request.build()).execute();
-        ResponseBody body = response.body();
+        String body = client.toBlocking().retrieve("/message/hello/John"); // <2>
         assertNotNull(body);
         assertEquals( // <3>
-                body.string(),
+                body,
                 "Hello John!"
         );
     }

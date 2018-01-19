@@ -111,7 +111,7 @@ class PersonControllerSpec extends Specification {
 
         expect:
         response.body.isPresent()
-        response.body.get() == body 
+        response.body.get() == body
         response.status == HttpStatus.CREATED
     }
 }

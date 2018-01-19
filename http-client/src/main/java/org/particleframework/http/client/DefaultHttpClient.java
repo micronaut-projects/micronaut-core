@@ -39,7 +39,6 @@ import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
@@ -57,7 +56,6 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.ClientFilterChain;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
-import org.particleframework.http.sse.Event;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
@@ -66,6 +64,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
@@ -98,7 +97,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     private final ServerSelector serverSelector;
     private final HttpClientConfiguration configuration;
     protected final Bootstrap bootstrap;
-    protected final EventLoopGroup group;
+    protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
     private final Charset defaultCharset;
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
@@ -121,19 +120,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        OptionalInt numOfThreads = configuration.getNumOfThreads();
-        Optional<Class<? extends ThreadFactory>> threadFactory = configuration.getThreadFactory();
-        boolean hasThreads = numOfThreads.isPresent();
-        boolean hasFactory = threadFactory.isPresent();
-        if(hasThreads && hasFactory) {
-            this.group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactory.get()));
-        }
-        else if(hasThreads) {
-            this.group = new NioEventLoopGroup(numOfThreads.getAsInt());
-        }
-        else {
-            this.group = new NioEventLoopGroup();
-        }
+        this.group = createEventLoopGroup(configuration);
         this.bootstrap.group(group)
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.SO_KEEPALIVE, true);
@@ -158,7 +145,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     public DefaultHttpClient(@Argument URL url) {
         this((Object discriminator)-> url);
     }
-
 
     @Override
     public BlockingHttpClient toBlocking() {
@@ -209,6 +195,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             }
         };
     }
+
 
     @Override
     public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
@@ -368,7 +355,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
     }
 
-
     /**
      * Creates an initial connection to the given remote host
      *
@@ -384,6 +370,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         return doConnect(host, port, sslCtx);
     }
 
+
     /**
      * Creates an initial connection to the given remote host
      *
@@ -397,6 +384,29 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         Bootstrap localBootstrap = this.bootstrap.clone();
         localBootstrap.handler(new HttpClientInitializer(sslCtx, false));
         return doConnect(localBootstrap, host, port);
+    }
+
+    /**
+     * Creates the {@link NioEventLoopGroup} for this client
+     * @param configuration The configuration
+     * @return The group
+     */
+    protected NioEventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration) {
+        OptionalInt numOfThreads = configuration.getNumOfThreads();
+        Optional<Class<? extends ThreadFactory>> threadFactory = configuration.getThreadFactory();
+        boolean hasThreads = numOfThreads.isPresent();
+        boolean hasFactory = threadFactory.isPresent();
+        NioEventLoopGroup group;
+        if(hasThreads && hasFactory) {
+            group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactory.get()));
+        }
+        else if(hasThreads) {
+            group = new NioEventLoopGroup(numOfThreads.getAsInt());
+        }
+        else {
+            group = new NioEventLoopGroup();
+        }
+        return group;
     }
 
     /**
@@ -508,14 +518,32 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     @Override
-    public void close() {
-        this.group.shutdownGracefully().addListener(f-> {
-            if(!f.isSuccess() && LOG.isErrorEnabled()) {
-                Throwable cause = f.cause();
-                LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
-            }
-        });
+    public HttpClient start() {
+        if(!isRunning()) {
+            this.group = createEventLoopGroup(configuration);
+        }
+        return this;
     }
+
+    @Override
+    public boolean isRunning() {
+        return !group.isShutdown();
+    }
+
+    @Override
+    @PreDestroy
+    public HttpClient stop() {
+        if(isRunning()) {
+            this.group.shutdownGracefully().addListener(f-> {
+                if(!f.isSuccess() && LOG.isErrorEnabled()) {
+                    Throwable cause = f.cause();
+                    LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
+                }
+            });
+        }
+        return this;
+    }
+
 
     private ClientFilterChain buildChain(List<HttpClientFilter> filters) {
 

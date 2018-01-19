@@ -16,6 +16,7 @@
 package org.particleframework.docs.server.request
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -30,9 +31,13 @@ class MessageControllerSpec extends Specification{
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer) // <1>
 
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
+
     void "test message response"() {
         expect:
-        new URL(embeddedServer.getURL(), "/request/hello?name=John").text == "Hello John!!" // <2>
+        client
+            .toBlocking()
+            .retrieve("/request/hello?name=John") == "Hello John!!" // <2>
     }
 
 }
