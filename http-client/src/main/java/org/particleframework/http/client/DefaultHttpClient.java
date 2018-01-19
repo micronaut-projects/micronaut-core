@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.netty.http.HttpStreamsClientHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -58,6 +59,7 @@ import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
+import org.particleframework.jackson.codec.JsonStreamMediaTypeCodec;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -137,10 +139,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     public DefaultHttpClient(ServerSelector serverSelector) {
-        this(serverSelector, new HttpClientConfiguration(), MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty()))
-        ));
+        this(serverSelector, new HttpClientConfiguration(), createDefaultMediaTypeRegistry());
     }
+
 
     public DefaultHttpClient(@Argument URL url) {
         this((Object discriminator) -> url);
@@ -592,6 +593,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 LOG.trace("{}: {}", name, all.get(0));
             }
         }
+    }
+
+    private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        return MediaTypeCodecRegistry.of(
+                new JsonMediaTypeCodec(objectMapper), new JsonStreamMediaTypeCodec(objectMapper)
+        );
     }
 
     protected <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
