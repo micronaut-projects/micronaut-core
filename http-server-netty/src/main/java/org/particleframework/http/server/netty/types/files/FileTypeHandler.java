@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.netty.types.impl;
+package org.particleframework.http.server.netty.types.files;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -29,7 +29,8 @@ import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
-import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerException;
+import org.particleframework.http.server.types.SpecialTypeHandlerException;
+import org.particleframework.http.server.types.files.FileSpecialType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ import java.util.concurrent.ExecutionException;
  * Responsible for writing files out to the response in Netty
  */
 @Singleton
-public class FileTypeHandler implements NettySpecialTypeHandler<File> {
+public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
 
 
     private static final Logger LOG = LoggerFactory.getLogger(FileTypeHandler.class);
@@ -62,7 +63,17 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
     }
 
     @Override
-    public void handle(File file, HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context) {
+    public void handle(Object obj, HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context) {
+        
+        File file;
+        if (obj instanceof File) {
+            file = (File) obj;
+        } else if (obj instanceof FileSpecialType) {
+            file = ((FileSpecialType) obj).getFile();
+        } else {
+            throw new SpecialTypeHandlerException("FileTypeHandler only supports File or FileSpecialType types");
+        }
+
 
         // Cache Validation
         String ifModifiedSince = request.headers().get(HttpHeaders.IF_MODIFIED_SINCE);
@@ -89,14 +100,14 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
         try {
             raf = new RandomAccessFile(file, "r");
         } catch (FileNotFoundException e) {
-            throw new NettySpecialTypeHandlerException("Could not find file", e);
+            throw new SpecialTypeHandlerException("Could not find file", e);
         }
 
         long fileLength;
         try {
             fileLength = raf.length();
         } catch (IOException e) {
-            throw new NettySpecialTypeHandlerException("Could not determine file length", e);
+            throw new SpecialTypeHandlerException("Could not determine file length", e);
         }
 
         response.header(HttpHeaders.CONTENT_TYPE, getMediaType(file));
@@ -106,7 +117,9 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
             response.header(HttpHeaders.CONNECTION, "keep-alive");
         }
 
-        processResponse(response, file);
+        if (obj instanceof FileSpecialType) {
+            ((FileSpecialType) obj).process(response);
+        }
 
         FullHttpResponse nettyResponse = response.getNativeResponse();
 
@@ -129,7 +142,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
                 flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, fileLength, 8192)),
                         context.newProgressivePromise());
             } catch (IOException e) {
-                throw new NettySpecialTypeHandlerException("Could not read file", e);
+                throw new SpecialTypeHandlerException("Could not read file", e);
             }
         }
 
@@ -138,7 +151,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
 
     @Override
     public boolean supports(Class<?> type) {
-        return File.class.isAssignableFrom(type);
+        return File.class.isAssignableFrom(type) || FileSpecialType.class.isAssignableFrom(type);
     }
 
     protected MediaType getMediaType(File file) {
@@ -173,10 +186,6 @@ public class FileTypeHandler implements NettySpecialTypeHandler<File> {
     protected void setDateHeader(MutableHttpResponse response) {
         Calendar time = new GregorianCalendar();
         response.header(HttpHeaders.DATE, dateFormat.format(time.getTime()));
-    }
-
-    protected void processResponse(MutableHttpResponse response, File file) {
-        //no-op
     }
 
     private FullHttpResponse notModified() {
