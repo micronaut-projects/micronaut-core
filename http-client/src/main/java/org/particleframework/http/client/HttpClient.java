@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.context.LifeCycle;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
@@ -27,6 +28,7 @@ import org.particleframework.http.sse.Event;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -39,7 +41,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpClient extends Closeable{
+public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
 
     /**
      * @return A blocking HTTP client suitable for testing and non-production scenarios.
@@ -164,6 +166,13 @@ public interface HttpClient extends Closeable{
     default <I> Publisher<String> retrieve(String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
     }
+
+    @Override
+    default HttpClient refresh() {
+        stop();
+        return start();
+    }
+
     /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead
@@ -176,7 +185,7 @@ public interface HttpClient extends Closeable{
         return new DefaultHttpClient(url);
     }
 
-//  The following methods to be added in future streaming support
+    //  The following methods to be added in future streaming support
 
 //    /**
 //     * Perform a request a listen for a stream of Server Sent events. Expects a response of type {@link org.particleframework.http.MediaType#TEXT_EVENT_STREAM}
