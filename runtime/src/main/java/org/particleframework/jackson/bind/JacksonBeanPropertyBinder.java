@@ -68,7 +68,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     @Override
-    public <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<CharSequence, ? super Object>> source) throws ConversionErrorException {
+    public <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
             ObjectNode objectNode = buildSourceObjectNode(source);
             return objectMapper.treeToValue(objectNode, type);
@@ -78,7 +78,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     @Override
-    public <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<CharSequence, ? super Object>> source) {
+    public <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
         try {
             ObjectNode objectNode = buildSourceObjectNode(source);
             objectMapper.readerForUpdating(object).readValue(objectNode);
@@ -89,7 +89,7 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     @Override
-    public <T2> T2 bind(T2 object, Set<? extends Map.Entry<CharSequence, ? super Object>> source) throws ConversionErrorException {
+    public <T2> T2 bind(T2 object, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
             ObjectNode objectNode = buildSourceObjectNode(source);
             return objectMapper.readerForUpdating(object).readValue(objectNode);
@@ -115,10 +115,10 @@ public class JacksonBeanPropertyBinder implements BeanPropertyBinder {
         return new ConversionErrorException(Argument.of(type), conversionError);
     }
 
-    private ObjectNode buildSourceObjectNode(Set<? extends Map.Entry<CharSequence, ? super Object>> source) {
+    private ObjectNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
         JsonNodeFactory nodeFactory = objectMapper.getNodeFactory();
         ObjectNode rootNode = new ObjectNode(nodeFactory);
-        for (Map.Entry<CharSequence, ? super Object> entry : source) {
+        for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
             CharSequence key = entry.getKey();
             Object value = entry.getValue();
             String property = key.toString();
