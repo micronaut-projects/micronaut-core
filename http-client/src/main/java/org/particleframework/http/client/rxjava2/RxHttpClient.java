@@ -15,24 +15,38 @@
  */
 package org.particleframework.http.client.rxjava2;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.typesafe.netty.http.StreamedHttpResponse;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.channel.*;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.ssl.SslContext;
+import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
 import org.particleframework.context.annotation.Replaces;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.io.buffer.ByteBuffer;
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
-import org.particleframework.http.client.DefaultHttpClient;
-import org.particleframework.http.client.HttpClient;
-import org.particleframework.http.client.HttpClientConfiguration;
-import org.particleframework.http.client.ServerSelector;
+import org.particleframework.http.MediaType;
+import org.particleframework.http.client.*;
+import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.sse.Event;
+import org.particleframework.jackson.codec.JsonMediaTypeCodec;
+import org.particleframework.jackson.parser.JacksonProcessor;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 
 import javax.inject.Inject;
+import java.net.URI;
 import java.net.URL;
 import java.util.Map;
 
@@ -45,7 +59,7 @@ import java.util.Map;
 @Prototype
 @Replaces(DefaultHttpClient.class)
 @Requires(classes = Flowable.class)
-public class RxHttpClient extends DefaultHttpClient {
+public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClient {
 
     @Inject
     public RxHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
@@ -69,6 +83,128 @@ public class RxHttpClient extends DefaultHttpClient {
         return Flowable.fromPublisher(super.exchange(request));
     }
 
+
+    @Override
+    public <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request) {
+        JsonMediaTypeCodec mediaTypeCodec = (JsonMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
+                .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
+        URI requestURI = resolveRequestURI(request);
+        SslContext sslContext = buildSslContext(requestURI);
+
+        return Flowable.create(emitter -> {
+            ChannelFuture channelFuture = doConnect(requestURI, sslContext);
+            emitter.setDisposable(new Disposable() {
+                boolean disposed = false;
+                @Override
+                public void dispose() {
+                    if(!disposed) {
+                        closeChannelAsync(channelFuture.channel());
+                    }
+                }
+
+                @Override
+                public boolean isDisposed() {
+                    return disposed;
+                }
+            });
+
+            channelFuture
+                    .addListener((ChannelFutureListener) f -> {
+                        if (f.isSuccess()) {
+                            Channel channel = f.channel();
+                            MediaType requestContentType = request
+                                    .getContentType()
+                                    .orElse(MediaType.APPLICATION_JSON_TYPE);
+
+                            boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+                            io.netty.handler.codec.http.HttpRequest nettyRequest =
+                                    buildNettyRequest(
+                                            request,
+                                            requestContentType,
+                                            permitsBody);
+
+
+                            prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+
+                            ChannelPipeline pipeline = channel.pipeline();
+                            pipeline.remove("aggregator");
+                            pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+                                @Override
+                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                    emitter.onError(
+                                            new HttpClientException("Client error:" + cause.getMessage(), cause)
+                                    );
+                                }
+
+                                @Override
+                                protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+                                    JacksonProcessor jacksonProcessor = new JacksonProcessor();
+                                    jacksonProcessor.onSubscribe((Subscription) emitter);
+                                    jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
+                                        @Override
+                                        protected void doOnSubscribe(Subscription subscription) {
+                                            long demand = emitter.requested();
+                                            subscription.request(demand);
+                                        }
+
+                                        @Override
+                                        protected void doOnNext(JsonNode message) {
+                                            try {
+                                                Map json = mediaTypeCodec.getObjectMapper().treeToValue(message, Map.class);
+                                                emitter.onNext(json);
+                                            } catch (JsonProcessingException e) {
+                                                emitter.onError(e);
+                                            }
+                                        }
+
+                                        @Override
+                                        protected void doOnError(Throwable t) {
+                                            emitter.onError(t);
+                                        }
+
+                                        @Override
+                                        protected void doOnComplete() {
+                                            emitter.onComplete();
+                                        }
+                                    });
+                                    msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
+                                        @Override
+                                        protected void doOnSubscribe(Subscription subscription) {
+                                            long demand = emitter.requested();
+                                            subscription.request(demand);
+                                        }
+
+                                        @Override
+                                        protected void doOnNext(HttpContent message) {
+                                            jacksonProcessor.onNext(ByteBufUtil.getBytes(message.content()));
+                                        }
+
+                                        @Override
+                                        protected void doOnError(Throwable t) {
+                                            jacksonProcessor.onError(t);
+                                        }
+
+                                        @Override
+                                        protected void doOnComplete() {
+                                            jacksonProcessor.onComplete();
+                                        }
+                                    });
+
+
+                                }
+
+                            });
+                            channel.writeAndFlush(nettyRequest);
+                        } else {
+                            Throwable cause = f.cause();
+                            emitter.onError(
+                                    new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            );
+                        }
+                    });
+        }, BackpressureStrategy.BUFFER);
+
+    }
     @Override
     public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
         return Flowable.fromPublisher(super.exchange(request, bodyType));

@@ -50,6 +50,13 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * @return The object mapper
+     */
+    public ObjectMapper getObjectMapper() {
+        return objectMapper;
+    }
+
     @Override
     public boolean supportsType(Class<?> type) {
         return !(CharSequence.class.isAssignableFrom(type));
