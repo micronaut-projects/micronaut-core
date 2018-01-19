@@ -17,8 +17,10 @@ package org.particleframework.jackson.codec;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.JSONPObject;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.type.Argument;
@@ -50,6 +52,13 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * @return The object mapper
+     */
+    public ObjectMapper getObjectMapper() {
+        return objectMapper;
+    }
+
     @Override
     public boolean supportsType(Class<?> type) {
         return !(CharSequence.class.isAssignableFrom(type));
@@ -76,6 +85,14 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         }
     }
 
+    public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
+        try {
+            T result = objectMapper.treeToValue(node, type.getType());
+            return result;
+        } catch (IOException e) {
+            throw new CodecException("Error decoding JSON stream for type ["+type.getName()+"]: " + e.getMessage());
+        }
+    }
     @Override
     public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
         try {
