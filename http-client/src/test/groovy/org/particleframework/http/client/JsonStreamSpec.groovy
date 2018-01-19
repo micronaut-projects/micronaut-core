@@ -4,6 +4,7 @@ import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.bind.BeanPropertyBinder
 import org.particleframework.http.HttpRequest
+import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Delete
@@ -107,7 +108,7 @@ class JsonStreamSpec  extends Specification {
     @Singleton
     static class BookController {
 
-        @Get('/')
+        @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<Book> list() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
