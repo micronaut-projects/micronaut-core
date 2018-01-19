@@ -17,6 +17,8 @@ package org.particleframework.docs.server.intro
 
 // tag::imports[]
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.*
 // end::imports[]
@@ -31,9 +33,12 @@ class HelloControllerSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer) // <1>
 
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
+
     void "test hello world response"() {
         expect:
-        new URL(embeddedServer.getURL(), "/hello").text == "Hello World" // <2>
+        client.toBlocking() // <3>
+              .retrieve(HttpRequest.GET('/hello')) == "Hello World" // <4>
     }
 }
 // end::class[]

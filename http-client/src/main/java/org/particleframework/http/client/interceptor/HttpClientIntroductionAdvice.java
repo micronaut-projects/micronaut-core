@@ -23,6 +23,7 @@ import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
+import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.type.Argument;
@@ -106,12 +107,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 uriTemplate = uriTemplate.nest(uri);
             }
 
-            uri = uriTemplate.expand(context.getParameterValueMap());
-            MutableHttpRequest<Object> request = HttpRequest.create(httpMethod, uri);
+            Map<String, Object> paramMap = context.getParameterValueMap();
+            List<String> uriVariables = uriTemplate.getVariables();
+
+            boolean variableSatisfied = uriVariables.isEmpty() || uriVariables.containsAll(paramMap.keySet());
+            MutableHttpRequest<Object> request;
             Object body = null;
             Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
-            List<String> uriVariables = uriTemplate.getVariables();
             Argument[] arguments = context.getArguments();
+            Map<String,String> headers = new LinkedHashMap<>(3);
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
@@ -128,7 +132,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     MutableArgumentValue<?> value = parameters.get(argumentName);
                     String finalHeaderName = headerName;
                     ConversionService.SHARED.convert(value.getValue(), String.class)
-                            .ifPresent(o -> request.header(finalHeaderName, o));
+                            .ifPresent(o -> headers.put(finalHeaderName, o));
                 }
                 else if(!uriVariables.contains(argumentName)){
                     bodyArguments.add(argument);
@@ -149,10 +153,40 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 if(body != null) {
+                    if(!variableSatisfied) {
+
+                        if(body instanceof Map) {
+                            paramMap.putAll((Map)body);
+                            uri = uriTemplate.expand(paramMap);
+                            request = HttpRequest.create(httpMethod, uri);
+                        }
+                        else{
+                            paramMap.putAll(BeanMap.of(body));
+                            uri = uriTemplate.expand(paramMap);
+                            request = HttpRequest.create(httpMethod, uri);
+                        }
+                    }
+                    else {
+                        uri = uriTemplate.expand(paramMap);
+                        request = HttpRequest.create(httpMethod, uri);
+                    }
                     request.body(body);
                 }
+                else {
+                    uri = uriTemplate.expand(paramMap);
+                    request = HttpRequest.create(httpMethod, uri);
+                }
+            }
+            else {
+                uri = uriTemplate.expand(paramMap);
+                request = HttpRequest.create(httpMethod, uri);
             }
 
+            if(!headers.isEmpty()) {
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    request.header(entry.getKey(), entry.getValue());
+                }
+            }
             HttpClient httpClient = reg.httpClient;
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
@@ -298,7 +332,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Override
     @PreDestroy
     public void close() throws IOException {
-
+        for (ClientRegistration registration : clients.values()) {
+            HttpClient httpClient = registration.httpClient;
+            httpClient.close();
+        }
     }
 
     class ClientRegistration {

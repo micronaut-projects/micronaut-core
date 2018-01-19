@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.bind;
 
+import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.exceptions.ConversionErrorException;
 
@@ -42,7 +43,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @throws ConversionErrorException if the object cannot be bound
      */
     @SuppressWarnings("unchecked")
-    <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<CharSequence, ? super Object>> source) throws ConversionErrorException;
+    <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
      * Bind an existing instance of the given type from the given source
@@ -52,7 +53,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @param <T2> The generic type
      * @return The bound instance
      */
-    <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<CharSequence, ? super Object>> source);
+    <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source);
 
     /**
      * Bind an existing instance of the given type from the given source
@@ -62,7 +63,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @return The bound instance
      * @throws ConversionErrorException if the object cannot be bound
      */
-    <T2> T2 bind(T2 object, Set<? extends Map.Entry<CharSequence, ? super Object>> source) throws ConversionErrorException;
+    <T2> T2 bind(T2 object, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
      * Bind a new instance of the given type from the given source
@@ -73,7 +74,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @throws ConversionErrorException if the object cannot be bound
      */
     @SuppressWarnings("unchecked")
-    default <T2> T2 bind(Class<T2> type, Map<CharSequence, ? super Object> source) throws ConversionErrorException {
+    default <T2> T2 bind(Class<T2> type, Map<? extends CharSequence, Object> source) throws ConversionErrorException {
         return bind(type, source.entrySet());
     }
 
@@ -85,7 +86,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @param <T2> The generic type
      * @return The bound instance
      */
-    default <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Map<CharSequence, ? super Object> source) {
+    default <T2> T2 bind(T2 object, ArgumentConversionContext<T2> context, Map<? extends CharSequence, Object> source) {
         return bind(object, context, source.entrySet());
     }
 
@@ -97,7 +98,19 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @return The bound instance
      * @throws ConversionErrorException if the object cannot be bound
      */
-    default <T2> T2 bind(T2 object, Map<CharSequence, ? super Object> source) throws ConversionErrorException {
+    default <T2> T2 bind(T2 object, Map<? extends CharSequence, Object> source) throws ConversionErrorException {
         return bind(object, source.entrySet());
+    }
+
+    /**
+     * Bind an existing instance of the given type from the given source
+     * @param object The bean
+     * @param source The source
+     * @param <T2> The generic type
+     * @return The bound instance
+     * @throws ConversionErrorException if the object cannot be bound
+     */
+    default <T2> T2 bind(T2 object, Object source) throws ConversionErrorException {
+        return bind(object, BeanMap.of(source).entrySet());
     }
 }
