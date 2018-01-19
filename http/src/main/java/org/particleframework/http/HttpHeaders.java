@@ -120,6 +120,10 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      */
     String CONTENT_BASE = "Content-Base";
     /**
+     * {@code "Content-Disposition"}
+     */
+    String CONTENT_DISPOSITION = "Content-Disposition";
+    /**
      * {@code "Content-Encoding"}
      */
     String CONTENT_ENCODING = "Content-Encoding";

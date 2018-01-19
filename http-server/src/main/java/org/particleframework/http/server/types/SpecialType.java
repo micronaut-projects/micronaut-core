@@ -13,21 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.netty.types;
+package org.particleframework.http.server.types;
+
+import org.particleframework.http.MutableHttpResponse;
 
 /**
- * Used when a {@link NettySpecialTypeHandler} encounters a problem
+ * A type that needs special handling that may
+ * include modification of the response.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class NettySpecialTypeHandlerException extends RuntimeException {
+public interface SpecialType {
 
-    public NettySpecialTypeHandlerException(String msg) {
-        super(msg);
-    }
-
-    public NettySpecialTypeHandlerException(String msg, Throwable cause) {
-        super(msg, cause);
-    }
+    /**
+     * Modify the response before it is written
+     * to the client.
+     *
+     * @param response The response to modify
+     */
+    void process(MutableHttpResponse response);
 }
