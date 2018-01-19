@@ -332,7 +332,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Override
     @PreDestroy
     public void close() throws IOException {
-
+        for (ClientRegistration registration : clients.values()) {
+            HttpClient httpClient = registration.httpClient;
+            httpClient.close();
+        }
     }
 
     class ClientRegistration {
