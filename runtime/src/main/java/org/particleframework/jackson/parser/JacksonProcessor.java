@@ -26,13 +26,15 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], JsonNode> {
 
-    private final NonBlockingJsonParser nonBlockingJsonParser;
+    private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
+    private final JsonFactory jsonFactory;
     private String currentFieldName;
 
     public JacksonProcessor(JsonFactory jsonFactory)  {
         try {
-            this.nonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+            this.jsonFactory = jsonFactory;
+            this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
         }
@@ -47,13 +49,13 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * @return Whether more input is needed
      */
     public boolean needMoreInput() {
-        return nonBlockingJsonParser.getNonBlockingInputFeeder().needMoreInput();
+        return currentNonBlockingJsonParser.getNonBlockingInputFeeder().needMoreInput();
     }
 
     @Override
     protected void doOnComplete() {
         if(needMoreInput()) {
-            doOnError(new JsonEOFException(nonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
+            doOnError(new JsonEOFException(currentNonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         }
         else {
             super.doOnComplete();
@@ -63,16 +65,21 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void onUpstreamMessage(byte[] message) {
         try {
-            ByteArrayFeeder byteFeeder = nonBlockingJsonParser.getNonBlockingInputFeeder();
+            ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
-            while (!consumed && byteFeeder.needMoreInput()) {
+            boolean needMoreInput = byteFeeder.needMoreInput();
+            if(!needMoreInput) {
+                currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
+                byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
+            }
+            while (!consumed) {
                 if (byteFeeder.needMoreInput()) {
                     byteFeeder.feedInput(message, 0, message.length);
                     consumed = true;
                 }
 
                 JsonToken event;
-                while ((event = nonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
+                while ((event = currentNonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
                         byteFeeder.endOfInput();
@@ -110,7 +117,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             case END_OBJECT:
             case END_ARRAY:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected array end literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected array end literal");
                 }
                 JsonNode current = nodeStack.pop();
                 if (nodeStack.isEmpty())
@@ -120,52 +127,52 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
             case FIELD_NAME:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected field literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected field literal");
                 }
-                currentFieldName = nonBlockingJsonParser.getCurrentName();
+                currentFieldName = currentNonBlockingJsonParser.getCurrentName();
                 break;
 
             case VALUE_NUMBER_INT:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected integer literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected integer literal");
                 }
                 JsonNode intNode = nodeStack.peekFirst();
                 if (intNode instanceof ObjectNode) {
-                    ((ObjectNode)intNode).put(currentFieldName, nonBlockingJsonParser.getLongValue());
+                    ((ObjectNode)intNode).put(currentFieldName, currentNonBlockingJsonParser.getLongValue());
                 }
                 else {
-                    ((ArrayNode)intNode).add(nonBlockingJsonParser.getLongValue());
+                    ((ArrayNode)intNode).add(currentNonBlockingJsonParser.getLongValue());
                 }
                 break;
 
             case VALUE_STRING:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected string literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected string literal");
                 }
                 JsonNode stringNode = nodeStack.peekFirst();
                 if (stringNode instanceof ObjectNode) {
-                    ((ObjectNode)stringNode).put(currentFieldName, nonBlockingJsonParser.getValueAsString());
+                    ((ObjectNode)stringNode).put(currentFieldName, currentNonBlockingJsonParser.getValueAsString());
                 }
                 else {
-                    ((ArrayNode)stringNode).add(nonBlockingJsonParser.getValueAsString());
+                    ((ArrayNode)stringNode).add(currentNonBlockingJsonParser.getValueAsString());
                 }
                 break;
 
             case VALUE_NUMBER_FLOAT:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected float literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected float literal");
                 }
                 JsonNode floatNode = nodeStack.peekFirst();
                 if (floatNode instanceof ObjectNode) {
-                    ((ObjectNode)floatNode).put(currentFieldName, nonBlockingJsonParser.getFloatValue());
+                    ((ObjectNode)floatNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
                 }
                 else {
-                    ((ArrayNode)floatNode).add(nonBlockingJsonParser.getFloatValue());
+                    ((ArrayNode)floatNode).add(currentNonBlockingJsonParser.getFloatValue());
                 }
                 break;
             case VALUE_NULL:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected null literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected null literal");
                 }
                 JsonNode nullNode = nodeStack.peekFirst();
                 if (nullNode instanceof ObjectNode) {
@@ -179,14 +186,14 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             case VALUE_TRUE:
             case VALUE_FALSE:
                 if(nodeStack.isEmpty()) {
-                    throw new JsonParseException(nonBlockingJsonParser, "Unexpected boolean literal");
+                    throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected boolean literal");
                 }
                 JsonNode booleanNode = nodeStack.peekFirst();
                 if (booleanNode instanceof ObjectNode) {
-                    ((ObjectNode)booleanNode).put(currentFieldName, nonBlockingJsonParser.getBooleanValue());
+                    ((ObjectNode)booleanNode).put(currentFieldName, currentNonBlockingJsonParser.getBooleanValue());
                 }
                 else {
-                    ((ArrayNode)booleanNode).add(nonBlockingJsonParser.getBooleanValue());
+                    ((ArrayNode)booleanNode).add(currentNonBlockingJsonParser.getBooleanValue());
                 }
                 break;
 
