@@ -215,33 +215,5 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
 //     */
 //    <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request);
 //
-//    /**
-//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-//     *
-//     * @param request The {@link HttpRequest} to execute
-//     * @param <I>     The request body type
-//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-//     */
-//    <I> Publisher<HttpResponse<Map<String, Object>>> jsonStream(HttpRequest<I> request);
-//
-//    /**
-//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-//     *
-//     * @param request  The {@link HttpRequest} to execute
-//     * @param bodyType The body type
-//     * @param <I>      The request body type
-//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-//     */
-//    <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Argument<O> bodyType);
-//    /**
-//     * Perform an HTTP request and receive data as a stream of JSON objects as they become available
-//     *
-//     * @param request  The {@link HttpRequest} to execute
-//     * @param bodyType The body type
-//     * @param <I>      The request body type
-//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-//     */
-//    default <I, O> Publisher<HttpResponse<O>> jsonStream(HttpRequest<I> request, Class<O> bodyType) {
-//        return jsonStream(request, Argument.of(bodyType));
-//    }
+
 }
