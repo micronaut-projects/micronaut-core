@@ -42,6 +42,25 @@ class JsonStreamSpec  extends Specification {
 
         then:
         jsonObjects.size() == 2
+        jsonObjects[0].title == 'The Stand'
+        jsonObjects[1].title == 'The Shining'
+
+    }
+
+    void "test read JSON stream demand all POJO"() {
+        given:
+        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Book> jsonObjects = client.jsonStream(HttpRequest.GET(
+                '/jsonstream/books'
+        ), Book).toList().blockingGet()
+
+        then:
+        jsonObjects.size() == 2
+        jsonObjects.every() { it instanceof Book}
+        jsonObjects[0].title == 'The Stand'
+        jsonObjects[1].title == 'The Shining'
     }
 
     void "test read JSON stream demand one"() {
@@ -53,7 +72,7 @@ class JsonStreamSpec  extends Specification {
                 '/jsonstream/books'
         ))
         Map json
-        
+
         stream.subscribe(new Subscriber<Map<String, Object>>() {
             @Override
             void onSubscribe(Subscription s) {
@@ -79,6 +98,7 @@ class JsonStreamSpec  extends Specification {
         PollingConditions conditions = new PollingConditions()
         then:
         conditions.eventually {
+            json != null
             json.title == "The Stand"
         }
 

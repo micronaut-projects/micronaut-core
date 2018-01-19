@@ -39,10 +39,8 @@ import org.particleframework.http.client.*;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
-import org.particleframework.http.sse.Event;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.parser.JacksonProcessor;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Inject;
@@ -83,9 +81,20 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
         return Flowable.fromPublisher(super.exchange(request));
     }
 
-
+    @SuppressWarnings("unchecked")
     @Override
     public <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request) {
+        Flowable flowable = jsonStream(request, Map.class);
+        return flowable;
+    }
+
+    @Override
+    public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Class<O> type) {
+        return jsonStream(request, org.particleframework.core.type.Argument.of(type));
+    }
+
+    @Override
+    public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> type) {
         JsonMediaTypeCodec mediaTypeCodec = (JsonMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
                 .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
         URI requestURI = resolveRequestURI(request);
@@ -93,12 +102,17 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
 
         return Flowable.create(emitter -> {
             ChannelFuture channelFuture = doConnect(requestURI, sslContext);
-            emitter.setDisposable(new Disposable() {
+            Disposable disposable = new Disposable() {
                 boolean disposed = false;
+
                 @Override
                 public void dispose() {
-                    if(!disposed) {
-                        closeChannelAsync(channelFuture.channel());
+                    if (!disposed) {
+                        Channel channel = channelFuture.channel();
+                        if (channel.isOpen()) {
+                            closeChannelAsync(channel);
+                        }
+                        disposed = true;
                     }
                 }
 
@@ -106,7 +120,9 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
                 public boolean isDisposed() {
                     return disposed;
                 }
-            });
+            };
+            emitter.setDisposable(disposable);
+            emitter.setCancellable(disposable::dispose);
 
             channelFuture
                     .addListener((ChannelFutureListener) f -> {
@@ -139,7 +155,6 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
                                     JacksonProcessor jacksonProcessor = new JacksonProcessor();
-                                    jacksonProcessor.onSubscribe((Subscription) emitter);
                                     jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
                                         @Override
                                         protected void doOnSubscribe(Subscription subscription) {
@@ -149,12 +164,8 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
 
                                         @Override
                                         protected void doOnNext(JsonNode message) {
-                                            try {
-                                                Map json = mediaTypeCodec.getObjectMapper().treeToValue(message, Map.class);
-                                                emitter.onNext(json);
-                                            } catch (JsonProcessingException e) {
-                                                emitter.onError(e);
-                                            }
+                                            O json = mediaTypeCodec.decode(type, message);
+                                            emitter.onNext(json);
                                         }
 
                                         @Override
@@ -171,12 +182,19 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
                                         @Override
                                         protected void doOnSubscribe(Subscription subscription) {
                                             long demand = emitter.requested();
+                                            jacksonProcessor.onSubscribe(subscription);
                                             subscription.request(demand);
                                         }
 
                                         @Override
                                         protected void doOnNext(HttpContent message) {
-                                            jacksonProcessor.onNext(ByteBufUtil.getBytes(message.content()));
+                                            try {
+                                                jacksonProcessor.onNext(
+                                                        ByteBufUtil.getBytes(message.content())
+                                                );
+                                            } catch (Exception e) {
+                                                jacksonProcessor.onError(e);
+                                            }
                                         }
 
                                         @Override
@@ -189,8 +207,6 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
                                             jacksonProcessor.onComplete();
                                         }
                                     });
-
-
                                 }
 
                             });
@@ -205,6 +221,7 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
         }, BackpressureStrategy.BUFFER);
 
     }
+
     @Override
     public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
         return Flowable.fromPublisher(super.exchange(request, bodyType));
