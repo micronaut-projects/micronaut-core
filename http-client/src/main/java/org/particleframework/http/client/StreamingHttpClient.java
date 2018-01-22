@@ -27,6 +27,7 @@ import java.util.Map;
  * Extended version of the {@link HttpClient} that supports streaming responses
  *
  * @author Graeme Rocher
+ * @since 1.0
  */
 public interface StreamingHttpClient extends HttpClient {
 
