@@ -15,15 +15,17 @@
  */
 package org.particleframework.http.client.rxjava2;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.typesafe.netty.http.StreamedHttpResponse;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.FlowableEmitter;
 import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
@@ -81,6 +83,129 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
         return Flowable.fromPublisher(super.exchange(request));
     }
 
+    @Override
+    public <I> Flowable<ByteBuffer<?>> dataStream(HttpRequest<I> request) {
+        URI requestURI = resolveRequestURI(request);
+        SslContext sslContext = buildSslContext(requestURI);
+
+        return Flowable.create(emitter -> {
+            ChannelFuture channelFuture = doConnect(requestURI, sslContext);
+            Disposable disposable = buildDisposableChannel(channelFuture);
+            emitter.setDisposable(disposable);
+            emitter.setCancellable(disposable::dispose);
+
+
+            channelFuture
+                    .addListener((ChannelFutureListener) f -> {
+                        if (f.isSuccess()) {
+                            Channel channel = f.channel();
+                            io.netty.handler.codec.http.HttpRequest nettyRequest = prepareRequest(request, requestURI);
+
+                            ChannelPipeline pipeline = channel.pipeline();
+                            pipeline.remove(HANDLER_AGGREGATOR);
+                            pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+
+                                @Override
+                                protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+                                    msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
+                                        @Override
+                                        protected void doOnSubscribe(Subscription subscription) {
+                                            subscription.request(emitter.requested());
+                                        }
+
+                                        @Override
+                                        protected void doOnNext(HttpContent message) {
+                                            ByteBuf byteBuf = message.content();
+                                            emitter.onNext(byteBufferFactory.wrap(byteBuf));
+                                        }
+
+                                        @Override
+                                        protected void doOnError(Throwable t) {
+                                            emitter.onError(t);
+                                        }
+
+                                        @Override
+                                        protected void doOnComplete() {
+                                            emitter.onComplete();
+                                        }
+                                    });
+                                }
+                            });
+                            channel.writeAndFlush(nettyRequest);
+                        } else {
+                            Throwable cause = f.cause();
+                            emitter.onError(
+                                    new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            );
+                        }
+                    });
+        }, BackpressureStrategy.BUFFER);
+    }
+
+
+    @Override
+    public <I> Flowable<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request) {
+        URI requestURI = resolveRequestURI(request);
+        SslContext sslContext = buildSslContext(requestURI);
+
+        return Flowable.create(emitter -> {
+            ChannelFuture channelFuture = doConnect(requestURI, sslContext);
+            Disposable disposable = buildDisposableChannel(channelFuture);
+            emitter.setDisposable(disposable);
+            emitter.setCancellable(disposable::dispose);
+
+
+            channelFuture
+                    .addListener((ChannelFutureListener) f -> {
+                        if (f.isSuccess()) {
+                            Channel channel = f.channel();
+                            io.netty.handler.codec.http.HttpRequest nettyRequest = prepareRequest(request, requestURI);
+
+                            ChannelPipeline pipeline = channel.pipeline();
+                            pipeline.remove(HANDLER_AGGREGATOR);
+                            pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+
+                                @Override
+                                protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+
+                                    NettyStreamedHttpResponse<ByteBuffer<?>> response = new NettyStreamedHttpResponse<>(msg);
+                                    msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
+                                        @Override
+                                        protected void doOnSubscribe(Subscription subscription) {
+                                            subscription.request(emitter.requested());
+                                        }
+
+                                        @Override
+                                        protected void doOnNext(HttpContent message) {
+                                            ByteBuf byteBuf = message.content();
+                                            ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
+                                            response.setBody(byteBuffer);
+                                            emitter.onNext(response);
+                                        }
+
+                                        @Override
+                                        protected void doOnError(Throwable t) {
+                                            emitter.onError(t);
+                                        }
+
+                                        @Override
+                                        protected void doOnComplete() {
+                                            emitter.onComplete();
+                                        }
+                                    });
+                                }
+                            });
+                            channel.writeAndFlush(nettyRequest);
+                        } else {
+                            Throwable cause = f.cause();
+                            emitter.onError(
+                                    new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            );
+                        }
+                    });
+        }, BackpressureStrategy.BUFFER);
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request) {
@@ -102,25 +227,7 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
 
         return Flowable.create(emitter -> {
             ChannelFuture channelFuture = doConnect(requestURI, sslContext);
-            Disposable disposable = new Disposable() {
-                boolean disposed = false;
-
-                @Override
-                public void dispose() {
-                    if (!disposed) {
-                        Channel channel = channelFuture.channel();
-                        if (channel.isOpen()) {
-                            closeChannelAsync(channel);
-                        }
-                        disposed = true;
-                    }
-                }
-
-                @Override
-                public boolean isDisposed() {
-                    return disposed;
-                }
-            };
+            Disposable disposable = buildDisposableChannel(channelFuture);
             emitter.setDisposable(disposable);
             emitter.setCancellable(disposable::dispose);
 
@@ -128,88 +235,10 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
                     .addListener((ChannelFutureListener) f -> {
                         if (f.isSuccess()) {
                             Channel channel = f.channel();
-                            MediaType requestContentType = request
-                                    .getContentType()
-                                    .orElse(MediaType.APPLICATION_JSON_TYPE);
-
-                            boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
-                            io.netty.handler.codec.http.HttpRequest nettyRequest =
-                                    buildNettyRequest(
-                                            request,
-                                            requestContentType,
-                                            permitsBody);
-
-
-                            prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
-
+                            io.netty.handler.codec.http.HttpRequest nettyRequest = prepareRequest(request, requestURI);
                             ChannelPipeline pipeline = channel.pipeline();
-                            pipeline.remove("aggregator");
-                            pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
-                                @Override
-                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                    emitter.onError(
-                                            new HttpClientException("Client error:" + cause.getMessage(), cause)
-                                    );
-                                }
-
-                                @Override
-                                protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
-                                    JacksonProcessor jacksonProcessor = new JacksonProcessor();
-                                    jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
-                                        @Override
-                                        protected void doOnSubscribe(Subscription subscription) {
-                                            long demand = emitter.requested();
-                                            subscription.request(demand);
-                                        }
-
-                                        @Override
-                                        protected void doOnNext(JsonNode message) {
-                                            O json = mediaTypeCodec.decode(type, message);
-                                            emitter.onNext(json);
-                                        }
-
-                                        @Override
-                                        protected void doOnError(Throwable t) {
-                                            emitter.onError(t);
-                                        }
-
-                                        @Override
-                                        protected void doOnComplete() {
-                                            emitter.onComplete();
-                                        }
-                                    });
-                                    msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
-                                        @Override
-                                        protected void doOnSubscribe(Subscription subscription) {
-                                            long demand = emitter.requested();
-                                            jacksonProcessor.onSubscribe(subscription);
-                                            subscription.request(demand);
-                                        }
-
-                                        @Override
-                                        protected void doOnNext(HttpContent message) {
-                                            try {
-                                                jacksonProcessor.onNext(
-                                                        ByteBufUtil.getBytes(message.content())
-                                                );
-                                            } catch (Exception e) {
-                                                jacksonProcessor.onError(e);
-                                            }
-                                        }
-
-                                        @Override
-                                        protected void doOnError(Throwable t) {
-                                            jacksonProcessor.onError(t);
-                                        }
-
-                                        @Override
-                                        protected void doOnComplete() {
-                                            jacksonProcessor.onComplete();
-                                        }
-                                    });
-                                }
-
-                            });
+                            pipeline.remove(HANDLER_AGGREGATOR);
+                            pipeline.addLast(newJsonStreamDecoder(type, mediaTypeCodec, emitter));
                             channel.writeAndFlush(nettyRequest);
                         } else {
                             Throwable cause = f.cause();
@@ -258,7 +287,7 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
     }
 
     @Override
-    public <I> Flowable<String> retrieve(String uri) {
+    public Flowable<String> retrieve(String uri) {
         return Flowable.fromPublisher(super.retrieve(uri));
     }
 
@@ -272,5 +301,117 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
      */
     public static RxHttpClient create(URL url) {
         return new RxHttpClient(url);
+    }
+
+
+    private <I> io.netty.handler.codec.http.HttpRequest prepareRequest(HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        MediaType requestContentType = request
+                .getContentType()
+                .orElse(MediaType.APPLICATION_JSON_TYPE);
+
+        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        io.netty.handler.codec.http.HttpRequest nettyRequest =
+                buildNettyRequest(
+                        request,
+                        requestContentType,
+                        permitsBody);
+
+
+        prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+        return nettyRequest;
+    }
+
+
+
+
+    private <O> SimpleChannelInboundHandler<StreamedHttpResponse> newJsonStreamDecoder(org.particleframework.core.type.Argument<O> type, JsonMediaTypeCodec mediaTypeCodec, FlowableEmitter<O> emitter) {
+        return new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                emitter.onError(
+                        new HttpClientException("Client error:" + cause.getMessage(), cause)
+                );
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+                JacksonProcessor jacksonProcessor = new JacksonProcessor();
+                jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
+                    @Override
+                    protected void doOnSubscribe(Subscription subscription) {
+                        long demand = emitter.requested();
+                        subscription.request(demand);
+                    }
+
+                    @Override
+                    protected void doOnNext(JsonNode message) {
+                        O json = mediaTypeCodec.decode(type, message);
+                        emitter.onNext(json);
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
+                        emitter.onError(t);
+                    }
+
+                    @Override
+                    protected void doOnComplete() {
+                        emitter.onComplete();
+                    }
+                });
+                msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
+                    @Override
+                    protected void doOnSubscribe(Subscription subscription) {
+                        long demand = emitter.requested();
+                        jacksonProcessor.onSubscribe(subscription);
+                        subscription.request(demand);
+                    }
+
+                    @Override
+                    protected void doOnNext(HttpContent message) {
+                        try {
+                            jacksonProcessor.onNext(
+                                    ByteBufUtil.getBytes(message.content())
+                            );
+                        } catch (Exception e) {
+                            jacksonProcessor.onError(e);
+                        }
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
+                        jacksonProcessor.onError(t);
+                    }
+
+                    @Override
+                    protected void doOnComplete() {
+                        jacksonProcessor.onComplete();
+                    }
+                });
+            }
+
+        };
+    }
+
+    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
+        return new Disposable() {
+            boolean disposed = false;
+
+            @Override
+            public void dispose() {
+                if (!disposed) {
+                    Channel channel = channelFuture.channel();
+                    if (channel.isOpen()) {
+                        closeChannelAsync(channel);
+                    }
+                    disposed = true;
+                }
+            }
+
+            @Override
+            public boolean isDisposed() {
+                return disposed;
+            }
+        };
     }
 }
