@@ -25,7 +25,6 @@ import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
-import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.io.socket.SocketUtils;
@@ -43,6 +42,7 @@ import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.web.router.Router;
+import org.particleframework.web.router.resource.StaticResourceResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +80,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
+    private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
@@ -97,6 +98,7 @@ public class NettyHttpServer implements EmbeddedServer {
             RequestBinderRegistry binderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry,
+            StaticResourceResolver resourceResolver,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             ChannelOutboundHandler... outboundHandlers
@@ -119,6 +121,7 @@ public class NettyHttpServer implements EmbeddedServer {
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.binderRegistry = binderRegistry;
+        this.staticResourceResolver = resourceResolver;
     }
 
     @Override
@@ -155,6 +158,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     router,
                                     mediaTypeCodecRegistry,
                                     specialTypeHandlerRegistry,
+                                    staticResourceResolver,
                                     serverConfiguration,
                                     binderRegistry,
                                     executorSelector,
