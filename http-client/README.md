@@ -10,3 +10,5 @@ This module provides a Reactive HTTP client based on the Particle and Reactive s
 * CONTINUE request handling
 * Load balancing / Ribbon support
 * Review HTTPS support
+* Cookie Support
+* Publisher has body to allow streaming requests
