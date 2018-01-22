@@ -161,10 +161,9 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * the response body to the specified type
      *
      * @param uri The URI
-     * @param <I> The request body type
      * @return A {@link Publisher} that emits String result
      */
-    default <I> Publisher<String> retrieve(String uri) {
+    default Publisher<String> retrieve(String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
     }
 
@@ -205,15 +204,5 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
 //     * @return A {@link Publisher} that emits a stream of response objects with the body of each response object containing a {@link Event}
 //     */
 //    <I, O> Publisher<HttpResponse<Event<O>>> eventStream(HttpRequest<I> request, Argument<O> bodyType);
-//
-//    /**
-//     * Perform an HTTP request and receive data chunk by chunk as it becomes available
-//     *
-//     * @param request The {@link HttpRequest} to execute
-//     * @param <I>     The request body type
-//     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
-//     */
-//    <I> Publisher<HttpResponse<ByteBuffer<?>>> dataStream(HttpRequest<I> request);
-//
 
 }

@@ -87,9 +87,6 @@ Some view technology support and port GSON views to Particle.
 
 ### HTTP Client
 
-#### Generate Client Implementation from Interface
-
-It should be possible to generate a client implementation at compile time from a given interface
 
 #### Service Discovery
 

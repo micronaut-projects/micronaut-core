@@ -46,6 +46,9 @@ class JsonStreamSpec  extends Specification {
         jsonObjects[0].title == 'The Stand'
         jsonObjects[1].title == 'The Shining'
 
+        cleanup:
+        client.stop()
+
     }
 
     void "test read JSON stream demand all POJO"() {

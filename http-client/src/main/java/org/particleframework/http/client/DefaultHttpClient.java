@@ -95,6 +95,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    protected static final String HANDLER_AGGREGATOR = "http-aggregator";
+    protected static final String HANDLER_STREAM = "stream-handler";
 
     private final ServerSelector serverSelector;
     private final HttpClientConfiguration configuration;
@@ -103,7 +105,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     private final HttpClientFilter[] filters;
     private final Charset defaultCharset;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
+    protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     @Inject
     public DefaultHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
@@ -218,7 +220,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                         boolean permitsBody = org.particleframework.http.HttpMethod.permitsRequestBody(request.getMethod());
                         io.netty.handler.codec.http.HttpRequest nettyRequest =
                                 buildNettyRequest(
-                                        (NettyClientHttpRequest) request,
+                                        request,
                                         requestContentType,
                                         permitsBody);
 
@@ -531,29 +533,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         if (permitsBody) {
 
             Optional body = clientHttpRequest.getBody();
-            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && body.isPresent()) {
+            boolean hasBody = body.isPresent();
+            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(((NettyClientHttpRequest)clientHttpRequest).getNettyRequest((ByteBuf) null), false);
-                Object requestBody = bodyValue;
-                Map<String, Object> formData;
-                if (requestBody instanceof Map) {
-                    formData = (Map<String, Object>) requestBody;
-                } else {
-                    formData = BeanMap.of(requestBody);
-                }
-                for (Map.Entry<String, Object> entry : formData.entrySet()) {
-                    Object value = entry.getValue();
-                    if (value != null) {
-                        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
-                        if (converted.isPresent()) {
-                            postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
-                        }
-                    }
-                }
-                nettyRequest = postRequestEncoder.finalizeRequest();
+                nettyRequest = buildFormDataRequest(clientHttpRequest, bodyValue);
             } else {
                 ByteBuf bodyContent = null;
-                if (body.isPresent()) {
+                if (hasBody) {
                     Object bodyValue = body.get();
                     if (CharSequence.class.isAssignableFrom(bodyValue.getClass())) {
                         CharSequence charSequence = (CharSequence) bodyValue;
@@ -578,6 +564,27 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             nettyRequest = clientHttpRequest.getNettyRequest((ByteBuf) null);
         }
         return nettyRequest;
+    }
+
+    private io.netty.handler.codec.http.HttpRequest buildFormDataRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
+        Object requestBody = bodyValue;
+        Map<String, Object> formData;
+        if (requestBody instanceof Map) {
+            formData = (Map<String, Object>) requestBody;
+        } else {
+            formData = BeanMap.of(requestBody);
+        }
+        for (Map.Entry<String, Object> entry : formData.entrySet()) {
+            Object value = entry.getValue();
+            if (value != null) {
+                Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+                if (converted.isPresent()) {
+                    postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                }
+            }
+        }
+        return postRequestEncoder.finalizeRequest();
     }
 
     private void traceRequest(io.netty.handler.codec.http.HttpRequest nettyRequest) {
@@ -654,8 +661,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             readTimeout.ifPresent(duration -> p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS)));
             p.addLast("codec", new HttpClientCodec());
             int maxContentLength = configuration.getMaxContentLength();
-            p.addLast("aggregator", new HttpObjectAggregator(maxContentLength));
-            p.addLast("stream-handler", new HttpStreamsClientHandler());
+            p.addLast(HANDLER_AGGREGATOR, new HttpObjectAggregator(maxContentLength));
+            p.addLast(HANDLER_STREAM, new HttpStreamsClientHandler());
         }
     }
 }

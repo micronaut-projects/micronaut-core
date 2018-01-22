@@ -15,6 +15,8 @@
  */
 package org.particleframework.http;
 
+import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.Argument;
 
@@ -58,7 +60,9 @@ public interface HttpMessage<B>  {
      * @param <T> The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    <T> Optional<T> getBody(Class<T> type);
+    default <T> Optional<T> getBody(Argument<T> type) {
+        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+    }
 
     /**
      * Return the body as the given type
@@ -66,7 +70,9 @@ public interface HttpMessage<B>  {
      * @param <T> The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    <T> Optional<T> getBody(Argument<T> type);
+    default <T> Optional<T> getBody(Class<T> type) {
+        return getBody(Argument.of(type));
+    }
 
     /**
      * @return The locale of the message
