@@ -64,7 +64,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
 
     private Object body;
-    private RouteMatch<Object> matchedRoute;
+    private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
 
 
@@ -227,7 +227,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Obtains the matched route
      */
     @Internal
-    public RouteMatch<Object> getMatchedRoute() {
+    public RouteMatch<?> getMatchedRoute() {
         return matchedRoute;
     }
 
@@ -259,7 +259,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Internal
-    void setMatchedRoute(RouteMatch<Object> matchedRoute) {
+    void setMatchedRoute(RouteMatch<?> matchedRoute) {
         this.matchedRoute = matchedRoute;
     }
 
