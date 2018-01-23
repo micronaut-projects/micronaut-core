@@ -242,6 +242,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+        this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
             for (String property : properties) {
                 Object value = properties.get(property);
