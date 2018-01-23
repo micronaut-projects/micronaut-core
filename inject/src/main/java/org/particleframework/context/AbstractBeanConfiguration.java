@@ -1,17 +1,9 @@
 package org.particleframework.context;
 
-import org.particleframework.context.annotation.Requirements;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.context.condition.Condition;
-import org.particleframework.context.condition.RequiresCondition;
-import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinitionReference;
-
-import java.util.ArrayList;
-import java.util.Collection;
 
 /**
  * An abstract implementation of the {@link BeanConfiguration} method. Not typically used directly from user code, instead
@@ -21,16 +13,12 @@ import java.util.Collection;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanConfiguration implements BeanConfiguration {
+public class AbstractBeanConfiguration extends AbstractBeanContextConditional implements BeanConfiguration {
 
     private final String packageName;
-    private final Condition condition;
-    private Boolean enabled = null;
 
     protected AbstractBeanConfiguration(String thePackage) {
         this.packageName = thePackage.intern();
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        this.condition = !annotationMetadata.hasStereotype(Requires.class) && !annotationMetadata.hasStereotype(Requirements.class) ? null : new RequiresCondition(annotationMetadata);
     }
 
     @Override
@@ -46,14 +34,6 @@ public class AbstractBeanConfiguration implements BeanConfiguration {
     @Override
     public String getVersion() {
         return getPackage().getImplementationVersion();
-    }
-
-    @Override
-    public boolean isEnabled(BeanContext context) {
-        if(enabled == null) {
-            enabled = condition == null || condition.matches(new DefaultConditionContext<>(context, this));
-        }
-        return enabled;
     }
 
     @Override

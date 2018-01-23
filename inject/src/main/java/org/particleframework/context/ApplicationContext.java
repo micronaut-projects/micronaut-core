@@ -17,7 +17,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.PropertySource;
-import org.particleframework.context.env.PropertySourceLoader;
+import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;
@@ -110,7 +110,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * @return The running {@link ApplicationContext}
      */
     static ApplicationContext run(Map<String, Object> properties, String... environments) {
-        PropertySource propertySource = PropertySource.of(PropertySourceLoader.DEFAULT_NAME, properties);
+        PropertySource propertySource = PropertySource.of(Environment.DEFAULT_NAME, properties);
         return run(propertySource, environments);
     }
 
@@ -150,7 +150,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * @return The running bean
      */
     static <T> T run(Class<T> type, Map<String, Object> properties, String... environments) {
-        PropertySource propertySource = PropertySource.of(PropertySourceLoader.DEFAULT_NAME, properties);
+        PropertySource propertySource = PropertySource.of(Environment.DEFAULT_NAME, properties);
         return run(type, propertySource, environments);
     }
 
@@ -217,7 +217,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(ClassLoader classLoader, String... environments) {
-        return new DefaultApplicationContext(classLoader, environments);
+        return new DefaultApplicationContext(ResourceLoader.of(classLoader), environments);
     }
 
     /**
@@ -228,7 +228,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver {
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static ApplicationContext build(Class mainClass, String... environments) {
-        DefaultApplicationContext applicationContext = new DefaultApplicationContext(mainClass.getClassLoader(), environments);
+        DefaultApplicationContext applicationContext = new DefaultApplicationContext(ResourceLoader.of(mainClass.getClassLoader()), environments);
         applicationContext.getEnvironment().addPackage(mainClass.getPackage());
         return applicationContext;
     }

@@ -24,6 +24,7 @@ import org.particleframework.core.value.PropertyResolver;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -34,7 +35,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
     protected final ConversionService<?> conversionService;
-    protected final Collection<PropertySource> propertySources = new ConcurrentLinkedQueue<>();
+    protected final Map<String,PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     protected final Map<String,Object>[] catalog = new Map[57];
@@ -77,7 +78,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     public PropertySourcePropertyResolver addPropertySource(@Nullable PropertySource propertySource) {
         if(propertySource != null) {
-            propertySources.add(propertySource);
+            propertySources.put(propertySource.getName(), propertySource);
             processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
         }
         return this;

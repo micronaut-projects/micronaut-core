@@ -15,7 +15,6 @@
  */
 package org.particleframework.core.io.service;
 
-import org.particleframework.core.io.IOUtils;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.CollectionUtils;
 
@@ -24,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**

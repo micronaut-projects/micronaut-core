@@ -1,7 +1,6 @@
 package org.particleframework.context.env;
 
 import org.particleframework.core.order.Ordered;
-import org.particleframework.core.value.PropertyResolver;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -44,33 +43,15 @@ public interface PropertySource extends Iterable<String>, Ordered {
         return new MapPropertySource(name, map);
     }
     /**
-     * Create a {@link PropertySource} named {@link PropertySourceLoader#DEFAULT_NAME} from the given map
+     * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map
      *
      * @param map The map
      * @return The {@link PropertySource}
      */
     static PropertySource of(Map<String, Object> map) {
-        return new MapPropertySource(PropertySourceLoader.DEFAULT_NAME, map);
+        return new MapPropertySource(Environment.DEFAULT_NAME, map);
     }
-    /**
-     * Create a {@link PropertySource} named {@link PropertySourceLoader#DEFAULT_NAME} for the given array of keys and values
-     *
-     * @param values The array
-     * @return The {@link PropertySource}
-     */
-    static PropertySource of(Object... values) {
-        int len = values.length;
-        if(len % 2 != 0) throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
 
-        Map<String,Object> answer = new LinkedHashMap<>(len / 2);
-        int i = 0;
-        while (i < values.length - 1) {
-            Object key = values[i++];
-            if(key != null)
-                answer.put(key.toString(), values[i++]);
-        }
-        return new MapPropertySource(PropertySourceLoader.DEFAULT_NAME, answer);
-    }
 
     enum PropertyConvention {
         /**

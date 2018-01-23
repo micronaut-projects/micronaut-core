@@ -15,7 +15,6 @@
  */
 package org.particleframework.inject;
 
-import org.particleframework.context.BeanContext;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
@@ -24,7 +23,7 @@ import org.particleframework.core.annotation.AnnotationMetadataProvider;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanType<T> extends AnnotationMetadataProvider {
+public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional {
     /**
      * @return Whether the bean definition is the {@link org.particleframework.context.annotation.Primary}
      */
@@ -42,11 +41,4 @@ public interface BeanType<T> extends AnnotationMetadataProvider {
         return getBeanType().getName();
     }
 
-    /**
-     * Whether the bean is enabled
-     *
-     * @param beanContext The bean context
-     * @return True if it is
-     */
-    boolean isEnabled(BeanContext beanContext);
 }

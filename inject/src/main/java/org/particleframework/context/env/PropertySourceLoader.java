@@ -11,9 +11,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface PropertySourceLoader extends Toggleable {
-
-    String DEFAULT_NAME = "application";
+public interface PropertySourceLoader extends Toggleable, PropertySourceLocator {
 
     /**
      * Load a {@link PropertySource} for the given {@link Environment}
@@ -21,8 +19,9 @@ public interface PropertySourceLoader extends Toggleable {
      * @param environment The environment
      * @return An optional of {@link PropertySource}
      */
+    @Override
     default Optional<PropertySource> load(Environment environment) {
-        return load(DEFAULT_NAME, environment, null);
+        return load(Environment.DEFAULT_NAME, environment, null);
     }
 
     /**

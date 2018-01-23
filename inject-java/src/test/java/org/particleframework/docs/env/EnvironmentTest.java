@@ -51,8 +51,11 @@ public class EnvironmentTest {
         // tag::envProps[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 PropertySource.of(
-                        "particle.server.host", "foo",
-                        "particle.server.port", 8080
+                        "test",
+                        CollectionUtils.mapOf(
+                                "particle.server.host", "foo",
+                            "particle.server.port", 8080
+                        )
                 ),
                 "test", "android");
         Environment environment = applicationContext.getEnvironment();

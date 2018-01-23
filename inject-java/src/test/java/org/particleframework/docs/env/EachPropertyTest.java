@@ -18,6 +18,7 @@ package org.particleframework.docs.env;
 import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.PropertySource;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
 import java.net.URI;
@@ -36,8 +37,10 @@ public class EachPropertyTest {
     public void testEachProperty() throws URISyntaxException {
         // tag::config[]
         ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
+                "test",
+                CollectionUtils.mapOf(
                 "test.datasource.one.url", "jdbc:mysql://localhost/one",
-                "test.datasource.two.url", "jdbc:mysql://localhost/two"
+                "test.datasource.two.url", "jdbc:mysql://localhost/two")
         ));
         // end::config[]
 
