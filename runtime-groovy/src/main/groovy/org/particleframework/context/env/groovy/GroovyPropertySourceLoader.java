@@ -30,18 +30,28 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader, Ordered
     }
 
     @Override
-    public Optional<PropertySource> load(String name, Environment environment) {
+    public Optional<PropertySource> load(String resourceName, Environment environment, String environmentName) {
         Map<String,Object> finalMap = new LinkedHashMap<>();
-        loadProperties(environment, name + ".groovy", finalMap);
-        Set<String> activeNames = environment.getActiveNames();
-        for (String activeName : activeNames) {
-            loadProperties(environment, name + "-"+ activeName +".groovy", finalMap);
+        String ext =  ".groovy";
+        String fileName = resourceName;
+        if(environmentName != null) {
+            fileName += "-" + environmentName;
         }
+        String qualifiedName = fileName;
+        fileName += "." + ext;
+
+        loadProperties(environment, fileName, finalMap);
+        int order = this.getOrder();
+        if(environmentName != null) {
+            order++; // higher precedence than the default
+        }
+
         if(!finalMap.isEmpty()) {
-            MapPropertySource newPropertySource = new MapPropertySource(finalMap) {
+            int finalOrder = order;
+            MapPropertySource newPropertySource = new MapPropertySource(qualifiedName, finalMap) {
                 @Override
                 public int getOrder() {
-                    return GroovyPropertySourceLoader.this.getOrder();
+                    return finalOrder;
                 }
             };
             return Optional.of(newPropertySource);

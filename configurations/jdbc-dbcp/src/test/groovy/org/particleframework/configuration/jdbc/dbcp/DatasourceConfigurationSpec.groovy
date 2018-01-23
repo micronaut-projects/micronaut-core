@@ -28,7 +28,8 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:]
+                "test",
+                ['datasources.default': [:]]
         ))
         applicationContext.start()
 
@@ -54,7 +55,8 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:]
+                "test",
+                ['datasources.default': [:]]
         ))
         applicationContext.start()
 
@@ -79,10 +81,11 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default.maxWaitMillis': 5000,
+                "test",
+                ['datasources.default.maxWaitMillis': 5000,
                 'datasources.default.connectionProperties': 'prop1=value1;prop2=value2',
                 'datasources.default.defaultAutoCommit': true,
-                'datasources.default.defaultCatalog': 'catalog',
+                'datasources.default.defaultCatalog': 'catalog']
         ))
         applicationContext.start()
 
@@ -108,8 +111,9 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:],
-                'datasources.foo': [:]
+                "test",
+                ['datasources.default': [:],
+                'datasources.foo': [:]]
         ))
         applicationContext.start()
 

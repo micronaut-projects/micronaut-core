@@ -1,6 +1,7 @@
 package org.particleframework.context.env;
 
 import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.core.convert.ConversionService;
@@ -97,9 +98,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param values The values
      * @return This environment
      */
-    default Environment addPropertySource(@Nullable Map<String, ? super Object> values) {
-        if(CollectionUtils.isNotEmpty(values)) {
-            return addPropertySource(PropertySource.of(values));
+    default Environment addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
+        if(StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
+            return addPropertySource(PropertySource.of(name, values));
         }
         return this;
     }

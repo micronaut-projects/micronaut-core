@@ -19,6 +19,7 @@ import io.netty.channel.ChannelOption
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.particleframework.http.HttpMethod
 import org.particleframework.http.server.cors.CorsOriginConfiguration
 import org.particleframework.http.server.netty.NettyHttpServer
@@ -33,13 +34,13 @@ class NettyHttpServerConfigurationSpec extends Specification {
     void "test netty server configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
-        beanContext.environment.addPropertySource(new MapPropertySource(
-                'particle.server.netty.childOptions.autoRead':'true',
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+                ['particle.server.netty.childOptions.autoRead':'true',
                 'particle.server.netty.worker.threads':8,
                 'particle.server.netty.parent.threads':8,
                 'particle.server.multipart.maxFileSize':2048,
                 'particle.server.maxRequestSize':'2MB',
-                'particle.server.ssl.port':8888,
+                'particle.server.ssl.port':8888]
 
         ))
         beanContext.start()
@@ -67,8 +68,8 @@ class NettyHttpServerConfigurationSpec extends Specification {
     void "test cors configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
-        beanContext.environment.addPropertySource(new MapPropertySource(
-                'particle.server.cors.enabled': true,
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+                ['particle.server.cors.enabled': true,
                 'particle.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
                 'particle.server.cors.configurations.foo.allowedMethods': ['GET'],
                 'particle.server.cors.configurations.foo.maxAge': -1,
@@ -76,7 +77,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
                 'particle.server.cors.configurations.bar.allowedHeaders': ['Content-Type', 'Accept'],
                 'particle.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
                 'particle.server.cors.configurations.bar.maxAge': 150,
-                'particle.server.cors.configurations.bar.allowCredentials': false,
+                'particle.server.cors.configurations.bar.allowCredentials': false]
 
         ))
         beanContext.start()
