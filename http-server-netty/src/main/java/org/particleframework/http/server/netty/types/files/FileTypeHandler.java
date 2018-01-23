@@ -230,6 +230,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
             return result;
         }
         catch (IOException ex) {
+            System.out.println(ex.getMessage());
             if (LOG.isWarnEnabled()) {
                 LOG.warn("Failed to load mime types for file extension detection!");
             }
