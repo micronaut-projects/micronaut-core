@@ -45,10 +45,27 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      */
     String CLOUD = "cloud";
     /**
+     * The default bootstrap name
+     */
+    String BOOTSTRAP_NAME_PROPERTY = "particle.bootstrap.name";
+    /**
+     * The default bootstrap config name
+     */
+    String BOOTSTRAP_NAME = "bootstrap";
+    /**
+     * The default application name
+     */
+    String DEFAULT_NAME = "application";
+
+    /**
      * @return The active environment names
      */
     Set<String> getActiveNames();
 
+    /**
+     * @return The active property sources
+     */
+    Collection<PropertySource> getPropertySources();
     /**
      * Adds a property source to this environment
      *
@@ -162,26 +179,5 @@ InputStream inputStream = getClassLoader().getResourceAsStream(path);
      */
     boolean isActive(BeanConfiguration configuration);
 
-    default Optional<URL> getResource(String path) {
-        URL resource = getClassLoader().getResource(path);
-        if(resource != null) {
-            return Optional.of(resource);
-        }
-        return Optional.empty();
-    }
 
-    default Stream<URL> getResources(String fileName) {
-        Enumeration<URL> all;
-        try {
-            all = getClassLoader().getResources(fileName);
-        } catch (IOException e) {
-            return Stream.empty();
-        }
-        Stream.Builder<URL> builder = Stream.<URL>builder();
-        while (all.hasMoreElements()) {
-            URL url = all.nextElement();
-            builder.accept(url);
-        }
-        return builder.build();
-    };
 }

@@ -18,11 +18,8 @@ package example;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import org.particleframework.cache.annotation.Cacheable;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Controller;
+import org.particleframework.http.annotation.*;
 import org.particleframework.validation.Validated;
-import org.particleframework.web.router.annotation.Get;
-import org.particleframework.web.router.annotation.Post;
 
 import javax.inject.Singleton;
 import javax.validation.constraints.NotBlank;

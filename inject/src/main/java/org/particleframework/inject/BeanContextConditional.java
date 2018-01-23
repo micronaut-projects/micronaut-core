@@ -13,20 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.context;
+package org.particleframework.inject;
 
-import org.particleframework.context.env.DefaultEnvironment;
+import org.particleframework.context.BeanContext;
 
 /**
+ * Interface for other types that are conditional within a context
+ *
  * @author graemerocher
  * @since 1.0
  */
-class BootstrapEnvironment extends DefaultEnvironment {
+public interface BeanContextConditional {
 
-    public static final String PROPERTY_SOURCE_PREFIX = "bootstrap";
-
-    @Override
-    protected String getPropertySourceRootName() {
-        return PROPERTY_SOURCE_PREFIX;
-    }
+    /**
+     * Return whether this component is enabled for the given context
+     *
+     * @param context The context
+     *
+     * @return True if it is
+     */
+    boolean isEnabled(BeanContext context);
 }
