@@ -1,15 +1,10 @@
 package example;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.http.HttpRequest;
+import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
-
-import java.net.MalformedURLException;
-import java.net.URL;
 
 import static org.junit.Assert.*;
 
@@ -22,19 +17,13 @@ public class BookControllerTest {
     public void testIndex() throws Exception {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
 
-        OkHttpClient client = new OkHttpClient();
+        HttpClient httpClient = server.getApplicationContext()
+                                      .createBean(HttpClient.class, server.getURL());
 
-        Request request = new Request.Builder()
-                .url(new URL(server.getURL(), "/book"))
-                .build();
-        Response response = client.newCall(
-                request
-        ).execute();
-
-        ResponseBody body = response.body();
+        String body = httpClient.toBlocking().retrieve(HttpRequest.GET("/book"));
         assertNotNull(body);
         assertEquals(
-                body.string(),
+                body,
                 "[{\"title\":\"The Stand\"},{\"title\":\"The Shining\"}]"
         );
 

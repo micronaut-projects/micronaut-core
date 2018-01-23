@@ -5,8 +5,6 @@ plugins {
 }
 mainClassName = "example.Application"
 
-// TODO: Why does this prevent "gradle run" from working?...
-//applicationDefaultJvmArgs = [""]
 jar {
     manifest {
         attributes 'Main-Class': "example.Application"
@@ -24,7 +22,7 @@ dependencies {
     runtime "ch.qos.logback:logback-classic:1.2.3"
 
     testCompile "junit:junit:4.12"
-    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+    testCompile "org.particleframework:http-client:${projectVersion}"
 }
 shadowJar {
     mergeServiceFiles()

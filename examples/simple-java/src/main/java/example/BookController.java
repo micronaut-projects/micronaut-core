@@ -35,7 +35,7 @@ import java.util.List;
 @Validated
 public class BookController {
 
-    @Get
+    @Get("/")
     @Cacheable("books")
     public List<Book> index() {
         return Arrays.asList(new Book("The Stand"), new Book("The Shining"));
