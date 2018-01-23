@@ -18,6 +18,7 @@ package org.particleframework.inject.configproperties.inheritance
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import spock.lang.Specification
 /**
  * @author Graeme Rocher
@@ -28,10 +29,11 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.port':'8080',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.port':'8080',
                 'foo.bar.host':'localhost',
-                'foo.bar.baz.stuff': 'test'
+                'foo.bar.baz.stuff': 'test']
         ))
 
         applicationContext.start()
@@ -51,10 +53,11 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
     void "test configuration properties binding extending POJO"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.baz.otherProperty':'x',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.baz.otherProperty':'x',
                 'foo.baz.onlySetter':'y',
-                'foo.baz.port': 55
+                'foo.baz.port': 55]
         ))
 
         applicationContext.start()

@@ -64,44 +64,46 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         FunctionBean annotation = method.getAnnotation(FunctionBean.class);
-        String functionPath = annotation.value();
-        Class<?> declaringType = method.getDeclaringType();
-        if(StringUtils.isEmpty(functionPath)) {
-            String typeName = declaringType.getSimpleName();
-            if(typeName.contains("$")) {
-                // generated lambda
-                functionPath = "/" + NameUtils.hyphenate(method.getMethodName());
+        if(annotation != null) {
+            String functionPath = annotation.value();
+            Class<?> declaringType = method.getDeclaringType();
+            if(StringUtils.isEmpty(functionPath)) {
+                String typeName = declaringType.getSimpleName();
+                if(typeName.contains("$")) {
+                    // generated lambda
+                    functionPath = "/" + NameUtils.hyphenate(method.getMethodName());
+                }
+                else {
+                    functionPath = "/" + NameUtils.hyphenate(typeName);
+                }
             }
             else {
-                functionPath = "/" + NameUtils.hyphenate(typeName);
+                functionPath = "/" + functionPath;
             }
-        }
-        else {
-            functionPath = "/" + functionPath;
-        }
 
-        UriRoute route = null;
-        if(Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
-            route = POST(functionPath, method);
+            UriRoute route = null;
+            if(Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
+                route = POST(functionPath, method);
 
-        }
-        else if(Supplier.class.isAssignableFrom(declaringType)) {
-            route = GET(functionPath, method);
-        }
-
-        if(route != null) {
-            Class[] argumentTypes = method.getArgumentTypes();
-            int argCount = argumentTypes.length;
-            if(argCount > 0) {
-               if(argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0])) {
-                   route.consumes(MediaType.APPLICATION_JSON_TYPE);
-               }
-               else {
-                   route.body(method.getArgumentNames()[0])
-                        .acceptAll();
-               }
             }
-            ((ExecutableMethodProcessor)functionRegistry).process(beanDefinition, method);
+            else if(Supplier.class.isAssignableFrom(declaringType)) {
+                route = GET(functionPath, method);
+            }
+
+            if(route != null) {
+                Class[] argumentTypes = method.getArgumentTypes();
+                int argCount = argumentTypes.length;
+                if(argCount > 0) {
+                    if(argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0])) {
+                        route.consumes(MediaType.APPLICATION_JSON_TYPE);
+                    }
+                    else {
+                        route.body(method.getArgumentNames()[0])
+                                .acceptAll();
+                    }
+                }
+                ((ExecutableMethodProcessor)functionRegistry).process(beanDefinition, method);
+            }
         }
     }
 

@@ -78,7 +78,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     public PropertySourcePropertyResolver addPropertySource(@Nullable PropertySource propertySource) {
         if(propertySource != null) {
             propertySources.add(propertySource);
-            processPropertySource(propertySource, false);
+            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
         }
         return this;
     }
@@ -88,9 +88,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * @param values The values
      * @return This environment
      */
-    public PropertySourcePropertyResolver addPropertySource(@Nullable Map<String, ? super Object> values) {
+    public PropertySourcePropertyResolver addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
         if(CollectionUtils.isNotEmpty(values)) {
-            return addPropertySource(PropertySource.of(values));
+            return addPropertySource(PropertySource.of(name, values));
         }
         return this;
     }
@@ -240,11 +240,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return subMap;
     }
 
-    protected void processPropertySource(PropertySource properties, boolean upperCaseUnderscoreSeperated) {
+    protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalog) {
             for (String property : properties) {
                 Object value = properties.get(property);
-                if(upperCaseUnderscoreSeperated) {
+                if(convention == PropertySource.PropertyConvention.UPPER_CASE_UNDER_SCORE_SEPARATED) {
                     property = property.toLowerCase(Locale.ENGLISH).replace('_', '.');
                 }
                 int i = property.indexOf('[');

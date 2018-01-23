@@ -18,6 +18,8 @@ package org.particleframework.runtime;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.MapPropertySource;
+import org.particleframework.context.env.PropertySource;
+import org.particleframework.context.env.PropertySourceLoader;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.CollectionUtils;
@@ -82,7 +84,7 @@ public class ParticleApplication {
 
 
         for (Map<String, Object> propertyMap : propertyMaps) {
-            environment.addPropertySource(new MapPropertySource(propertyMap));
+            environment.addPropertySource(PropertySource.of(PropertySourceLoader.DEFAULT_NAME, propertyMap));
         }
 
         try {

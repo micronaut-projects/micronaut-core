@@ -10,10 +10,17 @@ import java.util.Map;
  * @since 1.0
  */
 public class MapPropertySource implements PropertySource {
+    private final String name;
     private final Map map;
 
-    public MapPropertySource(Map map) {
+    public MapPropertySource(String name, Map map) {
+        this.name = name;
         this.map = map;
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 
     @Override
@@ -44,7 +51,13 @@ public class MapPropertySource implements PropertySource {
      * @param map The map
      * @return The map property source
      */
-    public static MapPropertySource of(Map<String, Object> map) {
-        return new MapPropertySource(map);
+    public static MapPropertySource of(String name, Map<String, Object> map) {
+        return new MapPropertySource(name, map);
+    }
+
+
+    @Override
+    public String toString() {
+        return getName();
     }
 }

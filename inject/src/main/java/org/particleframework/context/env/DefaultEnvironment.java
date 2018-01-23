@@ -87,14 +87,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.add(propertySource);
         if(isRunning()) {
-            processPropertySource(propertySource, false);
+            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
         }
         return this;
     }
 
     @Override
-    public DefaultEnvironment addPropertySource(Map<String, ? super Object> values) {
-        return (DefaultEnvironment) super.addPropertySource(values);
+    public DefaultEnvironment addPropertySource(String name, Map<String, ? super Object> values) {
+        return (DefaultEnvironment) super.addPropertySource(name, values);
     }
 
     @Override
@@ -134,20 +134,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if(running.compareAndSet(false, true)) {
-            ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
-            SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = SoftServiceLoader.load(PropertySourceLoader.class);
-            for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
-                if(loader.isPresent()) {
-                    Optional<PropertySource> propertySource = loader.load().load(this);
-                    propertySource.ifPresent(propertySources::add);
-                }
-            }
-            propertySources.add(new SystemPropertiesPropertySource());
-            propertySources.add(new EnvironmentPropertySource());
-            OrderUtil.sort(propertySources);
-            for (PropertySource propertySource : propertySources) {
-                processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
-            }
+            readPropertySources(getPropertySourceRootName());
         }
         return this;
     }
@@ -208,6 +195,38 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
         return new CachingClassPathAnnotationScanner(classLoader);
     }
+
+    protected String getPropertySourceRootName() {
+        return PropertySourceLoader.DEFAULT_NAME;
+    }
+
+    protected void readPropertySources(String name) {
+        ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
+        SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = readPropertySourceLoaders();
+        for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
+            if(loader.isPresent()) {
+                PropertySourceLoader propertySourceLoader = loader.load();
+                Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
+                defaultPropertySource.ifPresent(propertySources::add);
+                Set<String> activeNames = getActiveNames();
+                for (String activeName : activeNames) {
+                    Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
+                    propertySource.ifPresent(propertySources::add);
+                }
+            }
+        }
+        propertySources.add(new SystemPropertiesPropertySource());
+        propertySources.add(new EnvironmentPropertySource());
+        OrderUtil.sort(propertySources);
+        for (PropertySource propertySource : propertySources) {
+            processPropertySource(propertySource, propertySource.getConvention());
+        }
+    }
+
+    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+        return SoftServiceLoader.load(PropertySourceLoader.class);
+    }
+
     private EnvironmentsAndPackage deduceEnvironments() {
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
@@ -295,7 +314,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         return newCatalog;
     }
-
 
 
     private class EnvironmentsAndPackage {
