@@ -16,18 +16,12 @@
 package org.particleframework.http.server;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
-import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.format.ReadableBytes;
-import org.particleframework.core.io.ResourceLoader;
-import org.particleframework.core.io.file.FileSystemResourceLoader;
-import org.particleframework.core.io.scan.ClasspathResourceLoader;
 import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.server.cors.CorsOriginConfiguration;
 import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.io.File;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**

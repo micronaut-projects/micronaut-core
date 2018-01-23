@@ -19,7 +19,7 @@ import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.file.FileSystemResourceLoader;
-import org.particleframework.core.io.scan.ClasspathResourceLoader;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.util.Toggleable;
 
 import java.io.File;
@@ -49,7 +49,7 @@ public class StaticResourceConfiguration implements Toggleable {
         if (enabled) {
             for(String path: paths) {
                 if (path.startsWith("classpath:")) {
-                    loaders.add(new ClasspathResourceLoader(this.getClass().getClassLoader(), path.substring(10)));
+                    loaders.add(new ClassPathResourceLoader(this.getClass().getClassLoader(), path.substring(10)));
                 } else if (path.startsWith("file:")) {
                     loaders.add(new FileSystemResourceLoader(new File(path.substring(5))));
                 } else {
