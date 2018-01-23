@@ -16,6 +16,7 @@
 package org.particleframework.core.io.scan;
 
 import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,7 +102,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
-            if (!path.endsWith("/")) {
+            if (!path.endsWith("/") && StringUtils.isNotEmpty(path)) {
                 path = path + "/";
             }
         }
