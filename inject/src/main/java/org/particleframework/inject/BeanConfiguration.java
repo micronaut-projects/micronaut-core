@@ -9,7 +9,7 @@ import org.particleframework.core.annotation.AnnotationMetadataProvider;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanConfiguration extends AnnotationMetadataProvider {
+public interface BeanConfiguration extends AnnotationMetadataProvider, BeanContextConditional {
 
     /**
      * @return The package for the bean configuration
@@ -27,14 +27,6 @@ public interface BeanConfiguration extends AnnotationMetadataProvider {
      * @return The version or null
      */
     String getVersion();
-    /**
-     * Return whether this bean configuration is enabled
-     *
-     * @param context The context
-     *
-     * @return True if it is
-     */
-    boolean isEnabled(BeanContext context);
 
     /**
      * Check whether the specified bean definition class is within this bean configuration

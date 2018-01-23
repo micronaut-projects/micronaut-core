@@ -3,6 +3,7 @@ package org.particleframework.inject.configproperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -10,8 +11,9 @@ class ConfigurationPropertiesSpec extends Specification {
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-            'foo.bar.port':'8080',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+            'test',
+            ['foo.bar.port':'8080',
             'foo.bar.anotherPort':'9090',
             'foo.bar.intList':"1,2,3",
             'foo.bar.stringList':"1,2",
@@ -19,7 +21,7 @@ class ConfigurationPropertiesSpec extends Specification {
             'foo.bar.flags.two':'2',
             'foo.bar.urlList':"http://test.com, http://test2.com",
             'foo.bar.urlList2':["http://test.com", "http://test2.com"],
-            'foo.bar.url':'http://test.com'
+            'foo.bar.url':'http://test.com']
         ))
 
         applicationContext.start()
@@ -46,7 +48,7 @@ class ConfigurationPropertiesSpec extends Specification {
     void "test configuration inner class properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
+        applicationContext.environment.addPropertySource(PropertySource.of(
             'foo.bar.inner.enabled':'true',
         ))
 

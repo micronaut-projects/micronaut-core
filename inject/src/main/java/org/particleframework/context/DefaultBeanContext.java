@@ -26,6 +26,8 @@ import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.io.scan.ClasspathResourceLoader;
 import org.particleframework.core.io.service.StreamSoftServiceLoader;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -48,7 +50,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,11 +76,12 @@ public class DefaultBeanContext implements BeanContext {
     private final Cache<Class, Collection<BeanDefinition>> beanCandidateCache = Caffeine.newBuilder()
             .maximumSize(30)
             .build();
-    private final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(30);
+    final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(30);
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
-    private final AtomicBoolean running = new AtomicBoolean(false);
+    protected final AtomicBoolean running = new AtomicBoolean(false);
+    private final ClasspathResourceLoader resourceLoader;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class
@@ -94,7 +96,17 @@ public class DefaultBeanContext implements BeanContext {
      * @param classLoader The class loader
      */
     public DefaultBeanContext(ClassLoader classLoader) {
-        this.classLoader = classLoader;
+        this(ResourceLoader.of(classLoader));
+    }
+
+    /**
+     * Construct a new bean context with the given class loader
+     *
+     * @param resourceLoader The resource loader
+     */
+    public DefaultBeanContext(ClasspathResourceLoader resourceLoader) {
+        this.classLoader = resourceLoader.getClassLoader();
+        this.resourceLoader = resourceLoader;
     }
 
     @Override
@@ -667,16 +679,17 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @return The bean definition classes
      */
-    protected Iterable<BeanDefinitionReference> resolveBeanDefinitionClasses() {
-        return ServiceLoader.load(BeanDefinitionReference.class, classLoader);
+    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+        return StreamSoftServiceLoader.loadPresentParallel(BeanDefinitionReference.class, classLoader).collect(Collectors.toList());
     }
+
 
     /**
      * Resolves the {@link BeanConfiguration} class instances. Default implementation uses ServiceLoader pattern
      *
      * @return The bean definition classes
      */
-    protected Iterable<BeanConfiguration> resolveBeanConfigurarions() {
+    protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
         return ServiceLoader.load(BeanConfiguration.class, classLoader);
     }
 
@@ -1190,7 +1203,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void readAllBeanConfigurations() {
-        Iterable<BeanConfiguration> beanConfigurations = resolveBeanConfigurarions();
+        Iterable<BeanConfiguration> beanConfigurations = resolveBeanConfigurations();
         for (BeanConfiguration beanConfiguration : beanConfigurations) {
             registerConfiguration(beanConfiguration);
         }
@@ -1267,21 +1280,18 @@ public class DefaultBeanContext implements BeanContext {
         Map<String, BeanDefinitionReference> beanDefinitionsClassesByDefinition = new HashMap<>();
         Map<String, BeanDefinitionReference> replacementsByType = new LinkedHashMap<>();
         Map<String, BeanDefinitionReference> replacementsByDefinition = new LinkedHashMap<>();
-        List<BeanDefinitionReference> beanDefinitionReferences = StreamSoftServiceLoader.loadPresentParallel(BeanDefinitionReference.class, classLoader)
-                .filter(reference -> {
-                    if (!reference.isEnabled(this)) {
-                        return false;
-                    } else {
-                        for (BeanConfiguration configuration : beanConfigurations.values()) {
-                            if (configuration.isWithin(reference) && !configuration.isEnabled(this)) {
-                                return false;
-                            }
-                        }
-                    }
-                    return true;
-                }).collect(Collectors.toList());
+        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
 
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+            if (!beanDefinitionReference.isEnabled(this)) {
+                continue;
+            } else {
+                Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
+                if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
+                    continue;
+                }
+
+            }
             String replacesBeanTypeName = beanDefinitionReference.getReplacesBeanTypeName();
             if (replacesBeanTypeName != null) {
                 replacementsByType.put(replacesBeanTypeName, beanDefinitionReference);
@@ -1330,6 +1340,7 @@ public class DefaultBeanContext implements BeanContext {
 
         initializeContext(contextScopeBeans);
     }
+
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
@@ -1579,7 +1590,7 @@ public class DefaultBeanContext implements BeanContext {
 
     }
 
-    private static final class BeanKey<T> implements BeanIdentifier {
+    static final class BeanKey<T> implements BeanIdentifier {
         private final Class beanType;
         private final Qualifier qualifier;
 

@@ -19,6 +19,7 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import spock.lang.Specification
 
 /**
@@ -33,7 +34,7 @@ class VehicleSpec extends Specification {
         when:
         // tag::start[]
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource('my.engine.cylinders':'8'))
+        applicationContext.environment.addPropertySource(PropertySource.of('test',['my.engine.cylinders':'8']))
         applicationContext.start()
 
         Vehicle vehicle = applicationContext

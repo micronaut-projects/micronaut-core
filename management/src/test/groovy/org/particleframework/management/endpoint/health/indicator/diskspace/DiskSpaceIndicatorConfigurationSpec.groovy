@@ -2,6 +2,7 @@ package org.particleframework.management.endpoint.health.indicator.diskspace
 
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import spock.lang.Specification
 
 class DiskSpaceIndicatorConfigurationSpec extends Specification {
@@ -9,7 +10,7 @@ class DiskSpaceIndicatorConfigurationSpec extends Specification {
     void "test threshold configuration"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(new MapPropertySource(['endpoints.health.disk-space.threshold': '100GB']))
+        context.environment.addPropertySource(PropertySource.of(['endpoints.health.disk-space.threshold': '100GB']))
         context.start()
 
         expect:
@@ -22,7 +23,7 @@ class DiskSpaceIndicatorConfigurationSpec extends Specification {
     void "test path configuration"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(new MapPropertySource(['endpoints.health.disk-space.path': '/foo']))
+        context.environment.addPropertySource(PropertySource.of(['endpoints.health.disk-space.path': '/foo']))
         context.start()
 
         expect:

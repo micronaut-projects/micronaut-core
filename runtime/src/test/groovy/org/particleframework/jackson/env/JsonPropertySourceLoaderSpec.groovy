@@ -15,8 +15,13 @@
  */
 package org.particleframework.jackson.env
 
+import org.particleframework.context.env.DefaultEnvironment
 import org.particleframework.context.env.Environment
 import org.particleframework.context.env.PropertySource
+import org.particleframework.context.env.PropertySourceLoader
+import org.particleframework.context.env.yaml.YamlPropertySourceLoader
+import org.particleframework.core.io.service.ServiceDefinition
+import org.particleframework.core.io.service.SoftServiceLoader
 import org.particleframework.jackson.env.EnvJsonPropertySourceLoader
 import org.particleframework.jackson.env.JsonPropertySourceLoader
 import spock.lang.Specification
@@ -72,14 +77,32 @@ class JsonPropertySourceLoaderSpec extends Specification {
 
     void "test json property source loader"() {
         given:
-        JsonPropertySourceLoader loader = new JsonPropertySourceLoader()
+        def mock = Mock(SoftServiceLoader)
+        def serviceDefinition = Mock(ServiceDefinition)
+        serviceDefinition.isPresent() >> true
+        serviceDefinition.load() >> new JsonPropertySourceLoader()
+        mock.iterator() >> [serviceDefinition].iterator()
 
-        when:
-        Environment env = Mock(Environment)
-        env.isPresent(_) >> true
-        env.getActiveNames() >> (["test"] as Set)
-        env.getResourceAsStream("application.json") >> {
-            Optional.of(new ByteArrayInputStream('''\
+        Environment env = new DefaultEnvironment(["test"] as String[]) {
+            @Override
+            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+                return mock
+            }
+
+            @Override
+            Optional<InputStream> getResourceAsStream(String path) {
+                if(path.endsWith('-test.json')) {
+                    return Optional.of(new ByteArrayInputStream('''\
+{ "dataSource":
+    { "jmxExport": true,
+      "username": "sa",
+      "password": "test" 
+    }
+}
+'''.bytes))
+                }
+                else {
+                    return Optional.of(new ByteArrayInputStream('''\
 { "hibernate":
     { "cache":
         { "queries": false }
@@ -91,34 +114,23 @@ class JsonPropertySourceLoaderSpec extends Specification {
       "password": "", 
       "something": [1,2]  
     }
-}   
+}     
 '''.bytes))
-        }
-        env.getResourceAsStream("application-test.json") >> {
-            Optional.of(new ByteArrayInputStream('''\
-{ "dataSource":
-    { "jmxExport": true,
-      "username": "sa",
-      "password": "test" 
-    }
-}
-'''.bytes))
+                }
+            }
         }
 
-        def result = loader.load(env)
-
-        then:
-        result.isPresent()
 
         when:
-        PropertySource propertySource = result.get()
+        env.start()
 
         then:
-        propertySource.get("hibernate.cache.queries") == false
-        propertySource.get("dataSource.pooled") == true
-        propertySource.get("dataSource.password") == 'test'
-        propertySource.get("dataSource.jmxExport") == true
-        propertySource.get("dataSource.something") == [1,2]
+        env.get("hibernate.cache.queries", Boolean).get() == false
+        env.get("dataSource.pooled", Boolean).get() == true
+        env.get("dataSource.password", String).get() == 'test'
+        env.get("dataSource.jmxExport", boolean).get() == true
+        env.get("dataSource.something", List).get() == [1,2]
+
 
 
     }

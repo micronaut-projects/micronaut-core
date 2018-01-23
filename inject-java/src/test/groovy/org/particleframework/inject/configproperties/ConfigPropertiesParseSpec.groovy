@@ -167,8 +167,9 @@ class MyProperties {
 
         when:
         applicationContext.environment.addPropertySource(
-                'foo.setterTest' :'foo',
-                'foo.fieldTest' :'bar',
+                "test",
+                ['foo.setterTest' :'foo',
+                'foo.fieldTest' :'bar']
         )
         bean = factory.build(applicationContext, beanDefinition)
 
@@ -227,8 +228,9 @@ class Parent {
 
         when:
         applicationContext.environment.addPropertySource(
-                'foo.setterTest' :'foo',
-                'foo.fieldTest' :'bar',
+                "test",
+                ['foo.setterTest' :'foo',
+                'foo.fieldTest' :'bar']
         )
         bean = factory.build(applicationContext, beanDefinition)
 

@@ -3,6 +3,7 @@ package org.particleframework.inject.configproperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.particleframework.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
@@ -32,7 +33,7 @@ class ValidatedConfigurationSpec extends Specification {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
+        applicationContext.environment.addPropertySource(PropertySource.of(
                 'foo.bar.url':'http://localhost',
                 'foo.bar.name':'test'
         ))

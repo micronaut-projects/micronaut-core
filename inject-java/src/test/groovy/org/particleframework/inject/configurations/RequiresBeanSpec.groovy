@@ -5,6 +5,7 @@ import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.particleframework.inject.configurations.requiresbean.RequiresBean
 import org.particleframework.inject.configurations.requiresconditionfalse.TravisBean
 import org.particleframework.inject.configurations.requiresconditiontrue.TrueBean
@@ -59,8 +60,9 @@ class RequiresBeanSpec extends Specification {
     void "test requires property when present"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'dataSource.url':'jdbc::blah'
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['dataSource.url':'jdbc::blah']
         ))
         applicationContext.start()
 

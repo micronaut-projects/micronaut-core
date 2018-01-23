@@ -52,7 +52,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
+public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T> {
 
     private final Class<T> type;
     private final boolean isAbstract;
@@ -70,7 +70,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
     protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
     protected final Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap = new LinkedHashMap<>(3);
     private Map<Class, String> valuePrefixes;
-    private Boolean enabled = null;
 
     /**
      * Constructs a bean definition that is produced from a method call on another type
@@ -120,14 +119,6 @@ public class AbstractBeanDefinition<T> implements BeanDefinition<T> {
         return this.isAbstract;
     }
 
-    @Override
-    public boolean isEnabled(BeanContext beanContext) {
-        if(enabled == null) {
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            enabled = new RequiresCondition(annotationMetadata).matches(new DefaultConditionContext<>(beanContext, this));
-        }
-        return enabled;
-    }
 
     @Override
     public boolean isIterable() {

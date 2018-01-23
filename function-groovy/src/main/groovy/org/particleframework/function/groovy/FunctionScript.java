@@ -18,6 +18,7 @@ package org.particleframework.function.groovy;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.PropertySource;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.naming.NameUtils;
 import org.particleframework.function.executor.FunctionInitializer;
 
 import java.util.Iterator;
@@ -45,6 +46,11 @@ public abstract class FunctionScript extends FunctionInitializer implements Prop
     @Internal
     public Object get(String key) {
         return resolveProps().get(key);
+    }
+
+    @Override
+    public String getName() {
+        return NameUtils.hyphenate(getClass().getSimpleName());
     }
 
     @Override
