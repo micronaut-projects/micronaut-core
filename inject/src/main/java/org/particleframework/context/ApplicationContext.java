@@ -18,7 +18,6 @@ package org.particleframework.context;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.PropertySource;
 import org.particleframework.core.io.ResourceLoader;
-import org.particleframework.core.io.scan.ClasspathResourceLoader;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.convert.ConversionService;

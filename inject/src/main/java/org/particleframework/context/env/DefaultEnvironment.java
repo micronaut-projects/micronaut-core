@@ -23,7 +23,7 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
-import org.particleframework.core.io.scan.ClasspathResourceLoader;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.naming.NameUtils;
@@ -51,7 +51,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ClasspathResourceLoader resourceLoader;
+    protected final ClassPathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
@@ -70,7 +70,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this(ResourceLoader.of(classLoader), conversionService, names);
     }
 
-    public DefaultEnvironment(ClasspathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));

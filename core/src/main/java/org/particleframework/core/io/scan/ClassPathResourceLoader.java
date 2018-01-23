@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * @author James Kleeh
  * @since 1.0
  */
-public class ClasspathResourceLoader implements ResourceLoader {
+public class ClassPathResourceLoader implements ResourceLoader {
 
     private final ClassLoader classLoader;
     private final String basePath;
@@ -41,7 +41,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
      *
      * @param classLoader The class loader for loading resources
      */
-    public ClasspathResourceLoader(ClassLoader classLoader) {
+    public ClassPathResourceLoader(ClassLoader classLoader) {
         this(classLoader, null);
     }
 
@@ -51,7 +51,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
      * @param classLoader The class loader for loading resources
      * @param basePath The path to look for resources under
      */
-    public ClasspathResourceLoader(ClassLoader classLoader, String basePath) {
+    public ClassPathResourceLoader(ClassLoader classLoader, String basePath) {
         this.classLoader = classLoader;
         this.basePath = normalize(basePath);
     }
