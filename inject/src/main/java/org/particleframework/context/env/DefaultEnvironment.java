@@ -20,6 +20,7 @@ import org.particleframework.context.converters.StringToClassConverter;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
+import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClasspathResourceLoader;
@@ -50,9 +51,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final Set<String> names;
     private final ClassLoader classLoader;
+    protected final ClasspathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
-    private final ClasspathResourceLoader resourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -66,6 +67,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
+        this(ResourceLoader.of(classLoader), conversionService, names);
+    }
+
+    public DefaultEnvironment(ClasspathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
@@ -75,6 +80,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if(aPackage != null) {
             packages.add(aPackage.getName());
         }
+        this.classLoader = resourceLoader.getClassLoader();
         this.names = specifiedNames;
         conversionService.addConverter(
                 CharSequence.class, Class.class, new StringToClassConverter(classLoader)
@@ -82,9 +88,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         conversionService.addConverter(
                 Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
         );
-        this.classLoader = classLoader;
+        this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
-        this.resourceLoader = new ClasspathResourceLoader(classLoader);
     }
 
     @Override
@@ -105,16 +110,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.add(propertySource);
+        propertySources.put(propertySource.getName(),propertySource);
         if(isRunning()) {
-            processPropertySource(propertySource, false);
+            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
         }
         return this;
     }
 
     @Override
-    public DefaultEnvironment addPropertySource(Map<String, ? super Object> values) {
-        return (DefaultEnvironment) super.addPropertySource(values);
+    public DefaultEnvironment addPropertySource(String name, Map<String, ? super Object> values) {
+        return (DefaultEnvironment) super.addPropertySource(name, values);
     }
 
     @Override
@@ -152,22 +157,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public Collection<PropertySource> getPropertySources() {
+        return Collections.unmodifiableCollection(this.propertySources.values());
+    }
+
+    @Override
     public Environment start() {
         if(running.compareAndSet(false, true)) {
-            ArrayList<PropertySource> propertySources = new ArrayList<>(this.propertySources);
-            SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = SoftServiceLoader.load(PropertySourceLoader.class);
-            for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
-                if(loader.isPresent()) {
-                    Optional<PropertySource> propertySource = loader.load().load(this);
-                    propertySource.ifPresent(propertySources::add);
-                }
-            }
-            propertySources.add(new SystemPropertiesPropertySource());
-            propertySources.add(new EnvironmentPropertySource());
-            OrderUtil.sort(propertySources);
-            for (PropertySource propertySource : propertySources) {
-                processPropertySource(propertySource, propertySource.hasUpperCaseKeys());
-            }
+            readPropertySources(getPropertySourceRootName());
         }
         return this;
     }
@@ -228,6 +225,52 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected ClassPathAnnotationScanner createAnnotationScanner(ClassLoader classLoader) {
         return new CachingClassPathAnnotationScanner(classLoader);
     }
+
+    protected String getPropertySourceRootName() {
+        return Environment.DEFAULT_NAME;
+    }
+
+    protected void readPropertySources(String name) {
+        List<PropertySource> propertySources = readPropertySourceList(name);
+        OrderUtil.sort(propertySources);
+        for (PropertySource propertySource : propertySources) {
+            processPropertySource(propertySource, propertySource.getConvention());
+        }
+    }
+
+    protected List<PropertySource> readPropertySourceList(String name) {
+        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        SoftServiceLoader<PropertySourceLoader> propertySourceLoaders = readPropertySourceLoaders();
+        boolean hasLoaders = false;
+        for (ServiceDefinition<PropertySourceLoader> loader : propertySourceLoaders) {
+            hasLoaders = true;
+            if(loader.isPresent()) {
+                PropertySourceLoader propertySourceLoader = loader.load();
+                loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
+            }
+        }
+        if(!hasLoaders) {
+            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
+        }
+        propertySources.add(new SystemPropertiesPropertySource());
+        propertySources.add(new EnvironmentPropertySource());
+        return propertySources;
+    }
+
+    private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
+        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
+        defaultPropertySource.ifPresent(propertySources::add);
+        Set<String> activeNames = getActiveNames();
+        for (String activeName : activeNames) {
+            Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
+            propertySource.ifPresent(propertySources::add);
+        }
+    }
+
+    protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+        return SoftServiceLoader.load(PropertySourceLoader.class);
+    }
+
     private EnvironmentsAndPackage deduceEnvironments() {
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
@@ -330,7 +373,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Stream<URL> getResources(String path) {
         return resourceLoader.getResources(path);
     }
-
 
     private class EnvironmentsAndPackage {
         Package aPackage;

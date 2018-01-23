@@ -30,7 +30,7 @@ class HealthEndpointSpec extends Specification {
     void "test the disk space bean can be disabled"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource(['endpoints.health.disk-space.enabled': false]) })
+                .environment({ env -> env.addPropertySource("test",['endpoints.health.disk-space.enabled': false]) })
 
         context.start()
 
@@ -46,7 +46,7 @@ class HealthEndpointSpec extends Specification {
     void "test the beans are not available with health disabled"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-        context.environment.addPropertySource(new MapPropertySource(['endpoints.health.enabled': false]))
+        context.environment.addPropertySource(new MapPropertySource("test",['endpoints.health.enabled': false]))
         context.start()
 
         expect:
@@ -61,7 +61,7 @@ class HealthEndpointSpec extends Specification {
     void "test the beans are not available with all disabled"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource(['endpoints.all.enabled': false]) })
+                .environment({ env -> env.addPropertySource("test",['endpoints.all.enabled': false]) })
 
         context.start()
 
@@ -77,7 +77,7 @@ class HealthEndpointSpec extends Specification {
     void "test the beans are available with all disabled and health enabled"() {
         given:
         ApplicationContext context = ApplicationContext.build("test")
-                .environment({ env -> env.addPropertySource(['endpoints.all.enabled': false, 'endpoints.health.enabled': true]) })
+                .environment({ env -> env.addPropertySource("test",['endpoints.all.enabled': false, 'endpoints.health.enabled': true]) })
 
         context.start()
 

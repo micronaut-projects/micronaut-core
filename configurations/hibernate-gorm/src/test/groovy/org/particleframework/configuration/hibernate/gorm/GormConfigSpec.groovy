@@ -23,6 +23,7 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.annotation.Value
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.springframework.transaction.PlatformTransactionManager
 import spock.lang.Ignore
 import spock.lang.Specification
@@ -41,7 +42,7 @@ class GormConfigSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
                 .addPackage(getClass().getPackage())
-                .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
+                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop']))
         applicationContext.start()
 
         when:
@@ -71,7 +72,7 @@ class GormConfigSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
                 .addPackage(getClass().getPackage())
-                .addPropertySource(new MapPropertySource([(Settings.SETTING_DB_CREATE):'create-drop']))
+                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop']))
         applicationContext.start()
 
         when:

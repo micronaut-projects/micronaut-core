@@ -29,7 +29,8 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:]
+                'test',
+                ['datasources.default': [:]]
         ))
         applicationContext.start()
 
@@ -54,7 +55,8 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:]
+                'test',
+                ['datasources.default': [:]]
         ))
         applicationContext.start()
 
@@ -80,14 +82,15 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default.connectionTimeout': 500,
+                'test',
+                ['datasources.default.connectionTimeout': 500,
                 'datasources.default.idleTimeout': 20000,
                 'datasources.default.catalog': 'foo',
                 'datasources.default.autoCommit': true,
                 'datasources.default.healthCheckProperties.foo': 'bar',
                 'datasources.default.jndiName': 'java:comp/env/FooBarPool',
                 'datasources.default.url': 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-                'datasources.default.validationQuery': 'select 3'
+                'datasources.default.validationQuery': 'select 3']
         ))
         applicationContext.start()
 
@@ -116,8 +119,9 @@ class DatasourceConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'datasources.default': [:],
-                'datasources.foo': [:]
+                'test',
+                ['datasources.default': [:],
+                'datasources.foo': [:]]
         ))
         applicationContext.start()
 

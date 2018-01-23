@@ -68,7 +68,8 @@ class FunctionTransformSpec extends Specification{
         def applicationContext = ApplicationContext.build()
                 .environment({ env ->
             env.addPropertySource(MapPropertySource.of(
-                    'math.multiplier': '2'
+                    'test',
+                    ['math.multiplier': '2']
             ))
 
         })
@@ -99,7 +100,8 @@ class FunctionTransformSpec extends Specification{
         EmbeddedServer server = ApplicationContext.build()
                 .environment({ env ->
             env.addPropertySource(MapPropertySource.of(
-                    'math.multiplier':'2'
+                    'test',
+                    ['math.multiplier':'2']
             ))
 
         }).start().getBean(EmbeddedServer).start()
@@ -128,7 +130,8 @@ class FunctionTransformSpec extends Specification{
         EmbeddedServer server = ApplicationContext.build()
                                                   .environment({ env ->
             env.addPropertySource(MapPropertySource.of(
-                    'math.multiplier':'2'
+                    'test',
+                    ['math.multiplier':'2']
             ))
 
         }).start().getBean(EmbeddedServer).start()
@@ -157,7 +160,8 @@ class FunctionTransformSpec extends Specification{
         EmbeddedServer server = ApplicationContext.build()
                 .environment({ env ->
             env.addPropertySource(MapPropertySource.of(
-                    'math.multiplier':'2'
+                    'test',
+                    ['math.multiplier':'2']
             ))
 
         }).start().getBean(EmbeddedServer).start()

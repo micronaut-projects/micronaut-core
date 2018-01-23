@@ -28,12 +28,12 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test resolve property #property value for #key"() {
         given:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-                PropertySource.of((property): value)
+                PropertySource.of("test", [(property): value])
         )
 
         expect:
         resolver.containsProperty(key)
-        resolver.getProperty(key).isPresent()
+        resolver.getProperty(key, Object).isPresent()
         resolver.getProperty(key, type).get() == expected
 
         where:

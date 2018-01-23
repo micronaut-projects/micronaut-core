@@ -16,6 +16,7 @@
 package org.particleframework.context.env;
 
 import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.core.convert.ConversionService;
@@ -59,10 +60,27 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      */
     String CLOUD = "cloud";
     /**
+     * The default bootstrap name
+     */
+    String BOOTSTRAP_NAME_PROPERTY = "particle.bootstrap.name";
+    /**
+     * The default bootstrap config name
+     */
+    String BOOTSTRAP_NAME = "bootstrap";
+    /**
+     * The default application name
+     */
+    String DEFAULT_NAME = "application";
+
+    /**
      * @return The active environment names
      */
     Set<String> getActiveNames();
 
+    /**
+     * @return The active property sources
+     */
+    Collection<PropertySource> getPropertySources();
     /**
      * Adds a property source to this environment
      *
@@ -112,9 +130,9 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * @param values The values
      * @return This environment
      */
-    default Environment addPropertySource(@Nullable Map<String, ? super Object> values) {
-        if(CollectionUtils.isNotEmpty(values)) {
-            return addPropertySource(PropertySource.of(values));
+    default Environment addPropertySource(String name, @Nullable Map<String, ? super Object> values) {
+        if(StringUtils.isNotEmpty(name) && CollectionUtils.isNotEmpty(values)) {
+            return addPropertySource(PropertySource.of(name, values));
         }
         return this;
     }

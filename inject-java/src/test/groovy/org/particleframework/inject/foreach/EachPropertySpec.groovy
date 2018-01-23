@@ -18,6 +18,7 @@ package org.particleframework.inject.foreach
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Ignore
 import spock.lang.Specification
@@ -31,7 +32,8 @@ class EachPropertySpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'foo.bar.one.port':'8080',
+                'test',
+                ['foo.bar.one.port':'8080',
                 'foo.bar.one.anotherPort':'9090',
                 'foo.bar.one.intList':"1,2,3",
                 'foo.bar.one.stringList':"1,2",
@@ -51,7 +53,7 @@ class EachPropertySpec extends Specification {
                 'foo.bar.two.flags.three':'3',
                 'foo.bar.two.urlList':"http://test.com, http://test2.com",
                 'foo.bar.two.urlList2':["http://test.com", "http://test2.com"],
-                'foo.bar.two.url':'http://test.com'
+                'foo.bar.two.url':'http://test.com']
 
 
         ))
@@ -101,7 +103,8 @@ class EachPropertySpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.one.port':'8080',
+                'test',
+                ['foo.bar.one.port':'8080',
                 'foo.bar.one.anotherPort':'9090',
                 'foo.bar.one.intList':"1,2,3",
                 'foo.bar.one.stringList':"1,2",
@@ -121,7 +124,7 @@ class EachPropertySpec extends Specification {
                 'foo.bar.two.flags.three':'3',
                 'foo.bar.two.urlList':"http://test.com, http://test2.com",
                 'foo.bar.two.urlList2':["http://test.com", "http://test2.com"],
-                'foo.bar.two.url':'http://test.com'
+                'foo.bar.two.url':'http://test.com']
 
 
         ))
@@ -171,9 +174,10 @@ class EachPropertySpec extends Specification {
     void "test configuration properties binding by a non bean type"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.one.port':'8080',
-                'foo.bar.two.port':'8888',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888']
         ))
 
         applicationContext.start()
@@ -193,8 +197,9 @@ class EachPropertySpec extends Specification {
     void "test configuration properties binding by bean type with primary"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.one.port':'8080',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
                 'foo.bar.one.anotherPort':'9090',
                 'foo.bar.one.intList':"1,2,3",
                 'foo.bar.one.stringList':"1,2",
@@ -214,7 +219,7 @@ class EachPropertySpec extends Specification {
                 'foo.bar.two.flags.three':'3',
                 'foo.bar.two.urlList':"http://test.com, http://test2.com",
                 'foo.bar.two.urlList2':["http://test.com", "http://test2.com"],
-                'foo.bar.two.url':'http://test.com'
+                'foo.bar.two.url':'http://test.com']
 
 
         ))
@@ -263,9 +268,10 @@ class EachPropertySpec extends Specification {
     void "test configuration properties binding by non bean type with primary"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.one.port':'8080',
-                'foo.bar.two.port':'8888',
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                'foo.bar.two.port':'8888']
         ))
 
         applicationContext.start()

@@ -27,9 +27,10 @@ public class EnvironmentPropertySource extends MapPropertySource {
      * The position of the loader
      */
     public static final int POSITION = SystemPropertiesPropertySource.POSITION - 100;
+    public static final String NAME = "env";
 
     public EnvironmentPropertySource() {
-        super(System.getenv());
+        super(NAME, System.getenv());
     }
 
     @Override
@@ -38,7 +39,7 @@ public class EnvironmentPropertySource extends MapPropertySource {
     }
 
     @Override
-    public boolean hasUpperCaseKeys() {
-        return true;
+    public PropertyConvention getConvention() {
+        return PropertyConvention.UPPER_CASE_UNDER_SCORE_SEPARATED;
     }
 }

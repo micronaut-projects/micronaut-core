@@ -1,5 +1,7 @@
 package org.particleframework.core.io;
 
+import org.particleframework.core.io.scan.ClasspathResourceLoader;
+
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
@@ -36,4 +38,13 @@ public interface ResourceLoader {
      * @return A resource stream
      */
     Stream<URL> getResources(String path);
+
+    /**
+     * Create a resource loader for the given classloader
+     * @param classLoader The class loader
+     * @return The resource loader
+     */
+    static ClasspathResourceLoader of(ClassLoader classLoader) {
+        return new ClasspathResourceLoader(classLoader);
+    }
 }

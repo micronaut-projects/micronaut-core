@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
+ * Default load that handles Java properties files
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

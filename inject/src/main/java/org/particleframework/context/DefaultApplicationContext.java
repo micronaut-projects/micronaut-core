@@ -4,13 +4,16 @@ import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertySource;
+import org.particleframework.context.env.PropertySourceLocator;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.convert.TypeConverterRegistrar;
+import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.io.scan.ClasspathResourceLoader;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
-import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanConfiguration;
@@ -29,7 +32,12 @@ import java.util.*;
 public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
 
     private final ConversionService conversionService;
-    private final Environment environment;
+    private final ClasspathResourceLoader resourceLoader;
+    private Environment environment;
+
+    private Iterable<BeanConfiguration> resolvedConfigurations;
+    private List<BeanDefinitionReference> resolvedBeanReferences;
+
 
     /**
      * Construct a new ApplicationContext for the given environment name
@@ -37,21 +45,37 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(String... environmentNames) {
-        this(DefaultBeanContext.class.getClassLoader(), environmentNames);
+        this(ResourceLoader.of(DefaultBeanContext.class.getClassLoader()), environmentNames);
     }
 
     /**
      * Construct a new ApplicationContext for the given environment name and classloader
      *
      * @param environmentNames The environment names
-     * @param classLoader      The class loader
+     * @param resourceLoader  The class loader
      */
-    public DefaultApplicationContext(ClassLoader classLoader, String... environmentNames) {
-        super(classLoader);
+    public DefaultApplicationContext(ClasspathResourceLoader resourceLoader, String... environmentNames) {
+        super(resourceLoader);
         this.conversionService = createConversionService();
+        this.resourceLoader = resourceLoader;
         this.environment = createEnvironment(environmentNames);
     }
 
+    @Override
+    protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
+        if(resolvedConfigurations != null) {
+            return resolvedConfigurations;
+        }
+        return super.resolveBeanConfigurations();
+    }
+
+    @Override
+    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+        if(resolvedBeanReferences != null) {
+            return resolvedBeanReferences;
+        }
+        return super.resolveBeanDefinitionReferences();
+    }
 
     @Override
     public ApplicationContext registerSingleton(Object singleton) {
@@ -74,8 +98,87 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment name
      * @return The environment instance
      */
-    protected Environment createEnvironment(String... environmentNames) {
-        return new DefaultEnvironment(getClassLoader(), conversionService, environmentNames);
+    protected DefaultEnvironment createEnvironment(String... environmentNames) {
+        return new DefaultEnvironment(resourceLoader, conversionService, environmentNames) {
+            private DefaultApplicationContext bootstrapContext;
+
+            @Override
+            public Environment stop() {
+                if(bootstrapContext != null) {
+                    bootstrapContext.stop();
+                }
+
+                return super.stop();
+            }
+
+            @Override
+            protected List<PropertySource> readPropertySourceList(String name) {
+                Set<String> activeNames = getActiveNames();
+                String[] activeNamesArray = activeNames.toArray(new String[activeNames.size()]);
+                DefaultEnvironment bootstrapEnvironment = new DefaultEnvironment(resourceLoader, conversionService, activeNamesArray) {
+                    @Override
+                    protected String getPropertySourceRootName() {
+                        String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
+                        return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName  : BOOTSTRAP_NAME;
+                    }
+                };
+                bootstrapEnvironment.start();
+
+                this.bootstrapContext = new DefaultApplicationContext(resourceLoader, activeNamesArray) {
+                    @Override
+                    protected DefaultEnvironment createEnvironment(String... environmentNames) {
+                        return bootstrapEnvironment;
+                    }
+
+                    @Override
+                    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+                        List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
+                        resolvedBeanReferences = refs;
+                        return refs;
+                    }
+
+                    @Override
+                    protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
+                        Iterable<BeanConfiguration> beanConfigurations = super.resolveBeanConfigurations();
+                        resolvedConfigurations = beanConfigurations;
+                        return beanConfigurations;
+                    }
+
+                    @Override
+                    protected void startEnvironment() {
+                        registerSingleton(Environment.class, bootstrapEnvironment);
+                    }
+
+                    @Override
+                    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
+                        // no-op .. @Context scope beans are not started for bootstrap
+                    }
+                };
+
+                bootstrapContext.start();
+
+                Collection<PropertySourceLocator> locators = bootstrapContext.getBeansOfType(PropertySourceLocator.class);
+                for (PropertySourceLocator locator : locators) {
+                    Optional<PropertySource> propertySource = locator.load(bootstrapEnvironment);
+                    propertySource.ifPresent(ps ->{
+                        BootstrapPropertySource delegate = new BootstrapPropertySource(ps) {
+                            @Override
+                            public int getOrder() {
+                                return super.getOrder() + 10; // higher priority that application config
+                            }
+                        };
+                        addPropertySource(delegate);
+                    });
+                }
+
+                singletonObjects.putAll(bootstrapContext.singletonObjects);
+                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                }
+                return super.readPropertySourceList(name);
+            }
+        };
     }
 
     /**
@@ -98,7 +201,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public ApplicationContext start() {
+    public synchronized ApplicationContext start() {
         startEnvironment();
         return (ApplicationContext) super.start();
     }
@@ -130,11 +233,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
     }
 
-    protected void startEnvironment() {
-        Environment environment = getEnvironment();
-        environment.start();
 
-        registerSingleton(Environment.class, environment);
+
+    protected void startEnvironment() {
+        Environment defaultEnvironment = getEnvironment();
+        defaultEnvironment.start();
+        registerSingleton(Environment.class, defaultEnvironment);
         registerSingleton(new ExecutableMethodProcessorListener());
     }
 
@@ -271,5 +375,39 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         return super.findConcreteCandidate(beanType, qualifier, candidates);
+    }
+
+    private static class BootstrapPropertySource implements PropertySource {
+        private final PropertySource delegate;
+
+        public BootstrapPropertySource(PropertySource bootstrapPropertySource) {
+            this.delegate = bootstrapPropertySource;
+        }
+
+        @Override
+        public String toString() {
+            return getName();
+        }
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public Object get(String key) {
+            return delegate.get(key);
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+            return delegate.iterator();
+        }
+
+        @Override
+        public int getOrder() {
+            // lower priority than application property sources
+            return delegate.getOrder() - 10;
+        }
     }
 }

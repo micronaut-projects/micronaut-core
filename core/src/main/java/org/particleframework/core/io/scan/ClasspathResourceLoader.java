@@ -97,6 +97,13 @@ public class ClasspathResourceLoader implements ResourceLoader {
         return builder.build();
     }
 
+    /**
+     * @return The class loader used to retrieve resources
+     */
+    public ClassLoader getClassLoader() {
+        return classLoader;
+    }
+
     private String normalize(String path) {
         if (path != null) {
             if (path.startsWith("/")) {

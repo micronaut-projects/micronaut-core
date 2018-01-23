@@ -4,6 +4,7 @@ import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.DefaultApplicationContext
 import org.particleframework.context.env.MapPropertySource
+import org.particleframework.context.env.PropertySource
 import org.particleframework.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
@@ -38,9 +39,10 @@ class ValidatedConfigurationSpec extends Specification {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(new MapPropertySource(
-                'foo.bar.url':'http://localhost',
-                'foo.bar.name':'test'
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.url':'http://localhost',
+                'foo.bar.name':'test']
         ))
 
         applicationContext.registerSingleton(
