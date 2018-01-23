@@ -41,6 +41,7 @@ class CustomPropertySourceLocatorSpec extends Specification {
             Optional<InputStream> getResourceAsStream(String path) {
                 if(path == "bootstrap.properties") {
                     return Optional.of(new ByteArrayInputStream('''\
+some.bootstrap.value=bar
 some.bootstrap.config=true
 '''.bytes))
                 }
@@ -55,12 +56,14 @@ some.bootstrap.config=true
 
         ApplicationContext applicationContext = new DefaultApplicationContext(resourceLoader)
         applicationContext.environment.addPropertySource(PropertySource.of(
-                'custom.prop.a':'BBB'
+                'custom.prop.a':'BBB',
+                'some.bootstrap.value':'overridden'
         ))
         applicationContext.start()
 
         expect:
         applicationContext.environment.getProperty('custom.prop.a', String).get() == 'AAA'
+        applicationContext.environment.getProperty('some.bootstrap.value', String).get() == 'overridden'
     }
 
     void "test that a PropertySource from a PropertySourceLocator doesn't override application config when not enabled"() {
