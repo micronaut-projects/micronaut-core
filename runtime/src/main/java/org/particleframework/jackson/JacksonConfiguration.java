@@ -29,12 +29,12 @@ public class JacksonConfiguration {
     protected Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
     protected Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     protected Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
-    protected Set<JsonInclude.Include> serializationInclusion = CollectionUtils.setOf(JsonInclude.Include.NON_ABSENT, JsonInclude.Include.NON_EMPTY);
+    protected JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_ABSENT;
 
     /**
      * @return The default serialization inclusion settings
      */
-    public Set<JsonInclude.Include> getSerializationInclusion() {
+    public JsonInclude.Include getSerializationInclusion() {
         return serializationInclusion;
     }
 

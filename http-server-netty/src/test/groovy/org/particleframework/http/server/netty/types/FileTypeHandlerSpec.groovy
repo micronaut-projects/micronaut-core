@@ -76,7 +76,7 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body().string() == '{"message":"Internal Server Error: Could not find file"}'
+        response.body().string() == '{"_links":{},"_embedded":{},"message":"Internal Server Error: Could not find file"}'
     }
 
     void "test when an attached file is returned"() {

@@ -100,8 +100,8 @@ public class ObjectMapperFactory {
 
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         jacksonConfiguration.ifPresent((configuration)->{
-            Set<JsonInclude.Include> serializationInclusion = configuration.getSerializationInclusion();
-            for (JsonInclude.Include include : serializationInclusion) {
+            JsonInclude.Include include = configuration.getSerializationInclusion();
+            if (include != null) {
                 objectMapper.setSerializationInclusion(include);
             }
             String dateFormat = configuration.getDateFormat();
