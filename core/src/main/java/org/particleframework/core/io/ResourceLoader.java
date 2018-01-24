@@ -1,9 +1,9 @@
 package org.particleframework.core.io;
 
-import java.io.IOException;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
+
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Enumeration;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -24,48 +24,27 @@ public interface ResourceLoader {
     Optional<InputStream> getResourceAsStream(String path);
 
     /**
-     * @return The class loader for this resource loader
+     * Obtains a resource URL
+     *
+     * @param path The path
+     * @return An optional resource
      */
-    ClassLoader getClassLoader();
+    Optional<URL> getResource(String path);
 
-    default Optional<URL> getResource(String path) {
-        URL resource = getClassLoader().getResource(path);
-        if(resource != null) {
-            return Optional.of(resource);
-        }
-        return Optional.empty();
-    }
+    /**
+     * Obtains a stream of resource URLs
+     *
+     * @param path The path
+     * @return A resource stream
+     */
+    Stream<URL> getResources(String path);
 
-    default Stream<URL> getResources(String fileName) {
-        Enumeration<URL> all;
-        try {
-            all = getClassLoader().getResources(fileName);
-        } catch (IOException e) {
-            return Stream.empty();
-        }
-        Stream.Builder<URL> builder = Stream.builder();
-        while (all.hasMoreElements()) {
-            URL url = all.nextElement();
-            builder.accept(url);
-        }
-        return builder.build();
-    }
     /**
      * Create a resource loader for the given classloader
      * @param classLoader The class loader
      * @return The resource loader
      */
-    static ResourceLoader of(ClassLoader classLoader) {
-        return new ResourceLoader() {
-            @Override
-            public Optional<InputStream> getResourceAsStream(String path) {
-                return Optional.ofNullable(classLoader.getResourceAsStream(path));
-            }
-
-            @Override
-            public ClassLoader getClassLoader() {
-                return classLoader;
-            }
-        };
+    static ClassPathResourceLoader of(ClassLoader classLoader) {
+        return new ClassPathResourceLoader(classLoader);
     }
 }
