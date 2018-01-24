@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.consul.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import org.particleframework.core.util.StringUtils;
 
-import java.net.URL;
+import java.net.InetAddress;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -33,7 +33,7 @@ import java.util.Optional;
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class NodeEntry {
     private final String node;
-    private final URL address;
+    private final InetAddress address;
     private String datacenter;
     private Map<String, String> taggedAddresses;
     private Map<String, String> nodeMetadata;
@@ -44,7 +44,7 @@ public class NodeEntry {
      * @param address The node address
      */
     @JsonCreator
-    public NodeEntry(@JsonProperty("Node") String nodeId, @JsonProperty("Address") URL address) {
+    public NodeEntry(@JsonProperty("Node") String nodeId, @JsonProperty("Address") InetAddress address) {
         this.node = nodeId;
         this.address = address;
     }
@@ -88,7 +88,7 @@ public class NodeEntry {
      *
      * @return The node address
      */
-    public URL getAddress() {
+    public InetAddress getAddress() {
         return address;
     }
 

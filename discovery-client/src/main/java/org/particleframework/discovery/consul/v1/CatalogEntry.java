@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.consul.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-import java.net.URL;
+import java.net.InetAddress;
 import java.util.Map;
 import java.util.Optional;
 
@@ -40,7 +40,7 @@ public class CatalogEntry extends NodeEntry {
      * @param address The node address
      */
     @JsonCreator
-    public CatalogEntry(@JsonProperty("Node") String nodeId, @JsonProperty("Address") URL address) {
+    public CatalogEntry(@JsonProperty("Node") String nodeId, @JsonProperty("Address") InetAddress address) {
         super(nodeId, address);
     }
 

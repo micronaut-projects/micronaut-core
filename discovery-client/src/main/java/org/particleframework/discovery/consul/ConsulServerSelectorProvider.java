@@ -15,6 +15,7 @@
  */
 package org.particleframework.discovery.consul;
 
+import org.particleframework.discovery.consul.v1.ConsulClient;
 import org.particleframework.http.client.ServerSelector;
 import org.particleframework.http.client.ServerSelectorProvider;
 import org.particleframework.http.client.exceptions.HttpClientException;

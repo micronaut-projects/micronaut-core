@@ -13,29 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.consul.v1;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-import java.net.URL;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class HealthEntry extends CatalogEntry{
-    /**
-     * Create a new catalog entry
-     *
-     * @param nodeId  The node ID
-     * @param address The node address
-     */
-    @JsonCreator
-    public HealthEntry(@JsonProperty("Node") String nodeId, @JsonProperty("Address") URL address) {
-        super(nodeId, address);
+public class HealthEntry {
+    private NodeEntry node;
+    private ServiceEntry service;
+
+    public NodeEntry getNode() {
+        return node;
+    }
+
+    public void setNode(NodeEntry node) {
+        this.node = node;
+    }
+
+    public ServiceEntry getService() {
+        return service;
+    }
+
+    public void setService(ServiceEntry service) {
+        this.service = service;
     }
 }
