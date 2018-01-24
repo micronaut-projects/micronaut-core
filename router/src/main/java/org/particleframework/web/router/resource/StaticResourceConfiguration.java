@@ -38,6 +38,7 @@ public class StaticResourceConfiguration implements Toggleable {
 
     protected boolean enabled = false;
     protected List<String> paths = Collections.emptyList();
+    protected String mapping = "/**";
 
     @Override
     public boolean isEnabled() {

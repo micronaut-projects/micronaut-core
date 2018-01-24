@@ -1,10 +1,13 @@
 package org.particleframework.http.server.netty.resources
 
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.particleframework.http.HttpRequest
+import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.server.netty.types.files.FileTypeHandlerConfiguration
+import org.particleframework.runtime.server.EmbeddedServer
 
 import java.text.SimpleDateFormat
 
@@ -27,6 +30,10 @@ class StaticResourceResolutionSpec extends AbstractParticleSpec {
 
     Map<String, Object> getConfiguration() {
         ['router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent], 'router.static.resources.enabled': true]
+    }
+
+    void cleanupSpec() {
+        tempFile.delete()
     }
 
     void "test resources from the file system are returned"() {
@@ -67,5 +74,32 @@ class StaticResourceResolutionSpec extends AbstractParticleSpec {
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.header(LAST_MODIFIED) == dateFormat.format(new Date(file.lastModified()))
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
+    }
+
+    void "test resources with configured mapping"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent], 'router.static.resources.enabled': true, 'router.static.resources.mapping': '/static/**'], 'test')
+        OkHttpClient client = new OkHttpClient()
+
+        when:
+        def response = client.newCall(new Request.Builder()
+                .url(new URL(embeddedServer.getURL(), "/static/index.html"))
+                .get().build()).execute()
+        FileTypeHandlerConfiguration config = new FileTypeHandlerConfiguration()
+        SimpleDateFormat dateFormat = new SimpleDateFormat(config.dateFormat)
+        dateFormat.timeZone = config.dateTimeZone
+        File file = new File(this.getClass().getClassLoader().getResource("index.html").path)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        dateFormat.parse(response.header(DATE)) < dateFormat.parse(response.header(EXPIRES))
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.header(LAST_MODIFIED) == dateFormat.format(new Date(file.lastModified()))
+        response.body().string() == "<html><head></head><body>HTML Page from resources</body></html>"
+
+        cleanup:
+        embeddedServer.stop()
     }
 }
