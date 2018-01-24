@@ -133,6 +133,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     @Override
                     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                         List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
+                        // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
+                        // once for the bootstrap context and again for the main context
                         resolvedBeanReferences = refs;
                         return refs;
                     }
@@ -140,6 +142,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     @Override
                     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
                         Iterable<BeanConfiguration> beanConfigurations = super.resolveBeanConfigurations();
+                        // we cache the resolved configurations in a local field to avoid the I/O cost of resolving them twice
+                        // once for the bootstrap context and again for the main context
                         resolvedConfigurations = beanConfigurations;
                         return beanConfigurations;
                     }

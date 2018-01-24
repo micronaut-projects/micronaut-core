@@ -40,7 +40,9 @@ public interface ServiceInstance {
     /**
      * @return The service metadata
      */
-    ConvertibleValues<String> getMetadata();
+    default ConvertibleValues<String> getMetadata() {
+        return ConvertibleValues.empty();
+    }
 
     /**
      * @return The service host

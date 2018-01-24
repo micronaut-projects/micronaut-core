@@ -135,7 +135,7 @@ class HttpGetSpec extends Specification {
     void "test simple exchange request with POJO"() {
         given:
         def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
@@ -157,7 +157,7 @@ class HttpGetSpec extends Specification {
     void "test simple retrieve request with POJO"() {
         given:
         def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
@@ -174,7 +174,7 @@ class HttpGetSpec extends Specification {
     void "test simple get request with POJO list"() {
         given:
         def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(

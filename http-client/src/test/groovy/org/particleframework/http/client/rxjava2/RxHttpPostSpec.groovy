@@ -36,7 +36,7 @@ class RxHttpPostSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup RxHttpClient client = context.createBean(RxHttpClient, [url:embeddedServer.getURL()])
+    @Shared @AutoCleanup RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
 
     void "test simple post exchange request with JSON"() {
         when:

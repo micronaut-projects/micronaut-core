@@ -265,4 +265,6 @@ public interface ByteBuffer<T>  {
      * The copy will start at {@link ByteBuffer#readerIndex()} and copy {@link ByteBuffer#readableBytes()} bytes.
      */
     byte[] toByteArray();
+
+    String toString(Charset charset);
 }

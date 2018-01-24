@@ -43,7 +43,9 @@ class DataStreamSpec extends Specification {
 
     void "test read bytebuffer stream"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        RxHttpClient client = context.createBean(RxHttpClient, {
+                return embeddedServer.getURL()
+        } as ServerSelector)
 
         when:
         List<byte[]> arrays = client.dataStream(HttpRequest.GET(
@@ -62,7 +64,9 @@ class DataStreamSpec extends Specification {
 
     void "test read response bytebuffer stream"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        RxHttpClient client = context.createBean(RxHttpClient, {
+            return embeddedServer.getURL()
+        } as ServerSelector)
 
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(

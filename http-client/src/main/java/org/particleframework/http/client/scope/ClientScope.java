@@ -19,10 +19,13 @@ import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.scope.CustomScope;
+import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.client.Client;
 import org.particleframework.http.client.HttpClient;
+import org.particleframework.http.client.ServerSelector;
+import org.particleframework.http.client.ServerSelectorResolver;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanIdentifier;
 import org.particleframework.inject.ParametrizedProvider;
@@ -49,11 +52,11 @@ import java.util.function.Function;
 class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientScope.class);
-    private final Optional<EmbeddedServer> embeddedServer;
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>();
+    private final ServerSelectorResolver serverSelectorResolver;
 
-    public ClientScope(Optional<EmbeddedServer> embeddedServer) {
-        this.embeddedServer = embeddedServer;
+    public ClientScope(ServerSelectorResolver serverSelectorResolver) {
+        this.serverSelectorResolver = serverSelectorResolver;
     }
 
     @Override
@@ -71,46 +74,29 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
         BeanResolutionContext.Segment segment = resolutionContext.getPath().currentSegment().orElseThrow(()->
             new IllegalStateException("@Client used in invalid location")
         );
-        Client annotation = segment.getArgument().getAnnotation(Client.class);
+        Argument argument = segment.getArgument();
+        Client annotation = argument.getAnnotation(Client.class);
         if(annotation == null) {
-            throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "ClientScope called for injection point that is not annotated with @Client");
+            throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called for injection point that is not annotated with @Client");
         }
         if(!HttpClient.class.isAssignableFrom(beanDefinition.getBeanType())) {
-            throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "@Client used on type that is not an HttpClient");
+            throw new DependencyInjectionException(resolutionContext, argument, "@Client used on type that is not an HttpClient");
         }
         if(!(provider instanceof ParametrizedProvider)) {
-            throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "ClientScope called with invalid bean provider");
+            throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called with invalid bean provider");
         }
         String[] value = annotation.value();
         if(ArrayUtils.isEmpty(value) || StringUtils.isEmpty(value[0])) {
-            throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "No value specified for @Client");
+            throw new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client");
         }
-        String reference = value[0];
-        URL url;
-        if(reference.length() == 1 && reference.charAt(0) == '/') {
-            // current server reference
-            if(embeddedServer.isPresent()) {
-                url = embeddedServer.get().getURL();
-            }
-            else {
-                throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "Reference to current server present when no current server running");
-            }
-        }
-        else if(reference.indexOf('/') > -1) {
-            try {
-                url = new URL(reference);
-            } catch (MalformedURLException e) {
-                throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "Invalid URL ["+reference+"] specified to @Client");
-            }
-        }
-        else {
-            throw new DependencyInjectionException(resolutionContext, segment.getArgument(), "No value specified for @Client");
-        }
+
+        ServerSelector serverSelector = serverSelectorResolver.resolve(value)
+                                                                        .orElseThrow(()->
+                                                                            new DependencyInjectionException(resolutionContext, argument, "Invalid service reference ["+ArrayUtils.toString((Object[]) value)+"] specified to @Client")
+                                                                        );
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey ->
-            (HttpClient) ((ParametrizedProvider<T>)provider).get(Collections.singletonMap(
-                "url", url
-        )));
+            (HttpClient) ((ParametrizedProvider<T>)provider).get(serverSelector));
     }
 
     @Override
@@ -133,7 +119,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
         return this;
     }
 
-    private class ClientKey {
+    private static class ClientKey {
         final BeanIdentifier identifier;
         final String[] value;
 
@@ -153,7 +139,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
 
         @Override
         public int hashCode() {
-            int result = Objects.hash(identifier);
+            int result = identifier.hashCode();
             result = 31 * result + Arrays.hashCode(value);
             return result;
         }
