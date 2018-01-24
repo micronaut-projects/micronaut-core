@@ -47,7 +47,7 @@ public interface TypeConverter<S, T> {
      * @return The converter instance
      */
     static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
-        return (object, targetType1, context) -> Optional.of(converter.apply(object));
+        return (object, targetType1, context) -> Optional.ofNullable(converter.apply(object));
     }
 }
 

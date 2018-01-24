@@ -17,6 +17,7 @@ package org.particleframework.discovery;
 
 import org.reactivestreams.Publisher;
 
+import java.io.Closeable;
 import java.util.List;
 
 /**
@@ -25,7 +26,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface DiscoveryClient {
+public interface DiscoveryClient extends Closeable, AutoCloseable{
 
     /**
      * Obtain a list of {@link ServiceInstance} for the given service id

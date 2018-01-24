@@ -107,8 +107,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
-    @Inject
-    public DefaultHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         this((Object discriminator) -> url, configuration, codecRegistry, filters);
     }
 
@@ -119,7 +118,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @param configuration  The {@link HttpClientConfiguration} object
      * @param codecRegistry  The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
-    public DefaultHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    @Inject
+    public DefaultHttpClient(@Argument ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();

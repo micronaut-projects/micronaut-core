@@ -13,34 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.inject;
+package org.particleframework.discovery.consul.v1;
 
-import javax.inject.Provider;
-import java.util.Map;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
- *
  * @author graemerocher
  * @since 1.0
  */
-public interface ParametrizedProvider<T> extends Provider<T> {
+@JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+public class HealthEntry {
+    private NodeEntry node;
+    private ServiceEntry service;
 
-    /**
-     * @param argumentValues The argument values to use
-     * @return The bean
-     */
-    T get(Map<String, Object> argumentValues);
-
-    /**
-     * @param argumentValues The argument values to use
-     * @return The bean
-     */
-    T get(Object...argumentValues);
-
-    @Override
-    default T get() {
-        return get((Map<String, Object>) null);
+    public NodeEntry getNode() {
+        return node;
     }
 
+    public void setNode(NodeEntry node) {
+        this.node = node;
+    }
+
+    public ServiceEntry getService() {
+        return service;
+    }
+
+    public void setService(ServiceEntry service) {
+        this.service = service;
+    }
 }
