@@ -15,10 +15,10 @@
  */
 package org.particleframework.http.server.netty.interceptor
 
-import okhttp3.Request
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
-import spock.lang.Ignore
 
 /**
  * @author Graeme Rocher
@@ -28,31 +28,21 @@ class HttpFilterSpec extends AbstractParticleSpec {
 
     void "test interceptor execution and order - write replacement"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/secure")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        rxClient.retrieve("/secure").blockingFirst()
 
         then:
-        response.code() == HttpStatus.FORBIDDEN.code
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     void "test interceptor execution and order - proceed"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/secure?username=fred")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        HttpResponse<String> response = rxClient.exchange("/secure?username=fred", String).blockingFirst()
 
         then:
-        response.code() == HttpStatus.OK.code
-        response.header("X-Test") == "Foo Test"
-        response.body().string() == "Authenticated: fred"
+        response.status == HttpStatus.OK
+        response.headers.get("X-Test") == "Foo Test"
+        response.body.isPresent()
+        response.body.get() == "Authenticated: fred"
     }
 }

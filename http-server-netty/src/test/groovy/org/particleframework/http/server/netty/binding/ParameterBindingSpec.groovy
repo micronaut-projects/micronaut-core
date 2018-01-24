@@ -1,6 +1,5 @@
 package org.particleframework.http.server.netty.binding
 
-import okhttp3.Request
 import org.particleframework.http.HttpParameters
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
@@ -19,21 +18,17 @@ class ParameterBindingSpec extends AbstractParticleSpec {
     @Unroll
     void "test bind HTTP parameters for URI #uri"() {
         given:
-        def request = new Request.Builder()
-                .url("$server$uri")
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
-
-        def status = response.code()
+        def response = rxClient.exchange(uri, String)
+                               .onErrorReturn({t -> t.response}).blockingFirst()
+        def status = response.status
         def body = null
-        if (status == HttpStatus.OK.code) {
-            body = response.body().string()
+        if (status == HttpStatus.OK) {
+            body = response.body()
         }
+
         expect:
         body == result
-        HttpStatus.valueOf(status) == httpStatus
+        status == httpStatus
 
 
 

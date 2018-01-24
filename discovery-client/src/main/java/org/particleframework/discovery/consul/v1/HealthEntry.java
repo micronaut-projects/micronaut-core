@@ -27,6 +27,9 @@ public class HealthEntry {
     private NodeEntry node;
     private ServiceEntry service;
 
+    /**
+     * @return The node for this health entry
+     */
     public NodeEntry getNode() {
         return node;
     }

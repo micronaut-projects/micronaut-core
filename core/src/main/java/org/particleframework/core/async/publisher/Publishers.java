@@ -253,6 +253,7 @@ public class Publishers {
                 @Override
                 public void request(long n) {
                     if(done) return;
+                    done = true;
                     subscriber.onNext(value);
                     subscriber.onComplete();
                 }

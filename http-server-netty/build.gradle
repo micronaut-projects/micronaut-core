@@ -7,6 +7,7 @@ dependencies {
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
+    testCompile project(":http-client")
     testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
     testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'

@@ -16,6 +16,7 @@
 package org.particleframework.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
+import com.typesafe.netty.http.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
@@ -177,8 +178,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 } else {
                     VndError error = newError(request, "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
 
-                    MutableHttpResponse<Object> defaultResponse = HttpResponse.notAllowed(existingRoutes)
-                            .body(error);
+                    MutableHttpResponse<Object> defaultResponse = HttpResponse.notAllowed(existingRoutes);
+
+                    if(HttpMethod.permitsRequestBody(request.getMethod())) {
+                        defaultResponse.body(error);
+                    }
                     emitDefaultErrorResponse(ctx, request, defaultResponse);
                     return;
                 }
@@ -810,7 +814,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         ((NettyHttpResponse) message).getNativeResponse(),
                         null,
                         MediaType.APPLICATION_VND_ERROR_TYPE);
-                writeNettyResponse(ctx, request, ((NettyHttpResponse) message).getNativeResponse());
             }
 
             @Override

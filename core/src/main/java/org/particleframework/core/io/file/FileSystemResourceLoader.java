@@ -55,6 +55,11 @@ public class FileSystemResourceLoader implements ResourceLoader {
     }
 
     @Override
+    public ClassLoader getClassLoader() {
+        return FileSystemResourceLoader.class.getClassLoader();
+    }
+
+    @Override
     public Optional<URL> getResource(String path) {
         File file = forPath(path);
         if (file.exists() && file.canRead()) {

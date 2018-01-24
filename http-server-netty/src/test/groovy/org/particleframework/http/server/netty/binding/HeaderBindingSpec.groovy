@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty.binding
 import okhttp3.Request
 import org.particleframework.core.convert.format.Format
 import org.particleframework.http.HttpHeaders
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Header
 import org.particleframework.http.server.netty.AbstractParticleSpec
@@ -48,17 +49,11 @@ class HeaderBindingSpec extends AbstractParticleSpec {
     @Unroll
     void "test bind HTTP headers for URI #uri"() {
         expect:
-        def request = new Request.Builder()
-                .url("$server$uri")
-
+        def request = HttpRequest.GET(uri)
         for (header in headers) {
             request = request.header(header.key, header.value)
         }
-        client.newCall(
-                request.build()
-        ).execute().body().string() == result
-
-
+        rxClient.retrieve(request).blockingFirst() == result
 
         where:
         uri                     | result                       | headers

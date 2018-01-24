@@ -18,6 +18,7 @@ package org.particleframework.http.server.netty
 import okhttp3.OkHttpClient
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.ParticleApplication
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -41,6 +42,7 @@ abstract class AbstractParticleSpec extends Specification {
     )
     @Shared int serverPort = embeddedServer.getPort()
     @Shared URL server = embeddedServer.getURL()
+    @Shared RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
     @Shared OkHttpClient client = new OkHttpClient()
                                             .newBuilder()
                                             .readTimeout(1, TimeUnit.MINUTES)

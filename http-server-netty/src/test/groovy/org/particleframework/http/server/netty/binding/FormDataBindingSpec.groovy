@@ -18,9 +18,11 @@ package org.particleframework.http.server.netty.binding
 import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Post
@@ -35,60 +37,45 @@ class FormDataBindingSpec extends AbstractParticleSpec {
     void "test simple string-based body parsing"() {
 
         when:
-        RequestBody formBody = new FormBody.Builder()
-                .add("name", "Fred")
-                .add("age", "10").build()
-        def request = new Request.Builder()
-                .url("$server/form/simple")
-                .post(formBody)
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange(HttpRequest.POST('/form/simple', [
+                name:"Fred",
+                age:"10"
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
 
         then:
-        response.code() == HttpStatus.OK.code
-        response.body().string() == "name: Fred, age: 10"
+        response.status == HttpStatus.OK
+        response.body.isPresent()
+        response.body.get() == "name: Fred, age: 10"
 
     }
 
     void "test pojo body parsing"() {
 
         when:
-        RequestBody formBody = new FormBody.Builder()
-                .add("name", "Fred")
-                .add("something", "else")
-                .add("age", "10").build()
-        def request = new Request.Builder()
-                .url("$server/form/pojo")
-                .post(formBody)
+        def response = rxClient.exchange(HttpRequest.POST('/form/pojo', [
+                name:"Fred",
+                age:"10",
+                something: "else"
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
-        response.code() == HttpStatus.OK.code
-        response.body().string() == "name: Fred, age: 10"
+        response.status == HttpStatus.OK
+        response.body.isPresent()
+        response.body.get() == "name: Fred, age: 10"
 
     }
 
     void "test simple string-based body parsing with missing data"() {
-
         when:
-        RequestBody formBody = new FormBody.Builder()
-                .add("name", "Fred")
-                .build()
-        def request = new Request.Builder()
-                .url("$server/form/simple")
-                .post(formBody)
+        rxClient.exchange(HttpRequest.POST('/form/simple', [
+                name:"Fred"
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.BAD_REQUEST
 
     }
     @Controller(consumes = MediaType.APPLICATION_FORM_URLENCODED)
