@@ -33,17 +33,17 @@ public class ConsulConfiguration {
 
     private int port = 8500;
 
-    private String consulToken;
+    private String aslToken;
 
     /**
      * @return The token to include in all requests as the {@code X-Consul-Token} header
      */
-    public Optional<String> getConsulToken() {
-        return Optional.ofNullable(consulToken);
+    public Optional<String> getAslToken() {
+        return Optional.ofNullable(aslToken);
     }
 
-    public void setConsulToken(String consulToken) {
-        this.consulToken = consulToken;
+    public void setAslToken(String aslToken) {
+        this.aslToken = aslToken;
     }
 
     /**

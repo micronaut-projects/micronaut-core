@@ -21,6 +21,7 @@ import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.MutableHttpRequest;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
@@ -33,6 +34,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -121,12 +123,19 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return A {@link Publisher} that emits a result of the given type
      */
     default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
-        return Publishers.map(exchange(request, bodyType), response ->
-                response.getBody()
+        return Publishers.map(exchange(request, bodyType), response -> {
+            if(bodyType.getType() == HttpStatus.class) {
+                return (O) response.getStatus();
+            }
+            else {
+                Optional<O> body = response.getBody();
+                return body
                         .orElseThrow(() -> new HttpClientResponseException(
                                 "Empty body",
                                 response
-                        )));
+                        ));
+            }
+        });
     }
 
 

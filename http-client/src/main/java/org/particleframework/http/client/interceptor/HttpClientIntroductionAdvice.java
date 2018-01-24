@@ -18,9 +18,6 @@ package org.particleframework.http.client.interceptor;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.context.BeanContext;
-import org.particleframework.context.annotation.Prototype;
-import org.particleframework.context.exceptions.ConfigurationException;
-import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
@@ -39,8 +36,6 @@ import org.particleframework.http.client.*;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.uri.UriMatchTemplate;
-import org.particleframework.http.uri.UriTemplate;
-import org.particleframework.runtime.server.EmbeddedServer;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
@@ -49,13 +44,10 @@ import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 
 /**
  * Introduction advice that implements the {@link Client} annotation

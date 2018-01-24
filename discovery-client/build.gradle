@@ -1,4 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
     compile project(":http-client")
+
+    testCompile project(":http-server-netty")
 }
