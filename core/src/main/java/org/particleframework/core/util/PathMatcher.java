@@ -30,7 +30,7 @@ public interface PathMatcher {
     /**
      * The default Ant style patch matcher
      */
-    PathMatcher ANT = new AntPathMatcher();
+    AntPathMatcher ANT = new AntPathMatcher();
 
     /**
      * Returns <code>true</code> if the given <code>source</code> matches the specified <code>pattern</code>,

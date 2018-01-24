@@ -16,6 +16,8 @@
 package org.particleframework.web.router.resource;
 
 import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.util.AntPathMatcher;
+import org.particleframework.core.util.PathMatcher;
 
 import javax.inject.Singleton;
 import java.net.URL;
@@ -31,14 +33,19 @@ import java.util.Optional;
 @Singleton
 public class StaticResourceResolver {
 
+    private final String mapping;
     private final List<ResourceLoader> loaders;
+    private final AntPathMatcher pathMatcher;
 
     StaticResourceResolver(StaticResourceConfiguration configuration) {
         this.loaders = configuration.getResourceLoaders();
+        this.pathMatcher = PathMatcher.ANT;
+        this.mapping = configuration.mapping;
     }
 
     public Optional<URL> resolve(String path) {
-        if (!loaders.isEmpty()) {
+        if (!loaders.isEmpty() && pathMatcher.matches(mapping, path)) {
+            path = pathMatcher.extractPathWithinPattern(mapping, path);
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
