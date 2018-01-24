@@ -22,8 +22,6 @@ import org.particleframework.http.server.cors.CorsOriginConfiguration;
 import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.io.File;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**

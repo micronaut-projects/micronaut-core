@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.particleframework.context.env;
 
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
@@ -8,6 +23,7 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.naming.NameUtils;
@@ -35,7 +51,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ResourceLoader resourceLoader;
+    protected final ClassPathResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
@@ -54,7 +70,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this(ResourceLoader.of(classLoader), conversionService, names);
     }
 
-    public DefaultEnvironment(ResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
@@ -74,21 +90,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
-    }
-
-    @Override
-    public Optional<InputStream> getResourceAsStream(String path) {
-        return resourceLoader.getResourceAsStream(path);
-    }
-
-    @Override
-    public Optional<URL> getResource(String path) {
-        return resourceLoader.getResource(path);
-    }
-
-    @Override
-    public Stream<URL> getResources(String fileName) {
-        return resourceLoader.getResources(fileName);
     }
 
     @Override
@@ -358,6 +359,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return newCatalog;
     }
 
+    @Override
+    public Optional<InputStream> getResourceAsStream(String path) {
+        return resourceLoader.getResourceAsStream(path);
+    }
+
+    @Override
+    public Optional<URL> getResource(String path) {
+        return resourceLoader.getResource(path);
+    }
+
+    @Override
+    public Stream<URL> getResources(String path) {
+        return resourceLoader.getResources(path);
+    }
 
     private class EnvironmentsAndPackage {
         Package aPackage;

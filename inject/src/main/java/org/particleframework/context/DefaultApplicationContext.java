@@ -11,6 +11,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.convert.TypeConverterRegistrar;
 import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.type.Argument;
@@ -31,7 +32,7 @@ import java.util.*;
 public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
 
     private final ConversionService conversionService;
-    private final ResourceLoader resourceLoader;
+    private final ClassPathResourceLoader resourceLoader;
     private Environment environment;
 
     private Iterable<BeanConfiguration> resolvedConfigurations;
@@ -53,7 +54,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      * @param resourceLoader  The class loader
      */
-    public DefaultApplicationContext(ResourceLoader resourceLoader, String... environmentNames) {
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;

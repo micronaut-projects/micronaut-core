@@ -28,6 +28,7 @@ import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.ResourceLoader;
+import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.io.service.StreamSoftServiceLoader;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
@@ -81,7 +82,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
     protected final AtomicBoolean running = new AtomicBoolean(false);
-    private final ResourceLoader resourceLoader;
+    private final ClassPathResourceLoader resourceLoader;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class
@@ -104,7 +105,7 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(ResourceLoader resourceLoader) {
+    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
     }

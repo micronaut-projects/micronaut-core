@@ -52,7 +52,7 @@ class RequestArgumentSatisfier {
      * @param request The request
      * @return The route
      */
-    RouteMatch<Object> fulfillArgumentRequirements(RouteMatch<Object> route, HttpRequest<?> request, boolean satisfyOptionals) {
+    RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
