@@ -186,7 +186,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             } else {
 
                 Optional<File> optionalFile = Optional.empty();
-                Optional<URL> url = staticResourceResolver.resolve(request.getUri().toString());
+                Optional<URL> url = staticResourceResolver.resolve(requestPath);
                 if (url.isPresent()) {
                     File file = new File(url.get().getPath());
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
