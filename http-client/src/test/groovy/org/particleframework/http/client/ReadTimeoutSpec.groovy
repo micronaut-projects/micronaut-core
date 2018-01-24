@@ -35,7 +35,7 @@ class ReadTimeoutSpec extends Specification {
             "particle.http.client.readTimeout":'1s'
     )
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
 
     void "test read timeout setting"() {

@@ -13,34 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.inject;
+package org.particleframework.http.client;
 
-import javax.inject.Provider;
-import java.util.Map;
+import java.util.Optional;
 
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
+ * A resolver of {@link ServerSelector} instances that are capable of resolving references to services into a concrete selector
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-public interface ParametrizedProvider<T> extends Provider<T> {
+public interface ServerSelectorResolver {
 
     /**
-     * @param argumentValues The argument values to use
-     * @return The bean
+     * Resolve a {@link ServerSelector} for the given references
+     * @param serviceReferences The references
+     *
+     * @return A {@link ServerSelector} or empty of non can be resolved
      */
-    T get(Map<String, Object> argumentValues);
-
-    /**
-     * @param argumentValues The argument values to use
-     * @return The bean
-     */
-    T get(Object...argumentValues);
-
-    @Override
-    default T get() {
-        return get((Map<String, Object>) null);
-    }
-
+    Optional<ServerSelector> resolve(String... serviceReferences);
 }

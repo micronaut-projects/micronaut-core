@@ -35,7 +35,7 @@ class MaxResponseSizeSpec extends Specification {
             "particle.http.client.maxContentLength":'1kb'
     )
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, [url:embeddedServer.getURL()])
+    @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
     void "test max content length setting"() {
         when:
