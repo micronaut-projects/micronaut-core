@@ -61,13 +61,13 @@ import java.util.Map;
 @Requires(classes = Flowable.class)
 public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClient {
 
-    @Inject
-    public RxHttpClient(@Argument URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public RxHttpClient( URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         super(url, configuration, codecRegistry, filters);
     }
 
-    public RxHttpClient(ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry) {
-        super(serverSelector, configuration, codecRegistry);
+    @Inject
+    public RxHttpClient( @Argument ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+        super(serverSelector, configuration, codecRegistry, filters);
     }
 
     public RxHttpClient(ServerSelector serverSelector) {

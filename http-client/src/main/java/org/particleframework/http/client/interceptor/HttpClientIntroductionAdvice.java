@@ -35,10 +35,7 @@ import org.particleframework.http.*;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Header;
 import org.particleframework.http.annotation.HttpMethodMapping;
-import org.particleframework.http.client.BlockingHttpClient;
-import org.particleframework.http.client.Client;
-import org.particleframework.http.client.ClientPublisherResultTransformer;
-import org.particleframework.http.client.HttpClient;
+import org.particleframework.http.client.*;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.uri.UriMatchTemplate;
@@ -70,13 +67,16 @@ import java.util.function.Function;
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
 
     final BeanContext beanContext;
-    private final Optional<EmbeddedServer> embeddedServer;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ClientPublisherResultTransformer[] transformers;
+    private final ServerSelectorResolver serverSelectorResolver;
 
-    public HttpClientIntroductionAdvice(BeanContext beanContext, Optional<EmbeddedServer> embeddedServer, ClientPublisherResultTransformer...transformers) {
+    public HttpClientIntroductionAdvice(
+            BeanContext beanContext,
+            ServerSelectorResolver serverSelectorResolver,
+            ClientPublisherResultTransformer...transformers) {
         this.beanContext = beanContext;
-        this.embeddedServer = embeddedServer;
+        this.serverSelectorResolver = serverSelectorResolver;
         this.transformers = transformers != null ? transformers : new ClientPublisherResultTransformer[0];
     }
 
@@ -87,9 +87,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
         }
 
-        String[] clientId = clientAnnotation.value();
 
-        ClientRegistration reg = getClient(clientId);
+        ClientRegistration reg = getClient(clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if(httpMethodMapping.isPresent()) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse( "");
@@ -282,48 +281,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         throw new UnsupportedOperationException("Cannot implement method that is not annotated with an HTTP method type");
     }
 
-    /**
-     * Hook to allow dealing with the final converted Publisher type
-     *
-     * @param finalPublisher The final publisher
-     * @return The resulting publisher. Never null
-     */
-    protected Object finalizePublisher(Object finalPublisher) {
-        return finalPublisher;
-    }
+    private ClientRegistration getClient(Client clientAnn) {
+        String[] clientId = clientAnn.value();
 
-    private ClientRegistration getClient(String[] clientId) {
         return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
-            if(ArrayUtils.isEmpty(clientId) || StringUtils.isEmpty(clientId[0])) {
-                throw new HttpClientException("No value specified for @Client");
-            }
-            String reference = clientId[0];
-            URL url;
+            ServerSelector serverSelector = serverSelectorResolver.resolve(clientId)
+                                                                  .orElseThrow(()->
+                                                                          new HttpClientException("Invalid service reference ["+ArrayUtils.toString((Object[]) clientId)+"] specified to @Client")
+                                                                  );
             String contextPath = "";
-            if(reference.startsWith("/")) {
-                // current server reference
-                if(embeddedServer.isPresent()) {
-
-                    url = embeddedServer.get().getURL();
-                    if(reference.length() > 1) {
-                        contextPath = reference;
-                    }
-                }
-                else {
-                    throw new HttpClientException("Reference to current server used with @Client when no current server running");
-                }
+            String path = clientAnn.path();
+            if(StringUtils.isNotEmpty(path)) {
+                contextPath = path;
             }
-            else if(reference.indexOf('/') > -1) {
-                try {
-                    url = new URL(reference);
-                } catch (MalformedURLException e) {
-                    throw new HttpClientException("Invalid URL ["+reference+"] specified to @Client");
-                }
+            else if(ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
+                contextPath = clientId[0];
             }
-            else {
-                throw new HttpClientException( "Unsupported No value specified for @Client");
-            }
-            HttpClient client = beanContext.createBean(HttpClient.class, Collections.singletonMap("url", url));
+            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector);
             return new ClientRegistration(client, contextPath);
         });
     }

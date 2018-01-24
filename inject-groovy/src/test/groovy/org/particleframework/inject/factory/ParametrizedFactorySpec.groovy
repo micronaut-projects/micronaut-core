@@ -54,7 +54,7 @@ class ParametrizedFactorySpec extends Specification  {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message.contains('Message: Missing argument value: count')
+        e.message.contains('Missing bean arguments for type: org.particleframework.inject.factory.ParametrizedFactorySpec$C')
 
     }
 
@@ -67,7 +67,7 @@ class ParametrizedFactorySpec extends Specification  {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message.contains('Message: Invalid value [test] for argument: count')
+        e.message.contains('Invalid bean argument [int count]. Cannot convert object [test] to required type: int')
 
     }
 

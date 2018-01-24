@@ -1,5 +1,7 @@
 package org.particleframework.core.convert;
 
+import org.particleframework.core.type.Argument;
+
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -72,7 +74,17 @@ public interface ConversionService<Impl extends ConversionService> {
     default <T> Optional<T> convert(Object object, Class<T> targetType) {
         return convert(object, targetType, ConversionContext.DEFAULT);
     }
-
+    /**
+     * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
+     *
+     * @param object     The object to convert
+     * @param targetType The target type
+     * @param <T>        The generic type
+     * @return The optional
+     */
+    default <T> Optional<T> convert(Object object, Argument<T> targetType) {
+        return convert(object, ConversionContext.of(targetType));
+    }
     /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned
      *

@@ -15,6 +15,7 @@
  */
 package org.particleframework.core.util;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
@@ -77,7 +78,7 @@ public class ArrayUtils {
      * @param array The array
      * @return The string representation
      */
-    public static String toString(Object...array) {
+    public static String toString(@Nullable Object...array) {
         String delimiter = ",";
         return toString(delimiter, array);
     }
@@ -89,7 +90,7 @@ public class ArrayUtils {
      * @param array The array
      * @return The string representation
      */
-    public static String toString(String delimiter, Object... array) {
+    public static String toString(String delimiter,  @Nullable Object... array) {
         if(isEmpty(array)) {
             return "";
         }

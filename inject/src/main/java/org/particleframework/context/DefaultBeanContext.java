@@ -25,6 +25,7 @@ import org.particleframework.context.exceptions.*;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
 import org.particleframework.core.annotation.AnnotationUtil;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.service.StreamSoftServiceLoader;
@@ -429,28 +430,43 @@ public class DefaultBeanContext implements BeanContext {
         if (candidate.isPresent()) {
             BeanDefinition<T> definition = candidate.get();
             DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition);
-            Map<String,Object> argumentValues;
-            if(definition instanceof ParametrizedBeanFactory) {
-                Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
-                if(args.length != requiredArguments.length) {
-                    throw new BeanInstantiationException(resolutionContext, "Invalid number of bean arguments. Required " +requiredArguments.length + " but received " + args.length );
-                }
-                argumentValues = new LinkedHashMap<>(requiredArguments.length);
-                for (int i = 0; i < requiredArguments.length; i++) {
-                    Argument requiredArgument = requiredArguments[i];
-                    argumentValues.put(requiredArgument.getName(), args[i]);
-                }
-            }
-            else {
-                argumentValues = Collections.emptyMap();
-            }
-            T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
-            if (createdBean == null) {
-                throw new NoSuchBeanException(beanType);
-            }
-            return createdBean;
+            return doCreateBean(resolutionContext, definition, beanType, qualifier, args);
         }
         throw new NoSuchBeanException(beanType);
+    }
+
+    protected <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, Object... args) {
+        Map<String,Object> argumentValues;
+        if(definition instanceof ParametrizedBeanFactory) {
+            Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
+            if(args.length != requiredArguments.length) {
+                throw new BeanInstantiationException(resolutionContext, "Invalid number of bean arguments. Required " +requiredArguments.length + " but received " + args.length );
+            }
+            argumentValues = new LinkedHashMap<>(requiredArguments.length);
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            for (int i = 0; i < requiredArguments.length; i++) {
+                Argument<?> requiredArgument = requiredArguments[i];
+                try {
+                    path.pushConstructorResolve(
+                            definition, requiredArgument
+                    );
+                    Object val = args[i];
+                    argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
+                        new BeanInstantiationException(resolutionContext, "Invalid bean argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
+                    ));
+                } finally {
+                    path.pop();
+                }
+            }
+        }
+        else {
+            argumentValues = Collections.emptyMap();
+        }
+        T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
+        if (createdBean == null) {
+            throw new NoSuchBeanException(beanType);
+        }
+        return createdBean;
     }
 
     @Override
@@ -833,11 +849,27 @@ public class DefaultBeanContext implements BeanContext {
             try {
                 if (beanFactory instanceof ParametrizedBeanFactory) {
                     ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
+                    Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                    if(argumentValues == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Missing bean arguments for type: " + beanDefinition.getBeanType().getName() );
+                    }
+                    Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
+                    for (Argument<?> requiredArgument : requiredArguments) {
+                        Object val = argumentValues.get(requiredArgument.getName());
+                        if(val == null) {
+                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument ["+requiredArgument+"].");
+                        }
+                        BeanResolutionContext finalResolutionContext = resolutionContext;
+                        convertedValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
+                                new BeanInstantiationException(finalResolutionContext, "Invalid bean argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
+                        ));
+                    }
+
                     bean = parametrizedBeanFactory.build(
                             resolutionContext,
                             this,
                             beanDefinition,
-                            argumentValues
+                            convertedValues
                     );
                 } else {
                     bean = beanFactory.build(resolutionContext, this, beanDefinition);
@@ -1006,12 +1038,25 @@ public class DefaultBeanContext implements BeanContext {
                     resolutionContext,
                     finalDefinition,
                     new BeanKey(beanType, qualifier),
-                    (ParametrizedProvider<T>) argumentValues -> {
-                        T createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, argumentValues);
-                        if (createBean == null && throwNoSuchBean) {
-                            throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
+                    new ParametrizedProvider() {
+                        @Override
+                        public Object get(Map argumentValues) {
+                            Object createBean = doCreateBean(resolutionContext, finalDefinition, qualifier, false, argumentValues);
+                            if (createBean == null && throwNoSuchBean) {
+                                throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
+                            }
+                            return createBean;
+
                         }
-                        return createBean;
+
+                        @Override
+                        public Object get(Object... argumentValues) {
+                            T createdBean = doCreateBean(resolutionContext, finalDefinition, beanType, qualifier, argumentValues);
+                            if (createdBean == null && throwNoSuchBean) {
+                                throw new NoSuchBeanException(finalDefinition.getBeanType(), qualifier);
+                            }
+                            return createdBean;
+                        }
                     }
             );
         } else {

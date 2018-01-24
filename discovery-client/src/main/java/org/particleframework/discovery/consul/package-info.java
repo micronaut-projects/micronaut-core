@@ -13,34 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.inject;
-
-import javax.inject.Provider;
-import java.util.Map;
-
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}
+ * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface ParametrizedProvider<T> extends Provider<T> {
+@Requires(property = "cloud.consul.host")
+@Requires(property = "cloud.consul.port")
+package org.particleframework.discovery.consul;
 
-    /**
-     * @param argumentValues The argument values to use
-     * @return The bean
-     */
-    T get(Map<String, Object> argumentValues);
-
-    /**
-     * @param argumentValues The argument values to use
-     * @return The bean
-     */
-    T get(Object...argumentValues);
-
-    @Override
-    default T get() {
-        return get((Map<String, Object>) null);
-    }
-
-}
+import org.particleframework.context.annotation.Requires;

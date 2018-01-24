@@ -62,7 +62,7 @@ public class HttpGetTest {
         ApplicationContext applicationContext = ApplicationContext.run();
         EmbeddedServer server = applicationContext.getBean(EmbeddedServer.class).start();
 
-        HttpClient client = applicationContext.createBean(HttpClient.class, Collections.singletonMap("url", server.getURL()));
+        HttpClient client = applicationContext.createBean(HttpClient.class, server.getURL());
 
         Flowable<HttpResponse<List>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.GET("/get/pojoList"), Argument.of(List.class, HttpGetSpec.Book.class)

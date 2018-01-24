@@ -16,6 +16,7 @@
 package org.particleframework.http.client;
 
 import org.particleframework.aop.Introduction;
+import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice;
 import org.particleframework.runtime.context.scope.ScopedProxy;
@@ -43,5 +44,18 @@ public @interface Client {
     /**
      * @return The URL or service ID of the remote service
      */
-    String[] value();
+    String[] value() default "";
+
+    /**
+     * @return The ID of the client
+     */
+    @AliasFor(member = "value")
+    String id() default "";
+
+    /**
+     * The base URI for the client
+     *
+     * @return The base URI
+     */
+    String path() default "";
 }
