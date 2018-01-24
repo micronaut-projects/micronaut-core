@@ -3,6 +3,7 @@ package org.particleframework.http.server.netty.cors
 import okhttp3.FormBody
 import okhttp3.Request
 import org.particleframework.context.annotation.Requires
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
@@ -14,224 +15,203 @@ import static org.particleframework.http.HttpHeaders.*
 class NettyCorsSpec extends AbstractParticleSpec {
 
     void "test non cors request"() {
-        given:
-        def request = new Request.Builder()
-                .url("$server/test")
-
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        Set<String> headerNames = response.headers().names()
+        def response = rxClient.exchange('/test').blockingFirst()
+        Set<String> headerNames = response.getHeaders().getNames()
 
         then:
-        response.code() == HttpStatus.NO_CONTENT.code
+        response.status == HttpStatus.NO_CONTENT
+        response.contentLength == -1
         headerNames.empty
+
     }
 
     void "test cors request without configuration"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .header(ORIGIN, 'fooBar.com')
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test')
+                           .header(ORIGIN, 'fooBar.com')
+        ).blockingFirst()
 
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        Set<String> headerNames = response.headers().names()
+        Set<String> headerNames = response.headers.names
 
         then:
-        response.code() == HttpStatus.NO_CONTENT.code
+        response.status == HttpStatus.NO_CONTENT
         headerNames.empty
     }
 
     void "test cors request with a controller that returns map"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test/arbitrary")
-                .header(ORIGIN, 'foo.com')
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test/arbitrary')
+                        .header(ORIGIN, 'foo.com')
+        ).blockingFirst()
 
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Set<String> headerNames = response.headers.names
 
         then:
-        response.code() == HttpStatus.OK.code
+        response.status == HttpStatus.OK
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
-        !response.headers().names().contains(ACCESS_CONTROL_MAX_AGE)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_HEADERS)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_METHODS)
-        !response.headers().names().contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
+        !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
+
     }
 
     void "test cors request with controlled method"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .header(ORIGIN, 'foo.com')
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test')
+                        .header(ORIGIN, 'foo.com')
+        ).blockingFirst()
 
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Set<String> headerNames = response.headers.names
 
         then:
-        response.code() == HttpStatus.NO_CONTENT.code
+        response.status == HttpStatus.NO_CONTENT
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
-        !response.headers().names().contains(ACCESS_CONTROL_MAX_AGE)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_HEADERS)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_METHODS)
-        !response.headers().names().contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
+        !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
     void "test cors request with controlled headers"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .header(ORIGIN, 'bar.com')
-                .header(ACCEPT, 'application/json')
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test')
+                        .header(ORIGIN, 'bar.com')
+                        .header(ACCEPT, 'application/json')
+
+        ).blockingFirst()
 
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        Set<String> headerNames = response.headers.names
 
         then:
         response.code() == HttpStatus.NO_CONTENT.code
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'bar.com'
         response.header(VARY) == ORIGIN
-        !response.headers().names().contains(ACCESS_CONTROL_MAX_AGE)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_HEADERS)
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_METHODS)
-        response.headers(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
+        response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     void "test cors request with invalid method"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .method('POST', new FormBody.Builder().build())
-                .header(ORIGIN, 'foo.com')
+        def response = rxClient.exchange(
+                HttpRequest.POST('/test', [:])
+                        .header(ORIGIN, 'foo.com')
+
+        ).onErrorReturn({ t -> t.response} ).blockingFirst()
 
         when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
-        Set<String> headerNames = response.headers().names()
+        Set<String> headerNames = response.headers.names
 
         then:
         response.code() == HttpStatus.FORBIDDEN.code
-        headerNames == ['connection'] as Set
+        response.contentLength == 0
+        headerNames == ['connection', 'content-length'] as Set
+
     }
 
     void "test cors request with invalid header"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .header(ORIGIN, 'bar.com')
-                .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test')
+                        .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
-        when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        ).blockingFirst()
 
-        then: "it passes through because only preflight requests check allowed headers"
+        expect: "it passes through because only preflight requests check allowed headers"
         response.code() == HttpStatus.NO_CONTENT.code
+
     }
 
     void "test preflight request with invalid header"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .method('OPTIONS', new FormBody.Builder().build())
-                .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header(ORIGIN, 'bar.com')
-                .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
+        def response = rxClient.exchange(
+                HttpRequest.OPTIONS('/test')
+                        .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                        .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
-        when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        ).onErrorReturn({ t -> t.response} ).blockingFirst()
 
-        then: "it fails because preflight requests check allowed headers"
+
+        expect: "it fails because preflight requests check allowed headers"
         response.code() == HttpStatus.FORBIDDEN.code
     }
 
     void "test preflight request with invalid method"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .method('OPTIONS', new FormBody.Builder().build())
-                .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
-                .header(ORIGIN, 'foo.com')
+        def response = rxClient.exchange(
+                HttpRequest.OPTIONS('/test')
+                        .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
+                        .header(ORIGIN, 'foo.com')
 
-        when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        ).onErrorReturn({ t -> t.response} ).blockingFirst()
 
-        then:
+        expect:
         response.code() == HttpStatus.FORBIDDEN.code
     }
 
     void "test preflight request with controlled method"() {
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .method('OPTIONS', new FormBody.Builder().build())
-                .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
-                .header(ORIGIN, 'foo.com')
-                .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Bar')
+        def response = rxClient.exchange(
+                HttpRequest.OPTIONS('/test')
+                        .header(ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                        .header(ORIGIN, 'foo.com')
+                        .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Bar')
 
+        ).blockingFirst()
 
-        when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def headerNames = response.headers.names
 
-        then:
+        expect:
         response.code() == HttpStatus.OK.code
         response.header(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
-        response.headers(ACCESS_CONTROL_ALLOW_HEADERS) == ['Foo', 'Bar']
-        !response.headers().names().contains(ACCESS_CONTROL_MAX_AGE)
+        response.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['Foo', 'Bar']
+        !headerNames.contains(ACCESS_CONTROL_MAX_AGE)
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
-        !response.headers().names().contains(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
     }
 
     void "test preflight request with controlled headers"() {
+
         given:
-        def request = new Request.Builder()
-                .url("$server/test")
-                .method('OPTIONS', new FormBody.Builder().build())
-                .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
-                .header(ORIGIN, 'bar.com')
-                .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
+        def response = rxClient.exchange(
+                HttpRequest.OPTIONS('/test')
+                        .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
+                        .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
+        ).blockingFirst()
 
+        def headerNames = response.headers.names
 
-        when:
-        def response = client.newCall(
-                request.build()
-        ).execute()
-
-        then:
+        expect:
         response.code() == HttpStatus.OK.code
         response.header(ACCESS_CONTROL_ALLOW_METHODS) == 'POST'
-        response.headers(ACCESS_CONTROL_ALLOW_HEADERS) == ['Accept']
+        response.headers.getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['Accept']
         response.header(ACCESS_CONTROL_MAX_AGE) == '150'
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'bar.com'
         response.header(VARY) == ORIGIN
-        response.headers(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
-        !response.headers().names().contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+
     }
 
     Map<String, Object> getConfiguration() {

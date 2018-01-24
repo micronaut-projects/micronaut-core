@@ -30,7 +30,7 @@ import java.util.Optional;
 @Produces(MediaType.APPLICATION_VND_ERROR)
 public class VndError extends AbstractResource<VndError> {
 
-    private final String message;
+    private String message;
     private String logref;
     private String path;
 
@@ -38,7 +38,12 @@ public class VndError extends AbstractResource<VndError> {
         this.message = message;
     }
 
+    VndError() {
+    }
 
+    void setMessage(String message) {
+        this.message = message;
+    }
 
     /**
      * @return The message

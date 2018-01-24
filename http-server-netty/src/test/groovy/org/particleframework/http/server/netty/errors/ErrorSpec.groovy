@@ -19,13 +19,17 @@ import groovy.json.JsonSlurper
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.http.HttpHeaders
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Get
 
 import javax.inject.Singleton
+
+import static org.particleframework.http.HttpHeaders.ORIGIN
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -37,23 +41,25 @@ class ErrorSpec extends AbstractParticleSpec {
 
     void "test 500 server error"() {
         given:
-        def request = new Request.Builder()
-                .url(new URL(server, '/errors/serverError'))
-        def response = client.newCall(request.build()).execute()
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/serverError')
+
+        ).onErrorReturn({ t -> t.response.getBody(VndError); return t.response } ).blockingFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_VND_ERROR
-        new JsonSlurper().parseText(response.body().string()).message == 'Internal Server Error: bad'
+        response.getBody(VndError).get().message == 'Internal Server Error: bad'
+
+
     }
 
     void "test 404 error"() {
-        given:
-        def request = new Request.Builder()
-                .url(new URL(server, '/errors/blah'))
-
         when:
-        def response = client.newCall(request.build()).execute()
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/blah')
+
+        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
 
         then:
         response.code() == HttpStatus.NOT_FOUND.code
@@ -61,20 +67,20 @@ class ErrorSpec extends AbstractParticleSpec {
 
 
         when:
-        def json = new JsonSlurper().parseText(response.body().string())
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
         json.message == 'Page Not Found'
         json._links.self.href == '/errors/blah'
+
     }
 
     void "test 405 error"() {
-        given:
-        def request = new Request.Builder()
-                .url(new URL(server, '/errors/serverError'))
-                .post(RequestBody.create(okhttp3.MediaType.parse("text/plain"), "blah"))
         when:
-        def response = client.newCall(request.build()).execute()
+        def response = rxClient.exchange(
+                HttpRequest.POST('/errors/serverError', 'blah')
+
+        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
 
         then:
         response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
@@ -82,11 +88,13 @@ class ErrorSpec extends AbstractParticleSpec {
 
 
         when:
-        def json = new JsonSlurper().parseText(response.body().string())
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
         json.message == 'Method [POST] not allowed. Allowed methods: [GET]'
         json._links.self.href == '/errors/serverError'
+
+
     }
     @Controller('/errors')
     @Singleton

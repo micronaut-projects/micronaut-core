@@ -281,6 +281,10 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse streamedResponse) {
+                if(streamedResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
+                    // normalize the NO_CONTENT header, since http content aggregator adds it
+                    streamedResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                }
                 FullNettyClientHttpResponse<O> response
                         = new FullNettyClientHttpResponse<>(streamedResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
 
