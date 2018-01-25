@@ -4,9 +4,11 @@ import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.context.annotation.Requires
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Consumes
@@ -21,36 +23,26 @@ class CustomStaticMappingSpec extends AbstractParticleSpec {
 
     void "test that a bad request response can be redirected by the router"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/test/bad")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        rxClient.exchange('/test/bad').blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "You sent me bad stuff"
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+        e.response.reason() == "You sent me bad stuff"
 
     }
 
     void "test that a bad request response for invalid request data can be redirected by the router"() {
         when:
-        RequestBody formBody = new FormBody.Builder()
-                .add("name", "Fred")
-                .build()
-        def request = new Request.Builder()
-                .url("$server/test/simple")
-                .post(formBody)
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        rxClient.exchange(
+                HttpRequest.POST('/test/simple', [name:"Fred"])
+                           .contentType(MediaType.FORM)
+        ).blockingFirst()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "You sent me bad stuff"
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+        e.response.reason() == "You sent me bad stuff"
 
     }
 

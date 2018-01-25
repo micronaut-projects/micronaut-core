@@ -49,6 +49,11 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
     }
 
     @Override
+    public String reason() {
+        return nettyResponse.status().reasonPhrase();
+    }
+
+    @Override
     public HttpStatus getStatus() {
         return status;
     }

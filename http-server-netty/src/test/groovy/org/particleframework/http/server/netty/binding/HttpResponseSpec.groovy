@@ -15,7 +15,6 @@
  */
 package org.particleframework.http.server.netty.binding
 
-import okhttp3.Request
 import org.particleframework.http.HttpMessage
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
@@ -37,28 +36,19 @@ class HttpResponseSpec extends AbstractParticleSpec {
     void "test custom HTTP response for java action #action"() {
 
         when:
-
-        def request = new Request.Builder()
-                .url("$server/java/response/$action")
-                .get()
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
-        for (name in response.headers().names()) {
-            actualHeaders.put(name.toLowerCase(), response.headers().get(name))
+        for (name in response.headers.names) {
+            actualHeaders.put(name.toLowerCase(), response.header(name))
         }
-        def responseBody = response.body()
+        def responseBody = response.body.orElse(null)
 
 
         then:
         response.code() == status.code
-        body == null || responseBody.string() == body
+        body == null || responseBody == body
         actualHeaders == headers
-
-        cleanup:
-        responseBody.close()
 
 
         where:
@@ -77,22 +67,19 @@ class HttpResponseSpec extends AbstractParticleSpec {
     @Unroll
     void "test custom HTTP response for action #action"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/response/$action")
-                .get()
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
-        for (name in response.headers().names()) {
-            actualHeaders.put(name.toLowerCase(), response.headers().get(name))
+        for (name in response.headers.names) {
+            actualHeaders.put(name.toLowerCase(), response.header(name))
         }
+        def responseBody = response.body.orElse(null)
+
         def defaultHeaders = [connection: 'close']
 
         then:
         response.code() == status.code
-        body == null || response.body().string() == body
+        body == null || responseBody == body
         actualHeaders == headers
 
         where:

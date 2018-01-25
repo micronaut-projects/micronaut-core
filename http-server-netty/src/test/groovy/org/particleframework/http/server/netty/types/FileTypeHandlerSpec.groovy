@@ -2,9 +2,11 @@ package org.particleframework.http.server.netty.types
 
 import okhttp3.Request
 import org.particleframework.context.annotation.Requires
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.server.netty.types.files.FileTypeHandlerConfiguration
 import org.particleframework.http.server.types.files.AttachedFile
@@ -24,13 +26,7 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
 
     void "test returning a file from a controller"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/test/html")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange('/test/html', String).blockingFirst()
         FileTypeHandlerConfiguration config = new FileTypeHandlerConfiguration()
         SimpleDateFormat dateFormat = new SimpleDateFormat(config.dateFormat)
         dateFormat.timeZone = config.dateTimeZone
@@ -42,7 +38,7 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
         dateFormat.parse(response.header(DATE)) < dateFormat.parse(response.header(EXPIRES))
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.header(LAST_MODIFIED) == dateFormat.format(new Date(tempFile.lastModified()))
-        response.body().string() == "<html><head></head><body>HTML Page</body></html>"
+        response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
     void "test 304 is returned if the correct header is sent"() {
@@ -50,14 +46,9 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
         FileTypeHandlerConfiguration config = new FileTypeHandlerConfiguration()
         SimpleDateFormat dateFormat = new SimpleDateFormat(config.dateFormat)
         dateFormat.timeZone = config.dateTimeZone
-        def request = new Request.Builder()
-                .url("$server/test/html")
-                .header(IF_MODIFIED_SINCE, dateFormat.format(new Date(tempFile.lastModified())))
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange(
+                HttpRequest.GET('/test/html')
+                .header(IF_MODIFIED_SINCE, dateFormat.format(new Date(tempFile.lastModified()))), String).blockingFirst()
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
@@ -66,28 +57,22 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
 
     void "test what happens when a file isn't found"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/test/notFound")
-                .get()
+        rxClient.exchange('/test/notFound', String).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        when:
+        def response = e.response
 
         then:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.body().string() == '{"_links":{},"_embedded":{},"message":"Internal Server Error: Could not find file"}'
+        response.body() == '{"_links":{},"_embedded":{},"message":"Internal Server Error: Could not find file"}'
     }
 
     void "test when an attached file is returned"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/test/download")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange('/test/download', String).blockingFirst()
         FileTypeHandlerConfiguration config = new FileTypeHandlerConfiguration()
         SimpleDateFormat dateFormat = new SimpleDateFormat(config.dateFormat)
         dateFormat.timeZone = config.dateTimeZone
@@ -100,18 +85,12 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
         dateFormat.parse(response.header(DATE)) < dateFormat.parse(response.header(EXPIRES))
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.header(LAST_MODIFIED) == dateFormat.format(new Date(tempFile.lastModified()))
-        response.body().string() == "<html><head></head><body>HTML Page</body></html>"
+        response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
     void "test when an attached file is returned with a name"() {
         when:
-        def request = new Request.Builder()
-                .url("$server/test/differentName")
-                .get()
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def response = rxClient.exchange('/test/differentName', String).blockingFirst()
         FileTypeHandlerConfiguration config = new FileTypeHandlerConfiguration()
         SimpleDateFormat dateFormat = new SimpleDateFormat(config.dateFormat)
         dateFormat.timeZone = config.dateTimeZone
@@ -124,7 +103,7 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
         dateFormat.parse(response.header(DATE)) < dateFormat.parse(response.header(EXPIRES))
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.header(LAST_MODIFIED) == dateFormat.format(new Date(tempFile.lastModified()))
-        response.body().string() == "<html><head></head><body>HTML Page</body></html>"
+        response.body() == "<html><head></head><body>HTML Page</body></html>"
     }
 
     @Controller

@@ -15,15 +15,12 @@
  */
 package org.particleframework.http.server.netty
 
-import okhttp3.OkHttpClient
 import org.particleframework.context.ApplicationContext
 import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import java.util.concurrent.TimeUnit
 
 /**
  * @author Graeme Rocher
@@ -41,10 +38,6 @@ abstract class AbstractParticleSpec extends Specification {
     @Shared int serverPort = embeddedServer.getPort()
     @Shared URL server = embeddedServer.getURL()
     @Shared RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
-    @Shared OkHttpClient client = new OkHttpClient()
-                                            .newBuilder()
-                                            .readTimeout(1, TimeUnit.MINUTES)
-                                            .build()
 
     Collection<String> configurationNames() {
         ['org.particleframework.configuration.jackson','org.particleframework.web.router']

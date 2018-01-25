@@ -32,7 +32,7 @@ import java.util.*;
 public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
 
     private final ConversionService conversionService;
-    private final ClassPathResourceLoader resourceLoader;
+    private final ResourceLoader resourceLoader;
     private Environment environment;
 
     private Iterable<BeanConfiguration> resolvedConfigurations;
@@ -54,7 +54,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      * @param resourceLoader  The class loader
      */
-    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
+    public DefaultApplicationContext(ResourceLoader resourceLoader, String... environmentNames) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;

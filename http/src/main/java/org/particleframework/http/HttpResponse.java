@@ -46,6 +46,12 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * @return The HTTP status reason phrase
+     */
+    default String reason() {
+        return getStatus().getReason();
+    }
+    /**
      * Return an {@link HttpStatus#OK} response with an empty body
      *
      * @return The ok response

@@ -51,7 +51,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private final Set<String> names;
     private final ClassLoader classLoader;
-    protected final ClassPathResourceLoader resourceLoader;
+    protected final ResourceLoader resourceLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
     private Collection<String> configurationIncludes = new HashSet<>();
@@ -70,7 +70,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this(ResourceLoader.of(classLoader), conversionService, names);
     }
 
-    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+    public DefaultEnvironment(ResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));

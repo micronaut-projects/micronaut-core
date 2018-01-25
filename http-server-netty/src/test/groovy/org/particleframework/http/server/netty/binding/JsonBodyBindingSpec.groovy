@@ -13,6 +13,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Error
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.hateos.Link
 import org.particleframework.http.hateos.VndError
 import org.particleframework.http.server.netty.AbstractParticleSpec
@@ -27,73 +28,64 @@ import java.util.concurrent.CompletableFuture
  */
 class JsonBodyBindingSpec extends AbstractParticleSpec {
     void "test simple string-based body parsing with incomplete JSON"() {
-
         when:
         def json = '{"title":"The Stand"'
-        def request = new Request.Builder()
-                .url("$server/json/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        rxClient.exchange(
+                HttpRequest.POST('/json/string', json), String
+        ).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
-
+        def e = thrown(HttpClientResponseException)
+        e.message == "Bad Request"
+        e.response.status == HttpStatus.BAD_REQUEST
 
         when:
-        def body = response.body().string()
+        def body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
+
+
+
         then:
         result['_links'].self.href == '/json/string'
         result.message.startsWith('Invalid JSON')
-        response.message() == "No!! Invalid JSON"
     }
 
     void "test parse body into parameters if no @Body specified"() {
         when:
         def json = '{"name":"Fred", "age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/params")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/params', json), String
+        ).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == "Body: Foo(Fred, 10)"
+        response.body() == "Body: Foo(Fred, 10)"
     }
 
     void "test simple string-based body parsing with invalid JSON"() {
 
         when:
         def json = '{"title":The Stand}'
-        def request = new Request.Builder()
-                .url("$server/json/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        rxClient.exchange(
+                HttpRequest.POST('/json/string', json), String
+        ).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Bad Request"
+        e.response.status == HttpStatus.BAD_REQUEST
+
+        when:
+        def response = e.response
+        def body = e.response.getBody(String).orElse(null)
+        def result = new JsonSlurper().parseText(body)
 
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "No!! Invalid JSON"
-        response.headers().get(HttpHeaders.CONTENT_TYPE) == org.particleframework.http.MediaType.APPLICATION_VND_ERROR
-
-        when:
-        def result = new JsonSlurper().parseText(response.body().string())
-
-
-        then:
+        response.headers.get(HttpHeaders.CONTENT_TYPE) == org.particleframework.http.MediaType.APPLICATION_VND_ERROR
         result['_links'].self.href == '/json/string'
         result.message.startsWith('Invalid JSON')
-
     }
 
 
@@ -102,15 +94,12 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         when:
         def json = '{"title":"The Stand"}'
-        def request = new Request.Builder()
-                .url("$server/json/map")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/map', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: [title:The Stand]"
+        response.body() == "Body: [title:The Stand]"
     }
 
 
@@ -118,171 +107,133 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         when:
         def json = '{"title":"The Stand"}'
-        def request = new Request.Builder()
-                .url("$server/json/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/string', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: $json"
+        response.body() == "Body: $json"
 
     }
 
     void "test simple string-based body parsing with invalid mime type"() {
 
         when:
-        def json = '{"title":The Stand}'
-        def request = new Request.Builder()
-                .url("$server/json/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/xml"), json))
-
-        def response = client.newCall(
-                request.build()
-        ).execute()
+        def json = '{"title":"The Stand"}'
+        rxClient.exchange(
+                HttpRequest.POST('/json/map', json).contentType(org.particleframework.http.MediaType.APPLICATION_ATOM_XML_TYPE), String
+        ).blockingFirst()
 
         then:
-        response.code() == HttpStatus.UNSUPPORTED_MEDIA_TYPE.code
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
     }
 
 
 
     void "test simple POGO body parsing"() {
-
         when:
         def json = '{"name":"Fred", "age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/object")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/object', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: Foo(Fred, 10)"
+        response.body() == "Body: Foo(Fred, 10)"
     }
 
     void "test simple POGO body parse and return"() {
-
         when:
         def json = '{"name":"Fred","age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/objectToObject")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/objectToObject', json), String
+        ).blockingFirst()
+
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == json
+        response.body() == json
     }
 
 
     void "test array POGO body parsing"() {
-
         when:
         def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
-        def request = new Request.Builder()
-                .url("$server/json/array")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/array', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+        response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
     }
 
     void "test array POGO body parsing and return"() {
-
         when:
         def json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
-        def request = new Request.Builder()
-                .url("$server/json/arrayToArray")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/arrayToArray', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == json
+        response.body() == json
     }
 
     void "test list POGO body parsing"() {
 
         when:
         def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
-        def request = new Request.Builder()
-                .url("$server/json/list")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/list', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+        response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
     }
 
     void "test future argument handling with string"() {
-
         when:
         def json = '{"name":"Fred","age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/future")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/future', json), String
+        ).blockingFirst()
+
+
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: $json".toString()
+        response.body() == "Body: $json".toString()
     }
 
     void "test future argument handling with map"() {
-
         when:
         def json = '{"name":"Fred","age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/futureMap")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/futureMap', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: [name:Fred, age:10]".toString()
+        response.body() == "Body: [name:Fred, age:10]".toString()
     }
 
     void "test future argument handling with POGO"() {
-
         when:
         def json = '{"name":"Fred","age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/futureObject")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/futureObject', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Body: Foo(Fred, 10)".toString()
+        response.body() == "Body: Foo(Fred, 10)".toString()
     }
 
     void "test publisher argument handling with POGO"() {
 
         when:
         def json = '{"name":"Fred","age":10}'
-        def request = new Request.Builder()
-                .url("$server/json/publisherObject")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/publisherObject', json), String
+        ).blockingFirst()
 
         then:
-        client.newCall(
-                request.build()
-        ).execute().body().string() == "Foo(Fred, 10)".toString()
+        response.body() == "Foo(Fred, 10)".toString()
     }
 
     @Controller(produces = org.particleframework.http.MediaType.APPLICATION_JSON)

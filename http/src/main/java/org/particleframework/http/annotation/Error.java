@@ -37,4 +37,11 @@ public @interface Error {
      * @return The {@link HttpStatus} code to map
      */
     HttpStatus status() default HttpStatus.INTERNAL_SERVER_ERROR;
+
+    /**
+     * Whether the error handler should be registered as a global error handler or just locally to the declaring {@link Controller}
+     *
+     * @return True if it should be global
+     */
+    boolean global() default false;
 }

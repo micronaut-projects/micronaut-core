@@ -45,6 +45,7 @@ import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.*;
@@ -84,6 +85,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty
@@ -280,13 +282,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
             @Override
-            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse streamedResponse) {
-                if(streamedResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
-                    // normalize the NO_CONTENT header, since http content aggregator adds it
-                    streamedResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+                if(fullResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
+                    // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                    fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(streamedResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
+                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
 
                 HttpStatus status = response.getStatus();
                 if (status.getCode() >= 400) {
@@ -650,7 +652,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             ChannelPipeline p = ch.pipeline();
             if (sslContext != null) {
                 SSLEngine engine = sslContext.newEngine(ch.alloc());
-                p.addFirst("ssl", new SslHandler(engine));
+                p.addFirst("ssl-handler", new SslHandler(engine));
             }
 
 
@@ -662,10 +664,23 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
             }
             Optional<Duration> readTimeout = configuration.getReadTimeout();
-            readTimeout.ifPresent(duration -> p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS)));
-            p.addLast("codec", new HttpClientCodec());
+            readTimeout.ifPresent(duration -> {
+                if(!duration.isNegative()) {
+                    p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS));
+                }
+            });
+            p.addLast("http-client-codec", new HttpClientCodec());
             int maxContentLength = configuration.getMaxContentLength();
-            p.addLast(HANDLER_AGGREGATOR, new HttpObjectAggregator(maxContentLength));
+            p.addLast(HANDLER_AGGREGATOR, new HttpObjectAggregator(maxContentLength) {
+                @Override
+                protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
+                    if (!HttpUtil.isContentLengthSet(aggregated)) {
+                        if(aggregated.content().readableBytes() > 0) {
+                            super.finishAggregation(aggregated);
+                        }
+                    }
+                }
+            });
             p.addLast(HANDLER_STREAM, new HttpStreamsClientHandler());
         }
     }

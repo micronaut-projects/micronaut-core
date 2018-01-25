@@ -170,21 +170,33 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Error.class, (ExecutableMethod method) -> {
-                    if (method.isPresent(Error.class, "status")) {
+            boolean isGlobal = method.getValue(Error.class, "global", boolean.class).orElse(false);
+            Class declaringType = method.getDeclaringType();
+            if (method.isPresent(Error.class, "status")) {
                         Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
-                        value.ifPresent(httpStatus -> status(httpStatus, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes()));
+                        value.ifPresent(httpStatus -> status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes()));
                     } else if (method.isPresent(Error.class, "value")) {
                         Optional<Class> aClass = method.classValue(Error.class);
                         aClass.ifPresent(exceptionType ->
                                 {
                                     if (Throwable.class.isAssignableFrom(exceptionType)) {
-                                        //noinspection unchecked
-                                        error(exceptionType, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+                                        if(isGlobal) {
+                                            //noinspection unchecked
+                                            error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                                        }
+                                        else {
+                                            error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                                        }
                                     }
                                 }
                         );
                     } else {
-                        error(Throwable.class, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+                        if(isGlobal) {
+                            error(Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        }
+                        else {
+                            error(declaringType, Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        }
                     }
 
                 }

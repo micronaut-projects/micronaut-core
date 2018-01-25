@@ -82,7 +82,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
     protected final AtomicBoolean running = new AtomicBoolean(false);
-    private final ClassPathResourceLoader resourceLoader;
+    private final ResourceLoader resourceLoader;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class
@@ -105,7 +105,7 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
+    public DefaultBeanContext(ResourceLoader resourceLoader) {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
     }

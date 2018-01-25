@@ -120,8 +120,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
 
         then:
         response.code() == HttpStatus.FORBIDDEN.code
-        response.contentLength == 0
-        headerNames == ['connection', 'content-length'] as Set
+        headerNames == ['connection'] as Set
 
     }
 
