@@ -15,6 +15,7 @@
  */
 package org.particleframework.discovery.client.consul.v1;
 
+import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
@@ -32,8 +33,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Client(id = ConsulClient.SERVICE_ID, path = "/v1")
-public interface ConsulClient {
+public interface ConsulClient extends DiscoveryClient {
     /**
      * The default ID of the consul service
      */

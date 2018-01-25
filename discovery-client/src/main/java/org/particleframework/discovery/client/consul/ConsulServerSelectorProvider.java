@@ -31,7 +31,7 @@ import java.net.URL;
  * @since 1.0
  */
 @Singleton
-public class ConsulServerSelectorProvider implements ServerSelectorProvider{
+public class ConsulServerSelectorProvider implements ServerSelectorProvider {
 
     private final ConsulConfiguration configuration;
 
