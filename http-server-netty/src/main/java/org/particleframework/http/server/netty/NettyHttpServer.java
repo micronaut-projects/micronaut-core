@@ -41,6 +41,8 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
+import org.particleframework.runtime.server.event.ServerShutdownEvent;
+import org.particleframework.runtime.server.event.ServerStartupEvent;
 import org.particleframework.web.router.Router;
 import org.particleframework.web.router.resource.StaticResourceResolver;
 import org.slf4j.Logger;
@@ -186,6 +188,9 @@ public class NettyHttpServer implements EmbeddedServer {
                         LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
                     }
                 }
+                else {
+                    applicationContext.publishEvent(new ServerStartupEvent(this));
+                }
             });
         }
         return this;
@@ -199,6 +204,7 @@ public class NettyHttpServer implements EmbeddedServer {
                            .addListener(this::logShutdownErrorIfNecessary);
                 parentGroup.shutdownGracefully()
                            .addListener(this::logShutdownErrorIfNecessary);
+                applicationContext.publishEvent(new ServerShutdownEvent(this));
                 if(applicationContext.isRunning()) {
                     applicationContext.stop();
                 }

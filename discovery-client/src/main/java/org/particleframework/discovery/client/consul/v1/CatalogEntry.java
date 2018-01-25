@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.v1;
+package org.particleframework.discovery.client.consul.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -32,7 +32,7 @@ import java.util.Optional;
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public class CatalogEntry extends NodeEntry {
-    private ServiceEntry service;
+    private NewServiceEntry service;
 
     /**
      * Create a new catalog entry
@@ -64,16 +64,16 @@ public class CatalogEntry extends NodeEntry {
      *
      * @return The service
      */
-    public Optional<ServiceEntry> getService() {
+    public Optional<NewServiceEntry> getService() {
         return Optional.ofNullable(service);
     }
 
-    public CatalogEntry service(ServiceEntry service) {
+    public CatalogEntry service(NewServiceEntry service) {
         this.service = service;
         return this;
     }
 
-    public void setService(ServiceEntry service) {
+    public void setService(NewServiceEntry service) {
         this.service = service;
     }
 }

@@ -20,6 +20,7 @@ import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.http.annotation.Get
 import spock.lang.AutoCleanup
@@ -64,8 +65,12 @@ class ClientScopeSpec extends Specification {
         @Inject @Client('/')
         HttpClient client
 
+        @Inject @Client('/')
+        RxHttpClient rxHttpClient
+
 
         String get() {
+            rxHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )

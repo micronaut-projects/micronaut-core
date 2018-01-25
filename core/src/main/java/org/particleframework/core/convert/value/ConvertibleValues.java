@@ -44,6 +44,13 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     Collection<V> values();
 
     /**
+     * @return Whether this values is empty
+     */
+    default boolean isEmpty() {
+        return this == ConvertibleValuesMap.EMPTY || getNames().isEmpty();
+    }
+
+    /**
      * @return The concrete type of the value
      */
     @SuppressWarnings("unchecked")
