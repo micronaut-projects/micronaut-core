@@ -203,7 +203,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
                 isSingleton, annotationMetadata);
-        startClass(classWriter, proxyFullName, getTypeReference(targetClassFullName));
+        startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
     @Override

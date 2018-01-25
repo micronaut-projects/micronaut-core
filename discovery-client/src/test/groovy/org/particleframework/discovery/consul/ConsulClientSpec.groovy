@@ -17,6 +17,8 @@ package org.particleframework.discovery.consul
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
+import org.particleframework.discovery.DiscoveryClient
+import org.particleframework.discovery.ServiceInstance
 import org.particleframework.discovery.client.consul.v1.CatalogEntry
 import org.particleframework.discovery.client.consul.v1.ConsulClient
 import org.particleframework.discovery.client.consul.v1.HealthEntry
@@ -46,6 +48,12 @@ class ConsulClientSpec extends Specification {
             'consul.port': System.getenv('CONSUL_PORT')]
     )
     @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+
+    void "test is a discovery client"() {
+        expect:
+        client instanceof DiscoveryClient
+        Flowable.fromPublisher(((DiscoveryClient)client).serviceIds).blockingFirst().contains('consul')
+    }
 
     void "test list services"() {
 
@@ -95,7 +103,7 @@ class ConsulClientSpec extends Specification {
 
 
 
-        Map<String, NewServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
+        Map<String, ServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
 
         then:
         entries.size() == 1
@@ -148,6 +156,17 @@ class ConsulClientSpec extends Specification {
         service.name == 'test-service'
         service.tags == ['foo','bar']
         service.ID.get() == 'xxxxxxxx'
+
+        when:
+        List<ServiceInstance> services = Flowable.fromPublisher(client.getInstances('test-service')).blockingFirst()
+
+        then:
+        services.size() == 1
+        services[0].id == 'test-service'
+        services[0].port == embeddedServer.getPort()
+        services[0].host == embeddedServer.getHost()
+        services[0].URI == embeddedServer.getURI()
+
         when:
         HttpStatus result = Flowable.fromPublisher(client.deregister('test-service')).blockingFirst()
 

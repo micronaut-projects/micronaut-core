@@ -23,7 +23,6 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 
 import static org.junit.Assert.assertNotNull;
 import static org.particleframework.docs.env.DataSourceFactory.*;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 

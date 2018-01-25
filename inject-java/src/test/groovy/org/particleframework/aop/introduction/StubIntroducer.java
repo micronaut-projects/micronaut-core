@@ -18,8 +18,10 @@ package org.particleframework.aop.introduction;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.type.MutableArgumentValue;
 
 import javax.inject.Singleton;
+import java.util.Iterator;
 
 /**
  * @author Graeme Rocher
@@ -29,6 +31,9 @@ import javax.inject.Singleton;
 public class StubIntroducer implements MethodInterceptor<Object,Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        return context.getParameters().values().iterator().next().getValue();
+        Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator();
+        if(iterator.hasNext())
+            return iterator.next().getValue();
+        return null;
     }
 }
