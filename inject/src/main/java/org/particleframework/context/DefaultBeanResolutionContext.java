@@ -106,7 +106,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
 
         @Override
         public Optional<Segment> currentSegment() {
-            return Optional.ofNullable(peekLast());
+            return Optional.ofNullable(peek());
         }
 
         @Override
