@@ -73,14 +73,14 @@ class UploadSpec extends AbstractParticleSpec {
         ).execute()
 
         then:
-        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.code() == HttpStatus.BAD_REQUEST.code
 
         when:
         def json = new JsonSlurper().parseText(response.body().string())
 
         then:
         json.message.contains("Failed to convert argument [data]")
-//        json.path == "/data"
+        json.path == "/data"
 
     }
 
@@ -123,8 +123,8 @@ class UploadSpec extends AbstractParticleSpec {
         ).execute()
 
         then:
-        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-//        response.message() =='Request Entity Too Large'
+        response.code() == HttpStatus.REQUEST_ENTITY_TOO_LARGE.code
+        response.message() =='Request Entity Too Large'
         def body = response.body().string()
 
         when:

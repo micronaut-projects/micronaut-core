@@ -15,11 +15,14 @@
  */
 package org.particleframework.http.server.netty.binding
 
+import groovy.json.JsonSlurper
 import okhttp3.MediaType
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Post
@@ -33,22 +36,26 @@ class DefaultJsonErrorHandlingSpec extends AbstractParticleSpec {
     void "test simple string-based body parsing with invalid JSON"() {
 
         when:
-        def json = '{"title":The Stand}'
-        def request = new Request.Builder()
-                .url("$server/errors/string")
-                .header("Content-Length", json.length().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), json))
+        def json = '{"title":"The Stand"'
+        rxClient.exchange(
+                HttpRequest.POST('/errors/string', json), String
+        ).blockingFirst()
 
-        def response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
-        response.code() == HttpStatus.BAD_REQUEST.code
-        response.message() == "No!! Invalid JSON"
+        def e = thrown(HttpClientResponseException)
+        e.message == "Bad Request"
+        e.response.status == HttpStatus.BAD_REQUEST
 
-        cleanup:
-        response.close()
+        when:
+        def body = e.response.getBody(String).orElse(null)
+        def result = new JsonSlurper().parseText(body)
+
+
+
+        then:
+        result['_links'].self.href == '/errors/string'
+        result.message.startsWith('Invalid JSON')
 
     }
 

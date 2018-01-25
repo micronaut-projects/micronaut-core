@@ -85,6 +85,11 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     }
 
     @Override
+    public String reason() {
+        return this.nettyHttpResponse.status().reasonPhrase();
+    }
+
+    @Override
     public HttpStatus getStatus() {
         return status;
     }
