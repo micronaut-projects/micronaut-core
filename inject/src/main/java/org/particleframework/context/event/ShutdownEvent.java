@@ -3,7 +3,7 @@ package org.particleframework.context.event;
 import org.particleframework.context.BeanContext;
 
 /**
- * An event fired on shutdown
+ * An event fired prior to starting shutdown sequence
  *
  * @author Graeme Rocher
  * @since 1.0

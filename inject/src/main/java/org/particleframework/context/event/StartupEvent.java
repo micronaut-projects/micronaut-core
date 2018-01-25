@@ -3,7 +3,7 @@ package org.particleframework.context.event;
 import org.particleframework.context.BeanContext;
 
 /**
- * An event fired on startup
+ * An event fired once startup is complete
  *
  * @author Graeme Rocher
  * @since 1.0

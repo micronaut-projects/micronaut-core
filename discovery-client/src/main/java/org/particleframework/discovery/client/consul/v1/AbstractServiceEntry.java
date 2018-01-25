@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.v1;
+package org.particleframework.discovery.client.consul.v1;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import org.particleframework.http.client.exceptions.HttpClientException;
@@ -29,33 +27,20 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * A service entry in Consul. See https://www.consul.io/api/catalog.html#service
- *
  * @author graemerocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class ServiceEntry {
+public abstract class AbstractServiceEntry {
 
-    private final String service;
-
-    @JsonCreator
-    public ServiceEntry(@JsonProperty("Name") String serviceName) {
-        this.service = serviceName;
-    }
-
+    protected final String name;
     private InetAddress address;
     private Integer port;
     private List<String> tags;
     private String ID;
 
-    /**
-     * See https://www.consul.io/api/agent/service.html#name
-     *
-     * @return The name of the service
-     */
-    public String getName() {
-        return service;
+    public AbstractServiceEntry(String name) {
+        this.name = name;
     }
 
     /**
@@ -114,17 +99,17 @@ public class ServiceEntry {
         this.ID = id;
     }
 
-    public ServiceEntry id(String id) {
+    public AbstractServiceEntry id(String id) {
         this.ID = id;
         return this;
     }
 
-    public ServiceEntry address(InetAddress address) {
+    public AbstractServiceEntry address(InetAddress address) {
         this.address = address;
         return this;
     }
 
-    public ServiceEntry address(String address) {
+    public AbstractServiceEntry address(String address) {
         try {
             this.address = InetAddress.getByName(address);
         } catch (UnknownHostException e) {
@@ -133,12 +118,12 @@ public class ServiceEntry {
         return this;
     }
 
-    public ServiceEntry port(Integer port) {
+    public AbstractServiceEntry port(Integer port) {
         this.port = port;
         return this;
     }
 
-    public ServiceEntry tags(List<String> tags) {
+    public AbstractServiceEntry tags(List<String> tags) {
         this.tags = tags;
         return this;
     }

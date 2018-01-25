@@ -49,6 +49,13 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     V get(CharSequence name);
 
     /**
+     * @return Whether this values is empty
+     */
+    @Override
+    default boolean isEmpty() {
+        return this == ConvertibleMultiValuesMap.EMPTY || getNames().isEmpty();
+    }
+    /**
      * Performs the given action for each header. Note that in the case
      * where multiple values exist for the same header then the consumer will be invoked
      * multiple times for the same key
@@ -163,5 +170,16 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      */
     static <T> ConvertibleMultiValues<T> of( Map<CharSequence, List<T>> values ) {
         return new ConvertibleMultiValuesMap<>(values);
+    }
+
+
+    /**
+     * An empty {@link ConvertibleValues}
+     * @param <V> The generic type
+     * @return The empty {@link ConvertibleValues}
+     */
+    @SuppressWarnings("unchecked")
+    static <V> ConvertibleMultiValues<V> empty() {
+        return ConvertibleMultiValuesMap.EMPTY;
     }
 }

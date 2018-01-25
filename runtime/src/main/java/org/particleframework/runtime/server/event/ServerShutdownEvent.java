@@ -13,36 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.v1;
+package org.particleframework.runtime.server.event;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import org.particleframework.context.event.ApplicationEvent;
+import org.particleframework.runtime.server.EmbeddedServer;
 
 /**
+ * Event fired when the {@link EmbeddedServer} shuts down
+ *
  * @author graemerocher
  * @since 1.0
  */
-@JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class HealthEntry {
-    private NodeEntry node;
-    private ServiceEntry service;
-
+public class ServerShutdownEvent extends ApplicationEvent {
     /**
-     * @return The node for this health entry
+     * Constructs a prototypical Event.
+     *
+     * @param embeddedServer object on which the Event initially occurred.
+     * @throws IllegalArgumentException if source is null.
      */
-    public NodeEntry getNode() {
-        return node;
+    public ServerShutdownEvent(EmbeddedServer embeddedServer) {
+        super(embeddedServer);
     }
 
-    public void setNode(NodeEntry node) {
-        this.node = node;
-    }
-
-    public ServiceEntry getService() {
-        return service;
-    }
-
-    public void setService(ServiceEntry service) {
-        this.service = service;
+    @Override
+    public EmbeddedServer getSource() {
+        return (EmbeddedServer) super.getSource();
     }
 }

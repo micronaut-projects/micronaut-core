@@ -121,7 +121,10 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @param codecRegistry  The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
     @Inject
-    public DefaultHttpClient(@Argument ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public DefaultHttpClient(@Argument ServerSelector serverSelector,
+                             HttpClientConfiguration configuration,
+                             MediaTypeCodecRegistry codecRegistry,
+                             HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
@@ -230,7 +233,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
 
                         if (LOG.isTraceEnabled()) {
-                            traceRequest(nettyRequest);
+                            traceRequest(request, nettyRequest);
                         }
 
                         addFullHttpResponseHandler(channel, completableFuture, bodyType);
@@ -593,7 +596,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         return postRequestEncoder.finalizeRequest();
     }
 
-    private void traceRequest(io.netty.handler.codec.http.HttpRequest nettyRequest) {
+    private void traceRequest(HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         LOG.trace("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
         HttpHeaders headers = nettyRequest.headers();
         for (String name : headers.names()) {
@@ -604,6 +607,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 }
             } else if (!all.isEmpty()) {
                 LOG.trace("{}: {}", name, all.get(0));
+            }
+            if(HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
+                FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+                LOG.trace("Body");
+                LOG.trace("----");
+                LOG.trace(fullHttpRequest.content().toString(defaultCharset));
+                LOG.trace("----");
             }
         }
     }

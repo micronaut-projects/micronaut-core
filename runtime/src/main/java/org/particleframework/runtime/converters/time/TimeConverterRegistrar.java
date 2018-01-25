@@ -48,6 +48,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar{
     private static final Pattern DURATION_MATCHER = Pattern.compile("(\\d+)([s|m|h|d])(s?)");
     @Override
     public void register(ConversionService<?> conversionService) {
+        // CharSequence -> Duration
         conversionService.addConverter(
                 CharSequence.class,
                 Duration.class,

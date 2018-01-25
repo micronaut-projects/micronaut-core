@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.v1;
+package org.particleframework.discovery.client.consul.v1;
 
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
@@ -62,7 +62,7 @@ public interface ConsulClient {
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/agent/service/register")
-    Publisher<HttpStatus> register(@NotNull @Body ServiceEntry entry);
+    Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
 
 
     /**
@@ -77,7 +77,7 @@ public interface ConsulClient {
     /**
      * Gets all of the registered services
      *
-     * @return The {@link ServiceEntry} instances
+     * @return The {@link NewServiceEntry} instances
      */
     @Get("/agent/services")
     Publisher<Map<String,ServiceEntry>> getServices();

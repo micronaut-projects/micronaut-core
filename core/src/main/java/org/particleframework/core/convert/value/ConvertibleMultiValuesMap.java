@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
+    public static final ConvertibleMultiValues EMPTY = new ConvertibleMultiValuesMap<>(Collections.emptyMap());
+
     protected final Map<CharSequence, List<V>> values;
     private final ConversionService<?> conversionService;
 

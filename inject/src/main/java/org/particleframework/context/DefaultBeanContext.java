@@ -18,9 +18,7 @@ package org.particleframework.context;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.Primary;
-import org.particleframework.context.event.ApplicationEventListener;
-import org.particleframework.context.event.BeanCreatedEvent;
-import org.particleframework.context.event.BeanCreatedEventListener;
+import org.particleframework.context.event.*;
 import org.particleframework.context.exceptions.*;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
@@ -140,6 +138,7 @@ public class DefaultBeanContext implements BeanContext {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("BeanContext Started.");
             }
+            publishEvent(new StartupEvent(this));
         }
         return this;
     }
@@ -150,6 +149,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public BeanContext stop() {
         if (running.compareAndSet(true, false)) {
+            publishEvent(new ShutdownEvent(this));
             // need to sort registered singletons so that beans with that require other beans appear first
             ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
             objects.sort((o1, o2) -> {

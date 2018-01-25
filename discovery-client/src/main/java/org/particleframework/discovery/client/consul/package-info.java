@@ -21,6 +21,6 @@
  */
 @Requires(property = "cloud.consul.host")
 @Requires(property = "cloud.consul.port")
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.client.consul;
 
 import org.particleframework.context.annotation.Requires;

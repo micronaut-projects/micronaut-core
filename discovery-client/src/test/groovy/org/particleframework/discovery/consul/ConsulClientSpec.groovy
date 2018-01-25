@@ -17,9 +17,12 @@ package org.particleframework.discovery.consul
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.discovery.consul.v1.CatalogEntry
-import org.particleframework.discovery.consul.v1.ConsulClient
-import org.particleframework.discovery.consul.v1.ServiceEntry
+import org.particleframework.discovery.client.consul.v1.CatalogEntry
+import org.particleframework.discovery.client.consul.v1.ConsulClient
+import org.particleframework.discovery.client.consul.v1.HealthEntry
+import org.particleframework.discovery.client.consul.v1.HttpCheck
+import org.particleframework.discovery.client.consul.v1.NewServiceEntry
+import org.particleframework.discovery.client.consul.v1.ServiceEntry
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
@@ -81,15 +84,18 @@ class ConsulClientSpec extends Specification {
     }
 
     void "test register and deregister service entry"() {
+        setup:
+        Flowable.fromPublisher(client.deregister('xxxxxxxx')).blockingFirst()
+
         when:
-        def entry = new ServiceEntry("test-service")
+        def entry = new NewServiceEntry("test-service")
                             .address(embeddedServer.getHost())
                             .port(embeddedServer.getPort())
         Flowable.fromPublisher(client.register(entry)).blockingFirst()
 
 
 
-        Map<String, ServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
+        Map<String, NewServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
 
         then:
         entries.size() == 1
@@ -104,8 +110,52 @@ class ConsulClientSpec extends Specification {
         !entries.containsKey('test-service')
         entries.size() == 0
     }
-    
-    
+
+    void "test register service with health check"() {
+
+        when:
+        def check = new HttpCheck("test-service-check", new URL(embeddedServer.getURL(), '/consul/test'))
+        check.interval('5s')
+        check.deregisterCriticalServiceAfter('90m')
+        def entry = new NewServiceEntry("test-service")
+                .tags("foo", "bar")
+                .address(embeddedServer.getHost())
+                .port(embeddedServer.getPort())
+                .check(check)
+                .id('xxxxxxxx')
+        Flowable.fromPublisher(client.register(entry)).blockingFirst()
+
+
+
+        then:
+        entry.checks.size() == 1
+        entry.checks.first().interval =='5s'
+        entry.checks.first().deregisterCriticalServiceAfter.get() =='90m'
+
+        when:
+        List<HealthEntry> entries = Flowable.fromPublisher(client.getHealthyServices('test-service')).blockingFirst()
+
+        then:
+        entries.size() == 1
+
+        when:
+        HealthEntry healthEntry = entries[0]
+        ServiceEntry service = healthEntry.service
+
+        then:
+        service.port.getAsInt() == embeddedServer.getPort()
+        service.address.get().hostName == embeddedServer.getHost()
+        service.name == 'test-service'
+        service.tags == ['foo','bar']
+        service.ID.get() == 'xxxxxxxx'
+        when:
+        HttpStatus result = Flowable.fromPublisher(client.deregister('test-service')).blockingFirst()
+
+        then:
+        result == HttpStatus.OK
+
+
+    }
     @Controller('/consul/test')
     static class TestController {
         @Get("/")
