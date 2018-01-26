@@ -17,7 +17,8 @@ package org.particleframework.discovery.consul
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.discovery.DiscoveryClient
+import org.particleframework.discovery.client.CompositeDiscoveryClient
+import org.particleframework.discovery.client.DiscoveryClient
 import org.particleframework.discovery.ServiceInstance
 import org.particleframework.discovery.client.consul.v1.CatalogEntry
 import org.particleframework.discovery.client.consul.v1.ConsulClient
@@ -48,10 +49,14 @@ class ConsulClientSpec extends Specification {
             'consul.port': System.getenv('CONSUL_PORT')]
     )
     @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+    @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
 
     void "test is a discovery client"() {
+
         expect:
+        discoveryClient instanceof CompositeDiscoveryClient
         client instanceof DiscoveryClient
+        Flowable.fromPublisher(discoveryClient.serviceIds).blockingFirst().contains('consul')
         Flowable.fromPublisher(((DiscoveryClient)client).serviceIds).blockingFirst().contains('consul')
     }
 
@@ -158,7 +163,7 @@ class ConsulClientSpec extends Specification {
         service.ID.get() == 'xxxxxxxx'
 
         when:
-        List<ServiceInstance> services = Flowable.fromPublisher(client.getInstances('test-service')).blockingFirst()
+        List<ServiceInstance> services = Flowable.fromPublisher(discoveryClient.getInstances('test-service')).blockingFirst()
 
         then:
         services.size() == 1

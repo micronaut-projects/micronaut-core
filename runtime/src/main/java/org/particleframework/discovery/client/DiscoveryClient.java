@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery;
+package org.particleframework.discovery.client;
 
+import org.particleframework.discovery.ServiceInstance;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
