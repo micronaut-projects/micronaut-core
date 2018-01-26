@@ -39,6 +39,11 @@ public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> impl
     }
 
     @Override
+    public String toString() {
+        return map.toString();
+    }
+
+    @Override
     public MutableConvertibleValues<V> put(CharSequence key, V value) {
         if(value == null) {
             this.map.remove(key);

@@ -18,6 +18,7 @@ package org.particleframework.aop.internal;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
+import org.particleframework.core.util.ArrayUtils;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -82,6 +83,11 @@ public class AopAttributes {
     private static final class Entry {
         MutableConvertibleValues values;
         int nestingCount;
+
+        @Override
+        public String toString() {
+            return values.toString();
+        }
     }
 
     private static final class MethodKey {
@@ -93,6 +99,11 @@ public class AopAttributes {
             this.declaringType = declaringType;
             this.method = method;
             this.argumentTypes = argumentTypes;
+        }
+
+        @Override
+        public String toString() {
+            return declaringType.getName() + "." + method + "("+ ArrayUtils.toString(argumentTypes) + ")";
         }
 
         @Override
