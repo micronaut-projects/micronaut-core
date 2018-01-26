@@ -95,8 +95,11 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
                                                                             new DependencyInjectionException(resolutionContext, argument, "Invalid service reference ["+ArrayUtils.toString((Object[]) value)+"] specified to @Client")
                                                                         );
         //noinspection unchecked
-        return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey ->
-            (HttpClient) ((ParametrizedProvider<T>)provider).get(serverSelector));
+        return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
+            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(serverSelector);
+            httpClient.setClientIdentifiers(value);
+            return httpClient;
+        });
     }
 
     @Override

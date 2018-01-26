@@ -290,6 +290,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 contextPath = clientId[0];
             }
             HttpClient client = beanContext.createBean(HttpClient.class, serverSelector);
+            client.setClientIdentifiers(clientId);
             return new ClientRegistration(client, contextPath);
         });
     }

@@ -43,6 +43,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpMethod;
@@ -108,6 +109,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     private final Charset defaultCharset;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
+    private Set<String> clientIdentifiers = Collections.emptySet();
 
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         this((Object discriminator) -> url, configuration, codecRegistry, filters);
@@ -152,6 +154,29 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     public DefaultHttpClient(@Argument URL url) {
         this((Object discriminator) -> url);
+    }
+
+    /**
+     * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
+     * The client identifiers are equivalents to the value of {@link Client#id()}
+     * @param clientIdentifiers The client identifiers
+     */
+    @Override
+    public void setClientIdentifiers(Set<String> clientIdentifiers) {
+        if(clientIdentifiers != null) {
+            this.clientIdentifiers = clientIdentifiers;
+        }
+    }
+
+    /**
+     * @see #setClientIdentifiers(Set)
+     * @param clientIdentifiers The client identifiers
+     */
+    @Override
+    public void setClientIdentifiers(String... clientIdentifiers) {
+        if(clientIdentifiers != null) {
+            this.clientIdentifiers = new HashSet<>(Arrays.asList(clientIdentifiers));
+        }
     }
 
     @Override
@@ -397,20 +422,35 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     /**
      * Resolve the filters for the request path
      *
-     * @param path The path
+     * @param request The path
      * @return The filters
      */
-    protected List<HttpClientFilter> resolveFilters(String path) {
+    protected List<HttpClientFilter> resolveFilters(HttpRequest<?> request) {
         List<HttpClientFilter> filterList = new ArrayList<>();
+        String requestPath = request.getPath();
+        HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
             Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
             if (filterAnn != null) {
+                String[] clients = filterAnn.clients();
+                if(!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
+                    if( Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id)) ) {
+                        // no matching clients
+                        continue;
+                    }
+                }
+                HttpMethod[] methods = filterAnn.methods();
+                if(ArrayUtils.isNotEmpty(methods)) {
+                    if(!Arrays.asList(methods).contains(method)) {
+                        continue;
+                    }
+                }
                 String[] value = filterAnn.value();
                 if (value.length == 0) {
                     filterList.add(filter);
                 } else {
                     for (String pathPattern : value) {
-                        if (PathMatcher.ANT.matches(pathPattern, path)) {
+                        if (PathMatcher.ANT.matches(pathPattern, requestPath)) {
                             filterList.add(filter);
                         }
                     }
@@ -521,7 +561,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     private <I, O> Publisher<HttpResponse<O>> applyFilterToResponsePublisher(HttpRequest<I> request, Publisher<HttpResponse<O>> responsePublisher) {
         if (filters.length > 0) {
-            List<HttpClientFilter> httpClientFilters = resolveFilters(request.getPath());
+            List<HttpClientFilter> httpClientFilters = resolveFilters(request);
             OrderUtil.reverseSort(httpClientFilters);
             httpClientFilters.add((req, chain) -> responsePublisher);
 
