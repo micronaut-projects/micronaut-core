@@ -54,7 +54,6 @@ abstract class AbstractBean {
 
         when:
         def context = new DefaultBeanContext()
-        context.registerSingleton(new StubIntroducer())
         context.start()
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
@@ -94,7 +93,6 @@ abstract class AbstractBean implements Foo {
 
         when:
         def context = new DefaultBeanContext()
-        context.registerSingleton(new StubIntroducer())
         context.start()
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
