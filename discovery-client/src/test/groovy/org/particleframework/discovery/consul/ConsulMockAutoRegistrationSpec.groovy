@@ -22,17 +22,18 @@ import org.particleframework.discovery.DiscoveryClient
 import org.particleframework.discovery.ServiceInstance
 import org.particleframework.discovery.consul.client.v1.ConsulClient
 import org.particleframework.discovery.consul.client.v1.NewServiceEntry
-import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Stepwise
 class ConsulMockAutoRegistrationSpec extends Specification {
     @Shared int serverPort = SocketUtils.findAvailableTcpPort()
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -69,4 +70,33 @@ class ConsulMockAutoRegistrationSpec extends Specification {
         }
     }
 
+    void 'test that the service is automatically de-registered with Consul'() {
+
+        when:"creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
+                                                                               'consul.host'              : 'localhost',
+                                                                               'consul.port'              : serverPort])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceName)).blockingFirst()
+            instances.size() == 1
+            instances[0].id.contains(serviceName)
+            instances[0].port == anotherServer.getPort()
+            instances[0].host == anotherServer.getHost()
+        }
+
+        when:"stopping the server"
+        anotherServer.stop()
+
+        then:
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceName)).blockingFirst()
+            instances.size() == 0
+            !instances.find { it.id == serviceName }
+        }
+    }
 }
