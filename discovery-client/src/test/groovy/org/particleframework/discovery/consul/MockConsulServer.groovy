@@ -76,13 +76,15 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
-        return Publishers.just(services.values().collect {
-
+        ServiceEntry serviceEntry = services.get(service)
+        List<HealthEntry> healthEntries = []
+        if(serviceEntry != null) {
             def entry = new HealthEntry()
             entry.setNode(nodeEntry)
-            entry.setService(it)
-            return entry
-        } as List<HealthEntry>)
+            entry.setService(serviceEntry)
+            healthEntries.add(entry)
+        }
+        return Publishers.just(healthEntries)
     }
 
     @Override
