@@ -13,23 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import java.util.function.Consumer;
+
 /**
  * @author graemerocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class ServiceEntry extends AbstractServiceEntry{
+public class ServiceEntry extends AbstractServiceEntry {
     @JsonCreator
     public ServiceEntry(@JsonProperty("Service") String name, @JsonProperty("ID") String id) {
         super(name);
         setID(id);
+    }
+
+    /**
+     * Creates a copy from another entry
+     * @param entry The entry
+     */
+    public ServiceEntry(AbstractServiceEntry entry) {
+        super(entry.getName());
+        entry.getID().ifPresent(this::id);
+        entry.getAddress().ifPresent(this::address);
+        entry.getPort().ifPresent(this::port);
+        tags(entry.getTags());
     }
 
     /**

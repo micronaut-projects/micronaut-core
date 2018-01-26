@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
 import org.particleframework.core.async.publisher.Publishers;
-import org.particleframework.discovery.client.DiscoveryClient;
+import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;

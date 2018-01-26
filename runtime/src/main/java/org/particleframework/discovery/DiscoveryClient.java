@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client;
+package org.particleframework.discovery;
 
 import org.particleframework.discovery.ServiceInstance;
 import org.reactivestreams.Publisher;

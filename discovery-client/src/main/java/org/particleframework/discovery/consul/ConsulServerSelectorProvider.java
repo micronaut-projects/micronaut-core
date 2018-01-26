@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul;
+package org.particleframework.discovery.consul;
 
-import org.particleframework.discovery.client.consul.v1.ConsulClient;
 import org.particleframework.http.client.ServerSelector;
 import org.particleframework.http.client.ServerSelectorProvider;
 import org.particleframework.http.client.exceptions.HttpClientException;
-
+import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;

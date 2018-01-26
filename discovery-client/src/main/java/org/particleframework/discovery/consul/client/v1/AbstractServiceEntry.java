@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
@@ -97,6 +97,15 @@ public abstract class AbstractServiceEntry {
 
     public void setID(String id) {
         this.ID = id;
+    }
+
+    /**
+     * See https://www.consul.io/api/agent/service.html#name
+     *
+     * @return The name of the service
+     */
+    public String getName() {
+        return name;
     }
 
     public AbstractServiceEntry id(String id) {

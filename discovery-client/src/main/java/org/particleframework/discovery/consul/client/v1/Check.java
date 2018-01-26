@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.http.HttpStatus;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -84,7 +83,26 @@ public abstract class Check {
         return status.toString().toLowerCase();
     }
 
+    /**
+     * @return The status an an enum
+     */
+    public HealthStatus status() {
+        return status;
+    }
 
+    /**
+     * @return The interval as a {@link Duration}
+     */
+    public Duration interval() {
+        return this.interval;
+    }
+
+    /**
+     * @return The deregisterCriticalServiceAfter as a {@link Duration}
+     */
+    public Duration deregisterCriticalServiceAfter() {
+        return this.deregisterCriticalServiceAfter;
+    }
 
     public Optional<String> getDeregisterCriticalServiceAfter() {
         if(deregisterCriticalServiceAfter == null) {

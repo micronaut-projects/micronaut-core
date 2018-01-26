@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,6 +68,7 @@ public class DefaultBeanContext implements BeanContext {
 
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
+    private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
 
     private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder()
             .maximumSize(30)
@@ -356,7 +358,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> boolean containsBean(Class<T> beanType, Qualifier<T> qualifier) {
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-        return singletonObjects.containsKey(beanKey) || findConcreteCandidate(beanType, qualifier, false, false).isPresent();
+        return this.containsBeanCache.computeIfAbsent(beanKey, beanKey1 -> singletonObjects.containsKey(beanKey1) || findConcreteCandidateNoCache(beanType, qualifier, false, false, false).isPresent());
     }
 
     @Override
@@ -738,7 +740,8 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>      The bean generic type
      * @return The candidates
      */
-    protected <T> Collection<BeanDefinition> findBeanCandidates(Class<T> beanType) {
+    @SuppressWarnings("unchecked")
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for type: {}", beanType);
         }
@@ -747,14 +750,14 @@ public class DefaultBeanContext implements BeanContext {
         Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
         if (!beanDefinitionsClasses.isEmpty()) {
 
-            List<BeanDefinition> candidates = beanDefinitionsClasses
+            List<BeanDefinition<T>> candidates = beanDefinitionsClasses
                     .parallelStream()
                     .filter(reference -> {
                         Class<?> candidateType = reference.getBeanType();
 
                         return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
-                    .map(BeanDefinitionReference::load)
+                    .map(ref -> (BeanDefinition<T>)ref.load())
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
 
@@ -1129,7 +1132,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, boolean includeProvided, boolean filterProxied) {
-        Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidatesInternal(beanType));
+        Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidates(beanType));
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
@@ -1391,7 +1394,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
-        return (Collection) beanCandidateCache.get(beanType, aClass -> findBeanCandidates(beanType));
+        return (Collection) beanCandidateCache.get(beanType, aClass -> (Collection)findBeanCandidates(beanType));
     }
 
     private <T> Collection<T> getBeansOfTypeInternal(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {

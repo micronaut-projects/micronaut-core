@@ -13,25 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.health;
+package org.particleframework.runtime.server.event;
 
+import org.particleframework.context.event.ApplicationEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
-import org.particleframework.runtime.server.event.AbstractServerApplicationEvent;
 
 /**
- * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration} that
- *
+ * An abstract event for events specific to server applications
  * @author Graeme Rocher
  * @since 1.0
  */
-public class HeartbeatEvent extends AbstractServerApplicationEvent {
+public abstract class AbstractServerApplicationEvent extends ApplicationEvent {
+
+
     /**
      * Constructs a prototypical Event.
      *
      * @param embeddedServer The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
-    public HeartbeatEvent(EmbeddedServer embeddedServer) {
+    public AbstractServerApplicationEvent(EmbeddedServer embeddedServer) {
         super(embeddedServer);
+    }
+
+    @Override
+    public EmbeddedServer getSource() {
+        return (EmbeddedServer) super.getSource();
     }
 }

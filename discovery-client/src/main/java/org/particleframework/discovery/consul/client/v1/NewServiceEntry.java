@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -39,15 +39,6 @@ public class NewServiceEntry extends AbstractServiceEntry {
     }
 
     private List<Check> checks = new ArrayList<>(1);
-
-    /**
-     * See https://www.consul.io/api/agent/service.html#name
-     *
-     * @return The name of the service
-     */
-    public String getName() {
-        return name;
-    }
 
     /**
      * See https://www.consul.io/api/agent/service.html#checks

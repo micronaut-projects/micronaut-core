@@ -20,20 +20,26 @@ import org.particleframework.context.annotation.Primary;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * The default charset
+ * Common application configuration
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle")
+@ConfigurationProperties("particle.application")
 @Primary
 public class ApplicationConfiguration {
 
     public static final String DEFAULT_CHARSET = "particle.defaultCharset";
 
-    protected Charset defaultCharset = StandardCharsets.UTF_8;
+    private Charset defaultCharset = StandardCharsets.UTF_8;
+    private String name;
+    @SuppressWarnings("unchecked")
+    private Map<String, String> info = Collections.EMPTY_MAP;
 
     /**
      * @return The default charset to use
@@ -44,5 +50,31 @@ public class ApplicationConfiguration {
 
     public void setDefaultCharset(Charset defaultCharset) {
         this.defaultCharset = defaultCharset;
+    }
+
+    /**
+     * The application name. Used to identify the application for purposes of reporting, tracing, service discovery etc.
+     * Should be unique.
+     *
+     * @return The application name
+     */
+    public Optional<String> getName() {
+        return Optional.ofNullable(name);
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * Arbitrary application information
+     * @return The application information
+     */
+    public Map<String, String> getInfo() {
+        return info;
+    }
+
+    public void setInfo(Map<String, String> info) {
+        this.info = info;
     }
 }

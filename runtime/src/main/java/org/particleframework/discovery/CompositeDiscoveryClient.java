@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client;
+package org.particleframework.discovery;
 
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.util.ArrayUtils;
-import org.particleframework.discovery.ServiceInstance;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;

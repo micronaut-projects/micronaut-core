@@ -220,7 +220,7 @@ public class NameUtils {
     public static boolean isSetterName(String methodName) {
         int len = methodName.length();
         if (len > 3 && methodName.startsWith("set")) {
-            if (Character.isUpperCase(methodName.charAt(3))) return true;
+            return Character.isUpperCase(methodName.charAt(3));
         }
         return false;
     }

@@ -13,11 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul;
+package org.particleframework.discovery.consul;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.core.util.Toggleable;
+import org.particleframework.discovery.registration.RegistrationConfiguration;
 
 //import javax.validation.constraints.NotNull;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -34,6 +38,8 @@ public class ConsulConfiguration {
     private int port = 8500;
 
     private String aslToken;
+
+    private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
 
     /**
      * @return The token to include in all requests as the {@code X-Consul-Token} header
@@ -66,5 +72,32 @@ public class ConsulConfiguration {
 
     public void setPort(int port) {
         this.port = port;
+    }
+
+    /**
+     * @return The registration configuration
+     */
+    public ConsulRegistrationConfiguration getRegistration() {
+        return registration;
+    }
+
+    public void setRegistration(ConsulRegistrationConfiguration registration) {
+        this.registration = registration;
+    }
+
+    @ConfigurationProperties("registration")
+    public static class ConsulRegistrationConfiguration extends RegistrationConfiguration{
+        private List<String> tags = Collections.emptyList();
+
+        /**
+         * @return That tags to use for registering the service
+         */
+        public List<String> getTags() {
+            return tags;
+        }
+
+        public void setTags(List<String> tags) {
+            this.tags = tags;
+        }
     }
 }

@@ -13,24 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.runtime.server.event;
+package org.particleframework.discovery.registration;
 
-import org.particleframework.runtime.server.EmbeddedServer;
+import org.particleframework.discovery.exceptions.DiscoveryException;
 
 /**
- * Event fired when the {@link EmbeddedServer} shuts down
+ * Exception thrown during {@link org.particleframework.discovery.ServiceInstance} registration
  *
  * @author graemerocher
  * @since 1.0
  */
-public class ServerShutdownEvent extends AbstractServerApplicationEvent {
-    /**
-     * Constructs a prototypical Event.
-     *
-     * @param embeddedServer object on which the Event initially occurred.
-     * @throws IllegalArgumentException if source is null.
-     */
-    public ServerShutdownEvent(EmbeddedServer embeddedServer) {
-        super(embeddedServer);
+public class RegistrationException extends DiscoveryException {
+    public RegistrationException(String message) {
+        super(message);
+    }
+
+    public RegistrationException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

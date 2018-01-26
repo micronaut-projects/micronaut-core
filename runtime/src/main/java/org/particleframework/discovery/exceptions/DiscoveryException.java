@@ -13,14 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.exceptions;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * Base exception for exceptions thrown by the discovery system
  *
  * @author graemerocher
  * @since 1.0
  */
-@Requires(property = "cloud.consul.host")
-@Requires(property = "cloud.consul.port")
-package org.particleframework.discovery.client.consul;
+public class DiscoveryException extends RuntimeException {
 
-import org.particleframework.context.annotation.Requires;
+    public DiscoveryException(String message) {
+        super(message);
+    }
+
+    public DiscoveryException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}

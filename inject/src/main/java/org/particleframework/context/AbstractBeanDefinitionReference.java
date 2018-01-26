@@ -2,13 +2,7 @@ package org.particleframework.context;
 
 import org.particleframework.context.annotation.Context;
 import org.particleframework.context.annotation.Primary;
-import org.particleframework.context.annotation.Requirements;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.context.condition.Condition;
-import org.particleframework.context.condition.RequiresCondition;
-import org.particleframework.context.exceptions.BeanContextException;
 import org.particleframework.context.exceptions.BeanInstantiationException;
-import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.inject.BeanDefinition;
@@ -17,7 +11,6 @@ import org.particleframework.inject.BeanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

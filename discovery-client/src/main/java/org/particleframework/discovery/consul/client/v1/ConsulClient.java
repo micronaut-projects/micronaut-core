@@ -13,25 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.health;
+package org.particleframework.discovery.consul.client.v1;
 
-import org.particleframework.runtime.server.EmbeddedServer;
-import org.particleframework.runtime.server.event.AbstractServerApplicationEvent;
+import org.particleframework.discovery.DiscoveryClient;
+import org.particleframework.http.HttpStatus;
+import org.particleframework.http.annotation.Body;
+import org.particleframework.http.annotation.Get;
+import org.particleframework.http.annotation.Put;
+import org.reactivestreams.Publisher;
+
+import javax.validation.constraints.NotNull;
+import java.util.List;
+import java.util.Map;
 
 /**
- * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration} that
+ * A non-blocking HTTP client for consul
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class HeartbeatEvent extends AbstractServerApplicationEvent {
+public interface ConsulClient extends ConsulOperations, DiscoveryClient {
     /**
-     * Constructs a prototypical Event.
-     *
-     * @param embeddedServer The object on which the Event initially occurred.
-     * @throws IllegalArgumentException if source is null.
+     * The default ID of the consul service
      */
-    public HeartbeatEvent(EmbeddedServer embeddedServer) {
-        super(embeddedServer);
-    }
+    String SERVICE_ID = "consul";
 }
