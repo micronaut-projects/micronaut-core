@@ -31,8 +31,12 @@ subprojects { subproject ->
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
-        isConfiguration = subproject.name.startsWith('configurations')
+        isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
+    }
+
+    if (subproject.name == "configurations") {
+        return
     }
 
     if(isConfiguration) {
@@ -48,7 +52,7 @@ subprojects { subproject ->
         maven { url "https://repo.grails.org/grails/core" }
     }
     
-    if(subproject.name.startsWith("examples")) {
+    if (subproject.name.startsWith("examples")) {
         // apply plugin:"org.grails.grails-web"
     }
     else {
