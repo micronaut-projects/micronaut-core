@@ -86,4 +86,14 @@ class ClientFilterSpec extends Specification{
             return chain.proceed(request)
         }
     }
+
+    @Filter(patterns = '/filters/**', clients = 'otherClient')
+    static class AnotherFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            request.header("X-Auth-Lastname", "Flintstone")
+            return chain.proceed(request)
+        }
+    }
 }

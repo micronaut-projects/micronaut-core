@@ -58,4 +58,12 @@ public @interface Filter {
      * @return The methods to match. Defaults to all
      */
     HttpMethod[] methods() default {};
+
+    /**
+     * The clients identifiers this filter applies to. Applies only to {@link org.particleframework.http.filter.HttpClientFilter} instances.
+     * Equivalent to the {@code id()} of {@code org.particleframework.http.client.Client}.
+     *
+     * @return The client identifiers
+     */
+    String[] clients() default {};
 }
