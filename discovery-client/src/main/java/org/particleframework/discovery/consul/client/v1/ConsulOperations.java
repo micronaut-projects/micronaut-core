@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.client.consul.v1;
+package org.particleframework.discovery.consul.client.v1;
 
-import org.particleframework.discovery.client.DiscoveryClient;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
@@ -27,16 +26,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A non-blocking HTTP client for consul
- *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface ConsulClient extends DiscoveryClient {
-    /**
-     * The default ID of the consul service
-     */
-    String SERVICE_ID = "consul";
+public interface ConsulOperations {
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
      * @param entry The entry to register
@@ -54,6 +47,7 @@ public interface ConsulClient extends DiscoveryClient {
      */
     @Put("/catalog/deregister")
     Publisher<Boolean> deregister(@NotNull @Body CatalogEntry entry);
+
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
      * @param entry The entry to register
@@ -62,7 +56,6 @@ public interface ConsulClient extends DiscoveryClient {
      */
     @Put("/agent/service/register")
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
-
 
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
@@ -88,7 +81,6 @@ public interface ConsulClient extends DiscoveryClient {
      */
     @Get("/health/service/{service}")
     Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service);
-
 
     /**
      * Gets all of the registered nodes

@@ -4,4 +4,5 @@ dependencies {
     compile project(":http-client")
 
     testCompile project(":http-server-netty")
+    testCompile project(":inject-groovy")
 }

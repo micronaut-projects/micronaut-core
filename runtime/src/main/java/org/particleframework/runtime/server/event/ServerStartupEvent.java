@@ -15,7 +15,6 @@
  */
 package org.particleframework.runtime.server.event;
 
-import org.particleframework.context.event.ApplicationEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
 
 /**
@@ -24,7 +23,7 @@ import org.particleframework.runtime.server.EmbeddedServer;
  * @author graemerocher
  * @since 1.0
  */
-public class ServerStartupEvent extends ApplicationEvent {
+public class ServerStartupEvent extends AbstractServerApplicationEvent {
     /**
      * Constructs a prototypical Event.
      *
@@ -33,10 +32,5 @@ public class ServerStartupEvent extends ApplicationEvent {
      */
     public ServerStartupEvent(EmbeddedServer embeddedServer) {
         super(embeddedServer);
-    }
-
-    @Override
-    public EmbeddedServer getSource() {
-        return (EmbeddedServer) super.getSource();
     }
 }

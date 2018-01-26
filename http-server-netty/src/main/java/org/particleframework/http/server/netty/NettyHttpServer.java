@@ -188,11 +188,10 @@ public class NettyHttpServer implements EmbeddedServer {
                         LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
                     }
                 }
-                else {
-                    applicationContext.publishEvent(new ServerStartupEvent(this));
-                }
             });
+            applicationContext.publishEvent(new ServerStartupEvent(this));
         }
+
         return this;
     }
 

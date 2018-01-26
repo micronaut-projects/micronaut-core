@@ -2,8 +2,6 @@ package org.particleframework.context;
 
 import org.particleframework.context.annotation.*;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.context.condition.Condition;
-import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.naming.NameUtils;

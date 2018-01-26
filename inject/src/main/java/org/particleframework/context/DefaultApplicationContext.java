@@ -270,11 +270,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition> findBeanCandidates(Class<T> beanType) {
-        Collection<BeanDefinition> candidates = super.findBeanCandidates(beanType);
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType);
         if (!candidates.isEmpty()) {
 
-            List<BeanDefinition> transformedCandidates = new ArrayList<>();
+            List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
 
@@ -298,7 +298,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                     }
                 } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                    Class<?> dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
+                    Class dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
                     Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
@@ -330,7 +330,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                         if (qualifier instanceof Named) {
                                             delegate.put(Named.class.getName(), ((Named) qualifier).getName());
                                         }
-                                        transformedCandidates.add(delegate);
+                                        transformedCandidates.add((BeanDefinition<T>) delegate);
                                     }
                             );
                         }

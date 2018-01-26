@@ -17,16 +17,11 @@ package org.particleframework.discovery.consul
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.discovery.client.CompositeDiscoveryClient
-import org.particleframework.discovery.client.DiscoveryClient
+import org.particleframework.discovery.CompositeDiscoveryClient
+import org.particleframework.discovery.DiscoveryClient
 import org.particleframework.discovery.ServiceInstance
-import org.particleframework.discovery.client.consul.v1.CatalogEntry
-import org.particleframework.discovery.client.consul.v1.ConsulClient
-import org.particleframework.discovery.client.consul.v1.HealthEntry
-import org.particleframework.discovery.client.consul.v1.HttpCheck
-import org.particleframework.discovery.client.consul.v1.NewServiceEntry
-import org.particleframework.discovery.client.consul.v1.ServiceEntry
 import org.particleframework.http.HttpStatus
+import org.particleframework.discovery.consul.client.v1.*;
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.runtime.server.EmbeddedServer
@@ -178,6 +173,12 @@ class ConsulClientSpec extends Specification {
         then:
         result == HttpStatus.OK
 
+
+        when:
+        result = Flowable.fromPublisher(client.deregister('xxxxxxxx')).blockingFirst()
+
+        then:
+        result == HttpStatus.OK
 
     }
     @Controller('/consul/test')

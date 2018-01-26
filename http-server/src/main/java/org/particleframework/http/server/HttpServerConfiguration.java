@@ -21,7 +21,9 @@ import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.server.cors.CorsOriginConfiguration;
 import org.particleframework.runtime.ApplicationConfiguration;
 
+import javax.inject.Inject;
 import java.io.File;
+import java.nio.charset.Charset;
 import java.util.*;
 
 /**
@@ -30,9 +32,10 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties(value = "server", cliPrefix = "")
-public class HttpServerConfiguration extends ApplicationConfiguration {
+@ConfigurationProperties(value = "particle.server", cliPrefix = "")
+public class HttpServerConfiguration  {
 
+    private Charset defaultCharset;
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
     protected Optional<Integer> readTimeout;
@@ -41,6 +44,26 @@ public class HttpServerConfiguration extends ApplicationConfiguration {
     protected SslConfiguration ssl;
     protected MultipartConfiguration multipart =  new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
+    public HttpServerConfiguration() {
+    }
+
+    @Inject
+    public HttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+        if(applicationConfiguration != null)
+            this.defaultCharset = applicationConfiguration.getDefaultCharset();
+    }
+
+    /**
+     * @return The default charset to use
+     */
+    public Charset getDefaultCharset() {
+        return defaultCharset;
+    }
+
+    public void setDefaultCharset(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset;
+    }
+
     /**
      * The default server port
      */
