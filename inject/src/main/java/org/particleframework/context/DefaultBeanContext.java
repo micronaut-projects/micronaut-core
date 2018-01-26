@@ -49,6 +49,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -1404,11 +1406,11 @@ public class DefaultBeanContext implements BeanContext {
         BeanKey<T> key = new BeanKey<>(beanType, qualifier);
         @SuppressWarnings("unchecked") Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(key);
         if (existing != null) {
-            if (LOG.isDebugEnabled()) {
+            if (LOG.isTraceEnabled()) {
                 if (hasQualifier) {
-                    LOG.debug("Found {} existing beans for type [{} {}]: {} ", existing.size(), qualifier, beanType.getName(), existing);
+                    LOG.trace("Found {} existing beans for type [{} {}]: {} ", existing.size(), qualifier, beanType.getName(), existing);
                 } else {
-                    LOG.debug("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
+                    LOG.trace("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
                 }
             }
             return Collections.unmodifiableCollection(existing);
@@ -1474,7 +1476,9 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
-                candidateStream = candidateStream.filter(c -> !c.isAbstract());
+                candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream);
+
+
                 List<BeanDefinition<T>> reduced = qualifier.reduce(beanType, candidateStream)
                         .collect(Collectors.toList());
                 if (!reduced.isEmpty()) {
@@ -1495,9 +1499,11 @@ public class DefaultBeanContext implements BeanContext {
             } else if (!candidates.isEmpty()) {
                 boolean hasNonSingletonCandidate = false;
                 int candidateCount = candidates.size();
-                for (BeanDefinition<T> candidate : candidates) {
-                    if(candidate.isAbstract()) continue;
-                    if (processedDefinitions.contains(candidate)) continue;
+                Stream<BeanDefinition<T>> candidateStream = candidates.stream();
+                candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream)
+                                      .filter(c -> !processedDefinitions.contains(c));
+
+                for (BeanDefinition<T> candidate : candidateStream.collect(Collectors.toList())) {
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
                     }
@@ -1524,6 +1530,19 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         return beans;
+    }
+
+    private <T> Stream<BeanDefinition<T>> applyBeanResolutionFilters(BeanResolutionContext resolutionContext, Stream<BeanDefinition<T>> candidateStream) {
+        candidateStream = candidateStream.filter(c -> !c.isAbstract());
+
+        BeanResolutionContext.Segment segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
+        if(segment instanceof DefaultBeanResolutionContext.ConstructorSegment) {
+            BeanDefinition declaringBean = segment.getDeclaringType();
+            // if the currently injected segment is a constructor argument and the type to be constructed is the
+            // same as the candidate, then filter out the candidate to avoid a circular injection problem
+            candidateStream = candidateStream.filter(c -> !c.equals(declaringBean));
+        }
+        return candidateStream;
     }
 
     private <T> void addCandidateToList(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<T> candidate, Collection<T> beansOfTypeList, Qualifier<T> qualifier, boolean singleCandidate) {

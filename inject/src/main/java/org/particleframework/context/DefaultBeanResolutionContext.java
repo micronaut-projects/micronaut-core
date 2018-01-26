@@ -164,7 +164,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     /**
      * A segment that represents a constructor
      */
-    class ConstructorSegment extends AbstractSegment {
+    static class ConstructorSegment extends AbstractSegment {
         ConstructorSegment(BeanDefinition declaringClass, Argument argument) {
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
         }
@@ -182,7 +182,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     /**
      * A segment that represents a method
      */
-    class MethodSegment extends AbstractSegment {
+    static class MethodSegment extends AbstractSegment {
 
         private final MethodInjectionPoint methodInjectionPoint;
 
@@ -202,7 +202,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     /**
      * A segment that represents a field
      */
-    class FieldSegment extends AbstractSegment {
+    static class FieldSegment extends AbstractSegment {
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                     fieldInjectionPoint.getName(),
@@ -214,7 +214,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         }
     }
 
-    abstract class AbstractSegment implements Segment {
+    static abstract class AbstractSegment implements Segment {
         private final BeanDefinition declaringComponent;
         private final String name;
         private final Argument argument;

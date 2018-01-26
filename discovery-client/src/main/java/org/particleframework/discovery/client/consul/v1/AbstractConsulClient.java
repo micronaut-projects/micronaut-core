@@ -16,17 +16,15 @@
 package org.particleframework.discovery.client.consul.v1;
 
 import org.particleframework.core.async.publisher.Publishers;
-import org.particleframework.discovery.DiscoveryClient;
+import org.particleframework.discovery.client.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;
 
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}

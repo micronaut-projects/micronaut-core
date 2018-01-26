@@ -15,12 +15,11 @@
  */
 package org.particleframework.discovery.client.consul.v1;
 
-import org.particleframework.discovery.DiscoveryClient;
+import org.particleframework.discovery.client.DiscoveryClient;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.annotation.Put;
-import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;
 
 import javax.validation.constraints.NotNull;
