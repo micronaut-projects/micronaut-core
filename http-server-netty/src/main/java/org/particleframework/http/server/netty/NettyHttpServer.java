@@ -27,11 +27,15 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.event.ServiceDegistrationEvent;
+import org.particleframework.discovery.event.ServiceRegistrationEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -91,6 +95,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ApplicationContext applicationContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
+    private ServiceInstance serviceInstance;
 
     @Inject
     public NettyHttpServer(
@@ -190,6 +195,30 @@ public class NettyHttpServer implements EmbeddedServer {
                 }
             });
             applicationContext.publishEvent(new ServerStartupEvent(this));
+            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+            applicationName.ifPresent(id -> {
+                this.serviceInstance = new ServiceInstance() {
+                    @Override
+                    public String getId() {
+                        return id;
+                    }
+
+                    @Override
+                    public URI getURI() {
+                        return NettyHttpServer.this.getURI();
+                    }
+
+                    @Override
+                    public ConvertibleValues<String> getMetadata() {
+                        Map<CharSequence, String> metadata = serverConfiguration
+                                .getApplicationConfiguration()
+                                .getInstance()
+                                .getMetadata();
+                        return ConvertibleValues.of(metadata);
+                    }
+                };
+                applicationContext.publishEvent(new ServiceRegistrationEvent(serviceInstance));
+            });
         }
 
         return this;
@@ -204,6 +233,9 @@ public class NettyHttpServer implements EmbeddedServer {
                 parentGroup.shutdownGracefully()
                            .addListener(this::logShutdownErrorIfNecessary);
                 applicationContext.publishEvent(new ServerShutdownEvent(this));
+                if(serviceInstance != null) {
+                    applicationContext.publishEvent(new ServiceDegistrationEvent(serviceInstance));
+                }
                 if(applicationContext.isRunning()) {
                     applicationContext.stop();
                 }

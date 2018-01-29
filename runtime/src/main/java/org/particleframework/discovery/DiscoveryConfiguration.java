@@ -15,28 +15,9 @@
  */
 package org.particleframework.discovery;
 
-import org.reactivestreams.Publisher;
-
-import java.io.Closeable;
-import java.util.List;
-
 /**
- * Main abstraction used for service discovery
- *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface DiscoveryClient extends Closeable, AutoCloseable{
-
-    /**
-     * Obtain a list of {@link ServiceInstance} for the given service id
-     * @param serviceId The service id
-     * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
-     */
-    Publisher<List<ServiceInstance>> getInstances(String serviceId);
-
-    /**
-     * @return The known service IDs
-     */
-    Publisher<List<String>> getServiceIds();
+public class DiscoveryConfiguration {
 }

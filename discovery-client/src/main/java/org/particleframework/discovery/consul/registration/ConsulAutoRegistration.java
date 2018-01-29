@@ -20,6 +20,8 @@ import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.core.util.StringUtils;
+import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.consul.client.v1.NewServiceEntry;
@@ -28,7 +30,6 @@ import org.particleframework.discovery.registration.RegistrationException;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.runtime.ApplicationConfiguration;
-import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.inject.Singleton;
 import java.time.Duration;
@@ -47,49 +48,45 @@ import java.util.concurrent.TimeUnit;
 public class ConsulAutoRegistration extends AutoRegistration {
     private final ConsulClient consulClient;
     private final HeartbeatConfiguration heartbeatConfiguration;
-    private final ApplicationConfiguration applicationConfiguration;
     private final ConsulConfiguration consulConfiguration;
 
     protected ConsulAutoRegistration(
             ConsulClient consulClient,
             HeartbeatConfiguration heartbeatConfiguration,
-            ApplicationConfiguration applicationConfiguration,
             ConsulConfiguration consulConfiguration) {
         this.consulClient = consulClient;
         this.heartbeatConfiguration = heartbeatConfiguration;
-        this.applicationConfiguration = applicationConfiguration;
         this.consulConfiguration = consulConfiguration;
     }
 
     @Override
-    protected void deregister(EmbeddedServer server) {
-        Optional<String> applicationName = applicationConfiguration.getName();
-        if(applicationName.isPresent()) {
-
-            ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-            if(registration.isEnabled() && registration.isDeregister()) {
-                try {
-                    Flowable.fromPublisher(consulClient.deregister(applicationName.get())).blockingFirst();
-                    if(LOG.isInfoEnabled()) {
-                        LOG.info("De-registered service [{}] with Consul", applicationName.get());
-                    }
-                } catch (Throwable t) {
-                    if(LOG.isErrorEnabled()) {
-                        LOG.error("Error occurred de-registering service ["+applicationName.get()+"] with Consul: " + t.getMessage(), t);
-                    }
+    protected void deregister(ServiceInstance instance) {
+        String applicationName = instance.getId();
+        ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
+        if(registration.isEnabled() && registration.isDeregister()) {
+            try {
+                Flowable.fromPublisher(consulClient.deregister(applicationName)).blockingFirst();
+                if(LOG.isInfoEnabled()) {
+                    LOG.info("De-registered service [{}] with Consul", applicationName);
+                }
+            } catch (Throwable t) {
+                if(LOG.isErrorEnabled()) {
+                    LOG.error("Error occurred de-registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
                 }
             }
         }
     }
 
     @Override
-    protected void register(EmbeddedServer server) {
+    protected void register(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        Optional<String> applicationName = applicationConfiguration.getName();
-        if(registration.isEnabled() && applicationName.isPresent()) {
-            NewServiceEntry serviceEntry = new NewServiceEntry(applicationName.get());
-            serviceEntry.address(server.getHost())
-                        .port(server.getPort());
+        String applicationName = instance.getId();
+        if(registration.isEnabled() && StringUtils.isNotEmpty(applicationName)) {
+            NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
+            serviceEntry.address(instance.getHost())
+                        .port(instance.getPort())
+                        .tags(registration.getTags());
+
 
             io.reactivex.Observable<HttpStatus> registrationObservable = Flowable
                                                                             .fromPublisher(consulClient.register(serviceEntry))
@@ -113,7 +110,7 @@ public class ConsulAutoRegistration extends AutoRegistration {
                 try {
                     registrationObservable.blockingSingle();
                     if(LOG.isInfoEnabled()) {
-                        LOG.debug("Registered service [{}] with Consul", applicationName.get());
+                        LOG.debug("Registered service [{}] with Consul", applicationName);
                     }
                 }
                 catch (NoSuchElementException e) {
@@ -138,14 +135,14 @@ public class ConsulAutoRegistration extends AutoRegistration {
                     @Override
                     public void onNext(HttpStatus httpStatus) {
                         if(LOG.isInfoEnabled()) {
-                            LOG.info("Registered service [{}] with Consul", applicationName.get());
+                            LOG.info("Registered service [{}] with Consul", applicationName);
                         }
                     }
 
                     @Override
                     public void onError(Throwable t) {
                         if(LOG.isErrorEnabled()) {
-                            LOG.error("Error occurred registering service ["+applicationName.get()+"] with Consul: " + t.getMessage(), t);
+                            LOG.error("Error occurred registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
                         }
                     }
 

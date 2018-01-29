@@ -1,5 +1,6 @@
 package org.particleframework.management.endpoint.health
 
+import org.particleframework.health.HealthStatus
 import spock.lang.Specification
 
 class HealthStatusSpec extends Specification {

@@ -13,30 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery;
+package org.particleframework.discovery.event;
 
-import org.reactivestreams.Publisher;
-
-import java.io.Closeable;
-import java.util.List;
+import org.particleframework.discovery.ServiceInstance;
 
 /**
- * Main abstraction used for service discovery
+ * An event fired when registering a service
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface DiscoveryClient extends Closeable, AutoCloseable{
-
+public class ServiceRegistrationEvent extends AbstractServiceInstanceEvent {
     /**
-     * Obtain a list of {@link ServiceInstance} for the given service id
-     * @param serviceId The service id
-     * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
+     * Constructs a prototypical Event.
+     *
+     * @param source The object on which the Event initially occurred.
+     * @throws IllegalArgumentException if source is null.
      */
-    Publisher<List<ServiceInstance>> getInstances(String serviceId);
-
-    /**
-     * @return The known service IDs
-     */
-    Publisher<List<String>> getServiceIds();
+    public ServiceRegistrationEvent(ServiceInstance source) {
+        super(source);
+    }
 }

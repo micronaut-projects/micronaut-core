@@ -35,6 +35,7 @@ import java.util.*;
 @ConfigurationProperties(value = "particle.server", cliPrefix = "")
 public class HttpServerConfiguration  {
 
+    private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
@@ -44,13 +45,24 @@ public class HttpServerConfiguration  {
     protected SslConfiguration ssl;
     protected MultipartConfiguration multipart =  new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
+
     public HttpServerConfiguration() {
+        this.applicationConfiguration = new ApplicationConfiguration();
     }
 
     @Inject
     public HttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         if(applicationConfiguration != null)
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
+
+        this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * @return The application configuration instance
+     */
+    public ApplicationConfiguration getApplicationConfiguration() {
+        return applicationConfiguration;
     }
 
     /**

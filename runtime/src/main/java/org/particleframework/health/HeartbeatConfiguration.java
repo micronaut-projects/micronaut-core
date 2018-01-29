@@ -42,7 +42,7 @@ public class HeartbeatConfiguration implements Toggleable {
     }
 
     /**
-     * @return Whether {@link HeartbeatEvent} instances should be published in a background thread
+     * @return Whether {@link HeartbeatEvent} event instances should be published by the server
      */
     @Override
     public boolean isEnabled() {

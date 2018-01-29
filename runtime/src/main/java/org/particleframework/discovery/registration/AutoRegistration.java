@@ -16,10 +16,10 @@
 package org.particleframework.discovery.registration;
 
 import org.particleframework.context.event.ApplicationEventListener;
-import org.particleframework.runtime.server.EmbeddedServer;
-import org.particleframework.runtime.server.event.AbstractServerApplicationEvent;
-import org.particleframework.runtime.server.event.ServerShutdownEvent;
-import org.particleframework.runtime.server.event.ServerStartupEvent;
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
+import org.particleframework.discovery.event.ServiceDegistrationEvent;
+import org.particleframework.discovery.event.ServiceRegistrationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,30 +29,30 @@ import org.slf4j.LoggerFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-public abstract class AutoRegistration implements ApplicationEventListener<AbstractServerApplicationEvent> {
+public abstract class AutoRegistration implements ApplicationEventListener<AbstractServiceInstanceEvent> {
 
     protected static final Logger LOG = LoggerFactory.getLogger(AutoRegistration.class);
 
     @Override
-    public void onApplicationEvent(AbstractServerApplicationEvent event) {
-        if(event instanceof ServerStartupEvent) {
+    public void onApplicationEvent(AbstractServiceInstanceEvent event) {
+        if(event instanceof ServiceRegistrationEvent) {
             register(event.getSource());
         }
-        else if(event instanceof ServerShutdownEvent) {
+        else if(event instanceof ServiceDegistrationEvent) {
             deregister(event.getSource());
         }
     }
 
     /**
      * Deregister the server from service discovery services
-     * @param server The embedded server
+     * @param instance The embedded server
      */
-    protected abstract void deregister(EmbeddedServer server);
+    protected abstract void deregister(ServiceInstance instance);
 
     /**
      * Register the server with discovery services
      *
-     * @param server The server to register
+     * @param instance The server to register
      */
-    protected abstract void register(EmbeddedServer server);
+    protected abstract void register(ServiceInstance instance);
 }

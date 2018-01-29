@@ -17,7 +17,7 @@ package org.particleframework.management.endpoint.health.indicator;
 
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.management.endpoint.health.HealthResult;
-import org.particleframework.management.endpoint.health.HealthStatus;
+import org.particleframework.health.HealthStatus;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
@@ -45,6 +45,9 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
+        if(executorService == null) {
+            throw new IllegalStateException("I/O ExecutorService is null");
+        }
         return new AsyncSingleResultPublisher<>(executorService, () -> {
             HealthResult.Builder builder = HealthResult.builder(getName());
             try {

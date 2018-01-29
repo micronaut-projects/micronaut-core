@@ -32,6 +32,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("unused")
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1")
 public abstract class AbstractConsulClient implements ConsulClient, DiscoveryClient {
 

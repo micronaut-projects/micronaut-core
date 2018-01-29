@@ -38,6 +38,9 @@ import java.util.stream.Collectors;
 @Requires(beans = BeansEndpoint.class)
 public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String, Object>> {
 
+    DefaultBeanDefinitionData() {
+    }
+
     @Override
     public Map<String, Object> getData(BeanDefinition<?> beanDefinition) {
         Map<String, Object> beanData = new LinkedHashMap<>(3);

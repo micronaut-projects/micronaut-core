@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health;
+package org.particleframework.health;
 
 import javax.annotation.concurrent.Immutable;
 import javax.validation.constraints.NotNull;
