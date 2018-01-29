@@ -15,16 +15,14 @@
  */
 package org.particleframework.discovery.consul.client.v1;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import org.particleframework.http.client.exceptions.HttpClientException;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.*;
 
 /**
  * @author graemerocher
@@ -48,6 +46,7 @@ public abstract class AbstractServiceEntry {
      *
      * @return The ID of the service
      */
+    @JsonProperty("ID")
     public Optional<String> getID() {
         return Optional.ofNullable(ID);
     }
@@ -95,6 +94,7 @@ public abstract class AbstractServiceEntry {
         this.tags = tags;
     }
 
+    @JsonProperty("ID")
     public void setID(String id) {
         this.ID = id;
     }
@@ -135,5 +135,23 @@ public abstract class AbstractServiceEntry {
     public AbstractServiceEntry tags(List<String> tags) {
         this.tags = tags;
         return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        AbstractServiceEntry that = (AbstractServiceEntry) o;
+        return Objects.equals(name, that.name) &&
+                Objects.equals(address, that.address) &&
+                Objects.equals(port, that.port) &&
+                Objects.equals(tags, that.tags) &&
+                Objects.equals(ID, that.ID);
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(name, address, port, tags, ID);
     }
 }

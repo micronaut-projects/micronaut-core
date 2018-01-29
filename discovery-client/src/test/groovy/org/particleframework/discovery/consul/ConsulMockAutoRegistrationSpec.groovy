@@ -21,8 +21,11 @@ import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.discovery.DiscoveryClient
 import org.particleframework.discovery.ServiceInstance
 import org.particleframework.discovery.consul.client.v1.ConsulClient
+import org.particleframework.discovery.consul.client.v1.HTTPCheck
 import org.particleframework.discovery.consul.client.v1.HealthEntry
 import org.particleframework.discovery.consul.client.v1.NewServiceEntry
+import org.particleframework.discovery.consul.client.v1.TTLCheck
+import org.particleframework.http.HttpMethod
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.client.HttpClient
 import org.particleframework.http.client.exceptions.HttpClientResponseException
@@ -32,6 +35,8 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
+
+import java.time.Duration
 
 /**
  * @author graemerocher
@@ -95,6 +100,10 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             instances[0].id.contains(serviceName)
             instances[0].port == anotherServer.getPort()
             instances[0].host == anotherServer.getHost()
+            // TTL check by default so now URL
+            MockConsulServer.lastNewEntry.checks.size() == 1
+            MockConsulServer.lastNewEntry.checks[0].HTTP == null
+            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
         }
 
         when: "stopping the server"
@@ -129,10 +138,130 @@ class ConsulMockAutoRegistrationSpec extends Specification {
         anotherServer.stop()
     }
 
+    void "test that a service can be registered with an HTTP health check"() {
+        when: "creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'     : serviceName,
+                                                                               'consul.registration.check.http': true,
+                                                                               'consul.registration.tags'      : ['foo', 'bar'],
+                                                                               'consul.host'                   : 'localhost',
+                                                                               'consul.port'                   : serverPort])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+        String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
+        then:
+
+        conditions.eventually {
+            List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
+            entry.size() == 1
+            entry[0].service.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks.size() == 1
+            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
+            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+
+        }
+
+        cleanup:
+        anotherServer.stop()
+    }
+
+    void "test that a service can be registered with an HTTP health check and deregisterCriticalServiceAfter"() {
+        when: "creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'                               : serviceName,
+                                                                               'consul.registration.check.http'                          : true,
+                                                                               'consul.registration.check.deregisterCriticalServiceAfter': '90m',
+                                                                               'consul.registration.tags'                                : ['foo', 'bar'],
+                                                                               'consul.host'                                             : 'localhost',
+                                                                               'consul.port'                                             : serverPort])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+        String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
+        then:
+
+        conditions.eventually {
+            List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
+            entry.size() == 1
+            entry[0].service.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks.size() == 1
+            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
+            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.lastNewEntry.checks[0].deregisterCriticalServiceAfter() == Duration.ofMinutes(90)
+            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+        }
+
+        cleanup:
+        anotherServer.stop()
+    }
+
+    void "test that a service can be registered with an HTTP health check and tlsSkipVerify"() {
+        when: "creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'              : serviceName,
+                                                                               'consul.registration.check.http'         : true,
+                                                                               'consul.registration.check.tlsSkipVerify': true,
+                                                                               'consul.registration.tags'               : ['foo', 'bar'],
+                                                                               'consul.host'                            : 'localhost',
+                                                                               'consul.port'                            : serverPort])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+        String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
+        then:
+
+        conditions.eventually {
+            List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
+            entry.size() == 1
+            entry[0].service.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks.size() == 1
+            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
+            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.lastNewEntry.checks[0].isTLSSkipVerify()
+            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+        }
+
+        cleanup:
+        anotherServer.stop()
+    }
+
+    void "test that a service can be registered with an HTTP health check and HTTP method"() {
+        when: "creating another server instance"
+        def serviceName = 'another-server'
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'       : serviceName,
+                                                                               'consul.registration.check.http'  : true,
+                                                                               'consul.registration.check.method': 'POST',
+                                                                               'consul.registration.tags'        : ['foo', 'bar'],
+                                                                               'consul.host'                     : 'localhost',
+                                                                               'consul.port'                     : serverPort])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+        String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
+        then:
+
+        conditions.eventually {
+            List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
+            entry.size() == 1
+            entry[0].service.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks.size() == 1
+            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
+            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
+            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.lastNewEntry.checks[0].method.get() == HttpMethod.POST
+            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+        }
+
+        cleanup:
+        anotherServer.stop()
+    }
+
+
     void "test that a asl token can be configured"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.aslToken'          : ['xxxxxxxxxxxx']])
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.aslToken': ['xxxxxxxxxxxx']])
 
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
                                                                                'consul.aslToken'          : ['xxxxxxxxxxxx'],
@@ -148,7 +277,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             entry.size() == 1
         }
 
-        when:"A regular client tries to talk to consul without the token"
+        when: "A regular client tries to talk to consul without the token"
         HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, consulServer.getURL())
         client.toBlocking().retrieve('/v1/agent/services')
 

@@ -46,6 +46,7 @@ import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
@@ -430,6 +431,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         String requestPath = request.getPath();
         HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
+            if(filter instanceof Toggleable && !((Toggleable)filter).isEnabled()) {
+                continue;
+            }
             Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
             if (filterAnn != null) {
                 String[] clients = filterAnn.clients();

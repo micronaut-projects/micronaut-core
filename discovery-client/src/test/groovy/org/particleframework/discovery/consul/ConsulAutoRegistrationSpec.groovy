@@ -35,26 +35,66 @@ import spock.util.concurrent.PollingConditions
 @IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT')})
 @Stepwise
 class ConsulAutoRegistrationSpec extends Specification {
-    @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['particle.application.name':'test-auto-reg',
-             'consul.host': System.getenv('CONSUL_HOST'),
-             'consul.port': System.getenv('CONSUL_PORT')]
-    )
-    @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-    @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
 
 
-    void 'test that the service is automatically registered with Consul'() {
-        given:
+    void 'test that the service is automatically registered with Consul with a TTL configuration'() {
+        when:"A new server is bootstrapped"
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+                ['particle.application.name':'test-auto-reg',
+                 'consul.host': System.getenv('CONSUL_HOST'),
+                 'consul.port': System.getenv('CONSUL_PORT')])
+        ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host':System.getenv('CONSUL_HOST')])
+
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
-        expect:
+        then:"the server is registered with Consul"
         conditions.eventually {
             List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
             instances.size() == 1
             instances[0].port == embeddedServer.getPort()
             instances[0].host == embeddedServer.getHost()
         }
+
+        when:"the server is shutdown"
+        embeddedServer.stop()
+
+        then:'the client is deregistered'
+
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
+            instances.size() == 0
+        }
     }
 
+    void 'test that the service is automatically registered with Consul with a HTTP configuration'() {
+        when:"A new server is bootstrapped"
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+                ['particle.application.name':'test-auto-reg',
+                 'consul.registration.check.http': true,
+                 'consul.host': System.getenv('CONSUL_HOST'),
+                 'consul.port': System.getenv('CONSUL_PORT')])
+        ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host':System.getenv('CONSUL_HOST')])
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:"the server is registered with Consul"
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
+            instances.size() == 1
+            instances[0].port == embeddedServer.getPort()
+            instances[0].host == embeddedServer.getHost()
+        }
+
+        when:"the server is shutdown"
+        embeddedServer.stop()
+
+        then:'the client is deregistered'
+
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
+            instances.size() == 0
+        }
+    }
 }

@@ -122,7 +122,7 @@ class ConsulClientSpec extends Specification {
     void "test register service with health check"() {
 
         when:
-        def check = new HttpCheck("test-service-check", new URL(embeddedServer.getURL(), '/consul/test'))
+        def check = new HTTPCheck("test-service-check", new URL(embeddedServer.getURL(), '/consul/test'))
         check.interval('5s')
         check.deregisterCriticalServiceAfter('90m')
         def entry = new NewServiceEntry("test-service")
@@ -137,7 +137,7 @@ class ConsulClientSpec extends Specification {
 
         then:
         entry.checks.size() == 1
-        entry.checks.first().interval =='5s'
+        entry.checks.first().interval.get() =='5s'
         entry.checks.first().deregisterCriticalServiceAfter.get() =='90m'
 
         when:
