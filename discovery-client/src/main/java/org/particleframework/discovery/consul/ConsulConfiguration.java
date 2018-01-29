@@ -48,10 +48,6 @@ public class ConsulConfiguration {
         return Optional.ofNullable(aslToken);
     }
 
-    public void setAslToken(String aslToken) {
-        this.aslToken = aslToken;
-    }
-
     /**
      * @return The agent host name. Defaults to 'localhost'.
      **/
@@ -64,6 +60,10 @@ public class ConsulConfiguration {
      **/
     public int getPort() {
         return port;
+    }
+
+    public void setAslToken(String aslToken) {
+        this.aslToken = aslToken;
     }
 
     public void setHost(String host) {
