@@ -43,8 +43,15 @@ class MockConsulServer implements ConsulOperations {
     Map<String, ServiceEntry> services = new ConcurrentHashMap<>()
     final CatalogEntry nodeEntry
 
+    static NewServiceEntry lastNewEntry
+
     MockConsulServer(EmbeddedServer embeddedServer) {
         nodeEntry = new CatalogEntry(UUID.randomUUID().toString(), InetAddress.localHost)
+    }
+
+    @Override
+    Publisher<String> status() {
+        return Publishers.just("localhost")
     }
 
     @Override
@@ -59,6 +66,7 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry) {
+        lastNewEntry = entry
         services.put(entry.getName(), new ServiceEntry(entry))
         return Publishers.just(HttpStatus.OK)
     }

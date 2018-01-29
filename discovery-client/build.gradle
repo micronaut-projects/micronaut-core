@@ -2,6 +2,7 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
     compile project(":http-client")
+    compile project(":validation")
 
     testCompile project(":http-server-netty")
     testCompile project(":inject-groovy")

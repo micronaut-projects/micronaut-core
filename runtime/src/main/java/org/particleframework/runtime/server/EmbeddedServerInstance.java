@@ -13,13 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.runtime.server;
+
+import org.particleframework.discovery.ServiceInstance;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * Extended version of the {@link ServiceInstance} interface for the {@link EmbeddedServer}
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-package org.particleframework.discovery.consul;
-
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+public interface EmbeddedServerInstance extends ServiceInstance {
+    /**
+     * @return A reference to the server
+     */
+    EmbeddedServer getEmbeddedServer();
+}

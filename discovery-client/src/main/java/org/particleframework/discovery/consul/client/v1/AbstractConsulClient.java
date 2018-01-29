@@ -18,12 +18,16 @@ package org.particleframework.discovery.consul.client.v1;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;
 
+import javax.inject.Inject;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,32 +40,41 @@ import java.util.List;
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1")
 public abstract class AbstractConsulClient implements ConsulClient, DiscoveryClient {
 
+    @Inject protected ConsulConfiguration consulConfiguration;
+
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        return Publishers.map(getHealthyServices(serviceId), healthEntries -> {
-            List<ServiceInstance> serviceInstances = new ArrayList<>();
-            for (HealthEntry healthEntry : healthEntries) {
-                ServiceEntry service = healthEntry.getService();
-                NodeEntry node = healthEntry.getNode();
-                InetAddress inetAddress = service.getAddress().orElse(node.getAddress());
-                int port = service.getPort().orElse(-1);
-                String portSuffix = port > -1 ? ":"+port : "";
-                URI uri = URI.create("http://" + inetAddress.getHostName() + portSuffix);
-                serviceInstances.add(new ServiceInstance() {
-                    @Override
-                    public String getId() {
-                        return service.getName();
-                    }
+        if(SERVICE_ID.equals(serviceId) && consulConfiguration != null) {
+            return Publishers.just(
+                    Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))
+            );
+        }
+        else {
+            return Publishers.map(getHealthyServices(serviceId), healthEntries -> {
+                List<ServiceInstance> serviceInstances = new ArrayList<>();
+                for (HealthEntry healthEntry : healthEntries) {
+                    ServiceEntry service = healthEntry.getService();
+                    NodeEntry node = healthEntry.getNode();
+                    InetAddress inetAddress = service.getAddress().orElse(node.getAddress());
+                    int port = service.getPort().orElse(-1);
+                    String portSuffix = port > -1 ? ":"+port : "";
+                    URI uri = URI.create("http://" + inetAddress.getHostName() + portSuffix);
+                    serviceInstances.add(new ServiceInstance() {
+                        @Override
+                        public String getId() {
+                            return service.getName();
+                        }
 
-                    @Override
-                    public URI getURI() {
-                        return uri;
-                    }
+                        @Override
+                        public URI getURI() {
+                            return uri;
+                        }
 
-                });
-            }
-            return serviceInstances;
-        });
+                    });
+                }
+                return serviceInstances;
+            });
+        }
     }
 
     @Override

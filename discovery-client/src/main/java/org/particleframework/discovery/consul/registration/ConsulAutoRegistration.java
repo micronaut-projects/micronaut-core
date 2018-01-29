@@ -20,21 +20,25 @@ import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.core.convert.value.ConvertibleMultiValues;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
-import org.particleframework.discovery.consul.client.v1.ConsulClient;
-import org.particleframework.discovery.consul.client.v1.NewServiceEntry;
+import org.particleframework.discovery.consul.client.v1.*;
 import org.particleframework.discovery.exceptions.DiscoveryException;
 import org.particleframework.discovery.registration.AutoRegistration;
 import org.particleframework.discovery.registration.RegistrationException;
+import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;
-import org.particleframework.runtime.ApplicationConfiguration;
+import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.runtime.server.EmbeddedServerInstance;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.time.Duration;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -62,6 +66,16 @@ public class ConsulAutoRegistration extends AutoRegistration {
         this.consulClient = consulClient;
         this.heartbeatConfiguration = heartbeatConfiguration;
         this.consulConfiguration = consulConfiguration;
+    }
+
+    @Override
+    protected void pulsate(ServiceInstance instance, HealthStatus status) {
+        if(status.equals(HealthStatus.UP)) {
+            // send a request to /agent/check/pass/:check_id
+        }
+        else {
+            // send a request to /agent/check/critical/:check_id
+        }
     }
 
     @Override
@@ -124,6 +138,48 @@ public class ConsulAutoRegistration extends AutoRegistration {
                         .tags(registration.getTags());
 
 
+            if(instance instanceof EmbeddedServerInstance) {
+                Check check = null;
+                ConsulConfiguration.ConsulRegistrationConfiguration.CheckConfiguration checkConfig = registration.getCheck();
+                if(checkConfig.isEnabled()) {
+
+                    if(heartbeatConfiguration.isEnabled() && !checkConfig.isHttp()) {
+                        TTLCheck ttlCheck = new TTLCheck();
+                        ttlCheck.ttl(heartbeatConfiguration.getInterval().plus(Duration.ofSeconds(10)));
+                        check = ttlCheck;
+                    }
+                    else {
+
+                        URL serverURL = ((EmbeddedServerInstance) instance).getEmbeddedServer().getURL();
+                        HTTPCheck httpCheck;
+                        try {
+                            httpCheck = new HTTPCheck(
+                                    new URL(serverURL,registration.getHealthPath().orElse("/health"))
+                            );
+                        } catch (MalformedURLException e) {
+                            throw new DiscoveryException("Invalid health path configured: "+ registration.getHealthPath());
+                        }
+
+                        httpCheck.interval(checkConfig.getInterval());
+                        httpCheck.method(checkConfig.getMethod())
+                                .headers(ConvertibleMultiValues.of(checkConfig.getHeaders()));
+
+                        checkConfig.getTlsSkipVerify().ifPresent(httpCheck::setTLSSkipVerify);
+                        check = httpCheck;
+                    }
+                }
+
+
+                if(check != null) {
+                    check.status(Check.HealthStatus.PASSING);
+                    checkConfig.getDeregisterCriticalServiceAfter().ifPresent(check::deregisterCriticalServiceAfter);
+                    checkConfig.getNotes().ifPresent(check::notes);
+                    checkConfig.getId().ifPresent(check::id);
+                    serviceEntry.check(check);
+                }
+
+            }
+
             io.reactivex.Observable<HttpStatus> registrationObservable = Flowable
                                                                             .fromPublisher(consulClient.register(serviceEntry))
                                                                             .toObservable();
@@ -159,7 +215,8 @@ public class ConsulAutoRegistration extends AutoRegistration {
                     }
                 }
                 catch (Throwable e) {
-                    throw new RegistrationException("Error occurred during service registration with Consul: " + e.getMessage(), e);
+                    String message = getConsulErrorMessage(e);
+                    throw new RegistrationException(message, e);
                 }
             }
             else {
@@ -178,7 +235,8 @@ public class ConsulAutoRegistration extends AutoRegistration {
                     @Override
                     public void onError(Throwable t) {
                         if(LOG.isErrorEnabled()) {
-                            LOG.error("Error occurred registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
+                            String message = getConsulErrorMessage(t);
+                            LOG.error(message, t);
                         }
                     }
 
@@ -189,6 +247,23 @@ public class ConsulAutoRegistration extends AutoRegistration {
                 });
             }
         }
+    }
+
+    private String getConsulErrorMessage(Throwable e) {
+        String message;
+        if( e instanceof HttpClientResponseException) {
+            HttpClientResponseException hcre = (HttpClientResponseException) e;
+            if(hcre.getStatus()== HttpStatus.BAD_REQUEST) {
+                message = "Error occurred during service registration with Consul: " + hcre.getResponse().getBody(String.class).orElse(e.getMessage());
+            }
+            else {
+                message = "Error occurred during service registration with Consul: " + e.getMessage();
+            }
+        }
+        else {
+            message = "Error occurred during service registration with Consul: " + e.getMessage();
+        }
+        return message;
     }
 
     private void validateApplicationName(String applicationName) {

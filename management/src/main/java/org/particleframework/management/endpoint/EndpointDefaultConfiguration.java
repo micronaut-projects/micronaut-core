@@ -24,11 +24,13 @@ import org.particleframework.core.util.Toggleable;
  * @author James Kleeh
  * @since 1.0
  */
-@ConfigurationProperties("endpoints.all")
+@ConfigurationProperties(EndpointDefaultConfiguration.PREFIX)
 public class EndpointDefaultConfiguration implements Toggleable {
 
-    protected boolean enabled = true;
-    protected boolean sensitive;
+    public static final String PREFIX = "endpoints.all";
+
+    private boolean enabled = true;
+    private boolean sensitive;
 
     @Override
     public boolean isEnabled() {
@@ -42,5 +44,12 @@ public class EndpointDefaultConfiguration implements Toggleable {
         return sensitive;
     }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public void setSensitive(boolean sensitive) {
+        this.sensitive = sensitive;
+    }
 }
 

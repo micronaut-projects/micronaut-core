@@ -13,13 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.consul.condition;
+
+import org.particleframework.context.annotation.Requires;
+
+import java.lang.annotation.*;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * Meta annotation for Consul requirements
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-package org.particleframework.discovery.consul;
-
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.PACKAGE, ElementType.TYPE})
+@Requires(property = "consul.host")
+public @interface RequiresConsul {
+}

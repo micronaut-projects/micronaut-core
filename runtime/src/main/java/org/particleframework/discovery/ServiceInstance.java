@@ -18,6 +18,8 @@ package org.particleframework.discovery;
 import org.particleframework.core.convert.value.ConvertibleValues;
 
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 
 /**
  * <p>Represents a remote service discovered by the underlying discovery implementation</p>
@@ -64,5 +66,42 @@ public interface ServiceInstance {
      */
     default int getPort() {
         return getURI().getPort();
+    }
+
+    static ServiceInstance of(String id, URL url) {
+        try {
+            URI uri = url.toURI();
+            return of(id, uri);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid URI argument: " + url);
+        }
+    }
+
+    static ServiceInstance of(String id, URI uri) {
+        return new ServiceInstance() {
+            @Override
+            public String getId() {
+                return id;
+            }
+
+            @Override
+            public URI getURI() {
+                return uri;
+            }
+        };
+    }
+
+    static ServiceInstance of(String id, String host, int port) {
+        return new ServiceInstance() {
+            @Override
+            public String getId() {
+                return id;
+            }
+
+            @Override
+            public URI getURI() {
+                return URI.create("http://" + host + ":" + port);
+            }
+        };
     }
 }

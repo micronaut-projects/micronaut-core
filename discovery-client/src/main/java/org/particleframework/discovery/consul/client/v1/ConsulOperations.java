@@ -30,6 +30,13 @@ import java.util.Map;
  * @since 1.0
  */
 public interface ConsulOperations {
+
+    /**
+     * @return The current leader address
+     */
+    @Get("/status/leader")
+    Publisher<String> status();
+
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
      * @param entry The entry to register

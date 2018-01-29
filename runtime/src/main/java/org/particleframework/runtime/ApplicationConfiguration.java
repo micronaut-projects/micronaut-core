@@ -82,8 +82,20 @@ public class ApplicationConfiguration {
 
     @ConfigurationProperties("instance")
     public static class InstanceConfiguration {
+        private String id;
         @SuppressWarnings("unchecked")
         private Map<CharSequence, String> metadata = Collections.EMPTY_MAP;
+
+        /**
+         * @return An optional instance identifier
+         */
+        public Optional<String> getId() {
+            return Optional.ofNullable(id);
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
 
         public Map<CharSequence, String> getMetadata() {
             return metadata;
