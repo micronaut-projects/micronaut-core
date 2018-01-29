@@ -38,7 +38,7 @@ public class GroovyPropertySourceLoader implements PropertySourceLoader, Ordered
             fileName += "-" + environmentName;
         }
         String qualifiedName = fileName;
-        fileName += "." + ext;
+        fileName += ext;
 
         loadProperties(environment, fileName, finalMap);
         int order = this.getOrder();
