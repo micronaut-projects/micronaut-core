@@ -17,7 +17,7 @@ package org.particleframework.management.endpoint.health.indicator.diskspace;
 
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.management.endpoint.health.HealthEndpoint;
-import org.particleframework.management.endpoint.health.HealthStatus;
+import org.particleframework.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.AbstractHealthIndicator;
 
 import javax.inject.Singleton;

@@ -30,26 +30,23 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.application")
+@ConfigurationProperties(ApplicationConfiguration.PREFIX)
 @Primary
 public class ApplicationConfiguration {
 
-    public static final String DEFAULT_CHARSET = "particle.defaultCharset";
+    public static final String PREFIX = "particle.application";
+    public static final String DEFAULT_CHARSET = PREFIX + ".defaultCharset";
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
     private String name;
+    private InstanceConfiguration instance = new InstanceConfiguration();
     @SuppressWarnings("unchecked")
-    private Map<String, String> info = Collections.EMPTY_MAP;
 
     /**
      * @return The default charset to use
      */
     public Charset getDefaultCharset() {
         return defaultCharset;
-    }
-
-    public void setDefaultCharset(Charset defaultCharset) {
-        this.defaultCharset = defaultCharset;
     }
 
     /**
@@ -62,19 +59,38 @@ public class ApplicationConfiguration {
         return Optional.ofNullable(name);
     }
 
+    /**
+     * @return Configuration for the application instance
+     */
+    public InstanceConfiguration getInstance() {
+        return instance;
+    }
+
+    public void setInstance(InstanceConfiguration instance) {
+        if(instance != null) {
+            this.instance = instance;
+        }
+    }
+
+    public void setDefaultCharset(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset;
+    }
+
     public void setName(String name) {
         this.name = name;
     }
 
-    /**
-     * Arbitrary application information
-     * @return The application information
-     */
-    public Map<String, String> getInfo() {
-        return info;
-    }
+    @ConfigurationProperties("instance")
+    public static class InstanceConfiguration {
+        @SuppressWarnings("unchecked")
+        private Map<CharSequence, String> metadata = Collections.EMPTY_MAP;
 
-    public void setInfo(Map<String, String> info) {
-        this.info = info;
+        public Map<CharSequence, String> getMetadata() {
+            return metadata;
+        }
+
+        public void setMetadata(Map<CharSequence, String> metadata) {
+            this.metadata = metadata;
+        }
     }
 }

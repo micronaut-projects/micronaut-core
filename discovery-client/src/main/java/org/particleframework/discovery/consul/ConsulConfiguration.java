@@ -100,4 +100,14 @@ public class ConsulConfiguration {
             this.tags = tags;
         }
     }
+
+    @Override
+    public String toString() {
+        return "ConsulConfiguration{" +
+                "host='" + host + '\'' +
+                ", port=" + port +
+                ", aslToken='" + aslToken + '\'' +
+                ", registration=" + registration +
+                '}';
+    }
 }

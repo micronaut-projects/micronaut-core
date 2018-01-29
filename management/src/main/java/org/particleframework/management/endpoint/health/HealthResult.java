@@ -15,6 +15,8 @@
  */
 package org.particleframework.management.endpoint.health;
 
+import org.particleframework.health.HealthStatus;
+
 import javax.validation.constraints.NotNull;
 import java.util.HashMap;
 import java.util.Map;

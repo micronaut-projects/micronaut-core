@@ -20,7 +20,7 @@ import io.reactivex.Single;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.management.endpoint.health.HealthEndpoint;
 import org.particleframework.management.endpoint.health.HealthResult;
-import org.particleframework.management.endpoint.health.HealthStatus;
+import org.particleframework.health.HealthStatus;
 import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
 import org.reactivestreams.Publisher;
 

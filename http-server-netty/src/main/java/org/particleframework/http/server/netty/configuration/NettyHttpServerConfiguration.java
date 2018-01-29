@@ -20,7 +20,9 @@ import io.netty.channel.ChannelOption;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.NettyHttpServer;
+import org.particleframework.runtime.ApplicationConfiguration;
 
+import javax.inject.Inject;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +41,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     protected Map<ChannelOption, Object> options = Collections.emptyMap();
     protected Worker worker;
     protected Parent parent;
+
+
+    public NettyHttpServerConfiguration() {
+    }
+
+    @Inject
+    public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
+    }
+
     /**
      * @return The Netty child channel options.
      * @see ServerBootstrap#childOptions()
