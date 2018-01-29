@@ -25,17 +25,21 @@ import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.consul.client.v1.NewServiceEntry;
+import org.particleframework.discovery.exceptions.DiscoveryException;
 import org.particleframework.discovery.registration.AutoRegistration;
 import org.particleframework.discovery.registration.RegistrationException;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.runtime.ApplicationConfiguration;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Auto registration implementation for consul
@@ -46,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 @Requires(beans = ConsulClient.class)
 public class ConsulAutoRegistration extends AutoRegistration {
+    private static final Pattern APPLICATION_NAME_PATTERN = Pattern.compile( "^[a-zA-Z][\\w\\d-]*[a-zA-Z\\d]$");
     private final ConsulClient consulClient;
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ConsulConfiguration consulConfiguration;
@@ -64,15 +69,45 @@ public class ConsulAutoRegistration extends AutoRegistration {
         String applicationName = instance.getId();
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
         if(registration.isEnabled() && registration.isDeregister()) {
-            try {
-                Flowable.fromPublisher(consulClient.deregister(applicationName)).blockingFirst();
-                if(LOG.isInfoEnabled()) {
-                    LOG.info("De-registered service [{}] with Consul", applicationName);
+            if(registration.isFailFast()) {
+
+                try {
+                    Flowable.fromPublisher(consulClient.deregister(applicationName)).blockingFirst();
+                    if(LOG.isInfoEnabled()) {
+                        LOG.info("De-registered service [{}] with Consul", applicationName);
+                    }
+                } catch (Throwable t) {
+                    if(LOG.isErrorEnabled()) {
+                        LOG.error("Error occurred de-registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
+                    }
                 }
-            } catch (Throwable t) {
-                if(LOG.isErrorEnabled()) {
-                    LOG.error("Error occurred de-registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
-                }
+            }
+            else {
+                consulClient.deregister(applicationName).subscribe(new Subscriber<HttpStatus>() {
+                    @Override
+                    public void onSubscribe(Subscription subscription) {
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onNext(HttpStatus httpStatus) {
+                        if(LOG.isInfoEnabled()) {
+                            LOG.info("De-registered service [{}] with Consul", applicationName);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        if(LOG.isErrorEnabled()) {
+                            LOG.error("Error occurred de-registering service ["+applicationName+"] with Consul: " + t.getMessage(), t);
+                        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
             }
         }
     }
@@ -81,6 +116,7 @@ public class ConsulAutoRegistration extends AutoRegistration {
     protected void register(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
         String applicationName = instance.getId();
+        validateApplicationName(applicationName);
         if(registration.isEnabled() && StringUtils.isNotEmpty(applicationName)) {
             NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
             serviceEntry.address(instance.getHost())
@@ -152,6 +188,12 @@ public class ConsulAutoRegistration extends AutoRegistration {
                     }
                 });
             }
+        }
+    }
+
+    private void validateApplicationName(String applicationName) {
+        if(!APPLICATION_NAME_PATTERN.matcher(applicationName).matches()) {
+            throw new DiscoveryException("Application name ["+applicationName+"] must start with a letter, end with a letter or digit and contain only letters, digits or hyphens. Example: foo-bar");
         }
     }
 }
