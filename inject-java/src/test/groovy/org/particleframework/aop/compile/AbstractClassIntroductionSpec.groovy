@@ -234,4 +234,98 @@ abstract class AbstractBean implements Foo {
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
     }
+
+    void "test that a default method defined in a interface is not implemented by Introduction advice"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.AbstractBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import org.particleframework.aop.introduction.*;
+import org.particleframework.context.annotation.*;
+
+@Stub
+interface Foo {
+    String nonAbstract();
+    
+    default String anotherNonAbstract() {
+        return "good";
+    }
+}
+@Stub
+@javax.inject.Singleton
+abstract class AbstractBean implements Foo {
+    public abstract String isAbstract(); 
+    
+    @Override
+    public String nonAbstract() {
+        return "good";
+    }
+
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedFields.size() == 0
+
+        when:
+        def context = new DefaultBeanContext()
+        context.start()
+        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+
+
+        then:
+        instance.isAbstract() == null
+        instance.nonAbstract() == 'good'
+        instance.anotherNonAbstract() == 'good'
+    }
+
+
+    void "test that a default method overridden from parent interface is not implemented by Introduction advice"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.AbstractBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import org.particleframework.aop.introduction.*;
+import org.particleframework.context.annotation.*;
+
+interface Bar {
+    String anotherNonAbstract();
+}
+interface Foo extends Bar {
+    String nonAbstract();
+    
+    @Override
+    default String anotherNonAbstract() {
+        return "good";
+    }
+}
+@Stub
+@javax.inject.Singleton
+abstract class AbstractBean implements Foo {
+    public abstract String isAbstract(); 
+    
+    @Override
+    public String nonAbstract() {
+        return "good";
+    }
+
+}
+''')
+        then:
+        !beanDefinition.isAbstract()
+        beanDefinition != null
+        beanDefinition.injectedFields.size() == 0
+
+        when:
+        def context = new DefaultBeanContext()
+        context.start()
+        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+
+
+        then:
+        instance.isAbstract() == null
+        instance.nonAbstract() == 'good'
+        instance.anotherNonAbstract() == 'good'
+    }
 }

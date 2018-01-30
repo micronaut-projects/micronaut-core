@@ -235,8 +235,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     aopProxyWriter.visitBeanDefinitionConstructor();
                 }
                 beanDefinitionWriters.put(classElement.getQualifiedName(), aopProxyWriter);
-                classElement.asType().accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
-                    Map<String, List<ExecutableElement>> declaredMethods = new HashMap<>();
+                classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
                     @Override
                     protected void accept(ExecutableElement method, AopProxyWriter aopProxyWriter) {
                         ExecutableElementParamInfo params = populateParameterData(method);
@@ -275,26 +274,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         );
                     }
 
-                    @Override
-                    protected boolean isAcceptable(ExecutableElement executableElement) {
-                        Set<Modifier> modifiers = executableElement.getModifiers();
-                        String methodName = executableElement.getSimpleName().toString();
-                        boolean acceptable = modelUtils.isAbstract(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
-                        boolean isDeclared = executableElement.getEnclosingElement().equals(classElement);
-                        if(acceptable && !isDeclared && declaredMethods.containsKey(methodName)) {
-                            // check method is not overridden already
-                            for (ExecutableElement element : declaredMethods.get(methodName)) {
-                                if(elementUtils.overrides(element, executableElement, classElement)) {
-                                    return false;
-                                }
-                            }
-                        }
-                        else if(!acceptable && isDeclared) {
-                            List<ExecutableElement> declaredMethodList = declaredMethods.computeIfAbsent(methodName, s -> new ArrayList<>());
-                            declaredMethodList.add(executableElement);
-                        }
-                        return acceptable;
-                    }
                 }, aopProxyWriter);
                 boolean isInterface = classElement.getKind() == ElementKind.INTERFACE;
                 if(!isInterface) {
