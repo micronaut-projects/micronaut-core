@@ -105,7 +105,12 @@
             <version>${particle.version}</version>
             <scope>provided</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.particleframework</groupId>
+            <artifactId>http-client</artifactId>
+            <version>${particle.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
