@@ -19,16 +19,16 @@ import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
+import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;
+import javax.validation.constraints.NotNull;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Abstract implementation of {@link ConsulClient} that also implements {@link DiscoveryClient}
@@ -42,15 +42,31 @@ public abstract class AbstractConsulClient implements ConsulClient, DiscoveryCli
 
     @Inject protected ConsulConfiguration consulConfiguration;
 
+    /**
+     * Gets the healthy services that are passing health checks
+     *
+     * @return The {@link HealthEntry} instances
+     */
+    @Override
+    public Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
+        return getHealthyServices(service, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        if(SERVICE_ID.equals(serviceId) && consulConfiguration != null) {
+        boolean hasConfiguration = consulConfiguration != null;
+        if(SERVICE_ID.equals(serviceId) && hasConfiguration) {
             return Publishers.just(
                     Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))
             );
         }
         else {
-            return Publishers.map(getHealthyServices(serviceId), healthEntries -> {
+            boolean passing = hasConfiguration && consulConfiguration.getDiscovery().isPassing();
+            Optional<String> datacenter = hasConfiguration ? Optional.ofNullable(consulConfiguration.getDiscovery().getDatacenters().get(serviceId)) : Optional.empty();
+            Optional<String> tag = hasConfiguration ? Optional.ofNullable(consulConfiguration.getDiscovery().getTags().get(serviceId)) : Optional.empty();
+
+            Publisher<List<HealthEntry>> healthyServicesPublisher = getHealthyServices(serviceId, Optional.of(passing), tag, datacenter);
+            return Publishers.map(healthyServicesPublisher, healthEntries -> {
                 List<ServiceInstance> serviceInstances = new ArrayList<>();
                 for (HealthEntry healthEntry : healthEntries) {
                     ServiceEntry service = healthEntry.getService();
@@ -80,5 +96,10 @@ public abstract class AbstractConsulClient implements ConsulClient, DiscoveryCli
     @Override
     public Publisher<List<String>> getServiceIds() {
         return Publishers.map(getServiceNames(), services -> new ArrayList<>(services.keySet()));
+    }
+
+    @Override
+    public void close() throws IOException {
+        // no-op.. will be closed by org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice
     }
 }

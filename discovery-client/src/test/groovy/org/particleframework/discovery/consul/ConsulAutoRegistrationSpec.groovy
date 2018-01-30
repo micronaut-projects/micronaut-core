@@ -32,23 +32,22 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT')})
-@Stepwise
+@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT') })
 class ConsulAutoRegistrationSpec extends Specification {
 
 
     void 'test that the service is automatically registered with Consul with a TTL configuration'() {
-        when:"A new server is bootstrapped"
+        when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-                ['particle.application.name':'test-auto-reg',
-                 'consul.host': System.getenv('CONSUL_HOST'),
-                 'consul.port': System.getenv('CONSUL_PORT')])
+                ['particle.application.name': 'test-auto-reg',
+                 'consul.host'              : System.getenv('CONSUL_HOST'),
+                 'consul.port'              : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host':System.getenv('CONSUL_HOST')])
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST')])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
-        then:"the server is registered with Consul"
+        then: "the server is registered with Consul"
         conditions.eventually {
             List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
             instances.size() == 1
@@ -56,10 +55,10 @@ class ConsulAutoRegistrationSpec extends Specification {
             instances[0].host == embeddedServer.getHost()
         }
 
-        when:"the server is shutdown"
+        when: "the server is shutdown"
         embeddedServer.stop()
 
-        then:'the client is deregistered'
+        then: 'the client is deregistered'
 
         conditions.eventually {
             List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
@@ -68,18 +67,18 @@ class ConsulAutoRegistrationSpec extends Specification {
     }
 
     void 'test that the service is automatically registered with Consul with a HTTP configuration'() {
-        when:"A new server is bootstrapped"
+        when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-                ['particle.application.name':'test-auto-reg',
+                ['particle.application.name'     : 'test-auto-reg',
                  'consul.registration.check.http': true,
-                 'consul.host': System.getenv('CONSUL_HOST'),
-                 'consul.port': System.getenv('CONSUL_PORT')])
+                 'consul.host'                   : System.getenv('CONSUL_HOST'),
+                 'consul.port'                   : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host':System.getenv('CONSUL_HOST')])
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST')])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
-        then:"the server is registered with Consul"
+        then: "the server is registered with Consul"
         conditions.eventually {
             List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
             instances.size() == 1
@@ -87,14 +86,63 @@ class ConsulAutoRegistrationSpec extends Specification {
             instances[0].host == embeddedServer.getHost()
         }
 
-        when:"the server is shutdown"
+        when: "the server is shutdown"
         embeddedServer.stop()
 
-        then:'the client is deregistered'
+        then: 'the client is deregistered'
 
         conditions.eventually {
             List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances('test-auto-reg')).blockingFirst()
             instances.size() == 0
         }
+    }
+
+
+    void 'test that a service can be registered with tags and queried with tags'() {
+        when: "A new server is bootstrapped"
+        String serviceId = 'myService'
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+                ['particle.application.name': serviceId,
+                 'consul.registration.tags' : ['foo', 'bar'],
+                 'consul.host'              : System.getenv('CONSUL_HOST'),
+                 'consul.port'              : System.getenv('CONSUL_PORT')])
+
+        // a client with tags specified
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST'),
+                                                                                   'consul.port': System.getenv('CONSUL_PORT'),
+                                                                                   'consul.discovery.tags.myService':'foo' ])
+
+
+        DiscoveryClient anotherClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST'),
+                                                                                   'consul.port': System.getenv('CONSUL_PORT'),
+                                                                                   'consul.discovery.tags.myService':['someother'] ])
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then: "the server is registered with Consul"
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst()
+            instances.size() == 1
+            instances[0].port == embeddedServer.getPort()
+            instances[0].host == embeddedServer.getHost()
+        }
+
+        when:"another client is is queried that specifies tags"
+        List<ServiceInstance> otherInstances = Flowable.fromPublisher(anotherClient.getInstances(serviceId)).blockingFirst()
+
+        then:"The instances are not returned"
+        otherInstances.size() == 0
+
+        when: "the server is shutdown"
+        embeddedServer.stop()
+
+
+        then: 'the service is deregistered'
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst()
+            instances.size() == 0
+        }
+
+        cleanup:
+        discoveryClient.close()
     }
 }

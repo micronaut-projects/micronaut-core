@@ -42,6 +42,7 @@ import org.particleframework.http.server.netty.configuration.NettyHttpServerConf
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -296,6 +297,11 @@ public class NettyHttpServer implements EmbeddedServer {
     @Override
     public ApplicationContext getApplicationContext() {
         return applicationContext;
+    }
+
+    @Override
+    public ApplicationConfiguration getApplicationConfiguration() {
+        return serverConfiguration.getApplicationConfiguration();
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {

@@ -270,7 +270,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 } else {
                     Throwable cause = future.cause();
                     completableFuture.completeExceptionally(
-                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            new HttpClientException("Connect Error: " + cause.getMessage(), cause)
                     );
                 }
             });

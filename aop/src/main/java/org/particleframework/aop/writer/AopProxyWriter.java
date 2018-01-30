@@ -123,6 +123,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private Map<String, Object> constructorQualfierTypes;
     private Map<String, Map<String, Object>> constructorGenericTypes;
     private Map<String, Object> constructorNewArgumentTypes;
+    private List<Runnable> deferredInjectionPoints = new ArrayList<>();
+
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
      *
@@ -725,6 +727,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             }
         }
 
+        for (Runnable fieldInjectionPoint : deferredInjectionPoints) {
+            fieldInjectionPoint.run();
+        }
+
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
 
@@ -777,9 +783,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String fieldName,
             String setterName,
             Map<String, Object> genericTypes) {
-        proxyBeanDefinitionWriter.visitSetterInjectionPoint(
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterInjectionPoint(
                 declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes
-        );
+        ));
     }
 
     @Override
@@ -802,14 +808,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String setterName,
             Map<String, Object> genericTypes,
             boolean isOptional) {
-        proxyBeanDefinitionWriter.visitSetterValue(
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(
                 declaringType, qualifierType, requiresReflection, fieldType, fieldName, setterName, genericTypes, isOptional
-        );
+        ));
     }
 
     @Override
     public void visitSetterValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object valueType, String setterName, Map<String, Object> genericTypes, boolean isOptional) {
-        proxyBeanDefinitionWriter.visitSetterValue(declaringType, qualifierType, requiresReflection, valueType, setterName, genericTypes, isOptional);
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitSetterValue(declaringType, qualifierType, requiresReflection, valueType, setterName, genericTypes, isOptional));
     }
 
     @Override
@@ -821,9 +827,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, Object> argumentTypes,
             Map<String, Object> qualifierTypes,
             Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitPostConstructMethod(
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPostConstructMethod(
                 declaringType,requiresReflection, returnType, methodName, argumentTypes, qualifierTypes, genericTypes
-        );
+        ));
     }
 
     @Override
@@ -835,7 +841,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, Object> argumentTypes,
             Map<String, Object> qualifierTypes,
             Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitPreDestroyMethod(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes));
     }
 
     @Override
@@ -847,7 +853,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, Object> argumentTypes,
             Map<String, Object> qualifierTypes,
             Map<String, Map<String, Object>> genericTypes) {
-        proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes);
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitMethodInjectionPoint(declaringType, requiresReflection,returnType, methodName,argumentTypes, qualifierTypes, genericTypes));
     }
 
     @Override
@@ -860,26 +866,30 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, Object> qualifierTypes,
             Map<String, Map<String, Object>> genericTypes,
             AnnotationMetadata annotationMetadata) {
-        return proxyBeanDefinitionWriter.visitExecutableMethod(
-                declaringType,
-                returnType,
-                returnTypeGenericTypes,
-                methodName,
-                argumentTypes,
-                qualifierTypes,
-                genericTypes,
-                annotationMetadata
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitExecutableMethod(
+                        declaringType,
+                        returnType,
+                        returnTypeGenericTypes,
+                        methodName,
+                        argumentTypes,
+                        qualifierTypes,
+                        genericTypes,
+                        annotationMetadata
+                )
         );
+        return null;
     }
 
     @Override
     public void visitFieldInjectionPoint(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName) {
-        proxyBeanDefinitionWriter.visitFieldInjectionPoint(declaringType, qualifierType, requiresReflection, fieldType, fieldName);
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldInjectionPoint(declaringType, qualifierType, requiresReflection, fieldType, fieldName));
     }
 
     @Override
     public void visitFieldValue(Object declaringType, Object qualifierType, boolean requiresReflection, Object fieldType, String fieldName, boolean isOptional) {
-        proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional);
+        deferredInjectionPoints.add(() -> proxyBeanDefinitionWriter.visitFieldValue(declaringType, qualifierType, requiresReflection, fieldType, fieldName, isOptional));
+
     }
 
     @Override

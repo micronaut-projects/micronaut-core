@@ -55,14 +55,15 @@ class UriTemplateSpec extends Specification {
 
         where:
         template              | arguments                                          | result
-        ''                    | [:]                                                 | ''
-        '/'                   | [:]                                                 | '/'
+        ''                    | [:]                                                | ''
+        '/'                   | [:]                                                | '/'
         '{var}'               | [var: 'value']                                     | 'value' // Section 2.4.1 - Prefix Values
         '{var:20}'            | [var: 'value']                                     | 'value'
         '{var:3}'             | [var: 'value']                                     | 'val'
         '{semi}'              | [semi: ';']                                        | '%3B'
         '{semi:2}'            | [semi: ';']                                        | '%3B'
         'find{?year*}'        | [year: ["1965", "2000", "2012"]]                   | 'find?year=1965&year=2000&year=2012' // Section 2.4.2.  Composite Values
+        'find{?year*}'        | [:]                                                | 'find' // Section 2.4.2.  Composite Values
         'www{.dom*}'          | [dom: ["example", "com"]]                          | 'www.example.com'
         '{count}'             | [count: ['one', 'two', 'three']]                   | 'one,two,three' // Section 3.2.1  Variable Expansion
         '{count*}'            | [count: ['one', 'two', 'three']]                   | 'one,two,three'
