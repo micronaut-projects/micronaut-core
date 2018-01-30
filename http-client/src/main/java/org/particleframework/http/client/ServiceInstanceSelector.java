@@ -15,21 +15,13 @@
  */
 package org.particleframework.http.client;
 
-import java.util.Optional;
+import org.particleframework.discovery.ServiceInstanceList;
 
 /**
- * A resolver of {@link ServerSelector} instances that are capable of resolving references to services into a concrete selector
+ * A {@link ServerSelector} that is also a {@link ServiceInstanceList}
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface ServerSelectorResolver {
-
-    /**
-     * Resolve a {@link ServerSelector} for the given references
-     * @param serviceReferences The references
-     *
-     * @return A {@link ServerSelector} or empty of non can be resolved
-     */
-    Optional<? extends ServerSelector> resolve(String... serviceReferences);
+public interface ServiceInstanceSelector extends ServerSelector, ServiceInstanceList {
 }
