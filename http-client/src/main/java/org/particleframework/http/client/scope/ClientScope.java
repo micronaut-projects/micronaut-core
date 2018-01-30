@@ -15,20 +15,20 @@
  */
 package org.particleframework.http.client.scope;
 
+import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.LifeCycle;
+import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.exceptions.DependencyInjectionException;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
-import org.particleframework.http.client.Client;
-import org.particleframework.http.client.HttpClient;
-import org.particleframework.http.client.ServerSelector;
-import org.particleframework.http.client.ServerSelectorResolver;
+import org.particleframework.http.client.*;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanIdentifier;
 import org.particleframework.inject.ParametrizedProvider;
+import org.particleframework.runtime.context.scope.refresh.RefreshEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,14 +49,16 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Singleton
-class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
+class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, ApplicationEventListener<RefreshEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientScope.class);
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>();
     private final ServerSelectorResolver serverSelectorResolver;
+    private final BeanContext beanContext;
 
-    public ClientScope(ServerSelectorResolver serverSelectorResolver) {
+    public ClientScope(ServerSelectorResolver serverSelectorResolver, BeanContext beanContext) {
         this.serverSelectorResolver = serverSelectorResolver;
+        this.beanContext = beanContext;
     }
 
     @Override
@@ -96,7 +98,8 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
                                                                         );
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
-            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(serverSelector);
+            HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
+            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(serverSelector, configuration);
             httpClient.setClientIdentifiers(value);
             return httpClient;
         });
@@ -120,6 +123,11 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope> {
         }
         clients.clear();
         return this;
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        refresh();
     }
 
     private static class ClientKey {
