@@ -66,7 +66,7 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
     }
 
     @Inject
-    public RxHttpClient( @Argument ServerSelector serverSelector, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public RxHttpClient( @Argument ServerSelector serverSelector, @Argument HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         super(serverSelector, configuration, codecRegistry, filters);
     }
 

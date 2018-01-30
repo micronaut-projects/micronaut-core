@@ -58,4 +58,9 @@ public @interface Client {
      * @return The base URI
      */
     String path() default "";
+
+    /**
+     * @return The http client configuration bean to use
+     */
+    Class<? extends HttpClientConfiguration> configuration() default HttpClientConfiguration.class;
 }

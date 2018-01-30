@@ -40,8 +40,7 @@ import java.util.concurrent.ThreadFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.http.client")
-public class HttpClientConfiguration {
+public abstract class HttpClientConfiguration {
 
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
@@ -91,7 +90,6 @@ public class HttpClientConfiguration {
     public HttpClientConfiguration() {
     }
 
-    @Inject
     public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         if(applicationConfiguration != null)
             this.defaultCharset = applicationConfiguration.getDefaultCharset();

@@ -26,6 +26,7 @@ import org.particleframework.cache.annotation.PutOperations
 import org.particleframework.context.ApplicationContext
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
@@ -154,34 +155,41 @@ class SyncCacheSpec extends Specification {
         syncCache.put("three", 3)
         syncCache.put("four", 4)
         syncCache.nativeCache.cleanUp()
-        sleep(1000)
+        PollingConditions conditions = new PollingConditions(timeout: 2)
 
         then:
-        !syncCache.get("one", Integer).isPresent()
-        syncCache.get("two", Integer).isPresent()
-        syncCache.get("three", Integer).isPresent()
-        syncCache.get("four", Integer).isPresent()
+        conditions.eventually {
+            !syncCache.get("one", Integer).isPresent()
+            syncCache.get("two", Integer).isPresent()
+            syncCache.get("three", Integer).isPresent()
+            syncCache.get("four", Integer).isPresent()
+        }
 
         when:
         syncCache.invalidate("two")
 
         then:
-        !syncCache.get("one", Integer).isPresent()
-        !syncCache.get("two", Integer).isPresent()
-        syncCache.get("three", Integer).isPresent()
-        syncCache.putIfAbsent("three", 3).isPresent()
-        syncCache.get("four", Integer).isPresent()
+        conditions.eventually {
+
+            !syncCache.get("one", Integer).isPresent()
+            !syncCache.get("two", Integer).isPresent()
+            syncCache.get("three", Integer).isPresent()
+            syncCache.putIfAbsent("three", 3).isPresent()
+            syncCache.get("four", Integer).isPresent()
+        }
 
 
         when:
         syncCache.invalidateAll()
 
         then:
+        conditions.eventually {
 
-        !syncCache.get("one", Integer).isPresent()
-        !syncCache.get("two", Integer).isPresent()
-        !syncCache.get("three", Integer).isPresent()
-        !syncCache.get("four", Integer).isPresent()
+            !syncCache.get("one", Integer).isPresent()
+            !syncCache.get("two", Integer).isPresent()
+            !syncCache.get("three", Integer).isPresent()
+            !syncCache.get("four", Integer).isPresent()
+        }
 
         cleanup:
         applicationContext.stop()

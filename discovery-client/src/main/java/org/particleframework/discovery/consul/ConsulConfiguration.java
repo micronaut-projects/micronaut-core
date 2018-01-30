@@ -21,8 +21,11 @@ import org.particleframework.discovery.DiscoveryConfiguration;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.http.HttpMethod;
+import org.particleframework.http.client.HttpClientConfiguration;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 //import javax.validation.constraints.NotNull;
+import javax.inject.Inject;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -36,7 +39,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties(ConsulClient.SERVICE_ID)
-public class ConsulConfiguration {
+public class ConsulConfiguration extends HttpClientConfiguration {
 
     private String host = "localhost";
 
@@ -47,6 +50,15 @@ public class ConsulConfiguration {
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
 
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
+
+    public ConsulConfiguration() {
+    }
+
+    @Inject
+    public ConsulConfiguration(ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
+    }
+
     /**
      * @return The token to include in all requests as the {@code X-Consul-Token} header
      */
@@ -303,6 +315,7 @@ public class ConsulConfiguration {
                 ", port=" + port +
                 ", aslToken='" + aslToken + '\'' +
                 ", registration=" + registration +
+                ", discovery=" + discovery +
                 '}';
     }
 }

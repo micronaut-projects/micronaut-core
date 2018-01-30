@@ -289,7 +289,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             else if(ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
             }
-            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector);
+            HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
+            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector, configuration);
             client.setClientIdentifiers(clientId);
             return new ClientRegistration(client, contextPath);
         });
