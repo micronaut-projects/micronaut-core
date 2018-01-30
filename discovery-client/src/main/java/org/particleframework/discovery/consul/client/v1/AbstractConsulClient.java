@@ -38,19 +38,9 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
-public abstract class AbstractConsulClient implements ConsulClient, DiscoveryClient {
+public abstract class AbstractConsulClient implements ConsulClient {
 
     @Inject protected ConsulConfiguration consulConfiguration;
-
-    /**
-     * Gets the healthy services that are passing health checks
-     *
-     * @return The {@link HealthEntry} instances
-     */
-    @Override
-    public Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
-        return getHealthyServices(service, Optional.empty(), Optional.empty(), Optional.empty());
-    }
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
@@ -91,11 +81,6 @@ public abstract class AbstractConsulClient implements ConsulClient, DiscoveryCli
                 return serviceInstances;
             });
         }
-    }
-
-    @Override
-    public Publisher<List<String>> getServiceIds() {
-        return Publishers.map(getServiceNames(), services -> new ArrayList<>(services.keySet()));
     }
 
     @Override

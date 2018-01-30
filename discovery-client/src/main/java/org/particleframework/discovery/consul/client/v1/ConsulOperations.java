@@ -174,4 +174,13 @@ public interface ConsulOperations {
     default Publisher<HttpStatus> fail(String checkId) {
         return fail(checkId, Optional.empty());
     }
+
+    /**
+     * Gets service health information. Defaults to return both non-healthy and healthy services
+     *
+     * @return The {@link HealthEntry} instances
+     */
+    default Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
+        return getHealthyServices(service, Optional.empty(), Optional.empty(), Optional.empty());
+    }
 }

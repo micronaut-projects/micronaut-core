@@ -270,7 +270,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
         }
-        throw new UnsupportedOperationException("Cannot implement method that is not annotated with an HTTP method type");
+        throw new UnsupportedOperationException("Cannot implement method ["+context+"] that is not annotated with an HTTP method type");
     }
 
     private ClientRegistration getClient(Client clientAnn) {
