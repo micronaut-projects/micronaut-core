@@ -69,7 +69,6 @@ class ClientScopeSpec extends Specification {
                 host:System.getenv('CONSUL_HOST'),
                 port:System.getenv('CONSUL_PORT')
         ]
-        // a mock consul server
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
                 'consul.host': consulServer.host,
                 'consul.port': consulServer.port,
