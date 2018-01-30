@@ -112,10 +112,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
     private Set<String> clientIdentifiers = Collections.emptySet();
 
-    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        this((Object discriminator) -> url, configuration, codecRegistry, filters);
-    }
-
     /**
      * Construct a client for the given arguments
      *
@@ -125,7 +121,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      */
     @Inject
     public DefaultHttpClient(@Argument ServerSelector serverSelector,
-                             HttpClientConfiguration configuration,
+                             @Argument HttpClientConfiguration configuration,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
@@ -148,8 +144,12 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this.filters = filters;
     }
 
+    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+        this((Object discriminator) -> url, configuration, codecRegistry, filters);
+    }
+
     public DefaultHttpClient(ServerSelector serverSelector) {
-        this(serverSelector, new HttpClientConfiguration(), createDefaultMediaTypeRegistry());
+        this(serverSelector, new DefaultHttpClientConfiguration(), createDefaultMediaTypeRegistry());
     }
 
 

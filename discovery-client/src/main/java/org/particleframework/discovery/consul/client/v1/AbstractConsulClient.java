@@ -37,7 +37,7 @@ import java.util.*;
  * @since 1.0
  */
 @SuppressWarnings("unused")
-@Client(id = ConsulClient.SERVICE_ID, path = "/v1")
+@Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient, DiscoveryClient {
 
     @Inject protected ConsulConfiguration consulConfiguration;
