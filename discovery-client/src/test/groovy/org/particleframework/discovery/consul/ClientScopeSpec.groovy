@@ -76,17 +76,26 @@ class ClientScopeSpec extends Specification {
                 'particle.application.name': 'messageService'
         ])
 
+        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, [
+                'consul.host': consulServer.host,
+                'consul.port': consulServer.port,
+                'particle.application.name': 'messageService'
+        ])
+
         MessageService messageClient = ApplicationContext.run(MessageService, [
                 'consul.host': consulServer.host,
                 'consul.port': consulServer.port
         ])
 
-        expect:
-        messageClient.getMessage() == "Server ${messageServer.port}"
+
+        expect: "Different servers are called for each invocation of getMessage()"
+        messageClient.getMessage().startsWith("Server ")
+        messageClient.getMessage() != messageClient.getMessage()
+
 
         cleanup:
         messageServer.stop()
-
+        messageServer2.stop()
     }
 
 
