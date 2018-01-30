@@ -25,7 +25,9 @@ import java.util.StringJoiner;
 import java.util.StringTokenizer;
 
 /**
- * @author graemerocher
+ * The default generate for Instance IDs
+ *
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton

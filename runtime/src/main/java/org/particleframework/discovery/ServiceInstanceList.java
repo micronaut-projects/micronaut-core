@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.discovery;
 
-import java.util.Optional;
+import java.util.List;
 
 /**
- * A resolver of {@link ServerSelector} instances that are capable of resolving references to services into a concrete selector
+ * Interface for types that expose a list of {@link ServiceInstance}
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface ServerSelectorResolver {
+public interface ServiceInstanceList {
+    /**
+     * @return The service ID
+     */
+    String getID();
+    /**
+     * Updates the backing server list
+     *
+     * @param servers The servers
+     */
+    void update(List<ServiceInstance> servers);
 
     /**
-     * Resolve a {@link ServerSelector} for the given references
-     * @param serviceReferences The references
-     *
-     * @return A {@link ServerSelector} or empty of non can be resolved
+     * @return The instances
      */
-    Optional<? extends ServerSelector> resolve(String... serviceReferences);
+    List<ServiceInstance> getInstances();
 }
