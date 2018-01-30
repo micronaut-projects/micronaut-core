@@ -83,6 +83,8 @@ public class ApplicationConfiguration {
     @ConfigurationProperties("instance")
     public static class InstanceConfiguration {
         private String id;
+        private String group;
+        private String zone;
         @SuppressWarnings("unchecked")
         private Map<CharSequence, String> metadata = Collections.EMPTY_MAP;
 
@@ -93,12 +95,37 @@ public class ApplicationConfiguration {
             return Optional.ofNullable(id);
         }
 
-        public void setId(String id) {
-            this.id = id;
-        }
-
+        /**
+         * @return Any metadata to associate with the instance
+         */
         public Map<CharSequence, String> getMetadata() {
             return metadata;
+        }
+
+        /**
+         * @return The instance group
+         */
+        public Optional<String> getGroup() {
+            return Optional.ofNullable(group);
+        }
+
+        /**
+         * @return The instance zone
+         */
+        public Optional<String> getZone() {
+            return Optional.ofNullable(zone);
+        }
+
+        public void setZone(String zone) {
+            this.zone = zone;
+        }
+
+        public void setGroup(String group) {
+            this.group = group;
+        }
+
+        public void setId(String id) {
+            this.id = id;
         }
 
         public void setMetadata(Map<CharSequence, String> metadata) {

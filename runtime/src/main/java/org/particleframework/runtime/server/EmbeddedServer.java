@@ -18,6 +18,7 @@ package org.particleframework.runtime.server;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.LifeCycle;
 import org.particleframework.context.env.Environment;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.net.URI;
 import java.net.URL;
@@ -56,6 +57,10 @@ public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
      */
     ApplicationContext getApplicationContext();
 
+    /**
+     * @return The {@link ApplicationConfiguration} instance
+     */
+    ApplicationConfiguration getApplicationConfiguration();
     /**
      * @return The {@link Environment} for the server
      */

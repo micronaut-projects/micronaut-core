@@ -104,7 +104,7 @@ public class ConsulConfiguration {
 
     @ConfigurationProperties("discovery")
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
-        private Map<String, List<String>> tags = Collections.emptyMap();
+        private Map<String, String> tags = Collections.emptyMap();
         private Map<String, String> datacenters = Collections.emptyMap();
         private boolean passing = false;
 
@@ -120,7 +120,7 @@ public class ConsulConfiguration {
          * A map of service ID to tags to use for querying
          * @return The tags
          */
-        public Map<String, List<String>> getTags() {
+        public Map<String, String> getTags() {
             return tags;
         }
 
@@ -136,7 +136,7 @@ public class ConsulConfiguration {
             this.passing = passing;
         }
 
-        public void setTags(Map<String, List<String>> tags) {
+        public void setTags(Map<String, String> tags) {
             if(tags != null) {
                 this.tags = tags;
             }

@@ -37,4 +37,6 @@ public interface ConsulClient extends ConsulOperations, DiscoveryClient {
      * The default ID of the consul service
      */
     String SERVICE_ID = "consul";
+
+    Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service);
 }
