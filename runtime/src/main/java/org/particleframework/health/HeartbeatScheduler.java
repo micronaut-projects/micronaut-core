@@ -15,6 +15,7 @@
  */
 package org.particleframework.health;
 
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.context.event.ApplicationEventPublisher;
 import org.particleframework.context.exceptions.ConfigurationException;
@@ -23,6 +24,7 @@ import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
 import org.particleframework.discovery.event.ServiceDegistrationEvent;
 import org.particleframework.discovery.event.ServiceRegistrationEvent;
 import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
+import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.runtime.server.EmbeddedServerInstance;
 
 import javax.inject.Named;
@@ -39,6 +41,7 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = EmbeddedServer.class)
 public class HeartbeatScheduler implements ApplicationEventListener<AbstractServiceInstanceEvent> {
 
 
@@ -77,7 +80,7 @@ public class HeartbeatScheduler implements ApplicationEventListener<AbstractServ
             }
             else if(event instanceof ServiceDegistrationEvent && this.scheduledFixture != null) {
                 ServiceInstance source = event.getSource();
-                if(source instanceof EmbeddedServerInstance) {
+                if(source instanceof EmbeddedServerInstance && !this.scheduledFixture.isCancelled()) {
                     this.scheduledFixture.cancel(false);
                 }
             }

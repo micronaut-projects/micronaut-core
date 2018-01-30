@@ -78,65 +78,68 @@ public class ConsulAutoRegistration extends AutoRegistration {
 
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
-        String checkId = "service:" + idGenerator.generateId(environment, instance);
+        if(!consulConfiguration.getRegistration().getCheck().isHttp()) {
 
-        if (status.equals(HealthStatus.UP)) {
-            // send a request to /agent/check/pass/:check_id
-            consulClient.pass(checkId).subscribe(new Subscriber<HttpStatus>() {
-                @Override
-                public void onSubscribe(Subscription subscription) {
-                    subscription.request(1);
-                }
+            String checkId = "service:" + idGenerator.generateId(environment, instance);
 
-                @Override
-                public void onNext(HttpStatus httpStatus) {
-                    if(LOG.isDebugEnabled()) {
-                        LOG.debug("Successfully reported passing state to Consul");
-                    }
-                }
-
-                @Override
-                public void onError(Throwable throwable) {
-                    String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
-                    if(LOG.isErrorEnabled()) {
-                        LOG.error(errorMessage, throwable);
+            if (status.equals(HealthStatus.UP)) {
+                // send a request to /agent/check/pass/:check_id
+                consulClient.pass(checkId).subscribe(new Subscriber<HttpStatus>() {
+                    @Override
+                    public void onSubscribe(Subscription subscription) {
+                        subscription.request(1);
                     }
 
-                }
-
-                @Override
-                public void onComplete() {
-
-                }
-            });
-        } else {
-            // send a request to /agent/check/fail/:check_id
-            consulClient.fail(checkId, status.getDescription()).subscribe(new Subscriber<HttpStatus>() {
-                @Override
-                public void onSubscribe(Subscription subscription) {
-                    subscription.request(1);
-                }
-
-                @Override
-                public void onNext(HttpStatus httpStatus) {
-                    if(LOG.isDebugEnabled()) {
-                        LOG.debug("Successfully reported failure state to Consul");
+                    @Override
+                    public void onNext(HttpStatus httpStatus) {
+                        if(LOG.isDebugEnabled()) {
+                            LOG.debug("Successfully reported passing state to Consul");
+                        }
                     }
-                }
 
-                @Override
-                public void onError(Throwable throwable) {
-                    String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
-                    if(LOG.isErrorEnabled()) {
-                        LOG.error("Error reporting failure state to Consul: " +errorMessage, throwable);
+                    @Override
+                    public void onError(Throwable throwable) {
+                        String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
+                        if(LOG.isErrorEnabled()) {
+                            LOG.error(errorMessage, throwable);
+                        }
+
                     }
-                }
 
-                @Override
-                public void onComplete() {
+                    @Override
+                    public void onComplete() {
 
-                }
-            });
+                    }
+                });
+            } else {
+                // send a request to /agent/check/fail/:check_id
+                consulClient.fail(checkId, status.getDescription()).subscribe(new Subscriber<HttpStatus>() {
+                    @Override
+                    public void onSubscribe(Subscription subscription) {
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onNext(HttpStatus httpStatus) {
+                        if(LOG.isDebugEnabled()) {
+                            LOG.debug("Successfully reported failure state to Consul");
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
+                        if(LOG.isErrorEnabled()) {
+                            LOG.error("Error reporting failure state to Consul: " +errorMessage, throwable);
+                        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
+            }
         }
     }
 
