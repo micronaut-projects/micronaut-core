@@ -62,6 +62,7 @@ public abstract class Check {
     /**
      * @return A unique ID for the check
      */
+    @JsonProperty("ID")
     public String getID() {
         return ID;
     }
@@ -114,6 +115,7 @@ public abstract class Check {
     }
 
 
+    @JsonProperty("ID")
     void setID(String ID) {
         this.ID = ID;
     }
