@@ -42,9 +42,11 @@ import org.particleframework.http.server.netty.configuration.NettyHttpServerConf
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.particleframework.runtime.executor.ExecutorSelector;
 import org.particleframework.runtime.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
+import org.particleframework.runtime.server.EmbeddedServerInstance;
 import org.particleframework.runtime.server.event.ServerShutdownEvent;
 import org.particleframework.runtime.server.event.ServerStartupEvent;
 import org.particleframework.web.router.Router;
@@ -95,7 +97,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ApplicationContext applicationContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
-    private ServiceInstance serviceInstance;
+    private EmbeddedServerInstance serviceInstance;
 
     @Inject
     public NettyHttpServer(
@@ -197,7 +199,12 @@ public class NettyHttpServer implements EmbeddedServer {
             applicationContext.publishEvent(new ServerStartupEvent(this));
             Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
             applicationName.ifPresent(id -> {
-                this.serviceInstance = new ServiceInstance() {
+                this.serviceInstance = new EmbeddedServerInstance() {
+                    @Override
+                    public EmbeddedServer getEmbeddedServer() {
+                        return NettyHttpServer.this;
+                    }
+
                     @Override
                     public String getId() {
                         return id;
@@ -290,6 +297,11 @@ public class NettyHttpServer implements EmbeddedServer {
     @Override
     public ApplicationContext getApplicationContext() {
         return applicationContext;
+    }
+
+    @Override
+    public ApplicationConfiguration getApplicationConfiguration() {
+        return serverConfiguration.getApplicationConfiguration();
     }
 
     protected NioEventLoopGroup createParentEventLoopGroup() {

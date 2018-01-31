@@ -13,13 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery;
+
+import java.util.List;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * Interface for types that expose a list of {@link ServiceInstance}
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-package org.particleframework.discovery.consul;
+public interface ServiceInstanceList {
+    /**
+     * @return The service ID
+     */
+    String getID();
+    /**
+     * Updates the backing server list
+     *
+     * @param servers The servers
+     */
+    void update(List<ServiceInstance> servers);
 
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+    /**
+     * @return The instances
+     */
+    List<ServiceInstance> getInstances();
+}

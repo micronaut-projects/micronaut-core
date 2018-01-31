@@ -22,23 +22,23 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import org.particleframework.core.convert.ConversionService;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.Optional;
 
 
 /**
  * Base class for all checks
  *
- * @see HttpCheck
+ * @see HTTPCheck
  * @author Graeme Rocher
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 public abstract class Check {
 
-    private Duration interval = Duration.of(10, ChronoUnit.SECONDS);
+
     private Duration deregisterCriticalServiceAfter;
-    private final String name;
+    private String name;
     private String ID;
     private HealthStatus status = HealthStatus.PASSING;
     private String notes;
@@ -48,8 +48,7 @@ public abstract class Check {
         this.name = name;
     }
 
-    public String getInterval() {
-        return interval.getSeconds() + "s";
+    protected Check() {
     }
 
 
@@ -63,6 +62,7 @@ public abstract class Check {
     /**
      * @return A unique ID for the check
      */
+    @JsonProperty("ID")
     public String getID() {
         return ID;
     }
@@ -90,12 +90,6 @@ public abstract class Check {
         return status;
     }
 
-    /**
-     * @return The interval as a {@link Duration}
-     */
-    public Duration interval() {
-        return this.interval;
-    }
 
     /**
      * @return The deregisterCriticalServiceAfter as a {@link Duration}
@@ -111,37 +105,29 @@ public abstract class Check {
         return Optional.of(deregisterCriticalServiceAfter.toMinutes() + "m");
     }
 
-    public void setDeregisterCriticalServiceAfter(String deregisterCriticalServiceAfter) {
+
+    void setName(String name) {
+        this.name = name;
+    }
+
+    void setDeregisterCriticalServiceAfter(String deregisterCriticalServiceAfter) {
         this.deregisterCriticalServiceAfter = ConversionService.SHARED.convert(deregisterCriticalServiceAfter, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid deregisterCriticalServiceAfter Specified"));
     }
 
-    public void setInterval(String interval) {
-        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid Duration Specified"));
-    }
 
-    public void setID(String ID) {
+    @JsonProperty("ID")
+    void setID(String ID) {
         this.ID = ID;
     }
 
-    public void setStatus(String status) {
+    void setStatus(String status) {
         this.status = HealthStatus.valueOf(status.toUpperCase());
     }
 
-    public void setNotes(String notes) {
+    void setNotes(String notes) {
         this.notes = notes;
     }
 
-    public Check interval(Duration interval) {
-        if(interval != null) {
-            this.interval = interval;
-        }
-        return this;
-    }
-
-    public Check interval(String interval) {
-        this.interval = ConversionService.SHARED.convert(interval, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid Duration Specified"));
-        return this;
-    }
 
     public Check deregisterCriticalServiceAfter(Duration interval) {
         if(interval != null) {
@@ -173,7 +159,25 @@ public abstract class Check {
      * Valid health status values
      */
     @JsonNaming(PropertyNamingStrategy.LowerCaseStrategy.class)
-    enum HealthStatus {
+    public enum HealthStatus {
         PASSING, WARNING, CRITICAL
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Check check = (Check) o;
+        return Objects.equals(deregisterCriticalServiceAfter, check.deregisterCriticalServiceAfter) &&
+                Objects.equals(name, check.name) &&
+                Objects.equals(ID, check.ID) &&
+                status == check.status &&
+                Objects.equals(notes, check.notes);
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(deregisterCriticalServiceAfter, name, ID, status, notes);
     }
 }

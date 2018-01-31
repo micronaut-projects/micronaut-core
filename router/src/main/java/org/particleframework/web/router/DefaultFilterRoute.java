@@ -18,6 +18,7 @@ package org.particleframework.web.router;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
@@ -67,7 +68,11 @@ class DefaultFilterRoute implements FilterRoute {
         String uriStr = uri.toString();
         for (String pattern : patterns) {
             if( PathMatcher.ANT.matches(pattern, uriStr) ) {
-                return Optional.of(getFilter());
+                HttpFilter filter = getFilter();
+                if(filter instanceof Toggleable && !((Toggleable)filter).isEnabled()) {
+                    return Optional.empty();
+                }
+                return Optional.of(filter);
             }
         }
         return Optional.empty();

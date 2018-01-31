@@ -21,6 +21,8 @@ import org.particleframework.core.util.Toggleable;
 import java.time.Duration;
 
 /**
+ * Configuration fo
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -28,7 +30,7 @@ import java.time.Duration;
 public class HeartbeatConfiguration implements Toggleable {
 
     private Duration interval = Duration.ofSeconds(15);
-    private boolean enabled = false;
+    private boolean enabled = true;
 
     /**
      * @return The interval with which to publish {@link HeartbeatEvent} instances

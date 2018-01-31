@@ -27,12 +27,14 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "endpoints")
+@EachProperty(EndpointConfiguration.PREFIX)
 public class EndpointConfiguration implements Toggleable {
 
-    protected String id;
-    protected Optional<Boolean> enabled = Optional.empty();
-    protected Optional<Boolean> sensitive = Optional.empty();
+    public static final String PREFIX = "endpoints";
+
+    private final String id;
+    private Optional<Boolean> enabled = Optional.empty();
+    private Optional<Boolean> sensitive = Optional.empty();
 
     private EndpointDefaultConfiguration defaultConfiguration;
 
@@ -51,14 +53,21 @@ public class EndpointConfiguration implements Toggleable {
 
     @Override
     public boolean isEnabled() {
-        return enabled.orElse(defaultConfiguration.enabled);
+        return enabled.orElseGet(()->defaultConfiguration.isEnabled());
     }
 
     /**
      * @return Does the endpoint expose sensitive information
      */
     public boolean isSensitive() {
-        return sensitive.orElse(defaultConfiguration.sensitive);
+        return sensitive.orElseGet(()->defaultConfiguration.isSensitive());
     }
 
+    public void setEnabled(Boolean enabled) {
+        this.enabled = Optional.ofNullable(enabled);
+    }
+
+    public void setSensitive(Boolean sensitive) {
+        this.sensitive = Optional.ofNullable(sensitive);
+    }
 }

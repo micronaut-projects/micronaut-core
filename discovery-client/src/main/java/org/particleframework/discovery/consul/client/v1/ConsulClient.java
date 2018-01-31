@@ -15,6 +15,7 @@
  */
 package org.particleframework.discovery.consul.client.v1;
 
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
@@ -23,6 +24,7 @@ import org.particleframework.http.annotation.Put;
 import org.reactivestreams.Publisher;
 
 import javax.validation.constraints.NotNull;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -37,4 +39,9 @@ public interface ConsulClient extends ConsulOperations, DiscoveryClient {
      * The default ID of the consul service
      */
     String SERVICE_ID = "consul";
+
+    @Override
+    default Publisher<List<String>> getServiceIds() {
+        return Publishers.map(getServiceNames(), services -> new ArrayList<>(services.keySet()));
+    }
 }

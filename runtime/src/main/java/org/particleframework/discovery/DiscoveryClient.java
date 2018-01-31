@@ -21,7 +21,7 @@ import java.io.Closeable;
 import java.util.List;
 
 /**
- * Main abstraction used for service discovery
+ * Main client abstraction used for service discovery
  *
  * @author Graeme Rocher
  * @since 1.0

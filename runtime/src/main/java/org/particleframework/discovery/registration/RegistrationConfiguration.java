@@ -29,6 +29,10 @@ import java.util.Optional;
  */
 public abstract class RegistrationConfiguration implements Toggleable {
 
+    public static final String PREFIX = "registration";
+
+    private String healthPath;
+
     private int retryCount = -1;
 
     private Duration timeout;
@@ -46,10 +50,6 @@ public abstract class RegistrationConfiguration implements Toggleable {
      */
     public Optional<Duration> getTimeout() {
         return Optional.ofNullable(timeout);
-    }
-
-    public void setTimeout(Duration timeout) {
-        this.timeout = timeout;
     }
 
     /**
@@ -86,6 +86,21 @@ public abstract class RegistrationConfiguration implements Toggleable {
      */
     public Duration getRetryDelay() {
         return retryDelay;
+    }
+
+    /**
+     * @return The path to the health endpoint
+     */
+    public Optional<String> getHealthPath() {
+        return Optional.ofNullable(healthPath);
+    }
+
+    public void setHealthPath(String healthPath) {
+        this.healthPath = healthPath;
+    }
+
+    public void setTimeout(Duration timeout) {
+        this.timeout = timeout;
     }
 
     public void setRetryDelay(Duration retryDelay) {

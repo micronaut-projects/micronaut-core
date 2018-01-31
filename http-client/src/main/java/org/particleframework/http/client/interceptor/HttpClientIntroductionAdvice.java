@@ -270,7 +270,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
         }
-        throw new UnsupportedOperationException("Cannot implement method that is not annotated with an HTTP method type");
+        throw new UnsupportedOperationException("Cannot implement method ["+context+"] that is not annotated with an HTTP method type");
     }
 
     private ClientRegistration getClient(Client clientAnn) {
@@ -289,7 +289,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             else if(ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
                 contextPath = clientId[0];
             }
-            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector);
+            HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
+            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector, configuration);
             client.setClientIdentifiers(clientId);
             return new ClientRegistration(client, contextPath);
         });

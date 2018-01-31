@@ -633,7 +633,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
             @Override
             public String expand(Map<String, Object> parameters, boolean previousHasContent) {
                 Object found = parameters.get(variable);
-                if (found != null) {
+                boolean isOptional = found instanceof Optional;
+                if (found != null && !(isOptional && !((Optional)found).isPresent())) {
+                    if(isOptional) {
+                        found = ((Optional)found).get();
+                    }
                     String prefixToUse = prefix;
                     String result;
                     if (found.getClass().isArray()) {

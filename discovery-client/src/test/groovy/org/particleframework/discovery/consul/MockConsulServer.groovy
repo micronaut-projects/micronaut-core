@@ -43,8 +43,34 @@ class MockConsulServer implements ConsulOperations {
     Map<String, ServiceEntry> services = new ConcurrentHashMap<>()
     final CatalogEntry nodeEntry
 
+    static NewServiceEntry lastNewEntry
+    static List<String> passingReports = []
+
     MockConsulServer(EmbeddedServer embeddedServer) {
+        lastNewEntry = null
+        passingReports.clear()
         nodeEntry = new CatalogEntry(UUID.randomUUID().toString(), InetAddress.localHost)
+    }
+
+    @Override
+    Publisher<HttpStatus> pass(String checkId, Optional<String> note) {
+        passingReports.add(checkId)
+        return Publishers.just(HttpStatus.OK)
+    }
+
+    @Override
+    Publisher<HttpStatus> warn(String checkId, Optional<String> note) {
+        return Publishers.just(HttpStatus.OK)
+    }
+
+    @Override
+    Publisher<HttpStatus> fail(String checkId, Optional<String> note) {
+        return Publishers.just(HttpStatus.OK)
+    }
+
+    @Override
+    Publisher<String> status() {
+        return Publishers.just("localhost")
     }
 
     @Override
@@ -59,13 +85,20 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry) {
+        lastNewEntry = entry
         services.put(entry.getName(), new ServiceEntry(entry))
         return Publishers.just(HttpStatus.OK)
     }
 
     @Override
     Publisher<HttpStatus> deregister(@NotNull String service) {
-        services.remove(service)
+        def s = services.find { it.value.ID.isPresent() ? it.value.ID.get().equals(service) : it.value.name == service }
+        if(s) {
+            services.remove(s.value.name)
+        }
+        else {
+            services.remove(service)
+        }
         return Publishers.just(HttpStatus.OK)
     }
 
@@ -75,7 +108,8 @@ class MockConsulServer implements ConsulOperations {
     }
 
     @Override
-    Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
+    Publisher<List<HealthEntry>> getHealthyServices(
+            @NotNull String service, Optional<Boolean> passing, Optional<String> tag, Optional<String> dc) {
         ServiceEntry serviceEntry = services.get(service)
         List<HealthEntry> healthEntries = []
         if(serviceEntry != null) {

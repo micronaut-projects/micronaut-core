@@ -1324,7 +1324,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         String configurationPropertiesPrefix;
         String nestedConfigurationPropertiesPrefix = resolveConfigPropertiesValue(nestedType, beanContext);
         Class<?> supertype = nestedType.getSuperclass();
-        while (supertype != null && supertype != Object.class) {
+        while (supertype != null && supertype != Object.class && !(Modifier.isAbstract(supertype.getModifiers()))) {
             configurationPropertiesPrefix = resolveConfigPropertiesValue(supertype, beanContext);
             if (configurationPropertiesPrefix != null) {
                 if (nestedConfigurationPropertiesPrefix == null || !nestedConfigurationPropertiesPrefix.equals(configurationPropertiesPrefix)) {
@@ -1337,7 +1337,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String resolveConfigPropertiesValue(Class<?> supertype, BeanContext beanContext) {
         BeanDefinition<?> definition;
-        if (supertype.equals(getBeanType())) {
+        if (supertype.equals(getBeanType()) || Modifier.isAbstract(supertype.getModifiers())) {
             definition = this;
         } else {
             definition = beanContext.findBeanDefinition(supertype).orElse(null);
