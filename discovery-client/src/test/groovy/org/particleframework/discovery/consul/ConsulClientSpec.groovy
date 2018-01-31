@@ -41,7 +41,8 @@ class ConsulClientSpec extends Specification {
 
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ['consul.host': System.getenv('CONSUL_HOST'),
-            'consul.port': System.getenv('CONSUL_PORT')]
+            'consul.port': System.getenv('CONSUL_PORT'),
+            'consul.readTimeout': '5s']
     )
     @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
@@ -51,6 +52,8 @@ class ConsulClientSpec extends Specification {
         expect:
         discoveryClient instanceof CompositeDiscoveryClient
         client instanceof DiscoveryClient
+        embeddedServer.applicationContext.getBean(ConsulConfiguration).readTimeout.isPresent()
+        embeddedServer.applicationContext.getBean(ConsulConfiguration).readTimeout.get().getSeconds() == 5
         Flowable.fromPublisher(discoveryClient.serviceIds).blockingFirst().contains('consul')
         Flowable.fromPublisher(((DiscoveryClient)client).serviceIds).blockingFirst().contains('consul')
     }
@@ -122,7 +125,7 @@ class ConsulClientSpec extends Specification {
     void "test register service with health check"() {
 
         when:
-        def check = new HttpCheck("test-service-check", new URL(embeddedServer.getURL(), '/consul/test'))
+        def check = new HTTPCheck("test-service-check", new URL(embeddedServer.getURL(), '/consul/test'))
         check.interval('5s')
         check.deregisterCriticalServiceAfter('90m')
         def entry = new NewServiceEntry("test-service")
@@ -137,7 +140,7 @@ class ConsulClientSpec extends Specification {
 
         then:
         entry.checks.size() == 1
-        entry.checks.first().interval =='5s'
+        entry.checks.first().interval.get() =='5s'
         entry.checks.first().deregisterCriticalServiceAfter.get() =='90m'
 
         when:

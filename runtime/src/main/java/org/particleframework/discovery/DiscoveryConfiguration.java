@@ -16,6 +16,8 @@
 package org.particleframework.discovery;
 
 /**
+ * Base class for common discovery configuration options
+ *
  * @author graemerocher
  * @since 1.0
  */

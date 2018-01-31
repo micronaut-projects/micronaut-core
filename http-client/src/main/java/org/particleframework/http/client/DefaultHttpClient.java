@@ -46,6 +46,7 @@ import org.particleframework.core.reflect.InstantiationUtils;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.PathMatcher;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.util.Toggleable;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
@@ -111,10 +112,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
     private Set<String> clientIdentifiers = Collections.emptySet();
 
-    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        this((Object discriminator) -> url, configuration, codecRegistry, filters);
-    }
-
     /**
      * Construct a client for the given arguments
      *
@@ -124,7 +121,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      */
     @Inject
     public DefaultHttpClient(@Argument ServerSelector serverSelector,
-                             HttpClientConfiguration configuration,
+                             @Argument HttpClientConfiguration configuration,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
         this.serverSelector = serverSelector;
@@ -147,8 +144,12 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this.filters = filters;
     }
 
+    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+        this((Object discriminator) -> url, configuration, codecRegistry, filters);
+    }
+
     public DefaultHttpClient(ServerSelector serverSelector) {
-        this(serverSelector, new HttpClientConfiguration(), createDefaultMediaTypeRegistry());
+        this(serverSelector, new DefaultHttpClientConfiguration(), createDefaultMediaTypeRegistry());
     }
 
 
@@ -269,7 +270,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 } else {
                     Throwable cause = future.cause();
                     completableFuture.completeExceptionally(
-                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            new HttpClientException("Connect Error: " + cause.getMessage(), cause)
                     );
                 }
             });
@@ -430,6 +431,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         String requestPath = request.getPath();
         HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
+            if(filter instanceof Toggleable && !((Toggleable)filter).isEnabled()) {
+                continue;
+            }
             Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
             if (filterAnn != null) {
                 String[] clients = filterAnn.clients();

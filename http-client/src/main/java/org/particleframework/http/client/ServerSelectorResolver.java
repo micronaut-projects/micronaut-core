@@ -31,5 +31,5 @@ public interface ServerSelectorResolver {
      *
      * @return A {@link ServerSelector} or empty of non can be resolved
      */
-    Optional<ServerSelector> resolve(String... serviceReferences);
+    Optional<? extends ServerSelector> resolve(String... serviceReferences);
 }

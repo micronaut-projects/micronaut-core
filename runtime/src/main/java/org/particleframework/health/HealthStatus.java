@@ -33,8 +33,15 @@ public class HealthStatus implements Comparable<HealthStatus> {
     private final Optional<Boolean> operational;
     private final Optional<Integer> severity;
 
+    /**
+     * Indicates the service is operational
+     */
     public static final HealthStatus UP = new HealthStatus("UP", null, true, null);
+    /**
+     * Indicates the service is down and unavailable
+     */
     public static final HealthStatus DOWN = new HealthStatus("DOWN", null, false, 1000);
+
     public static final HealthStatus UNKNOWN = new HealthStatus("UNKNOWN");
 
     public HealthStatus(@NotNull String name, String description, Boolean operational, Integer severity) {

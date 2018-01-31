@@ -444,9 +444,6 @@ public class DefaultBeanContext implements BeanContext {
         Map<String,Object> argumentValues;
         if(definition instanceof ParametrizedBeanFactory) {
             Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
-            if(args.length != requiredArguments.length) {
-                throw new BeanInstantiationException(resolutionContext, "Invalid number of bean arguments. Required " +requiredArguments.length + " but received " + args.length );
-            }
             argumentValues = new LinkedHashMap<>(requiredArguments.length);
             BeanResolutionContext.Path path = resolutionContext.getPath();
             for (int i = 0; i < requiredArguments.length; i++) {
@@ -455,10 +452,19 @@ public class DefaultBeanContext implements BeanContext {
                     path.pushConstructorResolve(
                             definition, requiredArgument
                     );
-                    Object val = args[i];
-                    argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
-                        new BeanInstantiationException(resolutionContext, "Invalid bean argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
-                    ));
+                    if(args.length > i) {
+                        Object val = args[i];
+                        argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
+                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
+                        ));
+                    }
+                    else {
+                        // attempt resolve from context
+                        Optional<?> existingBean = findBean(resolutionContext, requiredArgument.getType(), null);
+                        argumentValues.put(requiredArgument.getName(), existingBean.orElseThrow(()->
+                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument ["+requiredArgument+"]. No bean found for type: " + requiredArgument.getType())
+                        ));
+                    }
                 } finally {
                     path.pop();
                 }

@@ -49,19 +49,17 @@ public class NewServiceEntry extends AbstractServiceEntry {
         return checks;
     }
 
-    public void setChecks(List<Check> checks) {
-        if(CollectionUtils.isNotEmpty(checks)) {
-            this.checks = checks;
-        }
-    }
-
     public NewServiceEntry checks(List<Check> checks) {
-        setChecks(checks);
+        if(checks != null) {
+            this.checks.addAll(checks);
+        }
         return this;
     }
 
     public NewServiceEntry check(Check check) {
-        setChecks(Collections.singletonList(check));
+        if(check != null) {
+            this.checks.add(check);
+        }
         return this;
     }
 
@@ -92,5 +90,11 @@ public class NewServiceEntry extends AbstractServiceEntry {
 
     public NewServiceEntry tags(String... tags) {
         return (NewServiceEntry) super.tags(Arrays.asList(tags));
+    }
+
+    void setChecks(List<HTTPCheck> checks) {
+        if(CollectionUtils.isNotEmpty(checks)) {
+            this.checks.addAll(checks);
+        }
     }
 }

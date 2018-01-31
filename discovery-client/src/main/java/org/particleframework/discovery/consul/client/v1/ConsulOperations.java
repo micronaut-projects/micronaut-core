@@ -24,12 +24,48 @@ import org.reactivestreams.Publisher;
 import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
+ * API operations for Consul
+ *
  * @author graemerocher
  * @since 1.0
  */
 public interface ConsulOperations {
+
+    /**
+     * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @param note An optional note
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    @Put("/agent/check/pass/{checkId}{?note}")
+    Publisher<HttpStatus> pass(String checkId, Optional<String> note);
+
+    /**
+     * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @param note An optional note
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    @Put("/agent/check/warn/{checkId}{?note}")
+    Publisher<HttpStatus> warn(String checkId, Optional<String> note);
+
+    /**
+     * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @param note An optional note
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    @Put("/agent/check/fail/{checkId}{?note}")
+    Publisher<HttpStatus> fail(String checkId, Optional<String> note);
+    /**
+     * @return The current leader address
+     */
+    @Get("/status/leader")
+    Publisher<String> status();
+
     /**
      * Register a new {@link CatalogEntry}. See https://www.consul.io/api/catalog.html
      * @param entry The entry to register
@@ -79,8 +115,12 @@ public interface ConsulOperations {
      *
      * @return The {@link HealthEntry} instances
      */
-    @Get("/health/service/{service}")
-    Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service);
+    @Get("/health/service/{service}{?passing,tag,dc}")
+    Publisher<List<HealthEntry>> getHealthyServices(
+            @NotNull String service,
+            Optional<Boolean> passing,
+            Optional<String> tag,
+            Optional<String> dc);
 
     /**
      * Gets all of the registered nodes
@@ -106,4 +146,41 @@ public interface ConsulOperations {
      */
     @Get("/catalog/services")
     Publisher<Map<String, List<String>>> getServiceNames();
+
+
+    /**
+     * Pass the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    default Publisher<HttpStatus> pass(String checkId) {
+        return pass(checkId, Optional.empty());
+    }
+
+    /**
+     * Warn the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    default Publisher<HttpStatus> warn(String checkId) {
+        return warn(checkId, Optional.empty());
+    }
+
+    /**
+     * Fail the TTL check. See https://www.consul.io/api/agent/check.html
+     * @param checkId The check ID
+     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     */
+    default Publisher<HttpStatus> fail(String checkId) {
+        return fail(checkId, Optional.empty());
+    }
+
+    /**
+     * Gets service health information. Defaults to return both non-healthy and healthy services
+     *
+     * @return The {@link HealthEntry} instances
+     */
+    default Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
+        return getHealthyServices(service, Optional.empty(), Optional.empty(), Optional.empty());
+    }
 }

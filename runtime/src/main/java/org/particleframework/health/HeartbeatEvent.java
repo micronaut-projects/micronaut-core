@@ -15,8 +15,12 @@
  */
 package org.particleframework.health;
 
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.runtime.server.event.AbstractServerApplicationEvent;
+
+import java.util.Optional;
 
 /**
  * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration} that
@@ -24,14 +28,23 @@ import org.particleframework.runtime.server.event.AbstractServerApplicationEvent
  * @author Graeme Rocher
  * @since 1.0
  */
-public class HeartbeatEvent extends AbstractServerApplicationEvent {
+public class HeartbeatEvent extends AbstractServiceInstanceEvent {
     /**
      * Constructs a prototypical Event.
      *
-     * @param embeddedServer The object on which the Event initially occurred.
+     * @param source The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
-    public HeartbeatEvent(EmbeddedServer embeddedServer) {
-        super(embeddedServer);
+    public HeartbeatEvent(ServiceInstance source) {
+        super(source);
+    }
+
+    /**
+     * This method will return the {@link HealthStatus} if the server is configured to calculate the status
+     *
+     * @return The current health status
+     */
+    public HealthStatus getStatus() {
+        return HealthStatus.UP; // TODO return calculated status
     }
 }

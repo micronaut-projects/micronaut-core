@@ -20,6 +20,8 @@ import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
 import org.particleframework.discovery.event.ServiceDegistrationEvent;
 import org.particleframework.discovery.event.ServiceRegistrationEvent;
+import org.particleframework.health.HealthStatus;
+import org.particleframework.health.HeartbeatEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,18 +43,31 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
         else if(event instanceof ServiceDegistrationEvent) {
             deregister(event.getSource());
         }
+        else if(event instanceof HeartbeatEvent) {
+            HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
+            pulsate(event.getSource(), heartbeatEvent.getStatus());
+        }
     }
 
     /**
-     * Deregister the server from service discovery services
-     * @param instance The embedded server
+     * This method will be invoked each time a {@link HeartbeatEvent} occurs allowing the implementation to perform any necessary callbacks to the service discovery server
+     *
+     * @param instance The instance
+     * @param status The {@link HealthStatus}
+     */
+    protected abstract void pulsate(ServiceInstance instance, HealthStatus status);
+
+    /**
+     * Deregister the {@link ServiceInstance} from service discovery services
+     *
+     * @param instance The {@link ServiceInstance}
      */
     protected abstract void deregister(ServiceInstance instance);
 
     /**
-     * Register the server with discovery services
+     * Register the {@link ServiceInstance} with discovery services
      *
-     * @param instance The server to register
+     * @param instance The {@link ServiceInstance}
      */
     protected abstract void register(ServiceInstance instance);
 }

@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery;
+
+import org.particleframework.context.env.Environment;
+
+import javax.annotation.Nonnull;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * Interface for generating IDs for {@link ServiceInstance}
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-package org.particleframework.discovery.consul;
+public interface ServiceInstanceIdGenerator {
 
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+    /**
+     * Generates a service ID
+     *
+     * @param environment The environment
+     * @param serviceInstance The service instance
+     * @return The generated ID. Never null
+     */
+    @Nonnull String generateId(Environment environment, ServiceInstance serviceInstance);
+}

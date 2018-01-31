@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.http.client;
+
+import org.particleframework.discovery.ServiceInstanceList;
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul
+ * A {@link ServerSelector} that is also a {@link ServiceInstanceList}
  *
  * @author graemerocher
  * @since 1.0
  */
-@RequiresConsul
-package org.particleframework.discovery.consul;
-
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+public interface ServiceInstanceSelector extends ServerSelector, ServiceInstanceList {
+}
