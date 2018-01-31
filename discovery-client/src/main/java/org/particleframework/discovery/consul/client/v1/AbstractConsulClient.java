@@ -19,6 +19,7 @@ import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
+import org.particleframework.discovery.consul.ConsulServiceInstance;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
 import org.reactivestreams.Publisher;
@@ -40,43 +41,27 @@ import java.util.*;
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient {
 
-    @Inject protected ConsulConfiguration consulConfiguration;
+    @Inject protected ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        boolean hasConfiguration = consulConfiguration != null;
-        if(SERVICE_ID.equals(serviceId) && hasConfiguration) {
+        if(SERVICE_ID.equals(serviceId)) {
             return Publishers.just(
                     Collections.singletonList(ServiceInstance.of(SERVICE_ID, consulConfiguration.getHost(), consulConfiguration.getPort()))
             );
         }
         else {
-            boolean passing = hasConfiguration && consulConfiguration.getDiscovery().isPassing();
-            Optional<String> datacenter = hasConfiguration ? Optional.ofNullable(consulConfiguration.getDiscovery().getDatacenters().get(serviceId)) : Optional.empty();
-            Optional<String> tag = hasConfiguration ? Optional.ofNullable(consulConfiguration.getDiscovery().getTags().get(serviceId)) : Optional.empty();
+            ConsulConfiguration.ConsulDiscoveryConfiguration discovery = consulConfiguration.getDiscovery();
+            boolean passing = discovery.isPassing();
+            Optional<String> datacenter = Optional.ofNullable(discovery.getDatacenters().get(serviceId));
+            Optional<String> tag = Optional.ofNullable(discovery.getTags().get(serviceId));
+            Optional<String> scheme = Optional.ofNullable(discovery.getSchemes().get(serviceId));
 
             Publisher<List<HealthEntry>> healthyServicesPublisher = getHealthyServices(serviceId, Optional.of(passing), tag, datacenter);
             return Publishers.map(healthyServicesPublisher, healthEntries -> {
                 List<ServiceInstance> serviceInstances = new ArrayList<>();
                 for (HealthEntry healthEntry : healthEntries) {
-                    ServiceEntry service = healthEntry.getService();
-                    NodeEntry node = healthEntry.getNode();
-                    InetAddress inetAddress = service.getAddress().orElse(node.getAddress());
-                    int port = service.getPort().orElse(-1);
-                    String portSuffix = port > -1 ? ":"+port : "";
-                    URI uri = URI.create("http://" + inetAddress.getHostName() + portSuffix);
-                    serviceInstances.add(new ServiceInstance() {
-                        @Override
-                        public String getId() {
-                            return service.getName();
-                        }
-
-                        @Override
-                        public URI getURI() {
-                            return uri;
-                        }
-
-                    });
+                    serviceInstances.add(new ConsulServiceInstance(healthEntry, scheme.orElse("http")));
                 }
                 return serviceInstances;
             });

@@ -213,13 +213,13 @@ public class ConsulAutoRegistration extends AutoRegistration {
                 ApplicationConfiguration.InstanceConfiguration instanceConfiguration = applicationConfiguration.getInstance();
                 instanceConfiguration.getGroup().ifPresent(g -> {
                             validateName(g, "Instance Group");
-                            tags.add("group=" + g);
+                            tags.add(ServiceInstance.GROUP + "=" + g);
                         }
 
                 );
                 instanceConfiguration.getZone().ifPresent(z -> {
                             validateName(z, "Instance Zone");
-                            tags.add("zone=" + z);
+                            tags.add(ServiceInstance.ZONE + "=" + z);
                         }
                 );
 

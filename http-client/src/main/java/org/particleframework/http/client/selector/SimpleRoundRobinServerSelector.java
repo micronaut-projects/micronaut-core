@@ -60,7 +60,8 @@ public class SimpleRoundRobinServerSelector implements ServiceInstanceSelector {
         lock.lock();
 
         try {
-            ServiceInstance instance = servers.get(index.getAndAccumulate(servers.size(), (cur, n) -> cur >= n - 1 ? 0 : cur + 1));
+            int i = index.getAndAccumulate(servers.size(), (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
+            ServiceInstance instance = servers.get(i);
             try {
                 return instance.getURI().toURL();
             } catch (MalformedURLException e) {

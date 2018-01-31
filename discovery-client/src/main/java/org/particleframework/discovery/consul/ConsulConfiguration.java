@@ -117,6 +117,7 @@ public class ConsulConfiguration extends HttpClientConfiguration {
     @ConfigurationProperties("discovery")
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
         private Map<String, String> tags = Collections.emptyMap();
+        private Map<String, String> schemes = Collections.emptyMap();
         private Map<String, String> datacenters = Collections.emptyMap();
         private boolean passing = false;
 
@@ -142,6 +143,18 @@ public class ConsulConfiguration extends HttpClientConfiguration {
          */
         public Map<String, String> getDatacenters() {
             return datacenters;
+        }
+
+        /**
+         * A map of service ID to protocol scheme (eg. http, https etc.). Default is http
+         * @return A map of schemes
+         */
+        public Map<String, String> getSchemes() {
+            return schemes;
+        }
+
+        public void setSchemes(Map<String, String> schemes) {
+            this.schemes = schemes;
         }
 
         public void setPassing(boolean passing) {
