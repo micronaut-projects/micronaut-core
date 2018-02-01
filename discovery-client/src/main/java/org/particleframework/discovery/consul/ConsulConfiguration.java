@@ -19,6 +19,7 @@ import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.util.Toggleable;
 import org.particleframework.discovery.DiscoveryConfiguration;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
+import org.particleframework.discovery.consul.condition.RequiresConsul;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.client.HttpClientConfiguration;
@@ -38,14 +39,17 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@RequiresConsul
 @ConfigurationProperties(ConsulClient.SERVICE_ID)
 public class ConsulConfiguration extends HttpClientConfiguration {
 
-    private String host = "localhost";
+    private String host = LOCALHOST;
 
     private int port = 8500;
 
     private String aslToken;
+
+    private boolean secure;
 
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
 
@@ -94,6 +98,17 @@ public class ConsulConfiguration extends HttpClientConfiguration {
         return discovery;
     }
 
+    /**
+     * @return Is Consul exposed over HTTPS (defaults to false)
+     */
+    public boolean isSecure() {
+        return secure;
+    }
+
+    public void setSecure(boolean secure) {
+        this.secure = secure;
+    }
+
     public void setDiscovery(ConsulDiscoveryConfiguration discovery) {
         this.discovery = discovery;
     }
@@ -114,7 +129,7 @@ public class ConsulConfiguration extends HttpClientConfiguration {
         this.registration = registration;
     }
 
-    @ConfigurationProperties("discovery")
+    @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
         private Map<String, String> tags = Collections.emptyMap();
         private Map<String, String> schemes = Collections.emptyMap();

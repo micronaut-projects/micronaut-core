@@ -13,15 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.eureka.condition;
+
+import org.particleframework.context.annotation.Requires;
+import org.particleframework.discovery.eureka.EurekaConfiguration;
+
+import java.lang.annotation.*;
 
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
+ * Meta annotation for that can be added to any component that requires Eureka to load
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-package org.particleframework.discovery.consul;
-
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.PACKAGE, ElementType.TYPE})
+@Requires(property = EurekaConfiguration.HOST)
+@Requires(property = EurekaConfiguration.PORT)
+public @interface RequiresEureka {
+}

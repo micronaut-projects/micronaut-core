@@ -23,6 +23,10 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.order.Ordered;
 import org.particleframework.http.server.HttpServerConfiguration;
 import org.particleframework.http.server.netty.NettyHttpRequest;
+import org.particleframework.http.server.netty.NettyHttpServer;
+import org.particleframework.runtime.server.EmbeddedServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -34,19 +38,24 @@ import java.util.List;
  */
 @ChannelHandler.Sharable
 public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> implements Ordered {
-
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     public static final String ID = "particle-http-decoder";
 
+    private final EmbeddedServer embeddedServer;
     private final ConversionService<?> conversionService;
     private final HttpServerConfiguration configuration;
 
-    public HttpRequestDecoder(ConversionService<?> conversionService, HttpServerConfiguration configuration) {
+    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService<?> conversionService, HttpServerConfiguration configuration) {
+        this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;
     }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) throws Exception {
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
+        }
         out.add(new NettyHttpRequest<>(msg, ctx, conversionService, configuration));
     }
 }

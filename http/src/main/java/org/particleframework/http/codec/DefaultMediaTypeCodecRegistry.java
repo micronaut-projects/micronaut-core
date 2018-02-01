@@ -17,9 +17,7 @@ package org.particleframework.http.codec;
 
 import org.particleframework.http.MediaType;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Registry of {@link MediaTypeCodec} instances
@@ -29,12 +27,18 @@ import java.util.Optional;
  */
 public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
 
+    private final Collection<MediaTypeCodec> codecs;
     Map<String, MediaTypeCodec> decodersByExtension = new LinkedHashMap<>(3);
     Map<MediaType, MediaTypeCodec> decodersByType = new LinkedHashMap<>(3);
 
-    DefaultMediaTypeCodecRegistry(MediaTypeCodec...decoders) {
-        if(decoders != null) {
-            for (MediaTypeCodec decoder : decoders) {
+    DefaultMediaTypeCodecRegistry(MediaTypeCodec...codecs) {
+        this(Arrays.asList(codecs));
+    }
+
+    DefaultMediaTypeCodecRegistry(Collection<MediaTypeCodec> codecs) {
+        if(codecs != null) {
+            this.codecs = Collections.unmodifiableCollection(codecs);
+            for (MediaTypeCodec decoder : codecs) {
                 MediaType mediaType = decoder.getMediaType();
                 if(mediaType != null) {
                     decodersByExtension.put(mediaType.getExtension(), decoder);
@@ -42,8 +46,10 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
                 }
             }
         }
+        else {
+            this.codecs = Collections.emptyList();
+        }
     }
-
     @Override
     public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
         if(mediaType == null) {
@@ -69,5 +75,10 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
             }
         }
         return codec;
+    }
+
+    @Override
+    public Collection<MediaTypeCodec> getCodecs() {
+        return codecs;
     }
 }

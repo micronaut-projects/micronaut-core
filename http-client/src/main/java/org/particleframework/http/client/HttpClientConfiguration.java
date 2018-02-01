@@ -42,6 +42,7 @@ import java.util.concurrent.ThreadFactory;
  */
 public abstract class HttpClientConfiguration {
 
+    public static final String LOCALHOST = "localhost";
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
 
