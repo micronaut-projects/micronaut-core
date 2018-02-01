@@ -1,0 +1,24 @@
+Often, you need to include the same HTTP headers or URL parameters in a set of requests against a particle third-party API or
+other particle micro-service. To simplify this, Particle includes a feature named `HttpClientFilter`.
+
+The next example illustrates a Particle's bean which interacts with https://bintray.com/docs/api/[Bintray REST Api].
+
+[source,groovy]
+----
+include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayApiConstants, indent=0]
+include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayService, indent=0]
+----
+
+Bintray API is secured. To authenticate you need to add an `Authorization` header for every request. You could
+modify `fetchRepositories` and `fetchPackages` methods to include the necessary HTTP Header for each request. A better solution is
+to create a filter to encapsulate this requirement.
+
+[source,groovy]
+----
+include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayFilter, indent=0]
+----
+
+<1> You can match only a subset of paths with a Client filter.
+
+When you invoke `bintrayService.fetchRepositories()`, the `Authorization` HTTP header is included in the request.
+
