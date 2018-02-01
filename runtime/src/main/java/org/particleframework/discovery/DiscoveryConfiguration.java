@@ -22,4 +22,6 @@ package org.particleframework.discovery;
  * @since 1.0
  */
 public class DiscoveryConfiguration {
+
+    public static final String PREFIX = "discovery";
 }

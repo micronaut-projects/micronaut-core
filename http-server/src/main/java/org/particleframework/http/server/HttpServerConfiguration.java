@@ -35,6 +35,8 @@ import java.util.*;
 @ConfigurationProperties(value = "particle.server", cliPrefix = "")
 public class HttpServerConfiguration  {
 
+    public static final String LOCALHOST = "localhost";
+
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     protected int port = -1; // default to random port

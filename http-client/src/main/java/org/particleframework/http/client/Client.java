@@ -36,7 +36,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@ScopedProxy
+@Scope
 @Introduction
 @Type(HttpClientIntroductionAdvice.class)
 @Singleton

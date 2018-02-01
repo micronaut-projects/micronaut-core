@@ -56,8 +56,8 @@ class ClientScopeSpec extends Specification {
 
 
         cleanup:
-        messageServer.stop()
-        consulServer.stop()
+        messageServer?.stop()
+        consulServer?.stop()
 
 
     }

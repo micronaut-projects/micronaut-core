@@ -13,15 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.eureka.client.v2;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
- *
- * @author graemerocher
- * @since 1.0
+ * @author Tomasz Bak
  */
-@Configuration
-package org.particleframework.discovery.consul;
+public class MyDataCenterInfo implements DataCenterInfo {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+    private final Name name;
+
+    @JsonCreator
+    public MyDataCenterInfo(@JsonProperty("name") Name name) {
+        this.name = name;
+    }
+
+    @Override
+    public Name getName() {
+        return name;
+    }
+}

@@ -161,7 +161,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-                            pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(environment, serverConfiguration));
+                            pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration));
                             pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(
                                     beanLocator,
                                     router,
@@ -181,6 +181,9 @@ public class NettyHttpServer implements EmbeddedServer {
 
             ChannelFuture future;
 
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("Binding server to port: {}", serverPort);
+            }
             if(host.isPresent()) {
                 future = serverBootstrap.bind(host.get(), serverPort);
             }

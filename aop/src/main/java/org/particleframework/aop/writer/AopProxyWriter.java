@@ -300,6 +300,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata) {
 
+        // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
+        visitExecutableMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
+
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
         Type returnTypeObject = getTypeReference(returnType);

@@ -15,10 +15,7 @@
  */
 package org.particleframework.core.beans;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -123,11 +120,32 @@ public abstract class BeanMap<T> implements Map<String, Object> {
 
     @Override
     public Set<Entry<String, Object>> entrySet() {
-        return propertyAccesses.entrySet().stream().collect(
-                Collectors.toMap(Map.Entry::getKey,
-                        access -> access.getValue().read()
-                )
-        ).entrySet();
+        Set<Entry<String, PropertyAccess>> entries = propertyAccesses.entrySet();
+        Set<Entry<String, Object>> nonNullEntries = new HashSet<>();
+        for (Entry<String, PropertyAccess> entry : entries) {
+            Object v = entry.getValue().read();
+            if(v != null) {
+                nonNullEntries.add(new Entry<String, Object>() {
+                    @Override
+                    public String getKey() {
+                        return entry.getKey();
+                    }
+
+                    @Override
+                    public Object getValue() {
+                        return v;
+                    }
+
+                    @Override
+                    public Object setValue(Object value) {
+                        entry.getValue().write(value);
+                        return v;
+                    }
+                });
+            }
+        }
+
+        return nonNullEntries;
     }
 
     /**
