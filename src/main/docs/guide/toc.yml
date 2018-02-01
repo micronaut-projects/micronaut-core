@@ -9,6 +9,7 @@ ioc:
   scopes:
     title: Scopes
     builtInScopes: Built-In Scopes
+    refreshable: Refreshable Scope
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   configurations: Bean Configurations
