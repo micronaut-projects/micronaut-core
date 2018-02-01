@@ -6,7 +6,10 @@ ioc:
   beanContext: The BeanContext 
   types: Injectable Container Types
   qualifiers: Bean Qualifiers
-  scopes: Bean Scopes
+  scopes:
+    title: Scopes
+    builtInScopes: Built-In Scopes
+    refreshable: Refreshable Scope
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   configurations: Bean Configurations
@@ -55,6 +58,7 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
+  clientFilter: HTTP Client Filter
 cloud:
   title: Cloud Deployment
   configurationSharing: Configuration Sharing
