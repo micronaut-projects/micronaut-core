@@ -1,0 +1,17 @@
+.Particle Built-in Scopes
+|===
+|Type |Description
+
+|link:{jeeapi}/javax/inject/Singleton.html[@Singleton]
+|Singleton scope indicates only one instance of the bean should exist
+|link:{api}/org/particleframework/context/annotation/Context.html[@Context]
+|Context scope indicates that the bean should be created at the same time as the `ApplicationContext` (eager initialization)
+|link:{api}/org/particleframework/context/annotation/Infrastructure.html[@Infrastructure]
+|Infrastructure is a `@Context` scope stereotype that indicates the bean cannot be replaced
+|link:{api}/org/particleframework/runtime/context/scope/ThreadLocal.html[@ThreadLocal]
+|`@ThreadLocal` scope is a custom scope that associates a bean per thread via a ThreadLocal
+|link:{api}/org/particleframework/runtime/context/scope/Refreshable.html[@Refreshable]
+|`@Refreshable` scope is a custom scope that allows a bean's state to be refreshed via the `/refresh` endpoint.
+|===
+
+Additional scopes can be added by defining a `@Singleton` bean that implements the link:{api}/org/particleframework/context/scope/CustomScope.html[CustomScope] interface.
