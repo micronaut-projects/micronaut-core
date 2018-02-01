@@ -58,6 +58,7 @@ httpServer:
     https: Securing the Server with HTTPS  
 httpClient:
   title: The HTTP Client
+  clientFilter: HTTP Client Filter
 cloud:
   title: Cloud Deployment
   configurationSharing: Configuration Sharing
