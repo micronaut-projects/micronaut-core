@@ -18,6 +18,8 @@ package org.particleframework.validation;
 import org.particleframework.aop.InterceptPhase;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
@@ -37,6 +39,8 @@ import java.util.Set;
 @Singleton
 public class ValidatingInterceptor implements MethodInterceptor {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
+
     /**
      * The position of the interceptor. See {@link org.particleframework.core.order.Ordered}
      */
@@ -55,6 +59,9 @@ public class ValidatingInterceptor implements MethodInterceptor {
                                     .map(factory -> factory.getValidator().forExecutables())
                                     .orElse(null);
 
+        if(LOG.isWarnEnabled()) {
+            LOG.warn("Beans requiring validation present, but no implementation of javax.validation configuration. Add an implementation (such as hibernate-validator) to prevent this error.");
+        }
     }
 
     @Override

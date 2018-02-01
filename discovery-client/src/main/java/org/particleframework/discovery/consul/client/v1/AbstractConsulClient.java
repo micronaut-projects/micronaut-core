@@ -70,6 +70,6 @@ public abstract class AbstractConsulClient implements ConsulClient {
 
     @Override
     public void close() throws IOException {
-        // no-op.. will be closed by org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice
+        // no-op.. will be closed by @Client
     }
 }

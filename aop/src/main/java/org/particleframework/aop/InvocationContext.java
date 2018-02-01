@@ -87,7 +87,10 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
                 .stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        (Function<Map.Entry<String, MutableArgumentValue<?>>, Object>) entry -> entry.getValue().getValue()
+                        (Function<Map.Entry<String, MutableArgumentValue<?>>, Object>) entry -> {
+                            MutableArgumentValue<?> value = entry.getValue();
+                            return value != null ? value.getValue() : null;
+                        }
                 ));
     }
 }

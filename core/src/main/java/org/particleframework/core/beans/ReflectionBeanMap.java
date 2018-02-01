@@ -39,13 +39,7 @@ class ReflectionBeanMap<T> extends BeanMap<T> {
         for (int i = 0; i < propertyDescriptors.length; i++) {
             final PropertyDescriptor propertyDescriptor = propertyDescriptors[i];
             final Method readMethod = propertyDescriptor.getReadMethod();
-            if(readMethod != null) {
-                readMethod.setAccessible(true);
-            }
             final Method writeMethod = propertyDescriptor.getWriteMethod();
-            if(writeMethod != null) {
-                writeMethod.setAccessible(true);
-            }
             propertyAccesses[i] = new PropertyAccess() {
                 @Override
                 public String getName() {

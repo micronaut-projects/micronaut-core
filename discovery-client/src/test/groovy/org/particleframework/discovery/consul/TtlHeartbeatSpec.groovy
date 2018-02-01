@@ -54,7 +54,7 @@ class TtlHeartbeatSpec extends Specification {
         }
 
         cleanup:
-        application.stop()
-        consulServer.stop()
+        application?.stop()
+        consulServer?.stop()
     }
 }

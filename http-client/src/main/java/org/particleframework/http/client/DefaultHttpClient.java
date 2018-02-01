@@ -180,6 +180,24 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
     }
 
+    /**
+     * @return The {@link MediaTypeCodecRegistry} used by this client
+     */
+    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
+        return mediaTypeCodecRegistry;
+    }
+
+    /**
+     * Sets the {@link MediaTypeCodecRegistry} used by this client
+     *
+     * @param mediaTypeCodecRegistry The registry to use. Should not be null
+     */
+    public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        if(mediaTypeCodecRegistry != null) {
+            this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        }
+    }
+
     @Override
     public BlockingHttpClient toBlocking() {
         return new BlockingHttpClient() {

@@ -288,7 +288,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
 
 
         cleanup:
-        anotherServer.stop()
-        consulServer.stop()
+        anotherServer?.stop()
+        consulServer?.stop()
     }
 }

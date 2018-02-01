@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
+ * This package contains client APIs, service discovery and distributed configuration integration between Particle and Eureka (https://github.com/Netflix/eureka)
  *
  * @author graemerocher
  * @since 1.0
  */
+
 @Configuration
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.eureka;
 
 import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+import org.particleframework.discovery.eureka.condition.RequiresEureka;
