@@ -17,6 +17,7 @@ package org.particleframework.http.codec;
 
 import org.particleframework.http.MediaType;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -45,12 +46,25 @@ public interface MediaTypeCodecRegistry {
     Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type);
 
     /**
-     * Create a new registry from the given decoders
+     * @return The available codecs
+     */
+    Collection<MediaTypeCodec> getCodecs();
+    /**
+     * Create a new registry from the given codecs
      *
-     * @param decoders The decoders
+     * @param codecs The decoders
      * @return The registry
      */
-    static MediaTypeCodecRegistry of(MediaTypeCodec...decoders) {
-        return new DefaultMediaTypeCodecRegistry(decoders);
+    static MediaTypeCodecRegistry of(MediaTypeCodec...codecs) {
+        return new DefaultMediaTypeCodecRegistry(codecs);
+    }
+    /**
+     * Create a new registry from the given codecs
+     *
+     * @param codecs The decoders
+     * @return The registry
+     */
+    static MediaTypeCodecRegistry of(Collection<MediaTypeCodec> codecs) {
+        return new DefaultMediaTypeCodecRegistry(codecs);
     }
 }

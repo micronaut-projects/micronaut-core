@@ -13,15 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.eureka.client.v2;
+
+import org.particleframework.discovery.DiscoveryClient;
 
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
+ * Default EurekaClient interface that implements both {@link EurekaOperations} and {@link DiscoveryClient}
  *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-package org.particleframework.discovery.consul;
-
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+public interface EurekaClient extends EurekaOperations, DiscoveryClient {
+    /**
+     * The default ID of the Eureka service
+     */
+    String SERVICE_ID = "eureka";
+}

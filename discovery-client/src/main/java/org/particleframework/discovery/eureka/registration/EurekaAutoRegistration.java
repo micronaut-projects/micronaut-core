@@ -13,15 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.discovery.eureka.registration;
+
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.registration.AutoRegistration;
+import org.particleframework.health.HealthStatus;
 
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
- *
  * @author graemerocher
  * @since 1.0
  */
-@Configuration
-package org.particleframework.discovery.consul;
+public class EurekaAutoRegistration extends AutoRegistration {
+    @Override
+    protected void pulsate(ServiceInstance instance, HealthStatus status) {
 
-import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;
+    }
+
+    @Override
+    protected void deregister(ServiceInstance instance) {
+
+    }
+
+    @Override
+    protected void register(ServiceInstance instance) {
+
+    }
+}

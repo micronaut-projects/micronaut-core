@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Particle and Consul (https://www.consul.io)
- *
  * @author graemerocher
  * @since 1.0
  */
+@RequiresConsul
 @Configuration
-package org.particleframework.discovery.consul;
+package org.particleframework.discovery.consul.client.v1;
 
 import org.particleframework.context.annotation.Configuration;
 import org.particleframework.discovery.consul.condition.RequiresConsul;

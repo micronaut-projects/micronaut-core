@@ -20,6 +20,7 @@ dependencies {
     compile "org.particleframework:management:${projectVersion}"
     compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+    compile "org.particleframework:discovery-client:${projectVersion}"
 
     testCompile "junit:junit:4.12"
     testCompile "org.particleframework:http-client:${projectVersion}"

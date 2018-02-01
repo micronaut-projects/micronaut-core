@@ -15,6 +15,9 @@
  */
 package org.particleframework.http.client.interceptor;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.context.BeanContext;
@@ -30,12 +33,18 @@ import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Body;
+import org.particleframework.http.annotation.Consumes;
 import org.particleframework.http.annotation.Header;
 import org.particleframework.http.annotation.HttpMethodMapping;
 import org.particleframework.http.client.*;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.uri.UriMatchTemplate;
+import org.particleframework.jackson.ObjectMapperFactory;
+import org.particleframework.jackson.annotation.JacksonFeatures;
+import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
@@ -58,6 +67,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Singleton
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
 
+    public static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
     final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ClientPublisherResultTransformer[] transformers;
@@ -80,7 +90,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
 
-        ClientRegistration reg = getClient(clientAnnotation);
+        ClientRegistration reg = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if(httpMethodMapping.isPresent()) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse( "");
@@ -152,7 +162,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             request = HttpRequest.create(httpMethod, uri);
                         }
                         else{
-                            paramMap.putAll(BeanMap.of(body));
+                            BeanMap<Object> beanMap = BeanMap.of(body);
+                            for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
+                                String k = entry.getKey();
+                                Object v = entry.getValue();
+                                if(v != null) {
+                                    paramMap.put( k, v );
+                                }
+                            }
                             uri = uriTemplate.expand(paramMap);
                             request = HttpRequest.create(httpMethod, uri);
                         }
@@ -186,11 +203,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 Class<?> argumentType = publisherArgument.getType();
                 Publisher<?> publisher;
                 if(HttpResponse.class.isAssignableFrom(argumentType)) {
+                    request.accept( context.getValue(Consumes.class,MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                     publisher = httpClient.exchange(
                             request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
                     );
                 }
+                else if(Void.class.isAssignableFrom(argumentType)) {
+                    publisher = httpClient.exchange(
+                            request
+                    );
+                }
                 else {
+                    MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                    request.accept(acceptTypes);
                     publisher = httpClient.retrieve(
                             request, publisherArgument
                     );
@@ -207,7 +232,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                         @Override
                         protected void doOnNext(Object message) {
-                            reference.set(message);
+                            if(!Void.class.isAssignableFrom(argumentType)) {
+                                reference.set(message);
+                            }
                         }
 
                         @Override
@@ -273,7 +300,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         throw new UnsupportedOperationException("Cannot implement method ["+context+"] that is not annotated with an HTTP method type");
     }
 
-    private ClientRegistration getClient(Client clientAnn) {
+    private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
         String[] clientId = clientAnn.value();
 
         return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
@@ -292,6 +319,40 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
             HttpClient client = beanContext.createBean(HttpClient.class, serverSelector, configuration);
             client.setClientIdentifiers(clientId);
+            JacksonFeatures jacksonFeatures = context.getAnnotation(JacksonFeatures.class);
+
+            if(jacksonFeatures != null && client instanceof DefaultHttpClient) {
+                DefaultHttpClient defaultClient = (DefaultHttpClient) client;
+                Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
+                ObjectMapper objectMapper = null;
+                if(existingCodec.isPresent()) {
+                    MediaTypeCodec existing = existingCodec.get();
+                    if(existing instanceof JsonMediaTypeCodec) {
+                        objectMapper = ((JsonMediaTypeCodec) existing).getObjectMapper().copy();
+                    }
+                }
+                if(objectMapper == null) {
+                    objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+                }
+
+                for (SerializationFeature serializationFeature : jacksonFeatures.enabledSerializationFeatures()) {
+                    objectMapper.configure(serializationFeature, true);
+                }
+
+                for (DeserializationFeature serializationFeature : jacksonFeatures.enabledDeserializationFeatures()) {
+                    objectMapper.configure(serializationFeature, true);
+                }
+
+                for (SerializationFeature serializationFeature : jacksonFeatures.disabledSerializationFeatures()) {
+                    objectMapper.configure(serializationFeature, false);
+                }
+
+                for (DeserializationFeature feature : jacksonFeatures.disabledDeserializationFeatures()) {
+                    objectMapper.configure(feature, false);
+                }
+
+                defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper)));
+            }
             return new ClientRegistration(client, contextPath);
         });
     }
