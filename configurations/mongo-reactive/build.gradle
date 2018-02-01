@@ -1,0 +1,8 @@
+dependencies {
+    compile project(":inject")
+    compileOnly project(":inject-java")
+    compile "org.mongodb:mongodb-driver-reactivestreams:1.7.0"
+
+    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+    testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+}
