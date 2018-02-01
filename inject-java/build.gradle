@@ -14,7 +14,7 @@ dependencies {
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
-    testCompile 'org.mongodb:mongo-java-driver:3.6.0-rc0'
+    testCompile 'org.mongodb:mongo-java-driver:3.6.1'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
 //    testCompile 'com.datastax.cassandra:cassandra-driver-core:3.3.2', {
