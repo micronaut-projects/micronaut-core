@@ -57,7 +57,6 @@ Need a mechanism for configuration discovery and sharing across the federation
 We need endpoints for managing and/or exposing information about:
 
 - logging
-- server stop/start
 
 These should be built on the `Endpoint` API
 
@@ -76,10 +75,6 @@ Content negotiation must be supported
 
 WebSocket Support must be implemented
 
-#### Serve Static Resources
-
-* Must be able to serve static resources / directories of resources
-* Must be able to transfer files from server chunk by chunk (streaming)
 
 #### Support for Views
 
