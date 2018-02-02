@@ -57,6 +57,8 @@ class EurekaMockAutoRegistrationSpec extends Specification {
 
         then: "The application is registered"
         conditions.eventually {
+            Flowable.fromPublisher(eurekaClient.applicationInfos).blockingFirst().size() == 1
+            Flowable.fromPublisher(eurekaClient.getApplicationVips(serviceId)).blockingFirst().size() == 1
             Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).blockingFirst().size() == 1
             Flowable.fromPublisher(eurekaClient.getServiceIds()).blockingFirst().contains(serviceId)
             MockEurekaServer.instances[serviceId].size() == 1
