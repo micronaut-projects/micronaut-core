@@ -21,8 +21,8 @@ import org.particleframework.context.event.ApplicationEventPublisher;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
-import org.particleframework.discovery.event.ServiceDegistrationEvent;
-import org.particleframework.discovery.event.ServiceRegistrationEvent;
+import org.particleframework.discovery.event.ServiceShutdownEvent;
+import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.runtime.server.EmbeddedServerInstance;
@@ -66,7 +66,7 @@ public class HeartbeatScheduler implements ApplicationEventListener<AbstractServ
     public void onApplicationEvent(AbstractServiceInstanceEvent event) {
         if(heartbeatConfiguration.isEnabled()) {
 
-            if(event instanceof ServiceRegistrationEvent) {
+            if(event instanceof ServiceStartedEvent) {
                 ServiceInstance source = event.getSource();
                 if(source instanceof EmbeddedServerInstance) {
                     long interval = heartbeatConfiguration.getInterval().toMillis();
@@ -78,7 +78,7 @@ public class HeartbeatScheduler implements ApplicationEventListener<AbstractServ
                     );
                 }
             }
-            else if(event instanceof ServiceDegistrationEvent && this.scheduledFixture != null) {
+            else if(event instanceof ServiceShutdownEvent && this.scheduledFixture != null) {
                 ServiceInstance source = event.getSource();
                 if(source instanceof EmbeddedServerInstance && !this.scheduledFixture.isCancelled()) {
                     this.scheduledFixture.cancel(false);

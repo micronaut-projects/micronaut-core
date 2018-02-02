@@ -20,8 +20,8 @@ import io.reactivex.Observable;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
-import org.particleframework.discovery.event.ServiceDegistrationEvent;
-import org.particleframework.discovery.event.ServiceRegistrationEvent;
+import org.particleframework.discovery.event.ServiceShutdownEvent;
+import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.discovery.exceptions.DiscoveryException;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatEvent;
@@ -55,10 +55,10 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
     @Override
     public void onApplicationEvent(AbstractServiceInstanceEvent event) {
         if(registrationConfiguration.isEnabled()) {
-            if(event instanceof ServiceRegistrationEvent) {
+            if(event instanceof ServiceStartedEvent) {
                 register(event.getSource());
             }
-            else if(event instanceof ServiceDegistrationEvent) {
+            else if(event instanceof ServiceShutdownEvent) {
                 if(registrationConfiguration.isDeregister()) {
                     deregister(event.getSource());
                 }

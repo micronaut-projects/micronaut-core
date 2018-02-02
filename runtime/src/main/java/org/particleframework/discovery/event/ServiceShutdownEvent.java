@@ -18,19 +18,19 @@ package org.particleframework.discovery.event;
 import org.particleframework.discovery.ServiceInstance;
 
 /**
- * An event fired when registering a service
+ * An event triggered when de-registering a {@link ServiceInstance}
  *
  * @author graemerocher
  * @since 1.0
  */
-public class ServiceRegistrationEvent extends AbstractServiceInstanceEvent {
+public class ServiceShutdownEvent extends AbstractServiceInstanceEvent {
     /**
      * Constructs a prototypical Event.
      *
      * @param source The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
-    public ServiceRegistrationEvent(ServiceInstance source) {
+    public ServiceShutdownEvent(ServiceInstance source) {
         super(source);
     }
 }
