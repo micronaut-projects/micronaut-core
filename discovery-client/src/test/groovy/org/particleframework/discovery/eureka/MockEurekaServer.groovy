@@ -85,6 +85,19 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Override
+    Publisher<List<ApplicationInfo>> getApplicationVips(String vipAddress) {
+        // no-op... never called
+    }
+
+    @Get('/vips/{vipAddress}')
+    Publisher<MockApplicationInfos> getApplicationVipsInternal(String vipAddress) {
+        // this logic is wrong, i know.. we just test the call
+        return Publishers.just(new MockApplicationInfos(instances.collect { it ->
+            new MockApplicationInfo(it.key, it.value.values() as List<InstanceInfo>)
+        } as List<ApplicationInfo>))
+    }
+
+    @Override
     Publisher<HttpStatus> heartbeat(@NotBlank String appId, @NotBlank String instanceId) {
         heartbeats.computeIfAbsent(appId, { String id -> [:]}).put(instanceId, true)
         return Publishers.just(HttpStatus.OK)
@@ -95,6 +108,14 @@ class MockEurekaServer implements EurekaOperations{
             @NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status) {
         instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>()})
                 .get(instanceId)?.status = status
+        return Publishers.just(HttpStatus.OK)
+    }
+
+    @Override
+    Publisher<HttpStatus> updateMetadata(
+            @NotBlank String appId, @NotBlank String instanceId, @NotBlank String key, @NotBlank String value) {
+        instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>()})
+                .get(instanceId)?.metadata?.put(key, value)
         return Publishers.just(HttpStatus.OK)
     }
 }

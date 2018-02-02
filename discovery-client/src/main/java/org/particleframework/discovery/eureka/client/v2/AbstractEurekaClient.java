@@ -18,16 +18,21 @@ package org.particleframework.discovery.eureka.client.v2;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
+import io.reactivex.Flowable;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.eureka.EurekaConfiguration;
 import org.particleframework.discovery.eureka.EurekaServiceInstance;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
+import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.validation.Validated;
 import org.reactivestreams.Publisher;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -54,17 +59,38 @@ abstract class AbstractEurekaClient implements EurekaClient {
 
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        return Publishers.map(getApplicationInfo(serviceId), applicationInfo -> {
+        Flowable<List<ServiceInstance>> flowable = Flowable.fromPublisher(getApplicationInfo(serviceId)).map(applicationInfo -> {
             List<InstanceInfo> instances = applicationInfo.getInstances();
             return instances.stream()
-                        .map(EurekaServiceInstance::new)
-                        .collect(Collectors.toList());
+                    .map(EurekaServiceInstance::new)
+                    .collect(Collectors.toList());
+        });
+
+        return flowable.onErrorReturn(throwable -> {
+            // Translate 404 into empty list
+            if(throwable instanceof HttpClientResponseException) {
+                HttpClientResponseException hcre = (HttpClientResponseException) throwable;
+                if(hcre.getStatus() == HttpStatus.NOT_FOUND) {
+                    return Collections.emptyList();
+                }
+            }
+            if(throwable instanceof Exception) {
+                throw (Exception)throwable;
+            }
+            else {
+                throw new HttpClientException("Internal Client Error: " + throwable.getMessage(), throwable);
+            }
         });
     }
 
     @Override
     public Publisher<List<ApplicationInfo>> getApplicationInfos() {
         return Publishers.map(getApplicationInfosInternal(), applicationInfos -> applicationInfos.applications);
+    }
+
+    @Override
+    public Publisher<List<ApplicationInfo>> getApplicationVips(String vipAddress) {
+        return Publishers.map(getApplicationVipsInternal(vipAddress), applicationInfos -> applicationInfos.applications);
     }
 
     @Override
@@ -82,6 +108,9 @@ abstract class AbstractEurekaClient implements EurekaClient {
     @Get("/apps")
     public abstract Publisher<ApplicationInfos> getApplicationInfosInternal();
 
+    @SuppressWarnings("WeakerAccess")
+    @Get("/vips/{vipAddress}")
+    public abstract Publisher<ApplicationInfos> getApplicationVipsInternal(String vipAddress);
 
     @JsonRootName("applications")
     static class ApplicationInfos {

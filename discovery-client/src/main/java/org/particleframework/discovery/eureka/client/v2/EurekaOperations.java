@@ -75,9 +75,18 @@ public interface EurekaOperations {
     /**
      * Obtain all of the {@link ApplicationInfo} registered with Eureka
      *
-     * @return The {@link ApplicationInfo} instance
+     * @return The {@link ApplicationInfo} instances
      */
     Publisher<List<ApplicationInfo>> getApplicationInfos();
+
+    /**
+     * Obtain all of the {@link ApplicationInfo} registered with Eureka under the given VIP address
+     *
+     * @see InstanceInfo#vipAddress
+     * @param vipAddress The {@link InstanceInfo#vipAddress}
+     * @return The {@link ApplicationInfo} instances
+     */
+    Publisher<List<ApplicationInfo>> getApplicationVips(String vipAddress);
     /**
      * Send an application heartbeat to Eureka
      *
@@ -90,9 +99,26 @@ public interface EurekaOperations {
 
     /**
      * Update the application's status
+     *
+     *
+     * @param appId The application id
+     * @param instanceId The instance id
      * @param status The status to use
      * @return A status of {@link HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}/status?value={status}")
     Publisher<HttpStatus> updateStatus(@NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status);
+
+    /**
+     * Update application metadata value
+     *
+     *
+     * @param appId The application id
+     * @param instanceId The instance id
+     * @param key The key to update
+     * @param value The value to update
+     * @return A status of {@link HttpStatus#OK} on success
+     */
+    @Put("/apps/{appId}/{instanceId}/metadata?{key}={value}")
+    Publisher<HttpStatus> updateMetadata(@NotBlank String appId, @NotBlank String instanceId, @NotBlank String key, @NotBlank String value);
 }
