@@ -30,7 +30,7 @@ public interface CookieFactory {
      * The default {@link CookieFactory} instance
      */
     CookieFactory INSTANCE = SoftServiceLoader.load(CookieFactory.class)
-                                              .firstOr("org.particleframework.http.server.netty.cookies.NettyCookieFactory", CookieFactory.class.getClassLoader())
+                                              .firstOr("org.particleframework.http.netty.cookies.NettyCookieFactory", CookieFactory.class.getClassLoader())
                                               .map(ServiceDefinition::load)
                                               .orElse(null);
 

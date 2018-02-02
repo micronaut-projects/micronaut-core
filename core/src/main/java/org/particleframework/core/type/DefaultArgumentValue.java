@@ -20,6 +20,7 @@ import org.particleframework.core.annotation.Internal;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -86,6 +87,17 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
 
     @Override
     public Annotation[] getDeclaredAnnotations() {
-        return new Annotation[0];
+        return argument.getDeclaredAnnotations();
     }
+
+    @Override
+    public boolean equalsType(Argument<?> o) {
+        return argument.equalsType(o);
+    }
+
+    @Override
+    public int typeHashCode() {
+        return argument.typeHashCode();
+    }
+
 }

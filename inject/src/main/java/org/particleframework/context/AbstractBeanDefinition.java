@@ -1231,6 +1231,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         String valString;
         if (val == null) {
             if (isConfigurationProperties()) {
+                if(Modifier.isAbstract(declaringClass.getModifiers())) {
+                    declaringClass = getBeanType();
+                }
                 String prefix = resolvePrefix(resolutionContext, beanContext, declaringClass, beanType);
                 valString = prefix + "." + name;
             } else {

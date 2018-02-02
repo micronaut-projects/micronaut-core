@@ -832,6 +832,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 injectMethodVisitor.getField(beanType, builderName, builderType);
             }
+
             Type returnTypeRef = getTypeReference(returnType);
             Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
             String desc = returnTypeRef.getClassName() + " " + methodName + "(" + (!zeroArgs ? paramTypeRef.getClassName() : "") + ")";
@@ -859,7 +860,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         org.objectweb.asm.commons.Method.getMethod(desc)
                 );
             }
-            injectMethodVisitor.pop();
+            if(returnType != void.class) {
+                injectMethodVisitor.pop();
+            }
 
             injectMethodVisitor.visitLabel(ifEnd);
         }

@@ -15,13 +15,27 @@
  */
 package org.particleframework.discovery.eureka.client.v2;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonRootName;
+import org.particleframework.core.async.publisher.Publishers;
+import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.eureka.EurekaConfiguration;
+import org.particleframework.discovery.eureka.EurekaServiceInstance;
+import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.validation.Validated;
+import org.reactivestreams.Publisher;
 
-import static com.fasterxml.jackson.databind.DeserializationFeature.*;
-import static com.fasterxml.jackson.databind.SerializationFeature.*;
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY;
+import static com.fasterxml.jackson.databind.DeserializationFeature.UNWRAP_ROOT_VALUE;
+import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
+import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED;
 
 /**
  * Compile time implementation of {@link EurekaClient}
@@ -36,5 +50,51 @@ import static com.fasterxml.jackson.databind.SerializationFeature.*;
     enabledDeserializationFeatures = {UNWRAP_ROOT_VALUE, ACCEPT_SINGLE_VALUE_AS_ARRAY}
 )
 @Validated
-public abstract class AbstractEurekaClient implements EurekaClient {
+abstract class AbstractEurekaClient implements EurekaClient {
+
+    @Override
+    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        return Publishers.map(getApplicationInfo(serviceId), applicationInfo -> {
+            List<InstanceInfo> instances = applicationInfo.getInstances();
+            return instances.stream()
+                        .map(EurekaServiceInstance::new)
+                        .collect(Collectors.toList());
+        });
+    }
+
+    @Override
+    public Publisher<List<ApplicationInfo>> getApplicationInfos() {
+        return Publishers.map(getApplicationInfosInternal(), applicationInfos -> applicationInfos.applications);
+    }
+
+    @Override
+    public Publisher<List<String>> getServiceIds() {
+        return Publishers.map(getApplicationInfosInternal(), applicationInfos ->
+                applicationInfos
+                        .applications
+                        .stream()
+                        .map(ApplicationInfo::getName)
+                        .collect(Collectors.toList())
+        );
+    }
+
+    @SuppressWarnings("WeakerAccess")
+    @Get("/apps")
+    public abstract Publisher<ApplicationInfos> getApplicationInfosInternal();
+
+
+    @JsonRootName("applications")
+    static class ApplicationInfos {
+        private List<ApplicationInfo> applications;
+
+        @JsonCreator
+        public ApplicationInfos(@JsonProperty("application") List<ApplicationInfo> applications) {
+            this.applications = applications;
+        }
+
+        @JsonProperty("application")
+        public List<ApplicationInfo> getApplications() {
+            return applications;
+        }
+    }
 }

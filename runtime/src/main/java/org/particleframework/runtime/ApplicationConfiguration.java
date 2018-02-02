@@ -36,6 +36,7 @@ public class ApplicationConfiguration {
 
     public static final String PREFIX = "particle.application";
     public static final String DEFAULT_CHARSET = PREFIX + ".defaultCharset";
+    public static final String APPLICATION_NAME = PREFIX + ".name";
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
     private String name;
@@ -80,8 +81,10 @@ public class ApplicationConfiguration {
         this.name = name;
     }
 
-    @ConfigurationProperties("instance")
+    @ConfigurationProperties(InstanceConfiguration.PREFIX)
     public static class InstanceConfiguration {
+        public static final String PREFIX = "instance";
+        public static final String INSTANCE_ID = ApplicationConfiguration.PREFIX + '.' + PREFIX + ".id";
         private String id;
         private String group;
         private String zone;

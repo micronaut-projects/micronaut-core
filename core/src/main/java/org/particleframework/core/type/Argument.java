@@ -62,6 +62,22 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     Annotation getQualifier();
 
     /**
+     * Whether the types are equivalent. The regular {@link #equals(Object)} implementation includes the argument name
+     * within the comparison so this method offers a variation that just compares types
+     *
+     * @param other The type type
+     * @return True if they are equal
+     */
+    boolean equalsType(Argument<?> other);
+
+    /**
+     * The hash code including only the types. The regular {@link #hashCode()} implementation includes the argument name
+     * within the comparison so this method offers a variation that just compares types
+     *
+     * @return The type hash code
+     */
+    int typeHashCode();
+    /**
      * Creates a new argument for the given type, name and qualifier
      *
      * @param type The type

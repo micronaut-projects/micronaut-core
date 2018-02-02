@@ -15,14 +15,31 @@
  */
 package org.particleframework.discovery.eureka;
 
+import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.ConfigurationProperties;
+import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.annotation.Value;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.discovery.DiscoveryConfiguration;
+import org.particleframework.discovery.ServiceInstanceIdGenerator;
+import org.particleframework.discovery.eureka.client.v2.ConfigurableInstanceInfo;
+import org.particleframework.discovery.eureka.client.v2.DataCenterInfo;
+import org.particleframework.discovery.eureka.client.v2.InstanceInfo;
+import org.particleframework.discovery.eureka.client.v2.LeaseInfo;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.http.client.HttpClientConfiguration;
 import org.particleframework.runtime.ApplicationConfiguration;
+import org.particleframework.runtime.server.EmbeddedServer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Configuration options for the Eureka client
@@ -41,10 +58,13 @@ public class EurekaConfiguration extends HttpClientConfiguration {
     private int port = 8761;
     private boolean secure;
     private EurekaDiscoveryConfiguration discovery = new EurekaDiscoveryConfiguration();
-    private EurekaRegistrationConfiguration registration = new EurekaRegistrationConfiguration();
+    private EurekaRegistrationConfiguration registration;
 
-    public EurekaConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public EurekaConfiguration(
+            ApplicationConfiguration applicationConfiguration,
+            Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
+        this.registration = eurekaRegistrationConfiguration.orElse(null);
     }
 
     /**
@@ -71,7 +91,7 @@ public class EurekaConfiguration extends HttpClientConfiguration {
     /**
      * @return The default registration configuration
      */
-    @Nonnull public EurekaRegistrationConfiguration getRegistration() {
+    @Nullable public EurekaRegistrationConfiguration getRegistration() {
         return registration;
     }
 
@@ -89,12 +109,6 @@ public class EurekaConfiguration extends HttpClientConfiguration {
     public void setDiscovery(EurekaDiscoveryConfiguration discovery) {
         if(discovery != null) {
             this.discovery = discovery;
-        }
-    }
-
-    public void setRegistration(EurekaRegistrationConfiguration registration) {
-        if(registration != null) {
-            this.registration = registration;
         }
     }
 
@@ -118,7 +132,66 @@ public class EurekaConfiguration extends HttpClientConfiguration {
     }
 
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
-    public static class EurekaRegistrationConfiguration extends RegistrationConfiguration{
+    @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
+    public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
+
+        public static final String IP_ADDRESS =
+                EurekaConfiguration.PREFIX + '.' +
+                RegistrationConfiguration.PREFIX + '.' +
+                "ipAddr";
+
+        @ConfigurationBuilder
+        InstanceInfo instanceInfo;
+
+        @ConfigurationBuilder(configurationPrefix = "leaseInfo")
+        LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
+
+        private final boolean explicitInstanceId;
+
+        public EurekaRegistrationConfiguration(
+                EmbeddedServer embeddedServer,
+                @Value(ApplicationConfiguration.APPLICATION_NAME) String applicationName,
+                @Value(EurekaRegistrationConfiguration.IP_ADDRESS) Optional<String> ipAddress,
+                @Value(ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID) Optional<String> instanceId,
+                Optional<DataCenterInfo> dataCenterInfo) {
+            this.explicitInstanceId = instanceId.isPresent();
+            if(ipAddress.isPresent()) {
+                this.instanceInfo = new InstanceInfo(
+                        embeddedServer.getHost(),
+                        embeddedServer.getPort(),
+                        ipAddress.get(),
+                        applicationName,
+                        instanceId.orElse(applicationName));
+
+            }
+            else {
+
+                this.instanceInfo = new InstanceInfo(
+                        embeddedServer.getHost(),
+                        embeddedServer.getPort(),
+                        applicationName,
+                        instanceId.orElse(applicationName));
+            }
+
+            dataCenterInfo.ifPresent(dci -> this.instanceInfo.setDataCenterInfo(dci));
+        }
+
+        /**
+         * @return Is an instance ID explicitly specified
+         */
+        public boolean isExplicitInstanceId() {
+            return explicitInstanceId;
+        }
+
+        /**
+         * @return The instance info
+         */
+        public InstanceInfo getInstanceInfo() {
+            LeaseInfo leaseInfo = this.leaseInfo.build();
+            instanceInfo.setLeaseInfo(leaseInfo);
+            return instanceInfo;
+        }
+
     }
 
 }

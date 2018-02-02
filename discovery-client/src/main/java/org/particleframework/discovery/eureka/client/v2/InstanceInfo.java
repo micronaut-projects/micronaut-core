@@ -41,9 +41,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @JsonRootName("instance")
-public class InstanceInfo {
+public class InstanceInfo implements ConfigurableInstanceInfo {
     public static final int DEFAULT_PORT = 7001;
-    public static final int DEFAULT_SECURE_PORT = 7002;
+    public static final int DEFAULT_SECURE_PORT = 0; // secure port disabled by default
     public static final int DEFAULT_COUNTRY_ID = 1; // US
 
     private String asgName;
@@ -183,6 +183,7 @@ public class InstanceInfo {
     /**
      * The host name of the application instance
      */
+    @Override
     @NotBlank
     public String getHostName() {
         return hostName;
@@ -196,6 +197,7 @@ public class InstanceInfo {
      *
      * @return the unique id.
      */
+    @Override
     @JsonIgnore
     public String getId() {
         if (instanceId != null && !instanceId.isEmpty()) {
@@ -211,6 +213,7 @@ public class InstanceInfo {
     /**
      * The port of the application instance
      */
+    @Override
     @JsonIgnore
     public int getPort() {
         return port;
@@ -218,6 +221,7 @@ public class InstanceInfo {
     /**
      * The secure port of the application instance
      */
+    @Override
     @JsonIgnore
     public int getSecurePort() {
         return securePort;
@@ -239,10 +243,12 @@ public class InstanceInfo {
         return new PortWrapper(true, securePort);
     }
 
+    @Override
     public void setSecurePort(int securePort) {
         this.securePort = securePort;
     }
 
+    @Override
     public void setPort(int port) {
         if(port >= 0) {
             this.port = port;
@@ -252,6 +258,7 @@ public class InstanceInfo {
     /**
      * The application name
      */
+    @Override
     @NotBlank
     public String getApp() {
         return app;
@@ -260,6 +267,7 @@ public class InstanceInfo {
     /**
      * The application group name
      */
+    @Override
     public String getAppGroupName() {
         return appGroupName;
     }
@@ -267,6 +275,7 @@ public class InstanceInfo {
     /**
      * The instance id
      */
+    @Override
     @NotBlank
     public String getInstanceId() {
         return instanceId;
@@ -275,6 +284,7 @@ public class InstanceInfo {
     /**
      * The country id
      */
+    @Override
     @Min(1L)
     public int getCountryId() {
         return countryId;
@@ -283,11 +293,13 @@ public class InstanceInfo {
     /**
      * The IP address of the instance
      */
+    @Override
     @NotBlank
     public String getIpAddr() {
         return ipAddr;
     }
 
+    @Override
     @NotNull
     public Status getStatus() {
         return status;
@@ -296,6 +308,7 @@ public class InstanceInfo {
     /**
      * The {@link DataCenterInfo} instance
      */
+    @Override
     @NotNull
     public DataCenterInfo getDataCenterInfo() {
         return dataCenterInfo;
@@ -304,6 +317,7 @@ public class InstanceInfo {
     /**
      * The {@link LeaseInfo} instance
      */
+    @Override
     public LeaseInfo getLeaseInfo() {
         return leaseInfo;
     }
@@ -311,6 +325,7 @@ public class InstanceInfo {
     /**
      * @return The instance metadata
      */
+    @Override
     public Map<String, String> getMetadata() {
         return metadata;
     }
@@ -318,6 +333,7 @@ public class InstanceInfo {
     /**
      * @return The status page URL
      */
+    @Override
     public String getStatusPageUrl() {
         if(this.statusPageUrl == null) {
             return getHealthCheckUrl();
@@ -328,6 +344,7 @@ public class InstanceInfo {
     /**
      * @return The home page URL
      */
+    @Override
     public String getHomePageUrl() {
         if(this.homePageUrl == null) {
             return "http://" + this.hostName + portString();
@@ -338,6 +355,7 @@ public class InstanceInfo {
     /**
      * @return The health check URL
      */
+    @Override
     public String getHealthCheckUrl() {
         if(this.healthCheckUrl == null) {
             return "http://" + this.hostName + portString() + "/health";
@@ -348,6 +366,7 @@ public class InstanceInfo {
     /**
      * @return The Virtual Host Address for this instance (defaults to the app name)
      */
+    @Override
     @NotBlank
     public String getVipAddress() {
         if(this.vipAddress == null) {
@@ -359,6 +378,7 @@ public class InstanceInfo {
     /**
      * @return The Secure Virtual Host Address for this instance (defaults to the app name)
      */
+    @Override
     @NotBlank
     public String getSecureVipAddress() {
         if(this.secureVipAddress == null) {
@@ -370,6 +390,7 @@ public class InstanceInfo {
     /**
      * @return The secure health check URL
      */
+    @Override
     public String getSecureHealthCheckUrl() {
         if(this.secureHealthCheckUrl == null) {
             return "https://" + this.hostName + securePortString() + "/health";
@@ -380,95 +401,125 @@ public class InstanceInfo {
     /**
      * @return The amazon auto scaling group name
      */
+    @Override
     public String getAsgName() {
         return asgName;
     }
 
+    /**
+     * Sets the instance ID
+     * @param instanceId The instance ID
+     */
+    @Override
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
+    @Override
     public void setAsgName(String asgName) {
         this.asgName = asgName;
     }
 
+    @Override
     public void setHomePageUrl(String homePageUrl) {
         if(!StringUtils.isEmpty(homePageUrl)) {
             this.homePageUrl = homePageUrl;
         }
     }
 
+    @Override
     public void setLeaseInfo(LeaseInfo leaseInfo) {
         this.leaseInfo = leaseInfo;
     }
 
+    @Override
     public void setCountryId(int countryId) {
         if(countryId > 0) {
             this.countryId = countryId;
         }
     }
 
+    @Override
     public void setStatusPageUrl(String statusPageUrl) {
         if(!StringUtils.isEmpty(statusPageUrl)) {
             this.statusPageUrl = statusPageUrl;
         }
     }
 
+    @Override
     public void setHealthCheckUrl(String healthCheckUrl) {
         if(!StringUtils.isEmpty(healthCheckUrl)) {
             this.healthCheckUrl = healthCheckUrl;
         }
     }
 
+    @Override
     public void setSecureHealthCheckUrl(String secureHealthCheckUrl) {
         if(!StringUtils.isEmpty(secureHealthCheckUrl)) {
             this.secureHealthCheckUrl = secureHealthCheckUrl;
         }
     }
 
+    @Override
     public void setDataCenterInfo(DataCenterInfo dataCenterInfo) {
         if(dataCenterInfo != null) {
             this.dataCenterInfo = dataCenterInfo;
         }
     }
 
+    @Override
     public void setStatus(Status status) {
         if(status != null) {
             this.status = status;
         }
     }
 
+    @Override
     public void setAppGroupName(String appGroupName) {
         if(StringUtils.isNotEmpty(appGroupName)) {
             this.appGroupName = appGroupName;
         }
     }
 
+    @Override
     public void setIpAddr(String ipAddr) {
         if(StringUtils.isNotEmpty(ipAddr)) {
             this.ipAddr = ipAddr;
         }
     }
 
+    @Override
     public void setVipAddress(String vipAddress) {
         if(StringUtils.isNotEmpty(vipAddress)) {
             this.vipAddress = vipAddress;
         }
     }
 
+    @Override
     public void setSecureVipAddress(String secureVipAddress) {
         if(StringUtils.isNotEmpty(secureVipAddress)) {
             this.secureVipAddress = secureVipAddress;
         }
     }
 
-
+    /**
+     * @param metadata Sets the application metadata
+     */
+    public void setMetadata(Map<String, String> metadata) {
+        if(metadata != null) {
+            this.metadata = metadata;
+        }
+    }
 
     /**
      * The instance status according to Eureka
      */
     public enum Status {
         UP, DOWN, STARTING, OUT_OF_SERVICE, UNKNOWN;
-
     }
+
     /**
-     * {@link com.netflix.appinfo.InstanceInfo} JSON and XML format for port information does not follow the usual conventions, which
+     * {@link InstanceInfo} JSON and XML format for port information does not follow the usual conventions, which
      * makes its mapping complicated. This class represents the wire format for port information.
      */
     static class PortWrapper {

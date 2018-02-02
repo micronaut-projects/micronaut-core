@@ -21,6 +21,7 @@ import org.particleframework.core.type.ArgumentValue;
 import org.particleframework.core.type.Executable;
 import org.particleframework.core.type.MutableArgumentValue;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -82,15 +83,13 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return The bound {@link ArgumentValue} instances
      */
     default Map<String,Object> getParameterValueMap() {
-        return getParameters()
-                .entrySet()
-                .stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        (Function<Map.Entry<String, MutableArgumentValue<?>>, Object>) entry -> {
-                            MutableArgumentValue<?> value = entry.getValue();
-                            return value != null ? value.getValue() : null;
-                        }
-                ));
+        Map<String, MutableArgumentValue<?>> parameters = getParameters();
+        Map<String, Object> valueMap = new LinkedHashMap<>(parameters.size());
+        for (Map.Entry<String, MutableArgumentValue<?>> entry : parameters.entrySet()) {
+            MutableArgumentValue<?> value = entry.getValue();
+            String key = entry.getKey();
+            valueMap.put(key, value.getValue());
+        }
+        return valueMap;
     }
 }

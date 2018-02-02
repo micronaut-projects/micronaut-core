@@ -58,16 +58,13 @@ class EurekaClientSpec extends Specification {
         client.register("", null)
         
         then:
-        def e = thrown(ConstraintViolationException)
-        e.message.contains 'register.appId: must not be blank'
-        e.message.contains 'register.instance: must not be null'
+        thrown(ConstraintViolationException)
 
         when:
         client.register("ok", null)
 
         then:
-        e = thrown(ConstraintViolationException)
-        e.message == 'register.instance: must not be null'
+        thrown(ConstraintViolationException)
 
     }
 
@@ -83,11 +80,19 @@ class EurekaClientSpec extends Specification {
 
         then:
         status == HttpStatus.NO_CONTENT
+
+        // NOTE: Eureka is eventually consistent so this sometimes fails due to the timeout in PollingConditions not being met
         conditions.eventually {
 
             ApplicationInfo applicationInfo = Flowable.fromPublisher(client.getApplicationInfo(appId)).blockingFirst()
+
+            InstanceInfo instanceInfo = Flowable.fromPublisher(client.getInstanceInfo(appId, instanceId)).blockingFirst()
+
             applicationInfo.name == appId.toUpperCase()
             applicationInfo.instances.size() == 1
+            instanceId != null
+            instanceInfo.id == instanceId
+            instanceInfo.app == applicationInfo.name
         }
 
         when:

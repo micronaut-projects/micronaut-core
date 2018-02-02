@@ -15,10 +15,7 @@
  */
 package org.particleframework.discovery.consul.registration;
 
-import io.reactivex.Flowable;
 import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.value.ConvertibleMultiValues;
@@ -28,14 +25,13 @@ import org.particleframework.discovery.ServiceInstanceIdGenerator;
 import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.consul.client.v1.*;
 import org.particleframework.discovery.exceptions.DiscoveryException;
-import org.particleframework.discovery.registration.AutoRegistration;
-import org.particleframework.discovery.registration.RegistrationException;
+import org.particleframework.discovery.registration.DiscoveryServiceAutoRegistration;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;
-import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.runtime.ApplicationConfiguration;
 import org.particleframework.runtime.server.EmbeddedServerInstance;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -43,9 +39,8 @@ import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Auto registration implementation for consul
@@ -55,8 +50,7 @@ import java.util.regex.Pattern;
  */
 @Singleton
 @Requires(beans = ConsulClient.class)
-public class ConsulAutoRegistration extends AutoRegistration {
-    private static final Pattern APPLICATION_NAME_PATTERN = Pattern.compile("^[a-zA-Z][\\w\\d-]*[a-zA-Z\\d]$");
+public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     private final ConsulClient consulClient;
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ConsulConfiguration consulConfiguration;
@@ -69,6 +63,7 @@ public class ConsulAutoRegistration extends AutoRegistration {
             HeartbeatConfiguration heartbeatConfiguration,
             ConsulConfiguration consulConfiguration,
             ServiceInstanceIdGenerator idGenerator) {
+        super(consulConfiguration.getRegistration());
         this.environment = environment;
         this.consulClient = consulClient;
         this.heartbeatConfiguration = heartbeatConfiguration;
@@ -99,7 +94,7 @@ public class ConsulAutoRegistration extends AutoRegistration {
 
                     @Override
                     public void onError(Throwable throwable) {
-                        String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
+                        String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Consul: ");
                         if(LOG.isErrorEnabled()) {
                             LOG.error(errorMessage, throwable);
                         }
@@ -128,9 +123,9 @@ public class ConsulAutoRegistration extends AutoRegistration {
 
                     @Override
                     public void onError(Throwable throwable) {
-                        String errorMessage = getConsulErrorMessage(throwable, "Error reporting passing state to Consul: ");
+                        String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Consul: ");
                         if(LOG.isErrorEnabled()) {
-                            LOG.error("Error reporting failure state to Consul: " +errorMessage, throwable);
+                            LOG.error(errorMessage, throwable);
                         }
                     }
 
@@ -148,47 +143,9 @@ public class ConsulAutoRegistration extends AutoRegistration {
         String applicationName = instance.getId();
         String serviceId = idGenerator.generateId(environment, instance);
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        if (registration.isEnabled() && registration.isDeregister()) {
-            if (registration.isFailFast()) {
-
-                try {
-                    Flowable.fromPublisher(consulClient.deregister(serviceId)).blockingFirst();
-                    if (LOG.isInfoEnabled()) {
-                        LOG.info("De-registered service [{}] with Consul", applicationName);
-                    }
-                } catch (Throwable t) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error occurred de-registering service [" + applicationName + "] with Consul: " + t.getMessage(), t);
-                    }
-                }
-            } else {
-                consulClient.deregister(applicationName).subscribe(new Subscriber<HttpStatus>() {
-                    @Override
-                    public void onSubscribe(Subscription subscription) {
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    public void onNext(HttpStatus httpStatus) {
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("De-registered service [{}] with Consul", applicationName);
-                        }
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error occurred de-registering service [" + applicationName + "] with Consul: " + t.getMessage(), t);
-                        }
-                    }
-
-                    @Override
-                    public void onComplete() {
-
-                    }
-                });
-            }
-        }
+        Publisher<HttpStatus> deregisterPublisher = consulClient.deregister(serviceId);
+        final String discoveryService = "Consul";
+        performDeregistration(discoveryService, registration, deregisterPublisher, applicationName);
     }
 
     @Override
@@ -196,7 +153,7 @@ public class ConsulAutoRegistration extends AutoRegistration {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
         String applicationName = instance.getId();
         validateApplicationName(applicationName);
-        if (registration.isEnabled() && StringUtils.isNotEmpty(applicationName)) {
+        if (StringUtils.isNotEmpty(applicationName)) {
             NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
             List<String> tags = new ArrayList<>(registration.getTags());
             serviceEntry.address(instance.getHost())
@@ -263,69 +220,9 @@ public class ConsulAutoRegistration extends AutoRegistration {
             }
 
             customizeServiceEntry(instance, serviceEntry);
-            io.reactivex.Observable<HttpStatus> registrationObservable = Flowable
-                    .fromPublisher(consulClient.register(serviceEntry))
-                    .toObservable();
-
-            Optional<Duration> timeout = registration.getTimeout();
-            if (timeout.isPresent()) {
-                registrationObservable = registrationObservable.timeout(timeout.get().toMillis(), TimeUnit.MILLISECONDS);
-            }
-            int retryCount = registration.getRetryCount();
-            boolean doRetry = retryCount > 1;
-            if (doRetry) {
-                registrationObservable = registrationObservable.retryWhen(attempts ->
-                        attempts.zipWith(Observable.range(1, retryCount), (n, i) -> i).flatMap(i ->
-                                Observable.timer(registration.getRetryDelay().toMillis(), TimeUnit.MILLISECONDS)
-                        )
-                );
-            }
-            if (registration.isFailFast()) {
-                // will throw an exception if a failure response code is called
-                try {
-                    registrationObservable.blockingSingle();
-                    if (LOG.isInfoEnabled()) {
-                        LOG.debug("Registered service [{}] with Consul", applicationName);
-                    }
-                } catch (NoSuchElementException e) {
-                    if (doRetry) {
-                        // timeouts throw NoSuchElementException from RxJava for some inexplicable reason
-                        throw new RegistrationException("Retry timeout error occurred during service registration with Consul");
-                    } else {
-                        throw new RegistrationException("Error occurred during service registration with Consul: " + e.getMessage(), e);
-                    }
-                } catch (Throwable e) {
-                    String message = getConsulErrorMessage(e);
-                    throw new RegistrationException(message, e);
-                }
-            } else {
-                registrationObservable.subscribe(new Observer<HttpStatus>() {
-                    @Override
-                    public void onSubscribe(Disposable d) {
-
-                    }
-
-                    @Override
-                    public void onNext(HttpStatus httpStatus) {
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("Registered service [{}] with Consul", applicationName);
-                        }
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        if (LOG.isErrorEnabled()) {
-                            String message = getConsulErrorMessage(t);
-                            LOG.error(message, t);
-                        }
-                    }
-
-                    @Override
-                    public void onComplete() {
-
-                    }
-                });
-            }
+            Publisher<HttpStatus> registerFlowable = consulClient.register(serviceEntry);
+            Observable<HttpStatus> registrationObservable = applyRetryPolicy(registration, registerFlowable);
+            performRegistration("Consul", registration, applicationName, registrationObservable);
         }
     }
 
@@ -339,34 +236,4 @@ public class ConsulAutoRegistration extends AutoRegistration {
         // no-op
     }
 
-    private String getConsulErrorMessage(Throwable e) {
-        String description = "Error occurred during service registration with Consul: ";
-        return getConsulErrorMessage(e, description);
-    }
-
-    private String getConsulErrorMessage(Throwable e, String description) {
-        String message;
-        if (e instanceof HttpClientResponseException) {
-            HttpClientResponseException hcre = (HttpClientResponseException) e;
-            if (hcre.getStatus() == HttpStatus.BAD_REQUEST) {
-                message = description + hcre.getResponse().getBody(String.class).orElse(e.getMessage());
-            } else {
-                message = description + e.getMessage();
-            }
-        } else {
-            message = description + e.getMessage();
-        }
-        return message;
-    }
-
-    private void validateApplicationName(String name) {
-        String typeDescription = "Application name";
-        validateName(name, typeDescription);
-    }
-
-    private void validateName(String name, String typeDescription) {
-        if (!APPLICATION_NAME_PATTERN.matcher(name).matches()) {
-            throw new DiscoveryException(typeDescription + " [" + name + "] must start with a letter, end with a letter or digit and contain only letters, digits or hyphens. Example: foo-bar");
-        }
-    }
 }

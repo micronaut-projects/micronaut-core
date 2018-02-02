@@ -51,7 +51,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
-    private final Map<Argument<?>, RequestArgumentBinder> byType = new LinkedHashMap<>();
+    private final Map<Integer, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
     private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache = Caffeine.newBuilder().maximumSize(30).build();
 
@@ -79,18 +79,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             }
             else if(binder instanceof TypedRequestArgumentBinder) {
                 TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                byType.put(typedRequestArgumentBinder.argumentType(), typedRequestArgumentBinder);
+                byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             }
         }
 
         registerDefaultConverters(conversionService);
         registerDefaultAnnotationBinders(byAnnotation);
 
-        byType.put(Argument.of(HttpHeaders.class), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
-        byType.put(Argument.of(HttpParameters.class), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
-        byType.put(Argument.of(Cookies.class), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
-        byType.put(Argument.of(Cookie.class), (RequestArgumentBinder<Cookie>)(context, source) -> {
+        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
+        byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
+        byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
+        byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>)(context, source) -> {
             Cookies cookies = source.getCookies();
             String name = context.getArgument().getName();
             Cookie cookie = cookies.get(name);
@@ -116,12 +116,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             }
         }
         else {
-            RequestArgumentBinder<T> binder = byType.get(argument);
+            RequestArgumentBinder<T> binder = byType.get(argument.typeHashCode());
             if(binder != null) {
                 return Optional.of(binder);
             }
             else {
-                binder = byType.get(Argument.of(argument.getType()));
+                binder = byType.get(Argument.of(argument.getType()).typeHashCode());
                 if(binder != null) {
                     return Optional.of(binder);
                 }
@@ -189,13 +189,13 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
             TypeAndAnnotation that = (TypeAndAnnotation) o;
 
-            if (!type.equals(that.type)) return false;
+            if (!type.equalsType(that.type)) return false;
             return annotation.equals(that.annotation);
         }
 
         @Override
         public int hashCode() {
-            int result = type.hashCode();
+            int result = type.typeHashCode();
             result = 31 * result + annotation.hashCode();
             return result;
         }

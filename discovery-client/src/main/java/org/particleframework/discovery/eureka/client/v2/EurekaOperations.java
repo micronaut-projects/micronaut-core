@@ -47,7 +47,7 @@ public interface EurekaOperations {
      *
      * @param appId The application id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
-     * @return A status of {@link HttpStatus#NO_CONTENT} on success
+     * @return A status of {@link HttpStatus#OK} on success
      */
     @Delete("/apps/{appId}/{instanceId}")
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId);
@@ -60,6 +60,17 @@ public interface EurekaOperations {
      */
     @Get("/apps/{appId}")
     Publisher<ApplicationInfo> getApplicationInfo(@NotBlank String appId);
+
+    /**
+     * Obtain a {@link InstanceInfo} for the given app id
+     *
+     * @param appId The app id
+     * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
+     * @return The {@link InstanceInfo} instance
+     */
+    @Get("/apps/{appId}/{instanceId}")
+    Publisher<InstanceInfo> getInstanceInfo(@NotBlank String appId, @NotBlank String instanceId);
+
 
     /**
      * Obtain all of the {@link ApplicationInfo} registered with Eureka
@@ -76,4 +87,12 @@ public interface EurekaOperations {
      */
     @Put("/apps/{appId}/{instanceId}")
     Publisher<HttpStatus> heartbeat(@NotBlank String appId, @NotBlank String instanceId);
+
+    /**
+     * Update the application's status
+     * @param status The status to use
+     * @return A status of {@link HttpStatus#OK} on success
+     */
+    @Put("/apps/{appId}/{instanceId}/status?value={status}")
+    Publisher<HttpStatus> updateStatus(@NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status);
 }
