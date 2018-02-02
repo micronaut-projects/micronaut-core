@@ -16,8 +16,8 @@
 package org.particleframework.discovery.consul;
 
 import org.particleframework.discovery.consul.condition.RequiresConsul;
-import org.particleframework.http.client.ServerSelector;
-import org.particleframework.http.client.ServerSelectorProvider;
+import org.particleframework.http.client.LoadBalancer;
+import org.particleframework.http.client.LoadBalancerProvider;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import javax.inject.Singleton;
@@ -32,11 +32,11 @@ import java.net.URL;
  */
 @Singleton
 @RequiresConsul
-public class ConsulServerSelectorProvider implements ServerSelectorProvider {
+public class ConsulLoadBalancerProvider implements LoadBalancerProvider {
 
     private final ConsulConfiguration configuration;
 
-    public ConsulServerSelectorProvider(ConsulConfiguration configuration) {
+    public ConsulLoadBalancerProvider(ConsulConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -46,7 +46,7 @@ public class ConsulServerSelectorProvider implements ServerSelectorProvider {
     }
 
     @Override
-    public ServerSelector getSelector() {
+    public LoadBalancer getLoadBalancer() {
         return discriminator -> {
             String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
             try {

@@ -15,21 +15,13 @@
  */
 package org.particleframework.http.client;
 
-import java.net.URL;
+import org.particleframework.discovery.ServiceInstanceList;
 
 /**
- * Interface to abstract server selection. Allows plugging in load balancing strategies.
+ * A {@link LoadBalancer} that is also a {@link ServiceInstanceList}
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-@FunctionalInterface
-public interface ServerSelector {
-    /**
-     *
-     * @return The selected server URL
-     *
-     * @param discriminator An object used to discriminate the server to select. Usually the service ID
-     */
-    URL select(Object discriminator);
+public interface ServiceInstanceLoadBalancer extends LoadBalancer, ServiceInstanceList {
 }

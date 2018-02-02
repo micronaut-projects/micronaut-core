@@ -18,7 +18,7 @@ package org.particleframework.http.client.selector;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.http.client.ServiceInstanceSelector;
+import org.particleframework.http.client.ServiceInstanceLoadBalancer;
 import org.particleframework.http.client.exceptions.HttpClientException;
 
 import java.net.MalformedURLException;
@@ -31,19 +31,19 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * An extremely simple {@link ServiceInstanceSelector} that uses round robin load balancing
+ * A simple {@link ServiceInstanceLoadBalancer} that uses round robin load balancing
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class SimpleRoundRobinServerSelector implements ServiceInstanceSelector {
+public class SimpleRoundRobinLoadBalancer implements ServiceInstanceLoadBalancer {
 
     private final AtomicInteger index = new AtomicInteger(0);
     private final List<ServiceInstance> servers;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final String serviceId;
 
-    public SimpleRoundRobinServerSelector(String serviceId, List<ServiceInstance> servers) {
+    public SimpleRoundRobinLoadBalancer(String serviceId, List<ServiceInstance> servers) {
         if(StringUtils.isEmpty(serviceId)) {
             throw new IllegalArgumentException("Service ID cannot be blank");
         }

@@ -15,20 +15,21 @@
  */
 package org.particleframework.http.client;
 
+import java.util.Optional;
+
 /**
- * Interface for plugging in {@link ServerSelector} implementations for specific service IDs configured by the container
+ * A resolver of {@link LoadBalancer} instances that are capable of resolving references to services into a concrete selector
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-public interface ServerSelectorProvider {
-    /**
-     * @return The ID of the service
-     */
-    String getId();
+public interface LoadBalancerResolver {
 
     /**
-     * @return The server selector
+     * Resolve a {@link LoadBalancer} for the given references
+     * @param serviceReferences The references. These could be service IDs or fully HTTP URLs
+     *
+     * @return A {@link LoadBalancer} or empty of non can be resolved
      */
-    ServerSelector getSelector();
+    Optional<? extends LoadBalancer> resolve(String... serviceReferences);
 }

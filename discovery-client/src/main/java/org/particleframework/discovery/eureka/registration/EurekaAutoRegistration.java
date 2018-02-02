@@ -16,19 +16,15 @@
 package org.particleframework.discovery.eureka.registration;
 
 import io.reactivex.Observable;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.ServiceInstanceIdGenerator;
-import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.eureka.EurekaConfiguration;
 import org.particleframework.discovery.eureka.client.v2.EurekaClient;
 import org.particleframework.discovery.eureka.client.v2.InstanceInfo;
 import org.particleframework.discovery.registration.AutoRegistration;
-import org.particleframework.discovery.registration.DiscoveryServiceAutoRegistration;
-import org.particleframework.discovery.registration.RegistrationException;
+import org.particleframework.discovery.registration.common.DiscoveryServiceAutoRegistration;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;
@@ -38,7 +34,6 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
-import java.util.NoSuchElementException;
 
 /**
  * A {@link AutoRegistration} that registers with Eureka

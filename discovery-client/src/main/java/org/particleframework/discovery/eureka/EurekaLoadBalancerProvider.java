@@ -16,8 +16,8 @@
 package org.particleframework.discovery.eureka;
 
 import org.particleframework.discovery.eureka.client.v2.EurekaClient;
-import org.particleframework.http.client.ServerSelector;
-import org.particleframework.http.client.ServerSelectorProvider;
+import org.particleframework.http.client.LoadBalancer;
+import org.particleframework.http.client.LoadBalancerProvider;
 import org.particleframework.http.client.exceptions.HttpClientException;
 
 import javax.inject.Singleton;
@@ -29,10 +29,10 @@ import java.net.URL;
  * @since 1.0
  */
 @Singleton
-public class EurekaServerSelectorProvider implements ServerSelectorProvider {
+public class EurekaLoadBalancerProvider implements LoadBalancerProvider {
     private final EurekaConfiguration configuration;
 
-    public EurekaServerSelectorProvider(EurekaConfiguration configuration) {
+    public EurekaLoadBalancerProvider(EurekaConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -42,7 +42,7 @@ public class EurekaServerSelectorProvider implements ServerSelectorProvider {
     }
 
     @Override
-    public ServerSelector getSelector() {
+    public LoadBalancer getLoadBalancer() {
         return discriminator -> {
             String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
             try {

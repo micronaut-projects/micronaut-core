@@ -15,13 +15,21 @@
  */
 package org.particleframework.http.client;
 
-import org.particleframework.discovery.ServiceInstanceList;
-
 /**
- * A {@link ServerSelector} that is also a {@link ServiceInstanceList}
+ * Interface for plugging in {@link LoadBalancer} implementations for specific service IDs, avoiding discovery service lookups
+ * for the locally configured {@link LoadBalancerProvider} instances
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface ServiceInstanceSelector extends ServerSelector, ServiceInstanceList {
+public interface LoadBalancerProvider {
+    /**
+     * @return The ID of the service
+     */
+    String getId();
+
+    /**
+     * @return The server load balancer
+     */
+    LoadBalancer getLoadBalancer();
 }

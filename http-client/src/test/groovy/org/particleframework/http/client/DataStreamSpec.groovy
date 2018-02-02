@@ -17,7 +17,6 @@ package org.particleframework.http.client
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.core.io.buffer.ByteBuffer
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
@@ -45,7 +44,7 @@ class DataStreamSpec extends Specification {
         given:
         RxHttpClient client = context.createBean(RxHttpClient, {
                 return embeddedServer.getURL()
-        } as ServerSelector)
+        } as LoadBalancer)
 
         when:
         List<byte[]> arrays = client.dataStream(HttpRequest.GET(
@@ -66,7 +65,7 @@ class DataStreamSpec extends Specification {
         given:
         RxHttpClient client = context.createBean(RxHttpClient, {
             return embeddedServer.getURL()
-        } as ServerSelector)
+        } as LoadBalancer)
 
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(

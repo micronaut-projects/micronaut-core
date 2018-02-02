@@ -29,18 +29,13 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanIdentifier;
 import org.particleframework.inject.ParametrizedProvider;
 import org.particleframework.runtime.context.scope.refresh.RefreshEvent;
-import org.particleframework.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * A scope for injecting {@link org.particleframework.http.client.HttpClient} implementations
@@ -53,11 +48,11 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientScope.class);
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>();
-    private final ServerSelectorResolver serverSelectorResolver;
+    private final LoadBalancerResolver loadBalancerResolver;
     private final BeanContext beanContext;
 
-    public ClientScope(ServerSelectorResolver serverSelectorResolver, BeanContext beanContext) {
-        this.serverSelectorResolver = serverSelectorResolver;
+    public ClientScope(LoadBalancerResolver loadBalancerResolver, BeanContext beanContext) {
+        this.loadBalancerResolver = loadBalancerResolver;
         this.beanContext = beanContext;
     }
 
@@ -92,14 +87,14 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             throw new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client");
         }
 
-        ServerSelector serverSelector = serverSelectorResolver.resolve(value)
+        LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
                                                                         .orElseThrow(()->
                                                                             new DependencyInjectionException(resolutionContext, argument, "Invalid service reference ["+ArrayUtils.toString((Object[]) value)+"] specified to @Client")
                                                                         );
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
             HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
-            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(serverSelector, configuration);
+            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration);
             httpClient.setClientIdentifiers(value);
             return httpClient;
         });

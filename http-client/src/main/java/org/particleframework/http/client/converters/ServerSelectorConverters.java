@@ -17,7 +17,7 @@ package org.particleframework.http.client.converters;
 
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverterRegistrar;
-import org.particleframework.http.client.ServerSelector;
+import org.particleframework.http.client.LoadBalancer;
 
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
@@ -25,7 +25,7 @@ import java.net.URL;
 import java.util.function.Function;
 
 /**
- * Converters from URL to {@link ServerSelector} interface
+ * Converters from URL to {@link LoadBalancer} interface
  *
  * @author graemerocher
  * @since 1.0
@@ -34,8 +34,8 @@ import java.util.function.Function;
 public class ServerSelectorConverters implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
-        conversionService.addConverter(URL.class, ServerSelector.class, (Function<URL, ServerSelector>) url -> discriminator -> url);
-        conversionService.addConverter(String.class, ServerSelector.class, (Function<String, ServerSelector>) url -> discriminator -> {
+        conversionService.addConverter(URL.class, LoadBalancer.class, (Function<URL, LoadBalancer>) url -> discriminator -> url);
+        conversionService.addConverter(String.class, LoadBalancer.class, (Function<String, LoadBalancer>) url -> discriminator -> {
             try {
                 return new URL(url);
             } catch (MalformedURLException e) {

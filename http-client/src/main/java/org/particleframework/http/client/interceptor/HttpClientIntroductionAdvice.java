@@ -71,14 +71,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ClientPublisherResultTransformer[] transformers;
-    private final ServerSelectorResolver serverSelectorResolver;
+    private final LoadBalancerResolver loadBalancerResolver;
 
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
-            ServerSelectorResolver serverSelectorResolver,
+            LoadBalancerResolver loadBalancerResolver,
             ClientPublisherResultTransformer...transformers) {
         this.beanContext = beanContext;
-        this.serverSelectorResolver = serverSelectorResolver;
+        this.loadBalancerResolver = loadBalancerResolver;
         this.transformers = transformers != null ? transformers : new ClientPublisherResultTransformer[0];
     }
 
@@ -304,7 +304,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         String[] clientId = clientAnn.value();
 
         return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
-            ServerSelector serverSelector = serverSelectorResolver.resolve(clientId)
+            LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                                                                   .orElseThrow(()->
                                                                           new HttpClientException("Invalid service reference ["+ArrayUtils.toString((Object[]) clientId)+"] specified to @Client")
                                                                   );
@@ -317,7 +317,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 contextPath = clientId[0];
             }
             HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
-            HttpClient client = beanContext.createBean(HttpClient.class, serverSelector, configuration);
+            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
             client.setClientIdentifiers(clientId);
             JacksonFeatures jacksonFeatures = context.getAnnotation(JacksonFeatures.class);
 

@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.registration;
+package org.particleframework.discovery.registration.common;
 
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import org.particleframework.discovery.consul.ConsulConfiguration;
+import org.particleframework.discovery.registration.AutoRegistration;
+import org.particleframework.discovery.registration.RegistrationConfiguration;
+import org.particleframework.discovery.registration.RegistrationException;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.reactivestreams.Publisher;
