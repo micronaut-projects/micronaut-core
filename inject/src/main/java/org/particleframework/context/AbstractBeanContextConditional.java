@@ -42,7 +42,7 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
         Boolean enabled = this.enabled.get(contextId);
         if(enabled == null) {
             AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class)? new RequiresCondition(annotationMetadata) : null;
+            Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
             enabled = condition == null || condition.matches(new DefaultConditionContext<>(context, this));
             this.enabled.put(contextId, enabled);
         }

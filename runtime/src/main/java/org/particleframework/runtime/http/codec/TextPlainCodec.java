@@ -95,9 +95,9 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     @Override
     public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
-        String string = object.toString();
-        int len = string.length();
+        byte[] bytes = encode(object);
+        int len = bytes.length;
         return allocator.buffer(len, len)
-                        .write(string.getBytes(defaultCharset));
+                        .write(bytes);
     }
 }
