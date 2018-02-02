@@ -38,10 +38,18 @@ public class StreamedFileSpecialType implements FileSpecialType {
     private final long length;
 
     public StreamedFileSpecialType(InputStream inputStream, String name) {
+        this(inputStream, name, Instant.now().toEpochMilli());
+    }
+
+    public StreamedFileSpecialType(InputStream inputStream, String name, long lastModified) {
+        this(inputStream, name, lastModified, -1);
+    }
+
+    public StreamedFileSpecialType(InputStream inputStream, String name, long lastModified, long contentLength) {
         this.name = name;
-        this.lastModified = Instant.now().toEpochMilli();
+        this.lastModified = lastModified;
         this.inputStream = inputStream;
-        this.length = -1;
+        this.length = contentLength;
     }
 
     public StreamedFileSpecialType(URL url) {
