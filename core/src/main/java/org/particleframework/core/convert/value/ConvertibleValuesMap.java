@@ -16,9 +16,7 @@
 package org.particleframework.core.convert.value;
 
 import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.type.Argument;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,18 +31,18 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
     static final ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
 
-    protected final Map<CharSequence, V> map;
+    protected final Map<? extends CharSequence, V> map;
     private final ConversionService<?> conversionService;
 
     public ConvertibleValuesMap() {
         this(new LinkedHashMap<>(), ConversionService.SHARED);
     }
 
-    public ConvertibleValuesMap(Map<CharSequence, V> map) {
+    public ConvertibleValuesMap(Map<? extends CharSequence, V> map) {
         this(map, ConversionService.SHARED);
     }
 
-    public ConvertibleValuesMap(Map<CharSequence, V> map, ConversionService<?> conversionService) {
+    public ConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
         this.map = map;
         this.conversionService = conversionService;
     }

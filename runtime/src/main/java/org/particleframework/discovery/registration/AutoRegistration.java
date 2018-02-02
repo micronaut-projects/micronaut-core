@@ -15,15 +15,25 @@
  */
 package org.particleframework.discovery.registration;
 
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
 import org.particleframework.discovery.event.ServiceDegistrationEvent;
 import org.particleframework.discovery.event.ServiceRegistrationEvent;
+import org.particleframework.discovery.exceptions.DiscoveryException;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatEvent;
+import org.particleframework.http.HttpStatus;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * A base class for classes that automatically register the server with discovery services
@@ -34,18 +44,29 @@ import org.slf4j.LoggerFactory;
 public abstract class AutoRegistration implements ApplicationEventListener<AbstractServiceInstanceEvent> {
 
     protected static final Logger LOG = LoggerFactory.getLogger(AutoRegistration.class);
+    private static final Pattern APPLICATION_NAME_PATTERN = Pattern.compile("^[a-zA-Z][\\w\\d-]*[a-zA-Z\\d]$");
+
+    private final RegistrationConfiguration registrationConfiguration;
+
+    protected AutoRegistration(RegistrationConfiguration registrationConfiguration) {
+        this.registrationConfiguration = registrationConfiguration;
+    }
 
     @Override
     public void onApplicationEvent(AbstractServiceInstanceEvent event) {
-        if(event instanceof ServiceRegistrationEvent) {
-            register(event.getSource());
-        }
-        else if(event instanceof ServiceDegistrationEvent) {
-            deregister(event.getSource());
-        }
-        else if(event instanceof HeartbeatEvent) {
-            HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
-            pulsate(event.getSource(), heartbeatEvent.getStatus());
+        if(registrationConfiguration.isEnabled()) {
+            if(event instanceof ServiceRegistrationEvent) {
+                register(event.getSource());
+            }
+            else if(event instanceof ServiceDegistrationEvent) {
+                if(registrationConfiguration.isDeregister()) {
+                    deregister(event.getSource());
+                }
+            }
+            else if(event instanceof HeartbeatEvent) {
+                HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
+                pulsate(event.getSource(), heartbeatEvent.getStatus());
+            }
         }
     }
 
@@ -70,4 +91,38 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
      * @param instance The {@link ServiceInstance}
      */
     protected abstract void register(ServiceInstance instance);
+
+    protected void validateApplicationName(String name) {
+        String typeDescription = "Application name";
+        validateName(name, typeDescription);
+    }
+
+    protected void validateName(String name, String typeDescription) {
+        if (!APPLICATION_NAME_PATTERN.matcher(name).matches()) {
+            throw new DiscoveryException(typeDescription + " [" + name + "] must start with a letter, end with a letter or digit and contain only letters, digits or hyphens. Example: foo-bar");
+        }
+    }
+
+    protected Observable<HttpStatus> applyRetryPolicy(RegistrationConfiguration registration, Publisher<HttpStatus> registerFlowable) {
+        Observable<HttpStatus> registrationObservable = Flowable
+                .fromPublisher(registerFlowable)
+                .toObservable();
+
+        Optional<Duration> timeout = registration.getTimeout();
+        if (timeout.isPresent()) {
+            registrationObservable = registrationObservable.timeout(timeout.get().toMillis(), TimeUnit.MILLISECONDS);
+        }
+        int retryCount = registration.getRetryCount();
+        boolean doRetry = retryCount > 1;
+        if (doRetry) {
+            registrationObservable = registrationObservable.retryWhen(attempts ->
+                    attempts.zipWith(Observable.range(1, retryCount), (n, i) -> i).flatMap(i ->
+                            Observable.timer(registration.getRetryDelay().toMillis(), TimeUnit.MILLISECONDS)
+                    )
+            );
+        }
+        return registrationObservable;
+    }
+
+
 }

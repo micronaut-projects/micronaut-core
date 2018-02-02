@@ -170,7 +170,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @param <T> The target generic type
      * @return The values
      */
-    static <T> ConvertibleValues<T> of(Map<CharSequence, T> values ) {
+    static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values ) {
         if(values == null) {
             return ConvertibleValuesMap.empty();
         }

@@ -27,6 +27,58 @@ import spock.lang.Ignore
  * @since 1.0
  */
 class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
+    void "test with setters that return void"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@ConfigurationProperties("test")
+class MyProperties {
+    
+    @ConfigurationBuilder
+    Test test = new Test();
+    
+     
+}
+
+class Test {
+    private String foo;
+    private int bar;
+    private Long baz;
+    
+    public void setFoo(String s) { this.foo = s;}
+    public void setBar(int s) {this.bar = s;}
+    public void setBaz(Long s) {this.baz = s;}
+    
+    public String getFoo() { return this.foo; }
+    public int getBar() { return this.bar; }
+    public Long getBaz() { return this.baz; }
+}
+''')
+
+        when:
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'test.foo':'good',
+                'test.bar': '10',
+                'test.baz':'20'
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean != null
+        bean.test != null
+
+        when:
+        def test = bean.test
+
+        then:
+        test.foo == 'good'
+        test.bar == 10
+        test.baz == 20
+    }
 
     void "test different inject types for config properties"() {
         when:

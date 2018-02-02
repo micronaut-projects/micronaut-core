@@ -13,31 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery;
-
-import org.particleframework.core.util.Toggleable;
+package org.particleframework.discovery.eureka.client.v2
 
 /**
- * Base class for common discovery configuration options
- *
  * @author graemerocher
  * @since 1.0
  */
-public abstract class DiscoveryConfiguration implements Toggleable {
-
-    public static final String PREFIX = "discovery";
-
-    private boolean enabled = true;
-
-    /**
-     * @return Is discovery enabled? Defaults to true
-     */
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+class MockApplicationInfos extends AbstractEurekaClient.ApplicationInfos{
+    MockApplicationInfos(List<ApplicationInfo> applications) {
+        super(applications)
     }
 }

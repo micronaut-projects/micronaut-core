@@ -13,31 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery;
+package org.particleframework.discovery.eureka.client.v2
 
-import org.particleframework.core.util.Toggleable;
+import com.fasterxml.jackson.annotation.JsonRootName
 
 /**
- * Base class for common discovery configuration options
- *
  * @author graemerocher
  * @since 1.0
  */
-public abstract class DiscoveryConfiguration implements Toggleable {
-
-    public static final String PREFIX = "discovery";
-
-    private boolean enabled = true;
-
-    /**
-     * @return Is discovery enabled? Defaults to true
-     */
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+@JsonRootName("application")
+class MockApplicationInfo extends ApplicationInfo {
+    def MockApplicationInfo(String name, List<InstanceInfo> instances) {
+        super(name, instances)
     }
 }

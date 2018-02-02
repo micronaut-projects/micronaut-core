@@ -123,7 +123,6 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                 }
             }
             else {
-
                 ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
                 if(contains(constructorSegment)) {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");

@@ -2,8 +2,6 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
 
-    compile 'com.netflix.eureka:eureka-client:1.8.6'
-
     compile project(":http-client")
     compile project(":validation")
 

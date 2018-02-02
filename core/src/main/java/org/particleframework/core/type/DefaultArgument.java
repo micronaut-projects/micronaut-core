@@ -76,25 +76,32 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
+    public boolean equalsType(Argument<?> o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        return Objects.equals(type, o.getType()) &&
+                Objects.equals(typeParameters, o.getTypeVariables());
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-
         DefaultArgument<?> that = (DefaultArgument<?>) o;
+        return Objects.equals(type, that.type) &&
+                Objects.equals(name, that.name) &&
+                Objects.equals(typeParameters, that.typeParameters);
+    }
 
-        if (!type.equals(that.type)) return false;
-        if(typeParameters.isEmpty() && that.typeParameters.isEmpty()) return true;
-        return new HashSet<>(typeParameters.values()).equals(new HashSet<>(that.typeParameters.values()));
+    @Override
+    public int typeHashCode() {
+        return Objects.hash(type, typeParameters);
     }
 
     @Override
     public int hashCode() {
-        int result = type.hashCode();
-        Collection<Argument<?>> values = typeParameters.values();
-        if(!values.isEmpty()) {
-            result = 31 * result + new HashSet<>(values).hashCode();
-        }
-        return result;
+
+        return Objects.hash(type, name, typeParameters);
     }
 
     private Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {

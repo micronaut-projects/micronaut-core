@@ -4,7 +4,9 @@ import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.type.Argument;
 
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A property resolver is capable of resolving properties from an underlying property source
@@ -116,5 +118,14 @@ public interface PropertyResolver extends ValueResolver<String> {
         return getProperty(name, requiredType).orElseThrow(() ->
             new PropertyNotFoundException(name, requiredType)
         );
+    }
+
+    /**
+     * Builds a property name for the given property path
+     * @param path The path
+     * @return The property name
+     */
+    static String nameOf(String...path) {
+        return Arrays.stream(path).collect(Collectors.joining("."));
     }
 }
