@@ -19,10 +19,10 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
+import org.particleframework.http.types.files.FileSpecialType;
 import org.particleframework.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,16 +30,16 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A route match designed to serve a {@link File}
+ * A route match designed to serve a {@link FileSpecialType}
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class StaticFileRouteMatch implements RouteMatch<File> {
+public class FileSpecialTypeRouteMatch implements RouteMatch<FileSpecialType> {
 
-    private final File file;
+    private final FileSpecialType file;
 
-    public StaticFileRouteMatch(File file) {
+    public FileSpecialTypeRouteMatch(FileSpecialType file) {
         this.file = file;
     }
 
@@ -48,17 +48,17 @@ public class StaticFileRouteMatch implements RouteMatch<File> {
     }
 
     @Override
-    public File execute(Map<String, Object> argumentValues) {
+    public FileSpecialType execute(Map<String, Object> argumentValues) {
         return file;
     }
 
-    public RouteMatch<File> fulfill(Map<String, Object> argumentValues) {
+    public RouteMatch<FileSpecialType> fulfill(Map<String, Object> argumentValues) {
         return this;
     }
 
     @Override
-    public RouteMatch<File> decorate(Function<RouteMatch<File>, File> executor) {
-        return new StaticFileRouteMatch(executor.apply(this));
+    public RouteMatch<FileSpecialType> decorate(Function<RouteMatch<FileSpecialType>, FileSpecialType> executor) {
+        return new FileSpecialTypeRouteMatch(executor.apply(this));
     }
 
     public Optional<Argument<?>> getRequiredInput(String name) {
@@ -74,8 +74,8 @@ public class StaticFileRouteMatch implements RouteMatch<File> {
         return Collections.emptyList();
     }
 
-    public ReturnType<File> getReturnType() {
-        return ReturnType.of(File.class);
+    public ReturnType<FileSpecialType> getReturnType() {
+        return ReturnType.of(FileSpecialType.class);
     }
 
     @Override

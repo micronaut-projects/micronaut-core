@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types;
+package org.particleframework.http.types.files;
+
+import org.particleframework.http.types.SpecialType;
 
 /**
- * Used when a special type handler encounters an error
+ * A special type for file handling.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SpecialTypeHandlerException extends RuntimeException {
+public interface FileSpecialType extends SpecialType {
 
-    public SpecialTypeHandlerException(String msg) {
-        super(msg);
-    }
+    long getLastModified();
 
-    public SpecialTypeHandlerException(String msg, Throwable cause) {
-        super(msg, cause);
-    }
+    long getLength();
+
+    String getName();
 }

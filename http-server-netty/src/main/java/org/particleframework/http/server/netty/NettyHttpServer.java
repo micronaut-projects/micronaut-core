@@ -33,7 +33,6 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.ServiceDegistrationEvent;
 import org.particleframework.discovery.event.ServiceRegistrationEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
