@@ -15,21 +15,31 @@
  */
 package org.particleframework.http.client;
 
-import java.util.Optional;
+import java.net.URL;
 
 /**
- * A resolver of {@link ServerSelector} instances that are capable of resolving references to services into a concrete selector
+ * Interface to abstract server selection. Allows plugging in load balancing strategies.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ServerSelectorResolver {
+@FunctionalInterface
+public interface LoadBalancer {
+    /**
+     *
+     * @return The selected server URL
+     *
+     * @param discriminator An object used to discriminate the server to select. Usually the service ID
+     */
+    URL select(Object discriminator);
 
     /**
-     * Resolve a {@link ServerSelector} for the given references
-     * @param serviceReferences The references
+     * A {@link LoadBalancer} that does no load balancing and always hits the given URL
      *
-     * @return A {@link ServerSelector} or empty of non can be resolved
+     * @param url The URL
+     * @return The {@link LoadBalancer}
      */
-    Optional<? extends ServerSelector> resolve(String... serviceReferences);
+    static LoadBalancer fixed(URL url) {
+        return discriminator -> url;
+    }
 }

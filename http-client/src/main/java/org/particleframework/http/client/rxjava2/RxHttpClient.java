@@ -66,12 +66,12 @@ public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClie
     }
 
     @Inject
-    public RxHttpClient( @Argument ServerSelector serverSelector, @Argument HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        super(serverSelector, configuration, codecRegistry, filters);
+    public RxHttpClient(@Argument LoadBalancer loadBalancer, @Argument HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+        super(loadBalancer, configuration, codecRegistry, filters);
     }
 
-    public RxHttpClient(ServerSelector serverSelector) {
-        super(serverSelector);
+    public RxHttpClient(LoadBalancer loadBalancer) {
+        super(loadBalancer);
     }
 
     public RxHttpClient(URL url) {

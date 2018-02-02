@@ -87,7 +87,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty
@@ -102,7 +101,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
     protected static final String HANDLER_STREAM = "stream-handler";
 
-    private final ServerSelector serverSelector;
+    private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
@@ -115,16 +114,16 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     /**
      * Construct a client for the given arguments
      *
-     * @param serverSelector The {@link ServerSelector} to use for selecting servers
+     * @param loadBalancer The {@link LoadBalancer} to use for selecting servers
      * @param configuration  The {@link HttpClientConfiguration} object
      * @param codecRegistry  The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
     @Inject
-    public DefaultHttpClient(@Argument ServerSelector serverSelector,
+    public DefaultHttpClient(@Argument LoadBalancer loadBalancer,
                              @Argument HttpClientConfiguration configuration,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this.serverSelector = serverSelector;
+        this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
@@ -148,8 +147,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this((Object discriminator) -> url, configuration, codecRegistry, filters);
     }
 
-    public DefaultHttpClient(ServerSelector serverSelector) {
-        this(serverSelector, new DefaultHttpClientConfiguration(), createDefaultMediaTypeRegistry());
+    public DefaultHttpClient(LoadBalancer loadBalancer) {
+        this(loadBalancer, new DefaultHttpClientConfiguration(), createDefaultMediaTypeRegistry());
     }
 
 
@@ -316,7 +315,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     protected <I> URI resolveRequestURI(HttpRequest<I> request) {
-        URL server = serverSelector.select(null);
+        URL server = loadBalancer.select(null);
         URI requestURI;
         try {
             requestURI = server.toURI().resolve(request.getUri());

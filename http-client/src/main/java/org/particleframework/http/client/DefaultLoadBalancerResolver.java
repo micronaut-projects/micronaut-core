@@ -21,7 +21,7 @@ import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.http.client.selector.SimpleRoundRobinServerSelector;
+import org.particleframework.http.client.selector.SimpleRoundRobinLoadBalancer;
 import org.particleframework.runtime.context.scope.refresh.RefreshEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.reactivestreams.Subscriber;
@@ -35,21 +35,27 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
- * Abstraction over {@link ServerSelector} lookup
+ * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
  *
- * @author graemerocher
+ * <ul>
+ *     <li>If a reference starts with '/' then we attempt to look up the {@link EmbeddedServer}</li>
+ *     <li>If the reference contains a '/' assume it is a URL and try to create a URL reference to it</li>
+ *     <li>Otherwise delegate to the {@link DiscoveryClient} to attempt to resolve the URIs</li>
+ * </ul>
+ *
+ *
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class DefaultServerSelectorResolver implements ServerSelectorResolver, ApplicationEventListener<RefreshEvent> {
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultServerSelectorResolver.class);
+public class DefaultLoadBalancerResolver implements LoadBalancerResolver, ApplicationEventListener<RefreshEvent> {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancerResolver.class);
     private final Optional<EmbeddedServer> embeddedServer;
-    private final Map<String, ServerSelectorProvider> serverSelectorProviderMap;
+    private final Map<String, LoadBalancerProvider> serverSelectorProviderMap;
     private final Provider<DiscoveryClient> discoveryClient;
-    private final Map<String, Optional<ServiceInstanceSelector>> instanceSelectorMap = new ConcurrentHashMap<>();
+    private final Map<String, Optional<ServiceInstanceLoadBalancer>> instanceSelectorMap = new ConcurrentHashMap<>();
 
     /**
      * The default server selector resolver
@@ -58,15 +64,15 @@ public class DefaultServerSelectorResolver implements ServerSelectorResolver, Ap
      * @param discoveryClient The discovery client
      * @param providers Any other providers
      */
-    public DefaultServerSelectorResolver(
+    public DefaultLoadBalancerResolver(
             Optional<EmbeddedServer> embeddedServer,
             Provider<DiscoveryClient> discoveryClient,
-            ServerSelectorProvider...providers) {
+            LoadBalancerProvider...providers) {
         this.embeddedServer = embeddedServer;
         this.discoveryClient = discoveryClient;
         if(ArrayUtils.isNotEmpty(providers)) {
             this.serverSelectorProviderMap = new HashMap<>(providers.length);
-            for (ServerSelectorProvider provider : providers) {
+            for (LoadBalancerProvider provider : providers) {
                 serverSelectorProviderMap.put(provider.getId(), provider);
             }
         }
@@ -76,14 +82,14 @@ public class DefaultServerSelectorResolver implements ServerSelectorResolver, Ap
     }
 
     @Override
-    public Optional<? extends ServerSelector> resolve(String... serviceReferences) {
+    public Optional<? extends LoadBalancer> resolve(String... serviceReferences) {
         if(ArrayUtils.isEmpty(serviceReferences) || StringUtils.isEmpty(serviceReferences[0])) {
             return Optional.empty();
         }
         String reference = serviceReferences[0];
 
         if(serverSelectorProviderMap.containsKey(reference)) {
-            return Optional.ofNullable(serverSelectorProviderMap.get(reference).getSelector());
+            return Optional.ofNullable(serverSelectorProviderMap.get(reference).getLoadBalancer());
         }
         else if(reference.startsWith("/")) {
             // current server reference
@@ -112,7 +118,7 @@ public class DefaultServerSelectorResolver implements ServerSelectorResolver, Ap
                     List<ServiceInstance> serviceInstances = Flowable.fromPublisher(client.getInstances(serviceId)).blockingFirst();
 
                     if(!serviceInstances.isEmpty()) {
-                        ServiceInstanceSelector roundRobinServerSelector = createServerSelector(serviceId, serviceInstances);
+                        ServiceInstanceLoadBalancer roundRobinServerSelector = createServerSelector(serviceId, serviceInstances);
                         return Optional.of(roundRobinServerSelector);
                     }
                     return Optional.empty();
@@ -130,9 +136,9 @@ public class DefaultServerSelectorResolver implements ServerSelectorResolver, Ap
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        Set<Map.Entry<String, Optional<ServiceInstanceSelector>>> entries = instanceSelectorMap.entrySet();
-        for (Map.Entry<String, Optional<ServiceInstanceSelector>> entry : entries) {
-                Optional<ServiceInstanceSelector> selector = entry.getValue();
+        Set<Map.Entry<String, Optional<ServiceInstanceLoadBalancer>>> entries = instanceSelectorMap.entrySet();
+        for (Map.Entry<String, Optional<ServiceInstanceLoadBalancer>> entry : entries) {
+                Optional<ServiceInstanceLoadBalancer> selector = entry.getValue();
                 String serviceId = entry.getKey();
                 if(selector.isPresent()) {
 
@@ -165,14 +171,14 @@ public class DefaultServerSelectorResolver implements ServerSelectorResolver, Ap
     }
 
     /**
-     * Creates the default {@link ServiceInstanceSelector} implementation. Subclasses can override to provide custom load balancing strategies
+     * Creates the default {@link ServiceInstanceLoadBalancer} implementation. Subclasses can override to provide custom load balancing strategies
      *
      *
      * @param serviceId The service ID
      * @param serviceInstances A list of {@link ServiceInstance} associated with the ID
-     * @return The {@link ServiceInstanceSelector}
+     * @return The {@link ServiceInstanceLoadBalancer}
      */
-    protected ServiceInstanceSelector createServerSelector(String serviceId, List<ServiceInstance> serviceInstances) {
-        return new SimpleRoundRobinServerSelector(serviceId, serviceInstances);
+    protected ServiceInstanceLoadBalancer createServerSelector(String serviceId, List<ServiceInstance> serviceInstances) {
+        return new SimpleRoundRobinLoadBalancer(serviceId, serviceInstances);
     }
 }
