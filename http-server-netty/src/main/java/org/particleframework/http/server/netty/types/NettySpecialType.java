@@ -18,7 +18,7 @@ package org.particleframework.http.server.netty.types;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
-import org.particleframework.http.types.SpecialType;
+import org.particleframework.http.server.types.SpecialType;
 
 /**
  * A special type that allows writing data in Netty

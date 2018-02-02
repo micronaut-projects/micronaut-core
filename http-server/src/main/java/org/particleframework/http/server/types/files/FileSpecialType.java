@@ -13,41 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.types.files;
+package org.particleframework.http.server.types.files;
 
-import java.io.File;
+import org.particleframework.http.server.types.SpecialType;
 
 /**
- * A special type for handling a {@link File}
+ * A special type for file handling.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SystemFileSpecialType implements FileSpecialType {
+public interface FileSpecialType extends SpecialType {
 
-    protected final File file;
+    long getLastModified();
 
-    public SystemFileSpecialType(File file) {
-        this.file = file;
-    }
+    long getLength();
 
-    public File getFile() {
-        return file;
-    }
-
-    @Override
-    public long getLastModified() {
-        return file.lastModified();
-    }
-
-    @Override
-    public String getName() {
-        return file.getName();
-    }
-
-    @Override
-    public long getLength() {
-        return file.length();
-    }
-
+    String getName();
 }

@@ -13,21 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.types;
+package org.particleframework.http.server.types;
+
+import org.particleframework.http.MutableHttpResponse;
 
 /**
- * Used when a special type handler encounters an error
+ * A type that needs special handling that may
+ * include modification of the response.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SpecialTypeHandlerException extends RuntimeException {
+public interface SpecialType {
 
-    public SpecialTypeHandlerException(String msg) {
-        super(msg);
-    }
-
-    public SpecialTypeHandlerException(String msg, Throwable cause) {
-        super(msg, cause);
+    /**
+     * Modify the response before it is written
+     * to the client.
+     *
+     * @param response The response to modify
+     */
+    default void process(MutableHttpResponse response) {
+        //no-op
     }
 }

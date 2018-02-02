@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.web.router.resource;
+package org.particleframework.web.router;
 
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
-import org.particleframework.http.types.files.FileSpecialType;
-import org.particleframework.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
@@ -30,41 +28,45 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A route match designed to serve a {@link FileSpecialType}
+ * A route match designed to return an existing object
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class FileSpecialTypeRouteMatch implements RouteMatch<FileSpecialType> {
+public class BasicObjectRouteMatch implements RouteMatch<Object> {
 
-    private final FileSpecialType file;
+    private final Object object;
 
-    public FileSpecialTypeRouteMatch(FileSpecialType file) {
-        this.file = file;
+    public BasicObjectRouteMatch(Object object) {
+        this.object = object;
     }
 
+    @Override
     public Map<String, Object> getVariables() {
         return Collections.emptyMap();
     }
 
     @Override
-    public FileSpecialType execute(Map<String, Object> argumentValues) {
-        return file;
+    public Object execute(Map<String, Object> argumentValues) {
+        return object;
     }
 
-    public RouteMatch<FileSpecialType> fulfill(Map<String, Object> argumentValues) {
+    @Override
+    public RouteMatch<Object> fulfill(Map<String, Object> argumentValues) {
         return this;
     }
 
     @Override
-    public RouteMatch<FileSpecialType> decorate(Function<RouteMatch<FileSpecialType>, FileSpecialType> executor) {
-        return new FileSpecialTypeRouteMatch(executor.apply(this));
+    public RouteMatch<Object> decorate(Function<RouteMatch<Object>, Object> executor) {
+        return new BasicObjectRouteMatch(executor.apply(this));
     }
 
+    @Override
     public Optional<Argument<?>> getRequiredInput(String name) {
         return Optional.empty();
     }
 
+    @Override
     public Optional<Argument<?>> getBodyArgument() {
         return Optional.empty();
     }
@@ -74,8 +76,9 @@ public class FileSpecialTypeRouteMatch implements RouteMatch<FileSpecialType> {
         return Collections.emptyList();
     }
 
-    public ReturnType<FileSpecialType> getReturnType() {
-        return ReturnType.of(FileSpecialType.class);
+    @Override
+    public ReturnType<?> getReturnType() {
+        return ReturnType.of(object.getClass());
     }
 
     @Override
