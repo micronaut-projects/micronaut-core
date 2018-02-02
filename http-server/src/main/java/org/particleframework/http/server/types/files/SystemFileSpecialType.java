@@ -13,26 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.types;
+package org.particleframework.http.server.types.files;
 
-import org.particleframework.http.MutableHttpResponse;
+import java.io.File;
 
 /**
- * A type that needs special handling that may
- * include modification of the response.
+ * A special type for handling a {@link File}
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface SpecialType {
+public class SystemFileSpecialType implements FileSpecialType {
 
-    /**
-     * Modify the response before it is written
-     * to the client.
-     *
-     * @param response The response to modify
-     */
-    default void process(MutableHttpResponse response) {
-        //no-op
+    protected final File file;
+
+    public SystemFileSpecialType(File file) {
+        this.file = file;
     }
+
+    public File getFile() {
+        return file;
+    }
+
+    @Override
+    public long getLastModified() {
+        return file.lastModified();
+    }
+
+    @Override
+    public String getName() {
+        return file.getName();
+    }
+
+    @Override
+    public long getLength() {
+        return file.length();
+    }
+
 }

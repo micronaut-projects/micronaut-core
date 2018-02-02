@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.types.files;
+package org.particleframework.http.server.types.files;
 
-import org.particleframework.http.types.SpecialTypeHandlerException;
+import org.particleframework.http.server.types.SpecialTypeHandlerException;
 
 import java.io.File;
 import java.io.IOException;

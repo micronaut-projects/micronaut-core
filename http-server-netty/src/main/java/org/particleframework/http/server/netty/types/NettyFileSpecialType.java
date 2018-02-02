@@ -15,7 +15,7 @@
  */
 package org.particleframework.http.server.netty.types;
 
-import org.particleframework.http.types.files.FileSpecialType;
+import org.particleframework.http.server.types.files.FileSpecialType;
 
 /**
  * A special type for files specific to Netty

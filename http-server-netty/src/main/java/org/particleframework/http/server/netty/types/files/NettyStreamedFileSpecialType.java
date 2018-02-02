@@ -25,7 +25,7 @@ import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
 import org.particleframework.http.server.netty.types.NettyFileSpecialType;
-import org.particleframework.http.types.files.StreamedFileSpecialType;
+import org.particleframework.http.server.types.files.StreamedFileSpecialType;
 
 import java.io.InputStream;
 import java.net.URL;

@@ -25,8 +25,8 @@ import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
 import org.particleframework.http.server.netty.types.NettyFileSpecialType;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
-import org.particleframework.http.types.SpecialTypeHandlerException;
-import org.particleframework.http.types.files.SystemFileSpecialType;
+import org.particleframework.http.server.types.SpecialTypeHandlerException;
+import org.particleframework.http.server.types.files.SystemFileSpecialType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

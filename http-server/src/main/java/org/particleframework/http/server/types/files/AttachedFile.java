@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.types.files;
+package org.particleframework.http.server.types.files;
 
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.MutableHttpResponse;

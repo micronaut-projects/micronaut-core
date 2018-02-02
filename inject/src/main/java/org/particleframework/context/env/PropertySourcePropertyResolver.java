@@ -129,7 +129,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     return true;
                 }
                 else {
-                    String finalName = name;
+                    String finalName = name + ".";
                     return entries.keySet().stream().anyMatch(key -> key.startsWith(finalName));
                 }
             }
