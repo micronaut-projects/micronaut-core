@@ -33,9 +33,8 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.discovery.event.ServiceDegistrationEvent;
-import org.particleframework.discovery.event.ServiceRegistrationEvent;
+import org.particleframework.discovery.event.ServiceShutdownEvent;
+import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -227,7 +226,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         return ConvertibleValues.of(metadata);
                     }
                 };
-                applicationContext.publishEvent(new ServiceRegistrationEvent(serviceInstance));
+                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
             });
         }
 
@@ -244,7 +243,7 @@ public class NettyHttpServer implements EmbeddedServer {
                            .addListener(this::logShutdownErrorIfNecessary);
                 applicationContext.publishEvent(new ServerShutdownEvent(this));
                 if(serviceInstance != null) {
-                    applicationContext.publishEvent(new ServiceDegistrationEvent(serviceInstance));
+                    applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
                 }
                 if(applicationContext.isRunning()) {
                     applicationContext.stop();
