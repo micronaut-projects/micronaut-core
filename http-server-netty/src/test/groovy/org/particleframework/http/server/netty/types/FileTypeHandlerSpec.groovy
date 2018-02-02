@@ -1,6 +1,5 @@
 package org.particleframework.http.server.netty.types
 
-import okhttp3.Request
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
@@ -9,7 +8,7 @@ import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.server.netty.types.files.FileTypeHandlerConfiguration
-import org.particleframework.http.server.types.files.AttachedFile
+import org.particleframework.http.types.files.AttachedFile
 
 import java.text.SimpleDateFormat
 import static org.particleframework.http.HttpHeaders.*
