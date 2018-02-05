@@ -15,22 +15,18 @@
  */
 package org.particleframework.http.server.netty.types.files;
 
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.stream.ChunkedFile;
 import org.particleframework.http.*;
 import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.HttpResponse;
 import org.particleframework.http.server.netty.NettyHttpResponse;
-import org.particleframework.http.server.netty.NettyHttpServer;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
+import org.particleframework.http.server.netty.types.NettyFileSpecialType;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
 import org.particleframework.http.server.types.SpecialTypeHandlerException;
-import org.particleframework.http.server.types.files.FileSpecialType;
+import org.particleframework.http.server.types.files.SystemFileSpecialType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +41,9 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * Responsible for writing files out to the response in Netty
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
 @Singleton
 public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
@@ -64,16 +63,19 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
 
     @Override
     public void handle(Object obj, HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context) {
-        
-        File file;
+
+        NettyFileSpecialType type;
         if (obj instanceof File) {
-            file = (File) obj;
-        } else if (obj instanceof FileSpecialType) {
-            file = ((FileSpecialType) obj).getFile();
+            type = new NettySystemFileSpecialType((File) obj);
+        } else if (obj instanceof NettyFileSpecialType) {
+            type = (NettyFileSpecialType) obj;
+        } else if (obj instanceof SystemFileSpecialType) {
+            type = new NettySystemFileSpecialType((SystemFileSpecialType) obj);
         } else {
             throw new SpecialTypeHandlerException("FileTypeHandler only supports File or FileSpecialType types");
         }
 
+        long lastModified = type.getLastModified();
 
         // Cache Validation
         String ifModifiedSince = request.headers().get(HttpHeaders.IF_MODIFIED_SINCE);
@@ -84,7 +86,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
                 // Only compare up to the second because the datetime format we send to the client
                 // does not have milliseconds
                 long ifModifiedSinceDateSeconds = ifModifiedSinceDate.getTime() / 1000;
-                long fileLastModifiedSeconds = file.lastModified() / 1000;
+                long fileLastModifiedSeconds = lastModified / 1000;
                 if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                     FullHttpResponse nettyResponse = notModified();
                     context.writeAndFlush(nettyResponse)
@@ -96,67 +98,25 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
             }
         }
 
-        RandomAccessFile raf;
-        try {
-            raf = new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException e) {
-            throw new SpecialTypeHandlerException("Could not find file", e);
-        }
-
-        long fileLength;
-        try {
-            fileLength = raf.length();
-        } catch (IOException e) {
-            throw new SpecialTypeHandlerException("Could not determine file length", e);
-        }
-
-        response.header(HttpHeaders.CONTENT_TYPE, getMediaType(file));
-        response.header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileLength));
-        setDateAndCacheHeaders(response, file);
+        response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
+        setDateAndCacheHeaders(response, lastModified);
         if (HttpUtil.isKeepAlive(request)) {
             response.header(HttpHeaders.CONNECTION, "keep-alive");
         }
 
-        if (obj instanceof FileSpecialType) {
-            ((FileSpecialType) obj).process(response);
-        }
+        type.process(response);
 
-        FullHttpResponse nettyResponse = response.getNativeResponse();
-
-        //The streams codec prevents non full responses from being written
-        Optional.ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> context.pipeline().remove(handler));
-
-        // Write the request data
-        context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
-
-        // Write the content.
-        ChannelFuture flushFuture;
-        if (context.pipeline().get(SslHandler.class) == null) {
-            context.write(new DefaultFileRegion(raf.getChannel(), 0, fileLength), context.newProgressivePromise());
-            // Write the end marker.
-            flushFuture = context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-        } else {
-            try {
-                // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, fileLength, 8192)),
-                        context.newProgressivePromise());
-            } catch (IOException e) {
-                throw new SpecialTypeHandlerException("Could not read file", e);
-            }
-        }
-
-        flushFuture.addListener(new DefaultCloseHandler(context, request, nettyResponse));
+        type.write(request, response, context);
     }
 
     @Override
     public boolean supports(Class<?> type) {
-        return File.class.isAssignableFrom(type) || FileSpecialType.class.isAssignableFrom(type);
+        return File.class.isAssignableFrom(type) || SystemFileSpecialType.class.isAssignableFrom(type);
     }
 
-    protected MediaType getMediaType(File file) {
+    protected MediaType getMediaType(String filename) {
         try {
-            String extension = getExtension(file);
+            String extension = getExtension(filename);
             String contentType = mediaTypeFileExtensions.get().get(extension);
             if (contentType != null) {
                 return new MediaType(contentType, extension);
@@ -170,7 +130,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
         return MediaType.TEXT_PLAIN_TYPE;
     }
 
-    protected void setDateAndCacheHeaders(MutableHttpResponse response, File fileToCache) {
+    protected void setDateAndCacheHeaders(MutableHttpResponse response, long lastModified) {
         // Date header
         Calendar time = new GregorianCalendar();
         response.header(HttpHeaders.DATE, dateFormat.format(time.getTime()));
@@ -180,7 +140,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
         response.header(HttpHeaders.EXPIRES, dateFormat.format(time.getTime()));
         response.header(HttpHeaders.CACHE_CONTROL, "private, max-age=" + configuration.getCacheSeconds());
         response.header(
-                HttpHeaderNames.LAST_MODIFIED, dateFormat.format(new Date(fileToCache.lastModified())));
+                HttpHeaderNames.LAST_MODIFIED, dateFormat.format(new Date(lastModified)));
     }
 
     protected void setDateHeader(MutableHttpResponse response) {
@@ -194,8 +154,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
         return response.getNativeResponse();
     }
 
-    private String getExtension(File file) {
-        String filename = file.getName();
+    private String getExtension(String filename) {
         int extensionPos = filename.lastIndexOf('.');
         int lastUnixPos = filename.lastIndexOf('/');
         int lastWindowsPos = filename.lastIndexOf('\\');

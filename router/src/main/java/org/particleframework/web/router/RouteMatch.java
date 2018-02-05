@@ -92,7 +92,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest> {
         return Collections.emptyList();
     }
 
-    ReturnType<R> getReturnType();
+    ReturnType<? extends R> getReturnType();
 
     /**
      * Execute the route with the given values. Note if there are required arguments returned from {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}
