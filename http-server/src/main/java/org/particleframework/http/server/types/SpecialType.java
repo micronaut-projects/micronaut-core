@@ -32,5 +32,7 @@ public interface SpecialType {
      *
      * @param response The response to modify
      */
-    void process(MutableHttpResponse response);
+    default void process(MutableHttpResponse response) {
+        //no-op
+    }
 }

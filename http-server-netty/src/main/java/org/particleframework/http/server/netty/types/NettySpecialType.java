@@ -13,21 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types.files;
+package org.particleframework.http.server.netty.types;
 
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.HttpRequest;
+import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.types.SpecialType;
 
 /**
- * A special type for file handling.
+ * A special type that allows writing data in Netty
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface FileSpecialType extends SpecialType {
+public interface NettySpecialType extends SpecialType {
 
-    long getLastModified();
-
-    long getLength();
-
-    String getName();
+    void write(HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context);
 }

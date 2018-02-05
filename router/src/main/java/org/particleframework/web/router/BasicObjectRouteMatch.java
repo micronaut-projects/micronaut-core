@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.web.router.resource;
+package org.particleframework.web.router;
 
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MediaType;
-import org.particleframework.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,41 +28,45 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A route match designed to serve a {@link File}
+ * A route match designed to return an existing object
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class StaticFileRouteMatch implements RouteMatch<File> {
+public class BasicObjectRouteMatch implements RouteMatch<Object> {
 
-    private final File file;
+    private final Object object;
 
-    public StaticFileRouteMatch(File file) {
-        this.file = file;
+    public BasicObjectRouteMatch(Object object) {
+        this.object = object;
     }
 
+    @Override
     public Map<String, Object> getVariables() {
         return Collections.emptyMap();
     }
 
     @Override
-    public File execute(Map<String, Object> argumentValues) {
-        return file;
+    public Object execute(Map<String, Object> argumentValues) {
+        return object;
     }
 
-    public RouteMatch<File> fulfill(Map<String, Object> argumentValues) {
+    @Override
+    public RouteMatch<Object> fulfill(Map<String, Object> argumentValues) {
         return this;
     }
 
     @Override
-    public RouteMatch<File> decorate(Function<RouteMatch<File>, File> executor) {
-        return new StaticFileRouteMatch(executor.apply(this));
+    public RouteMatch<Object> decorate(Function<RouteMatch<Object>, Object> executor) {
+        return new BasicObjectRouteMatch(executor.apply(this));
     }
 
+    @Override
     public Optional<Argument<?>> getRequiredInput(String name) {
         return Optional.empty();
     }
 
+    @Override
     public Optional<Argument<?>> getBodyArgument() {
         return Optional.empty();
     }
@@ -74,8 +76,9 @@ public class StaticFileRouteMatch implements RouteMatch<File> {
         return Collections.emptyList();
     }
 
-    public ReturnType<File> getReturnType() {
-        return ReturnType.of(File.class);
+    @Override
+    public ReturnType<?> getReturnType() {
+        return ReturnType.of(object.getClass());
     }
 
     @Override

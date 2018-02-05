@@ -28,28 +28,30 @@ import java.io.File;
  * @author James Kleeh
  * @since 1.0
  */
-public class AttachedFile implements FileSpecialType {
+public class AttachedFile extends SystemFileSpecialType {
 
     private static final String headerValue = "attachment; filename=\"%s\"";
 
-    private final File file;
     private final String filename;
+    private final String attachmentName;
 
     public AttachedFile(File file) {
         this(file, file.getName());
     }
 
     public AttachedFile(File file, String filename) {
-        this.file = file;
-        this.filename = filename;
-    }
-
-    public File getFile() {
-        return file;
+        super(file);
+        this.filename = file.getName();
+        this.attachmentName = filename;
     }
 
     @Override
     public void process(MutableHttpResponse response) {
-        response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(headerValue, filename));
+        response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(headerValue, attachmentName));
+    }
+
+    @Override
+    public String getName() {
+        return filename;
     }
 }

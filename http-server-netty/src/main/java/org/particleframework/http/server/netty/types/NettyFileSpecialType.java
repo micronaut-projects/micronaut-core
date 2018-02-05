@@ -13,21 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types.files;
+package org.particleframework.http.server.netty.types;
 
-import org.particleframework.http.server.types.SpecialType;
+import org.particleframework.http.server.types.files.FileSpecialType;
 
 /**
- * A special type for file handling.
+ * A special type for files specific to Netty
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface FileSpecialType extends SpecialType {
-
-    long getLastModified();
-
-    long getLength();
-
-    String getName();
+public interface NettyFileSpecialType extends FileSpecialType, NettySpecialType {
 }

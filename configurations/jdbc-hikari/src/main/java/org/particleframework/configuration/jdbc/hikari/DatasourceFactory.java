@@ -19,7 +19,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.EachProperty;
 
 /**
  * Creates a Hikari data source for each configuration bean

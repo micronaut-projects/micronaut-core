@@ -122,6 +122,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName  : BOOTSTRAP_NAME;
                     }
                 };
+                for (PropertySource source: propertySources.values()) {
+                    bootstrapEnvironment.addPropertySource(source);
+                }
                 bootstrapEnvironment.start();
 
                 this.bootstrapContext = new DefaultApplicationContext(resourceLoader, activeNamesArray) {

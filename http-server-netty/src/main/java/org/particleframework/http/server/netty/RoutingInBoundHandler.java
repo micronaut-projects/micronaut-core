@@ -16,7 +16,6 @@
 package org.particleframework.http.server.netty;
 
 import com.typesafe.netty.http.StreamedHttpRequest;
-import com.typesafe.netty.http.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
@@ -45,6 +44,9 @@ import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
+import org.particleframework.http.server.netty.types.files.NettyStreamedFileSpecialType;
+import org.particleframework.http.server.netty.types.files.NettySystemFileSpecialType;
+import org.particleframework.http.server.types.files.FileSpecialType;
 import org.particleframework.runtime.http.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.async.ContextCompletionAwareSubscriber;
@@ -55,12 +57,8 @@ import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.executor.ExecutorSelector;
-import org.particleframework.web.router.MethodBasedRouteMatch;
-import org.particleframework.web.router.RouteMatch;
-import org.particleframework.web.router.Router;
-import org.particleframework.web.router.UriRouteMatch;
+import org.particleframework.web.router.*;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
-import org.particleframework.web.router.resource.StaticFileRouteMatch;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.particleframework.web.router.resource.StaticResourceResolver;
 import org.reactivestreams.Publisher;
@@ -189,17 +187,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             } else {
 
-                Optional<File> optionalFile = Optional.empty();
-                Optional<URL> url = staticResourceResolver.resolve(requestPath);
-                if (url.isPresent()) {
-                    File file = new File(url.get().getPath());
+                Optional<? extends FileSpecialType> optionalFile = Optional.empty();
+                Optional<URL> optionalUrl = staticResourceResolver.resolve(requestPath);
+                if (optionalUrl.isPresent()) {
+                    URL url = optionalUrl.get();
+                    File file = new File(url.getPath());
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        optionalFile = Optional.of(file);
+                        optionalFile = Optional.of(new NettySystemFileSpecialType(file));
+                    } else {
+                        optionalFile = Optional.of(new NettyStreamedFileSpecialType(url));
                     }
                 }
 
                 if (optionalFile.isPresent()) {
-                    route = new StaticFileRouteMatch(optionalFile.get());
+                    route = new BasicObjectRouteMatch(optionalFile.get());
                 } else {
                     Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
                     if (statusRoute.isPresent()) {
