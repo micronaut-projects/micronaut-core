@@ -17,6 +17,7 @@ package org.particleframework.cache;
 
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -31,20 +32,23 @@ import java.util.OptionalLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty("particle.caches")
+@EachProperty(CacheConfiguration.PREFIX)
 public class CacheConfiguration {
 
-    protected Integer initialCapacity;
-    protected Long maximumSize;
-    protected Long maximumWeight;
-    protected Duration expireAfterWrite;
-    protected Duration expireAfterAccess;
+    public static final String PREFIX = "particle.caches";
+
+    private Integer initialCapacity;
+    private Long maximumSize;
+    private Long maximumWeight;
+    private Duration expireAfterWrite;
+    private Duration expireAfterAccess;
+    protected Charset charset;
 
     private final String cacheName;
-    protected Charset charset = StandardCharsets.UTF_8;
 
-    public CacheConfiguration(@Argument String cacheName) {
+    public CacheConfiguration(@Argument String cacheName, ApplicationConfiguration applicationConfiguration) {
         this.cacheName = cacheName;
+        this.charset = applicationConfiguration.getDefaultCharset();
     }
 
     /**
@@ -99,5 +103,29 @@ public class CacheConfiguration {
      */
     public Charset getCharset() {
         return charset;
+    }
+
+    public void setInitialCapacity(Integer initialCapacity) {
+        this.initialCapacity = initialCapacity;
+    }
+
+    public void setMaximumSize(Long maximumSize) {
+        this.maximumSize = maximumSize;
+    }
+
+    public void setMaximumWeight(Long maximumWeight) {
+        this.maximumWeight = maximumWeight;
+    }
+
+    public void setExpireAfterWrite(Duration expireAfterWrite) {
+        this.expireAfterWrite = expireAfterWrite;
+    }
+
+    public void setExpireAfterAccess(Duration expireAfterAccess) {
+        this.expireAfterAccess = expireAfterAccess;
+    }
+
+    public void setCharset(Charset charset) {
+        this.charset = charset;
     }
 }

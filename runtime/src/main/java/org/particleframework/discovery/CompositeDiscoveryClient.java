@@ -49,9 +49,14 @@ public class CompositeDiscoveryClient implements DiscoveryClient {
     }
 
     @Override
-    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+    public String getDescription() {
+        return "compositeClient";
+    }
+
+    @Override
+    public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
         if(ArrayUtils.isEmpty(discoveryClients)) {
-            return Publishers.just(Collections.emptyList());
+            return Flowable.just(Collections.emptyList());
         }
         Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(serviceId)));
         Maybe<List<ServiceInstance>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((instances, otherInstances) -> {
@@ -62,9 +67,9 @@ public class CompositeDiscoveryClient implements DiscoveryClient {
     }
 
     @Override
-    public Publisher<List<String>> getServiceIds() {
+    public Flowable<List<String>> getServiceIds() {
         if(ArrayUtils.isEmpty(discoveryClients)) {
-            return Publishers.just(Collections.emptyList());
+            return Flowable.just(Collections.emptyList());
         }
         Stream<Flowable<List<String>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getServiceIds()));
         Maybe<List<String>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((strings, strings2) -> {

@@ -1512,7 +1512,8 @@ public class DefaultBeanContext implements BeanContext {
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream)
                                       .filter(c -> !processedDefinitions.contains(c));
 
-                for (BeanDefinition<T> candidate : candidateStream.collect(Collectors.toList())) {
+                List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
+                for (BeanDefinition<T> candidate : candidateList) {
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
                     }
@@ -1549,7 +1550,15 @@ public class DefaultBeanContext implements BeanContext {
             BeanDefinition declaringBean = segment.getDeclaringType();
             // if the currently injected segment is a constructor argument and the type to be constructed is the
             // same as the candidate, then filter out the candidate to avoid a circular injection problem
-            candidateStream = candidateStream.filter(c -> !c.equals(declaringBean));
+            candidateStream = candidateStream.filter(c -> {
+                if(c.equals(declaringBean)) {
+                    return false;
+                }
+                else if(declaringBean instanceof ProxyBeanDefinition) {
+                    return !((ProxyBeanDefinition)declaringBean).getTargetDefinitionType().equals(c.getClass());
+                }
+                return true;
+            });
         }
         return candidateStream;
     }

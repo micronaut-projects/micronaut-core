@@ -297,7 +297,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
         }
-        throw new UnsupportedOperationException("Cannot implement method ["+context+"] that is not annotated with an HTTP method type");
+        // try other introduction advice
+        return context.proceed();
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
@@ -318,40 +319,42 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             HttpClientConfiguration configuration = beanContext.getBean(clientAnn.configuration());
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration);
-            client.setClientIdentifiers(clientId);
-            JacksonFeatures jacksonFeatures = context.getAnnotation(JacksonFeatures.class);
-
-            if(jacksonFeatures != null && client instanceof DefaultHttpClient) {
+            if(client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
-                Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
-                ObjectMapper objectMapper = null;
-                if(existingCodec.isPresent()) {
-                    MediaTypeCodec existing = existingCodec.get();
-                    if(existing instanceof JsonMediaTypeCodec) {
-                        objectMapper = ((JsonMediaTypeCodec) existing).getObjectMapper().copy();
+                defaultClient.setClientIdentifiers(clientId);
+                JacksonFeatures jacksonFeatures = context.getAnnotation(JacksonFeatures.class);
+
+                if(jacksonFeatures != null) {
+                    Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
+                    ObjectMapper objectMapper = null;
+                    if(existingCodec.isPresent()) {
+                        MediaTypeCodec existing = existingCodec.get();
+                        if(existing instanceof JsonMediaTypeCodec) {
+                            objectMapper = ((JsonMediaTypeCodec) existing).getObjectMapper().copy();
+                        }
                     }
-                }
-                if(objectMapper == null) {
-                    objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
-                }
+                    if(objectMapper == null) {
+                        objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+                    }
 
-                for (SerializationFeature serializationFeature : jacksonFeatures.enabledSerializationFeatures()) {
-                    objectMapper.configure(serializationFeature, true);
-                }
+                    for (SerializationFeature serializationFeature : jacksonFeatures.enabledSerializationFeatures()) {
+                        objectMapper.configure(serializationFeature, true);
+                    }
 
-                for (DeserializationFeature serializationFeature : jacksonFeatures.enabledDeserializationFeatures()) {
-                    objectMapper.configure(serializationFeature, true);
-                }
+                    for (DeserializationFeature serializationFeature : jacksonFeatures.enabledDeserializationFeatures()) {
+                        objectMapper.configure(serializationFeature, true);
+                    }
 
-                for (SerializationFeature serializationFeature : jacksonFeatures.disabledSerializationFeatures()) {
-                    objectMapper.configure(serializationFeature, false);
-                }
+                    for (SerializationFeature serializationFeature : jacksonFeatures.disabledSerializationFeatures()) {
+                        objectMapper.configure(serializationFeature, false);
+                    }
 
-                for (DeserializationFeature feature : jacksonFeatures.disabledDeserializationFeatures()) {
-                    objectMapper.configure(feature, false);
-                }
+                    for (DeserializationFeature feature : jacksonFeatures.disabledDeserializationFeatures()) {
+                        objectMapper.configure(feature, false);
+                    }
 
-                defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper)));
+                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper)));
+                }
             }
             return new ClientRegistration(client, contextPath);
         });

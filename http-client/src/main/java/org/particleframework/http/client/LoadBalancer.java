@@ -15,6 +15,9 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.core.async.publisher.Publishers;
+import org.reactivestreams.Publisher;
+
 import java.net.URL;
 
 /**
@@ -31,7 +34,7 @@ public interface LoadBalancer {
      *
      * @param discriminator An object used to discriminate the server to select. Usually the service ID
      */
-    URL select(Object discriminator);
+    Publisher<URL> select(Object discriminator);
 
     /**
      * A {@link LoadBalancer} that does no load balancing and always hits the given URL
@@ -40,6 +43,6 @@ public interface LoadBalancer {
      * @return The {@link LoadBalancer}
      */
     static LoadBalancer fixed(URL url) {
-        return discriminator -> url;
+        return discriminator -> Publishers.just(url);
     }
 }

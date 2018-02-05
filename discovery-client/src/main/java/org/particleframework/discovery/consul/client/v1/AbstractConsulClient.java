@@ -44,6 +44,11 @@ public abstract class AbstractConsulClient implements ConsulClient {
     @Inject protected ConsulConfiguration consulConfiguration = new ConsulConfiguration();
 
     @Override
+    public String getDescription() {
+        return ConsulClient.SERVICE_ID;
+    }
+
+    @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         if(SERVICE_ID.equals(serviceId)) {
             return Publishers.just(

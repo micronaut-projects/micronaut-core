@@ -115,14 +115,15 @@ class MessageUtils {
     static String buildMessage(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = System.getProperty("line.separator");
+        BeanResolutionContext.Path path = resolutionContext.getPath();
         builder.append(argument.getName()).append("] of class: ")
-               .append(resolutionContext.getPath().peek().getDeclaringType().getName())
+               .append(path.peek().getDeclaringType().getName())
                .append(ls)
                .append(ls);
         if(message != null) {
             builder.append("Message: ").append(message).append(ls);;
         }
-        builder.append("Path Taken: ").append(resolutionContext.getPath().toString());
+        appendPath(circular, builder, ls, path);
         return builder.toString();
     }
 
@@ -130,10 +131,14 @@ class MessageUtils {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         if(!path.isEmpty()) {
 
-            String pathString =  circular ? path.toCircularString() : path.toString();
-            builder.append("Path Taken: ");
-            if(circular) builder.append(ls);
-            builder.append(pathString);
+            appendPath(circular, builder, ls, path);
         }
+    }
+
+    private static void appendPath(boolean circular, StringBuilder builder, String ls, BeanResolutionContext.Path path) {
+        String pathString =  circular ? path.toCircularString() : path.toString();
+        builder.append("Path Taken: ");
+        if(circular) builder.append(ls);
+        builder.append(pathString);
     }
 }

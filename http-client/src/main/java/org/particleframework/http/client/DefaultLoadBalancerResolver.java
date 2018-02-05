@@ -21,7 +21,7 @@ import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.http.client.selector.SimpleRoundRobinLoadBalancer;
+import org.particleframework.http.client.loadbalance.SimpleRoundRobinLoadBalancer;
 import org.particleframework.runtime.context.scope.refresh.RefreshEvent;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.reactivestreams.Subscriber;
@@ -53,12 +53,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver, ApplicationEventListener<RefreshEvent> {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancerResolver.class);
     private final Optional<EmbeddedServer> embeddedServer;
-    private final Map<String, LoadBalancerProvider> serverSelectorProviderMap;
+    private final Map<String, LoadBalancerProvider> loadBalancerProviderMap;
     private final Provider<DiscoveryClient> discoveryClient;
     private final Map<String, Optional<ServiceInstanceLoadBalancer>> instanceSelectorMap = new ConcurrentHashMap<>();
 
     /**
-     * The default server selector resolver
+     * The default server loadbalance resolver
      *
      * @param embeddedServer An optional reference to the {@link EmbeddedServer}
      * @param discoveryClient The discovery client
@@ -71,13 +71,13 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver, Applic
         this.embeddedServer = embeddedServer;
         this.discoveryClient = discoveryClient;
         if(ArrayUtils.isNotEmpty(providers)) {
-            this.serverSelectorProviderMap = new HashMap<>(providers.length);
+            this.loadBalancerProviderMap = new HashMap<>(providers.length);
             for (LoadBalancerProvider provider : providers) {
-                serverSelectorProviderMap.put(provider.getId(), provider);
+                loadBalancerProviderMap.put(provider.getId(), provider);
             }
         }
         else {
-            this.serverSelectorProviderMap = Collections.emptyMap();
+            this.loadBalancerProviderMap = Collections.emptyMap();
         }
     }
 
@@ -88,14 +88,14 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver, Applic
         }
         String reference = serviceReferences[0];
 
-        if(serverSelectorProviderMap.containsKey(reference)) {
-            return Optional.ofNullable(serverSelectorProviderMap.get(reference).getLoadBalancer());
+        if(loadBalancerProviderMap.containsKey(reference)) {
+            return Optional.ofNullable(loadBalancerProviderMap.get(reference).getLoadBalancer());
         }
         else if(reference.startsWith("/")) {
             // current server reference
             if(embeddedServer.isPresent()) {
                 URL url = embeddedServer.get().getURL();
-                return Optional.of(discriminator -> url);
+                return Optional.of(LoadBalancer.fixed(url));
             }
             else {
                 return Optional.empty();
@@ -104,7 +104,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver, Applic
         else if(reference.indexOf('/') > -1) {
             try {
                 URL url = new URL(reference);
-                return Optional.of(discriminator -> url);
+                return Optional.of(LoadBalancer.fixed(url));
             } catch (MalformedURLException e) {
                 return Optional.empty();
             }

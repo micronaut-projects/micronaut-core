@@ -17,6 +17,7 @@ package org.particleframework.discovery.consul
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.discovery.DiscoveryClient
 import org.particleframework.discovery.ServiceInstance
@@ -48,10 +49,11 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['particle.application.name': 'test-auto-reg',
-             'particle.server.port'     : serverPort,
-             'consul.host'              : 'localhost',
-             'consul.port'              : serverPort]
+            ['particle.application.name'              : 'test-auto-reg',
+             'particle.server.port'                   : serverPort,
+             "particle.caches.discoveryClient.enabled": false,
+             'consul.host'                            : 'localhost',
+             'consul.port'                            : serverPort]
     )
     @Shared
     ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)

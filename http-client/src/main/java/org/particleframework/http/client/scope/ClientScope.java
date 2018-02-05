@@ -95,7 +95,9 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
             HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
             HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration);
-            httpClient.setClientIdentifiers(value);
+            if(httpClient instanceof DefaultHttpClient) {
+                ((DefaultHttpClient)httpClient).setClientIdentifiers(value);
+            }
             return httpClient;
         });
     }

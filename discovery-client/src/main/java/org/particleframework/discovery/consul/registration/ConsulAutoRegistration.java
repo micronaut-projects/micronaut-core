@@ -25,7 +25,7 @@ import org.particleframework.discovery.ServiceInstanceIdGenerator;
 import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.consul.client.v1.*;
 import org.particleframework.discovery.exceptions.DiscoveryException;
-import org.particleframework.discovery.registration.common.DiscoveryServiceAutoRegistration;
+import org.particleframework.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;

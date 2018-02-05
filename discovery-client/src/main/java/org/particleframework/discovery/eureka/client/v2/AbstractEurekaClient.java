@@ -58,6 +58,11 @@ import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_SINGLE_E
 abstract class AbstractEurekaClient implements EurekaClient {
 
     @Override
+    public String getDescription() {
+        return EurekaClient.SERVICE_ID;
+    }
+
+    @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         Flowable<List<ServiceInstance>> flowable = Flowable.fromPublisher(getApplicationInfo(serviceId)).map(applicationInfo -> {
             List<InstanceInfo> instances = applicationInfo.getInstances();

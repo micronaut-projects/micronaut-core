@@ -186,19 +186,6 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
-     * The client identifiers are equivalents to the value of {@link Client#id()}
-     * @param clientIdentifiers The client identifiers
-     */
-    void setClientIdentifiers(Set<String> clientIdentifiers);
-
-    /**
-     * @see #setClientIdentifiers(Set)
-     * @param clientIdentifiers The client identifiers
-     */
-    void setClientIdentifiers(String... clientIdentifiers);
-
-    /**
      * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a Particle application. Within particle use
      * {@link javax.inject.Inject} to inject a client instead
      *

@@ -144,7 +144,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        this((Object discriminator) -> url, configuration, codecRegistry, filters);
+        this(LoadBalancer.fixed(url), configuration, codecRegistry, filters);
     }
 
     public DefaultHttpClient(LoadBalancer loadBalancer) {
@@ -153,7 +153,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
 
     public DefaultHttpClient(@Argument URL url) {
-        this((Object discriminator) -> url);
+        this(LoadBalancer.fixed(url));
     }
 
     /**
@@ -161,7 +161,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * The client identifiers are equivalents to the value of {@link Client#id()}
      * @param clientIdentifiers The client identifiers
      */
-    @Override
     public void setClientIdentifiers(Set<String> clientIdentifiers) {
         if(clientIdentifiers != null) {
             this.clientIdentifiers = clientIdentifiers;
@@ -172,7 +171,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @see #setClientIdentifiers(Set)
      * @param clientIdentifiers The client identifiers
      */
-    @Override
     public void setClientIdentifiers(String... clientIdentifiers) {
         if(clientIdentifiers != null) {
             this.clientIdentifiers = new HashSet<>(Arrays.asList(clientIdentifiers));
@@ -250,47 +248,68 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     @Override
     public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        URI requestURI = resolveRequestURI(request);
-        SslContext sslContext = buildSslContext(requestURI);
-
-
         Publisher<HttpResponse<O>> responsePublisher = Publishers.fromCompletableFuture(() -> {
             CompletableFuture<HttpResponse<O>> completableFuture = new CompletableFuture<>();
-            ChannelFuture connectionFuture = doConnect(requestURI, sslContext);
-            connectionFuture.addListener(future -> {
-                if (future.isSuccess()) {
-                    try {
-                        Channel channel = connectionFuture.channel();
-                        MediaType requestContentType = request
-                                .getContentType()
-                                .orElse(MediaType.APPLICATION_JSON_TYPE);
 
-                        boolean permitsBody = org.particleframework.http.HttpMethod.permitsRequestBody(request.getMethod());
-                        io.netty.handler.codec.http.HttpRequest nettyRequest =
-                                buildNettyRequest(
-                                        request,
-                                        requestContentType,
-                                        permitsBody);
+            Publisher<URI> requestURI = resolveRequestURI(request);
+            requestURI.subscribe(new CompletionAwareSubscriber<URI>() {
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    subscription.request(1);
+                }
+
+                @Override
+                protected void doOnNext(URI requestURI) {
+                    SslContext sslContext = buildSslContext(requestURI);
+
+                    ChannelFuture connectionFuture = doConnect(requestURI, sslContext);
+                    connectionFuture.addListener(future -> {
+                        if (future.isSuccess()) {
+                            try {
+                                Channel channel = connectionFuture.channel();
+                                MediaType requestContentType = request
+                                        .getContentType()
+                                        .orElse(MediaType.APPLICATION_JSON_TYPE);
+
+                                boolean permitsBody = org.particleframework.http.HttpMethod.permitsRequestBody(request.getMethod());
+                                io.netty.handler.codec.http.HttpRequest nettyRequest =
+                                        buildNettyRequest(
+                                                request,
+                                                requestContentType,
+                                                permitsBody);
 
 
-                        prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+                                prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
 
-                        if (LOG.isTraceEnabled()) {
-                            traceRequest(request, nettyRequest);
+                                if (LOG.isTraceEnabled()) {
+                                    traceRequest(request, nettyRequest);
+                                }
+
+                                addFullHttpResponseHandler(channel, completableFuture, bodyType);
+                                writeAndCloseRequest(channel, nettyRequest);
+                            } catch (Exception e) {
+                                completableFuture.completeExceptionally(e);
+                            }
+                        } else {
+                            Throwable cause = future.cause();
+                            completableFuture.completeExceptionally(
+                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                            );
                         }
+                    });
+                }
 
-                        addFullHttpResponseHandler(channel, completableFuture, bodyType);
-                        writeAndCloseRequest(channel, nettyRequest);
-                    } catch (Exception e) {
-                        completableFuture.completeExceptionally(e);
-                    }
-                } else {
-                    Throwable cause = future.cause();
-                    completableFuture.completeExceptionally(
-                            new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                    );
+                @Override
+                protected void doOnError(Throwable t) {
+                    completableFuture.completeExceptionally(t);
+                }
+
+                @Override
+                protected void doOnComplete() {
+
                 }
             });
+
             return completableFuture;
         });
         return applyFilterToResponsePublisher(request, responsePublisher);
@@ -314,15 +333,17 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         });
     }
 
-    protected <I> URI resolveRequestURI(HttpRequest<I> request) {
-        URL server = loadBalancer.select(null);
-        URI requestURI;
-        try {
-            requestURI = server.toURI().resolve(request.getUri());
-        } catch (URISyntaxException e) {
-            throw new HttpClientException("Invalid request URI for");
-        }
-        return requestURI;
+    protected <I> Publisher<URI> resolveRequestURI(HttpRequest<I> request) {
+        return Publishers.map(loadBalancer.select(null), server -> {
+            URI requestURI;
+            try {
+                requestURI = server.toURI().resolve(request.getUri());
+            } catch (URISyntaxException e) {
+                throw new HttpClientException("Invalid request URI for");
+            }
+            return requestURI;
+
+        });
     }
 
     private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
@@ -580,7 +601,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         };
     }
 
-    private <I, O> Publisher<HttpResponse<O>> applyFilterToResponsePublisher(HttpRequest<I> request, Publisher<HttpResponse<O>> responsePublisher) {
+    protected <I, O> Publisher<HttpResponse<O>> applyFilterToResponsePublisher(HttpRequest<I> request, Publisher<HttpResponse<O>> responsePublisher) {
         if (filters.length > 0) {
             List<HttpClientFilter> httpClientFilters = resolveFilters(request);
             OrderUtil.reverseSort(httpClientFilters);

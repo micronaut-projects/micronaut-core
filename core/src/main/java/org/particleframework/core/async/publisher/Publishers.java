@@ -84,6 +84,16 @@ public class Publishers {
     public static <T> Publisher<T> just(T value) {
         return new JustPublisher<>(value);
     }
+
+    /**
+     * A {@link Publisher} that emits a fixed single value
+     * @param error The error to emit
+     * @param <T> The value type
+     * @return The {@link Publisher}
+     */
+    public static <T> Publisher<T> just(Throwable error) {
+        return new JustThrowPublisher<>(error);
+    }
     /**
      * Map the result from a publisher using the given mapper
      *
@@ -256,6 +266,33 @@ public class Publishers {
                     done = true;
                     subscriber.onNext(value);
                     subscriber.onComplete();
+                }
+
+                @Override
+                public void cancel() {
+                    done = true;
+                }
+            });
+        }
+    }
+
+    private static class JustThrowPublisher<T> implements Publisher<T> {
+
+        private final Throwable error;
+
+        public JustThrowPublisher(Throwable error) {
+            this.error = error;
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            subscriber.onSubscribe(new Subscription() {
+                boolean done;
+                @Override
+                public void request(long n) {
+                    if(done) return;
+                    done = true;
+                    subscriber.onError(error);
                 }
 
                 @Override

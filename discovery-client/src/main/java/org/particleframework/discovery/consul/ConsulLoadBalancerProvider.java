@@ -20,12 +20,13 @@ import org.particleframework.http.client.LoadBalancer;
 import org.particleframework.http.client.LoadBalancerProvider;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
+
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
 
 /**
- * A selector that discovers the consul URI from configuration
+ * A loadbalance that discovers the consul URI from configuration
  *
  * @author graemerocher
  * @since 1.0
@@ -47,13 +48,11 @@ public class ConsulLoadBalancerProvider implements LoadBalancerProvider {
 
     @Override
     public LoadBalancer getLoadBalancer() {
-        return discriminator -> {
-            String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
-            try {
-                return new URL(spec);
-            } catch (MalformedURLException e) {
-                throw new HttpClientException("Invalid Consul URL: " + spec, e);
-            }
-        };
+        String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
+        try {
+            return LoadBalancer.fixed(new URL(spec));
+        } catch (MalformedURLException e) {
+            throw new HttpClientException("Invalid Consul URL: " + spec, e);
+        }
     }
 }
