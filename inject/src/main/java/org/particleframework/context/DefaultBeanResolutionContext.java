@@ -134,10 +134,25 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
                             if(!((ProxyBeanDefinition)declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
                                 throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
                             }
+                            else {
+                                push(constructorSegment);
+                            }
+                        }
+                        else if(declaringBean instanceof ProxyBeanDefinition) {
+                            // take into account proxies
+                            if(!((ProxyBeanDefinition)declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
+                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                            }
+                            else {
+                                push(constructorSegment);
+                            }
                         }
                         else {
                             throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
                         }
+                    }
+                    else {
+                        push(constructorSegment);
                     }
                 }
                 else {

@@ -65,8 +65,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
-                    Set.class,
-                    Set.class,
+                    Map.class,
+                    Map.class,
                     Map.class,
                     Map.class,
                     Map.class
@@ -148,9 +148,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         GeneratorAdapter constructor = startConstructor(classWriter);
         constructor.loadThis();
         // 1st argument: the declared annotations
-        pushCreateSetCall(constructor, annotationMetadata.declaredAnnotations);
+        pushCreateAnnotationData(constructor, annotationMetadata.declaredAnnotations);
         // 2nd argument: the declared stereotypes
-        pushCreateSetCall(constructor, annotationMetadata.declaredStereotypes);
+        pushCreateAnnotationData(constructor, annotationMetadata.declaredStereotypes);
         // 3rd argument: all stereotypes
         pushCreateAnnotationData(constructor, annotationMetadata.allStereotypes);
         // 4th argument: all annotations

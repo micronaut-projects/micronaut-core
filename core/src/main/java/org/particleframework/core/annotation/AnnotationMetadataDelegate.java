@@ -67,6 +67,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
+    default ConvertibleValues<Object> getDeclaredValues(String annotation) {
+        return getAnnotationMetadata().getValues(annotation);
+    }
+
+    @Override
     default <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }

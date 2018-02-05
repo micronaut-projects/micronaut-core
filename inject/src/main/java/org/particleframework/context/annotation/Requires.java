@@ -72,6 +72,11 @@ public @interface Requires {
     String value() default "";
 
     /**
+     * @return The default value if no value is specified
+     */
+    String defaultValue() default "";
+
+    /**
      * Used in combination with {@link #configuration()}, {@link #classes()} or {@link #beans()} to express a minimum version of the configuration or classes
      *
      * @return The minimum version

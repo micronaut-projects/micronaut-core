@@ -27,12 +27,11 @@ import org.particleframework.discovery.ServiceInstance;
 import java.util.List;
 
 /**
- * Replaces the default {@link CompositeDiscoveryClient} with one that caches the return values
+ * Replaces the default {@link org.particleframework.discovery.DefaultCompositeDiscoveryClient} with one that caches the return values
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Replaces(CompositeDiscoveryClient.class)
 @Primary
 @Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
 public class CachingCompositeDiscoveryClient extends CompositeDiscoveryClient {

@@ -43,7 +43,9 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.host'              : System.getenv('CONSUL_HOST'),
                  'consul.port'              : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST')])
+        DiscoveryClient discoveryClient = ApplicationContext.run(
+                DiscoveryClient,
+                ['consul.host': System.getenv('CONSUL_HOST'), "particle.caches.discoveryClient.enabled": false])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -74,7 +76,10 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.host'                   : System.getenv('CONSUL_HOST'),
                  'consul.port'                   : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST')])
+        DiscoveryClient discoveryClient = ApplicationContext.run(
+                DiscoveryClient,
+                ['consul.host': System.getenv('CONSUL_HOST'), "particle.caches.discoveryClient.enabled": false])
+
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -110,11 +115,13 @@ class ConsulAutoRegistrationSpec extends Specification {
         // a client with tags specified
         DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST'),
                                                                                    'consul.port': System.getenv('CONSUL_PORT'),
+                                                                                   "particle.caches.discoveryClient.enabled": false,
                                                                                    'consul.discovery.tags.myService':'foo' ])
 
 
         DiscoveryClient anotherClient = ApplicationContext.run(DiscoveryClient, ['consul.host': System.getenv('CONSUL_HOST'),
                                                                                    'consul.port': System.getenv('CONSUL_PORT'),
+                                                                                    "particle.caches.discoveryClient.enabled": false,
                                                                                    'consul.discovery.tags.myService':['someother'] ])
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
