@@ -5,6 +5,8 @@ dependencies {
     compile project(":http-client")
     compile project(":validation")
 
+    compile 'com.netflix.ribbon:ribbon-loadbalancer:2.2.4'
+
     testRuntime project(":configurations:hibernate-validator")
     testCompile project(":http-server-netty")
     testCompile project(":inject-groovy")

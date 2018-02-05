@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.registration.common;
+package org.particleframework.discovery.client.registration;
 
 import io.reactivex.Flowable;
 import io.reactivex.Observable;

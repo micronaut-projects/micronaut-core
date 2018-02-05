@@ -31,13 +31,13 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Singleton
-public class ServerSelectorConverters implements TypeConverterRegistrar {
+public class LoadBalancerConverters implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
-        conversionService.addConverter(URL.class, LoadBalancer.class, (Function<URL, LoadBalancer>) url -> discriminator -> url);
-        conversionService.addConverter(String.class, LoadBalancer.class, (Function<String, LoadBalancer>) url -> discriminator -> {
+        conversionService.addConverter(URL.class, LoadBalancer.class, (Function<URL, LoadBalancer>) LoadBalancer::fixed);
+        conversionService.addConverter(String.class, LoadBalancer.class, (Function<String, LoadBalancer>) url -> {
             try {
-                return new URL(url);
+                return LoadBalancer.fixed(new URL(url));
             } catch (MalformedURLException e) {
                 return null;
             }

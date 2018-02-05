@@ -24,7 +24,7 @@ import org.particleframework.discovery.eureka.EurekaConfiguration;
 import org.particleframework.discovery.eureka.client.v2.EurekaClient;
 import org.particleframework.discovery.eureka.client.v2.InstanceInfo;
 import org.particleframework.discovery.registration.AutoRegistration;
-import org.particleframework.discovery.registration.common.DiscoveryServiceAutoRegistration;
+import org.particleframework.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.health.HeartbeatConfiguration;
 import org.particleframework.http.HttpStatus;

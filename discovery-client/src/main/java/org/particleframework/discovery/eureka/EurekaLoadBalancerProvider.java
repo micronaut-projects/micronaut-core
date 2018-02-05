@@ -43,13 +43,11 @@ public class EurekaLoadBalancerProvider implements LoadBalancerProvider {
 
     @Override
     public LoadBalancer getLoadBalancer() {
-        return discriminator -> {
-            String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
-            try {
-                return new URL(spec);
-            } catch (MalformedURLException e) {
-                throw new HttpClientException("Invalid Consul URL: " + spec, e);
-            }
-        };
+        String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
+        try {
+            return LoadBalancer.fixed(new URL(spec));
+        } catch (MalformedURLException e) {
+            throw new HttpClientException("Invalid Consul URL: " + spec, e);
+        }
     }
 }

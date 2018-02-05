@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client.selector;
+package org.particleframework.http.client.loadbalance;
 
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.http.client.ServiceInstanceLoadBalancer;
 import org.particleframework.http.client.exceptions.HttpClientException;
+import org.reactivestreams.Publisher;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -31,7 +33,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * A simple {@link ServiceInstanceLoadBalancer} that uses round robin load balancing
+ * A simple {@link ServiceInstanceLoadBalancer} that uses round robin load balancing against a pre-supplied list of
+ * {@link ServiceInstance}
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -55,7 +58,8 @@ public class SimpleRoundRobinLoadBalancer implements ServiceInstanceLoadBalancer
     }
 
     @Override
-    public URL select(Object discriminator) {
+    public Publisher<URL> select(Object discriminator) {
+        // Ideally should be rewritten without the use of locks
         Lock lock = this.lock.readLock();
         lock.lock();
 
@@ -63,9 +67,9 @@ public class SimpleRoundRobinLoadBalancer implements ServiceInstanceLoadBalancer
             int i = index.getAndAccumulate(servers.size(), (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
             ServiceInstance instance = servers.get(i);
             try {
-                return instance.getURI().toURL();
+                return Publishers.just(instance.getURI().toURL());
             } catch (MalformedURLException e) {
-                throw new HttpClientException("Invalid service URI: " + instance.getURI());
+                return Publishers.just(new HttpClientException("Invalid service URI: " + instance.getURI()));
             }
         } finally {
             lock.unlock();

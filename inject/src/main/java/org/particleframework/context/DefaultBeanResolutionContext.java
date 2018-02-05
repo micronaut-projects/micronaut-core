@@ -113,8 +113,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
             ConstructorInjectionPoint constructor = declaringType.getConstructor();
             if(constructor instanceof MethodConstructorInjectionPoint) {
-               MethodConstructorInjectionPoint factoryMethod = (MethodConstructorInjectionPoint) constructor;
-               MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
+                MethodSegment methodSegment = new MethodSegment(declaringType, (MethodInjectionPoint) constructor, argument);
                 if(contains(methodSegment)) {
                     throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
                 }
@@ -125,7 +124,21 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
             else {
                 ConstructorSegment constructorSegment = new ConstructorSegment(declaringType, argument);
                 if(contains(constructorSegment)) {
-                    throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                    Segment last = peek();
+                    BeanDefinition declaringBean = last.getDeclaringType();
+                    // if the currently injected segment is a constructor argument and the type to be constructed is the
+                    // same as the candidate, then filter out the candidate to avoid a circular injection problem
+                    if(!declaringBean.equals(declaringType)) {
+                        if(declaringType instanceof ProxyBeanDefinition) {
+                            // take into account proxies
+                            if(!((ProxyBeanDefinition)declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
+                                throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                            }
+                        }
+                        else {
+                            throw new CircularDependencyException(DefaultBeanResolutionContext.this, argument, "Circular dependency detected");
+                        }
+                    }
                 }
                 else {
                     push(constructorSegment);

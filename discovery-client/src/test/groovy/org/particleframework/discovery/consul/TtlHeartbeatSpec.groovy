@@ -50,6 +50,7 @@ class TtlHeartbeatSpec extends Specification {
         then:"The heart beat is received"
         conditions.eventually {
             Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
+            Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
             MockConsulServer.passingReports.find { it.contains(serviceId)} != null
         }
 

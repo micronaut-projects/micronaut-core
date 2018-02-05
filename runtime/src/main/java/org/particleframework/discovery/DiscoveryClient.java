@@ -29,6 +29,11 @@ import java.util.List;
 public interface DiscoveryClient extends Closeable, AutoCloseable{
 
     /**
+     * @return Description of the client
+     */
+    String getDescription();
+
+    /**
      * Obtain a list of {@link ServiceInstance} for the given service id
      * @param serviceId The service id
      * @return A {@link Publisher} that emits a list of {@link ServiceInstance}

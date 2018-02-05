@@ -18,7 +18,7 @@ package org.particleframework.http.client;
 import java.util.Optional;
 
 /**
- * A resolver of {@link LoadBalancer} instances that are capable of resolving references to services into a concrete selector
+ * A resolver of {@link LoadBalancer} instances that are capable of resolving references to services into a concrete loadbalance
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -20,6 +20,7 @@ import org.particleframework.cache.serialize.DefaultStringKeySerializer;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.serialize.ObjectSerializer;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import java.util.Optional;
 
@@ -29,8 +30,10 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty("particle.redis.caches")
+@EachProperty(RedisCacheConfiguration.PREFIX)
 public class RedisCacheConfiguration extends CacheConfiguration {
+
+    public static final String PREFIX = "particle.redis.caches";
 
     protected String server;
 
@@ -38,8 +41,8 @@ public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected Class<ObjectSerializer> valueSerializer;
 
-    public RedisCacheConfiguration(@Argument String cacheName) {
-        super(cacheName);
+    public RedisCacheConfiguration(@Argument String cacheName, ApplicationConfiguration applicationConfiguration) {
+        super(cacheName, applicationConfiguration);
     }
 
 
