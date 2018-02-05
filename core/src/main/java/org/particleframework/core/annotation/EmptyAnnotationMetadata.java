@@ -61,6 +61,11 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
+    public ConvertibleValues<Object> getDeclaredValues(String annotation) {
+        return ConvertibleValues.empty();
+    }
+
+    @Override
     public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
         return OptionalValues.empty();
     }

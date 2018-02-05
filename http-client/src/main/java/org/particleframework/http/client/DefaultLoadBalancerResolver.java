@@ -15,17 +15,12 @@
  */
 package org.particleframework.http.client;
 
-import io.reactivex.Flowable;
-import org.particleframework.context.event.ApplicationEventListener;
+import org.particleframework.context.BeanContext;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.DiscoveryClient;
-import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.http.client.loadbalance.SimpleRoundRobinLoadBalancer;
-import org.particleframework.runtime.context.scope.refresh.RefreshEvent;
+import org.particleframework.http.client.loadbalance.DiscoveryClientRoundRobinLoadBalancer;
 import org.particleframework.runtime.server.EmbeddedServer;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +28,10 @@ import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
@@ -50,26 +47,24 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @Singleton
-public class DefaultLoadBalancerResolver implements LoadBalancerResolver, ApplicationEventListener<RefreshEvent> {
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancerResolver.class);
+public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     private final Optional<EmbeddedServer> embeddedServer;
     private final Map<String, LoadBalancerProvider> loadBalancerProviderMap;
-    private final Provider<DiscoveryClient> discoveryClient;
-    private final Map<String, Optional<ServiceInstanceLoadBalancer>> instanceSelectorMap = new ConcurrentHashMap<>();
+    private final BeanContext beanContext;
 
     /**
      * The default server loadbalance resolver
      *
      * @param embeddedServer An optional reference to the {@link EmbeddedServer}
-     * @param discoveryClient The discovery client
+     * @param beanContext The bean context
      * @param providers Any other providers
      */
     public DefaultLoadBalancerResolver(
             Optional<EmbeddedServer> embeddedServer,
-            Provider<DiscoveryClient> discoveryClient,
+            BeanContext beanContext,
             LoadBalancerProvider...providers) {
         this.embeddedServer = embeddedServer;
-        this.discoveryClient = discoveryClient;
+        this.beanContext = beanContext;
         if(ArrayUtils.isNotEmpty(providers)) {
             this.loadBalancerProviderMap = new HashMap<>(providers.length);
             for (LoadBalancerProvider provider : providers) {
@@ -112,73 +107,23 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver, Applic
         else if(serviceReferences.length == 1){
             // if we've arrived here we have a reference to a service that requires service discovery
             // since this is only done at startup it is ok to block
-            return instanceSelectorMap.computeIfAbsent(reference, serviceId -> {
-                DiscoveryClient client = this.discoveryClient.get();
-                try {
-                    List<ServiceInstance> serviceInstances = Flowable.fromPublisher(client.getInstances(serviceId)).blockingFirst();
-
-                    if(!serviceInstances.isEmpty()) {
-                        ServiceInstanceLoadBalancer roundRobinServerSelector = createServerSelector(serviceId, serviceInstances);
-                        return Optional.of(roundRobinServerSelector);
-                    }
-                    return Optional.empty();
-                } catch (Exception e) {
-                    if(LOG.isErrorEnabled()) {
-                        LOG.error("Error resolving server list from discovery client: " + e.getMessage(), e);
-                    }
-                    return Optional.empty();
-                }
-            });
+            LoadBalancer loadBalancer = createServiceInstanceLoadBalancer(serviceReferences[0]);
+            return Optional.of(loadBalancer);
 
         }
         return Optional.empty();
     }
 
-    @Override
-    public void onApplicationEvent(RefreshEvent event) {
-        Set<Map.Entry<String, Optional<ServiceInstanceLoadBalancer>>> entries = instanceSelectorMap.entrySet();
-        for (Map.Entry<String, Optional<ServiceInstanceLoadBalancer>> entry : entries) {
-                Optional<ServiceInstanceLoadBalancer> selector = entry.getValue();
-                String serviceId = entry.getKey();
-                if(selector.isPresent()) {
-
-                    DiscoveryClient client = this.discoveryClient.get();
-                    client.getInstances(serviceId).subscribe(new Subscriber<List<ServiceInstance>>() {
-                        @Override
-                        public void onSubscribe(Subscription subscription) {
-                            subscription.request(1);
-                        }
-
-                        @Override
-                        public void onNext(List<ServiceInstance> serviceInstances) {
-                            selector.get().update(serviceInstances);
-                        }
-
-                        @Override
-                        public void onError(Throwable throwable) {
-                            if(LOG.isErrorEnabled()) {
-                                LOG.error("Error resolving updated server list from discovery client: " + throwable.getMessage(), throwable);
-                            }
-                        }
-
-                        @Override
-                        public void onComplete() {
-
-                        }
-                    });
-                }
-        }
-    }
 
     /**
-     * Creates the default {@link ServiceInstanceLoadBalancer} implementation. Subclasses can override to provide custom load balancing strategies
+     * Creates the default {@link LoadBalancer} implementation. Subclasses can override to provide custom load balancing strategies
      *
      *
      * @param serviceId The service ID
-     * @param serviceInstances A list of {@link ServiceInstance} associated with the ID
-     * @return The {@link ServiceInstanceLoadBalancer}
+     * @return The {@link LoadBalancer}
      */
-    protected ServiceInstanceLoadBalancer createServerSelector(String serviceId, List<ServiceInstance> serviceInstances) {
-        return new SimpleRoundRobinLoadBalancer(serviceId, serviceInstances);
+    protected LoadBalancer createServiceInstanceLoadBalancer(String serviceId) {
+        return beanContext.createBean(LoadBalancer.class, serviceId);
     }
+
 }

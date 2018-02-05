@@ -107,7 +107,13 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return A {@link ConvertibleValues} instance
      */
     ConvertibleValues<Object> getValues(String annotation);
-
+    /**
+     * Get all of the values for the given annotation that are directly declared on the annotated element
+     *
+     * @param annotation The annotation name
+     * @return A {@link ConvertibleValues} instance
+     */
+    ConvertibleValues<Object> getDeclaredValues(String annotation);
     /**
      * Get all of the values for the given annotation and type of the underlying values
      *

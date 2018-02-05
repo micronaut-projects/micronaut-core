@@ -40,6 +40,7 @@ class EurekaClientSpec extends Specification {
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [(EurekaConfiguration.HOST): System.getenv('EUREKA_HOST'),
              (EurekaConfiguration.PORT): System.getenv('EUREKA_PORT'),
+             "particle.caches.discoveryClient.enabled": false,
              'eureka.client.readTimeout': '5s']
     )
     @Shared EurekaClient client = embeddedServer.applicationContext.getBean(EurekaClient)

@@ -17,7 +17,9 @@ package org.particleframework.discovery;
 
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.util.ArrayUtils;
 import org.reactivestreams.Publisher;
@@ -31,20 +33,21 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.particleframework.discovery.CompositeDiscoveryClient.SETTING_ENABLED;
+
 /**
  * A composite implementation combining all registered {@link DiscoveryClient} instances
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Primary
-@Singleton
-public class CompositeDiscoveryClient implements DiscoveryClient {
+public abstract class CompositeDiscoveryClient implements DiscoveryClient {
+
+    static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
 
     private final DiscoveryClient[] discoveryClients;
 
-    @Inject
-    public CompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
+    protected CompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         this.discoveryClients = discoveryClients;
     }
 
