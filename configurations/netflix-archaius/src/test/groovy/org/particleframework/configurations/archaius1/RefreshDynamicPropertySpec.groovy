@@ -43,5 +43,11 @@ class RefreshDynamicPropertySpec extends Specification {
         then:
         intProperty.get() == 20
 
+        when:
+        applicationContext.publishEvent(new RefreshEvent(['foo.bar':null]))
+
+        then:
+        intProperty.get() == 10
+
     }
 }
