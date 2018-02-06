@@ -18,7 +18,6 @@ package org.particleframework.context;
 import org.particleframework.context.annotation.Requirements;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.condition.Condition;
-import org.particleframework.context.condition.RequiresCondition;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 import org.particleframework.inject.BeanContextConditional;

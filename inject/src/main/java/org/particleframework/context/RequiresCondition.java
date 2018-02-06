@@ -1,4 +1,4 @@
-package org.particleframework.context.condition;
+package org.particleframework.context;
 
 import groovy.lang.GroovySystem;
 import org.particleframework.context.ApplicationContext;
@@ -20,14 +20,14 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.core.version.SemanticVersion;
 import org.particleframework.inject.BeanConfiguration;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.BeanDefinitionReference;
 import org.particleframework.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -110,6 +110,9 @@ public class RequiresCondition implements Condition {
         return false;
     }
 
+    /*
+     * This method will process requirements for a {@link BeanDefinitionReference} that has not yet been loaded
+     */
     private boolean processClassRequirements(ConditionContext context, ConvertibleValues<Object> convertibleValues) {
         if (!matchesPresenceOfClasses(context, convertibleValues)) {
             return true;
@@ -124,10 +127,12 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean processRequires(ConditionContext context, Requires annotation) {
-        return !matchesPresenceOfBeans(context, annotation) ||
+        return
                 !matchesProperty(context, annotation) ||
                 !matchesMissingProperty(context, annotation) ||
                 !matchesEnvironment(context, annotation) ||
+                !matchesPresenceOfBeans(context, annotation) ||
+                !matchesAbsenceOfBeans(context, annotation) ||
                 !matchesConfiguration(context, annotation) ||
                 !matchesSdk(annotation) ||
                 !matchesConditions(context, annotation);
@@ -309,6 +314,28 @@ public class RequiresCondition implements Condition {
             for (Class type : beans) {
                 if (!beanContext.containsBean(type)) {
                     return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesAbsenceOfBeans(ConditionContext context, Requires annotation) {
+        Class[] missingBeans = annotation.missingBeans();
+        AnnotationMetadataProvider component = context.getComponent();
+        if (ArrayUtils.isNotEmpty(missingBeans) && component instanceof BeanDefinition) {
+            BeanDefinition bd = (BeanDefinition) component;
+
+            DefaultBeanContext beanContext = (DefaultBeanContext) context.getBeanContext();
+
+            for (Class<?> type : missingBeans) {
+                Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd));
+                // remove self
+                if(!beanDefinitions.isEmpty()) {
+                    List<? extends BeanDefinition<?>> definitions = beanDefinitions.stream().filter(BeanDefinition::isAbstract).collect(Collectors.toList());
+                    if(definitions.isEmpty()) {
+                       return false;
+                    }
                 }
             }
         }

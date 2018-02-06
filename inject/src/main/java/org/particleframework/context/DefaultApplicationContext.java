@@ -273,8 +273,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType);
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter);
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
@@ -302,7 +302,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     }
                 } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
                     Class dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType, null);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 

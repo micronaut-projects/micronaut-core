@@ -21,6 +21,7 @@ import org.particleframework.inject.BeanConfiguration;
 import org.particleframework.inject.BeanDefinition;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -86,6 +87,15 @@ public interface BeanDefinitionRegistry {
      */
     <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier);
 
+    /**
+     * Obtain a {@link BeanDefinition} for the given type
+     *
+     * @param beanType The type
+     * @param <T> The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws NonUniqueBeanException When multiple possible bean definitions exist for the given type
+     */
+    <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType);
     /**
      * Get all of the {@link BeanDefinition} for the given qualifier
      * @param qualifier The qualifer
