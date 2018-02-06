@@ -97,7 +97,13 @@ class EnvironmentConfiguration extends AbstractConfiguration implements Applicat
     public void onApplicationEvent(RefreshEvent event) {
         Map<String, Object> changedProperties = event.getSource();
         for (Map.Entry<String, Object> entry : changedProperties.entrySet()) {
-            fireEvent(EVENT_SET_PROPERTY, entry.getKey(), entry.getValue(), false);
+            Object value = entry.getValue();
+            if(value == null) {
+                fireEvent(EVENT_CLEAR_PROPERTY, entry.getKey(), null, false);
+            }
+            else {
+                fireEvent(EVENT_SET_PROPERTY, entry.getKey(), value, false);
+            }
         }
     }
 }

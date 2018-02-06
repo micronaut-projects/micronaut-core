@@ -17,6 +17,8 @@ package org.particleframework.configurations.ribbon
 
 import com.netflix.loadbalancer.DummyPing
 import com.netflix.loadbalancer.IPing
+import com.netflix.loadbalancer.IRule
+import com.netflix.loadbalancer.ZoneAvoidanceRule
 import org.particleframework.context.ApplicationContext
 import spock.lang.Specification
 
@@ -31,10 +33,16 @@ class RibbonConfigSpec extends Specification {
     void "test that a custom default ping is possible"() {
         expect:
         ApplicationContext.run().getBean(IPing) instanceof MyPing
+        ApplicationContext.run().getBean(IRule) instanceof MyZoneAvoidanceRule
     }
 
     @Singleton
     static class MyPing extends DummyPing {
+
+    }
+
+    @Singleton
+    static class MyZoneAvoidanceRule extends ZoneAvoidanceRule {
 
     }
 }
