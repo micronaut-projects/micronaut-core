@@ -16,10 +16,16 @@
 package org.particleframework.discovery.eureka;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.eureka.client.v2.AmazonInfo;
+import org.particleframework.discovery.eureka.client.v2.DataCenterInfo;
 import org.particleframework.discovery.eureka.client.v2.InstanceInfo;
+import org.particleframework.health.HealthStatus;
 
+import javax.validation.constraints.NotNull;
 import java.net.URI;
+import java.util.Optional;
 
 /**
  * A {@link ServiceInstance} implementation for Eureka
@@ -48,6 +54,53 @@ public class EurekaServiceInstance implements ServiceInstance {
             String portStr = port > 0 ? ":" + port : "";
             return URI.create("http://" + instanceInfo.getHostName() + portStr);
         }
+    }
+
+    @Override
+    public Optional<String> getInstanceId() {
+        return Optional.ofNullable(instanceInfo.getInstanceId());
+    }
+
+    @Override
+    public HealthStatus getHealthStatus() {
+        InstanceInfo.@NotNull Status status = instanceInfo.getStatus();
+        switch (status) {
+            case UP:
+                return HealthStatus.UP;
+            case UNKNOWN:
+                return HealthStatus.UNKNOWN;
+            default:
+                return HealthStatus.DOWN;
+        }
+    }
+
+    @Override
+    public Optional<String> getZone() {
+        @NotNull DataCenterInfo dataCenterInfo = instanceInfo.getDataCenterInfo();
+        if(dataCenterInfo instanceof AmazonInfo) {
+            String availabilityZone = ((AmazonInfo) dataCenterInfo).get(AmazonInfo.MetaDataKey.availabilityZone);
+            return Optional.ofNullable(availabilityZone);
+        }
+        return ServiceInstance.super.getZone();
+    }
+
+    @Override
+    public Optional<String> getRegion() {
+        @NotNull DataCenterInfo dataCenterInfo = instanceInfo.getDataCenterInfo();
+        if(dataCenterInfo instanceof AmazonInfo) {
+            String availabilityZone = ((AmazonInfo) dataCenterInfo).get(AmazonInfo.MetaDataKey.availabilityZone);
+            return Optional.ofNullable(availabilityZone);
+        }
+        return ServiceInstance.super.getZone();
+    }
+
+    @Override
+    public Optional<String> getGroup() {
+        String asgName = instanceInfo.getAsgName();
+        if(StringUtils.isNotEmpty(asgName)) {
+            return Optional.of(asgName);
+        }
+        return ServiceInstance.super.getZone();
     }
 
     /**

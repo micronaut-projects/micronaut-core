@@ -26,13 +26,9 @@ import io.netty.handler.ssl.SslContext;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
-import io.reactivex.SingleSource;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
-import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.Prototype;
-import org.particleframework.context.annotation.Replaces;
-import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.annotation.*;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.http.HttpMethod;
@@ -45,7 +41,6 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.parser.JacksonProcessor;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Inject;
@@ -60,6 +55,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Prototype
+@Primary
 @Replaces(DefaultHttpClient.class)
 @Requires(classes = Flowable.class)
 public class RxHttpClient extends DefaultHttpClient implements StreamingHttpClient {

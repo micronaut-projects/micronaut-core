@@ -75,6 +75,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -521,16 +522,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     .orElse(MediaType.APPLICATION_JSON_TYPE);
 
             Publisher<? extends HttpResponse<?>> finalPublisher;
+            AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
             Publisher<MutableHttpResponse<?>> routePublisher = Publishers.fromCompletableFuture(() -> {
                 CompletableFuture<MutableHttpResponse<?>> completableFuture = new CompletableFuture<>();
                 executor.submit(() -> {
 
                     MutableHttpResponse<?> response;
+                    HttpRequest<?> httpRequest = requestReference.get();
 
                     try {
                         RouteMatch<?> routeMatch = finalRoute;
                         if (!routeMatch.isExecutable()) {
-                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, true);
+                            routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
                         }
                         Object result = routeMatch.execute();
 
@@ -539,7 +542,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             if (javaReturnType != void.class) {
                                 // handle re-mapping of errors
                                 result = router.route(HttpStatus.NOT_FOUND)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                         .filter(RouteMatch::isExecutable)
                                         .map(RouteMatch::execute)
                                         .map(Object.class::cast)
@@ -558,7 +561,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             if (status.getCode() >= 300) {
                                 // handle re-mapping of errors
                                 result = router.route(status)
-                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, request, true))
+                                        .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
                                         .filter(RouteMatch::isExecutable)
                                         .map(RouteMatch::execute)
                                         .map(Object.class::cast)
@@ -583,7 +586,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 return completableFuture;
             });
 
-            finalPublisher = filterPublisher(request, routePublisher);
+            finalPublisher = filterPublisher(request,requestReference, routePublisher);
 
             finalPublisher.subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
                 @Override
@@ -612,7 +615,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return route;
     }
 
-    private Publisher<? extends HttpResponse<?>> filterPublisher(HttpRequest<?> request, Publisher<MutableHttpResponse<?>> routePublisher) {
+    private Publisher<? extends HttpResponse<?>> filterPublisher(
+            HttpRequest<?> request,
+            AtomicReference<HttpRequest<?>> requestReference,
+            Publisher<MutableHttpResponse<?>> routePublisher) {
         Publisher<? extends HttpResponse<?>> finalPublisher;
         List<HttpFilter> filters = new ArrayList<>(router.findFilters(request));
         if (!filters.isEmpty()) {
@@ -630,7 +636,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                     }
                     HttpFilter httpFilter = filters.get(pos);
-                    return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this);
+                    return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
                 }
             };
             HttpFilter httpFilter = filters.get(0);
@@ -800,7 +806,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
     private void emitDefaultErrorResponse(ChannelHandlerContext ctx, HttpRequest<?> request, MutableHttpResponse<Object> defaultResponse) {
         Publisher<MutableHttpResponse<?>> notAllowedResponse = Publishers.just(defaultResponse);
-        notAllowedResponse = (Publisher<MutableHttpResponse<?>>) filterPublisher(request, notAllowedResponse);
+        AtomicReference<HttpRequest<?>> reference = new AtomicReference<>(request);
+        notAllowedResponse = (Publisher<MutableHttpResponse<?>>) filterPublisher(request, reference, notAllowedResponse);
         notAllowedResponse.subscribe(new CompletionAwareSubscriber<MutableHttpResponse<?>>() {
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -810,7 +817,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             @Override
             protected void doOnNext(MutableHttpResponse<?> message) {
                 writeHttpResponse(ctx,
-                        request,
+                        reference.get(),
                         message,
                         ((NettyHttpResponse) message).getNativeResponse(),
                         null,

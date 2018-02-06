@@ -58,6 +58,20 @@ public interface PropertyResolver extends ValueResolver<String> {
      *
      *
      * @param name The name
+     * @param argument The required type
+     * @param <T> The concrete type
+     * @return An optional containing the property value if it exists
+     */
+    default <T> Optional<T> getProperty(String name, Argument<T> argument) {
+        return getProperty(name, ConversionContext.of(argument));
+    }
+    /**
+     * <p>Resolve the given property for the given name, type and generic type arguments.</p>
+     *
+     * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
+     *
+     *
+     * @param name The name
      * @param requiredType The required type
      * @param context The {@link ConversionContext} to apply  to any conversion
      * @param <T> The concrete type

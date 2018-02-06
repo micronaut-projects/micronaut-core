@@ -92,4 +92,43 @@ public class InstantiationUtils {
             throw new InstantiationException("Could not instantiate type ["+type.getName()+"]: " + e.getMessage(),e);
         }
     }
+
+    /**
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
+     *
+     * @param type The type
+     * @return The instantiated instance
+     * @throws InstantiationException When an error occurs
+     */
+    public static Object instantiate(String type, ClassLoader classLoader) {
+        try {
+            return ClassUtils.forName(type, classLoader)
+                             .flatMap(InstantiationUtils::tryInstantiate)
+                             .orElseThrow(()-> new InstantiationException("No class found for name: " + type));
+        } catch (Throwable e) {
+            throw new InstantiationException("Could not instantiate type ["+type+"]: " + e.getMessage(),e);
+        }
+    }
+
+    /**
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException}
+     *
+     * @param type The type
+     * @return The instantiated instance
+     * @throws InstantiationException When an error occurs
+     */
+    public static <T> T  instantiate(String type, Class<T> requiredType) {
+        try {
+            return ClassUtils.forName(type, requiredType.getClassLoader())
+                    .flatMap((Function<Class, Optional<T>>) aClass -> {
+                        if(requiredType == aClass || requiredType.isAssignableFrom(aClass)) {
+                            return tryInstantiate(aClass);
+                        }
+                        return Optional.empty();
+                    })
+                    .orElseThrow(()-> new InstantiationException("No compatible class found for name: " + type));
+        } catch (Throwable e) {
+            throw new InstantiationException("Could not instantiate type ["+type+"]: " + e.getMessage(),e);
+        }
+    }
 }

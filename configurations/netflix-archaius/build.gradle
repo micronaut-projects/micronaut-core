@@ -1,0 +1,5 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile 'com.netflix.archaius:archaius-core:0.7.6'
+    compile project(":runtime")
+}

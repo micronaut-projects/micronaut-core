@@ -1,6 +1,7 @@
 package org.particleframework.core.reflect;
 
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.core.util.StringUtils;
@@ -267,6 +268,27 @@ public class ReflectionUtils {
         return declaredField;
     }
 
+    /**
+     * Finds a field in the type or super type
+     * @param type The type
+     * @param name The field name
+     * @return An {@link Optional} of field
+     */
+    public static void setFieldIfPossible(Class type, String name, Object value) {
+        Optional<Field> declaredField = findDeclaredField(type, name);
+        if(declaredField.isPresent()) {
+            Field field = declaredField.get();
+            Optional<?> converted = ConversionService.SHARED.convert(value, field.getType());
+            if(converted.isPresent()) {
+                field.setAccessible(true);
+                try {
+                    field.set(type, converted.get());
+                } catch (IllegalAccessException e) {
+                    // ignore
+                }
+            }
+        }
+    }
     /**
      * Finds a method on the given type for the given name
      *

@@ -4,6 +4,7 @@ This module provides a Reactive HTTP client based on the Particle and Reactive s
 
 # TODO Items
 
+* Connection Pooling
 * multi part requests / file uploads
 * Server Sent Events
 * HTTP Redirect Handling
