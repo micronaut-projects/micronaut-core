@@ -15,9 +15,26 @@
  */
 package org.particleframework.configurations.ribbon
 
+import com.netflix.loadbalancer.DummyPing
+import com.netflix.loadbalancer.IPing
+import org.particleframework.context.ApplicationContext
+import spock.lang.Specification
+
+import javax.inject.Singleton
+
 /**
  * @author graemerocher
  * @since 1.0
  */
-class RibbonConfigSpec {
+class RibbonConfigSpec extends Specification {
+
+    void "test that a custom default ping is possible"() {
+        expect:
+        ApplicationContext.run().getBean(IPing) instanceof MyPing
+    }
+
+    @Singleton
+    static class MyPing extends DummyPing {
+
+    }
 }
