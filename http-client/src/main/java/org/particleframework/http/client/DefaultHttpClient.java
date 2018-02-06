@@ -34,6 +34,8 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
 import org.particleframework.core.async.publisher.Publishers;
@@ -87,6 +89,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty
@@ -248,71 +251,56 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
 
     @Override
     public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-        Publisher<HttpResponse<O>> responsePublisher = Publishers.fromCompletableFuture(() -> {
-            CompletableFuture<HttpResponse<O>> completableFuture = new CompletableFuture<>();
+        Publisher<URI> uriPublisher = resolveRequestURI(request);
+        return Flowable.fromPublisher(uriPublisher)
+                       .switchMap(buildExchangePublisher(request, bodyType));
+    }
 
-            Publisher<URI> requestURI = resolveRequestURI(request);
-            requestURI.subscribe(new CompletionAwareSubscriber<URI>() {
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    subscription.request(1);
-                }
+    protected <I, O> Function<URI, Publisher<? extends HttpResponse<O>>> buildExchangePublisher(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
+        return requestURI -> {
+            Publisher<HttpResponse<O>> responsePublisher = Publishers.fromCompletableFuture(() -> {
+                CompletableFuture<HttpResponse<O>> completableFuture = new CompletableFuture<>();
+                SslContext sslContext = buildSslContext(requestURI);
 
-                @Override
-                protected void doOnNext(URI requestURI) {
-                    SslContext sslContext = buildSslContext(requestURI);
+                ChannelFuture connectionFuture = doConnect(requestURI, sslContext);
+                connectionFuture.addListener(future -> {
+                    if (future.isSuccess()) {
+                        try {
+                            Channel channel = connectionFuture.channel();
+                            MediaType requestContentType = request
+                                    .getContentType()
+                                    .orElse(MediaType.APPLICATION_JSON_TYPE);
 
-                    ChannelFuture connectionFuture = doConnect(requestURI, sslContext);
-                    connectionFuture.addListener(future -> {
-                        if (future.isSuccess()) {
-                            try {
-                                Channel channel = connectionFuture.channel();
-                                MediaType requestContentType = request
-                                        .getContentType()
-                                        .orElse(MediaType.APPLICATION_JSON_TYPE);
-
-                                boolean permitsBody = org.particleframework.http.HttpMethod.permitsRequestBody(request.getMethod());
-                                io.netty.handler.codec.http.HttpRequest nettyRequest =
-                                        buildNettyRequest(
-                                                request,
-                                                requestContentType,
-                                                permitsBody);
+                            boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+                            io.netty.handler.codec.http.HttpRequest nettyRequest =
+                                    buildNettyRequest(
+                                            request,
+                                            requestContentType,
+                                            permitsBody);
 
 
-                                prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+                            prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
 
-                                if (LOG.isTraceEnabled()) {
-                                    traceRequest(request, nettyRequest);
-                                }
-
-                                addFullHttpResponseHandler(channel, completableFuture, bodyType);
-                                writeAndCloseRequest(channel, nettyRequest);
-                            } catch (Exception e) {
-                                completableFuture.completeExceptionally(e);
+                            if (LOG.isTraceEnabled()) {
+                                traceRequest(request, nettyRequest);
                             }
-                        } else {
-                            Throwable cause = future.cause();
-                            completableFuture.completeExceptionally(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
+
+                            addFullHttpResponseHandler(channel, completableFuture, bodyType);
+                            writeAndCloseRequest(channel, nettyRequest);
+                        } catch (Exception e) {
+                            completableFuture.completeExceptionally(e);
                         }
-                    });
-                }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    completableFuture.completeExceptionally(t);
-                }
-
-                @Override
-                protected void doOnComplete() {
-
-                }
+                    } else {
+                        Throwable cause = future.cause();
+                        completableFuture.completeExceptionally(
+                                new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                        );
+                    }
+                });
+                return completableFuture;
             });
-
-            return completableFuture;
-        });
-        return applyFilterToResponsePublisher(request, responsePublisher);
+            return applyFilterToResponsePublisher(request, responsePublisher);
+        };
     }
 
     private void writeAndCloseRequest(Channel channel, io.netty.handler.codec.http.HttpRequest nettyRequest) {
@@ -334,16 +322,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     }
 
     protected <I> Publisher<URI> resolveRequestURI(HttpRequest<I> request) {
-        return Publishers.map(loadBalancer.select(null), server -> {
-            URI requestURI;
-            try {
-                requestURI = server.toURI().resolve(request.getUri());
-            } catch (URISyntaxException e) {
-                throw new HttpClientException("Invalid request URI for");
-            }
-            return requestURI;
-
-        });
+        return Publishers.map(loadBalancer.select(null), server ->
+                server.resolve(request.getUri())
+        );
     }
 
     private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {

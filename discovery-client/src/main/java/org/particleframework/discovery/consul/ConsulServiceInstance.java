@@ -21,16 +21,14 @@ import org.particleframework.discovery.consul.client.v1.HealthEntry;
 import org.particleframework.discovery.consul.client.v1.NodeEntry;
 import org.particleframework.discovery.consul.client.v1.ServiceEntry;
 import org.particleframework.discovery.exceptions.DiscoveryException;
+import org.particleframework.health.HealthStatus;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * A {@link ServiceInstance} for Consul
@@ -75,9 +73,15 @@ public class ConsulServiceInstance implements ServiceInstance {
         return healthEntry;
     }
 
+
     @Override
     public String getId() {
         return healthEntry.getService().getName();
+    }
+
+    @Override
+    public Optional<String> getInstanceId() {
+        return healthEntry.getService().getID();
     }
 
     @Override

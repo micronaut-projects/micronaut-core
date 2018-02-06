@@ -13,7 +13,7 @@ import java.lang.annotation.*;
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @Repeatable(Requirements.class)
 public @interface Requires {
 

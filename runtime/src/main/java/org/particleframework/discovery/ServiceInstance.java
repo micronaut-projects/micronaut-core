@@ -16,10 +16,12 @@
 package org.particleframework.discovery;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.health.HealthStatus;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Optional;
 
 /**
  * <p>Represents a remote service discovered by the underlying discovery implementation</p>
@@ -39,7 +41,11 @@ public interface ServiceInstance {
     String ZONE = "zone";
 
     /**
-     * @return The identifier of the service
+     * Constant to represent the region of the service contained with {@link #getMetadata()}
+     */
+    String REGION = "region";
+    /**
+     * @return The identifier of the service used for purposes of service discovery
      */
     String getId();
 
@@ -48,6 +54,44 @@ public interface ServiceInstance {
      */
     URI getURI();
 
+    /**
+     * @return The {@link HealthStatus} of the instance
+     */
+    default HealthStatus getHealthStatus() {
+        return HealthStatus.UP;
+    }
+    /**
+     * @return The ID of the instance
+     */
+    default Optional<String> getInstanceId() {
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the availability zone to use. A zone is, for example, the AWS availability zone
+     *
+     * @return The zone to use
+     */
+    default Optional<String> getZone() {
+        return getMetadata().get(ZONE, String.class);
+    }
+
+    /**
+     * Returns the region to use. A region is, for example, the AWS region
+     *
+     * @return The region
+     */
+    default Optional<String> getRegion() {
+        return getMetadata().get(ZONE, String.class);
+    }
+    /**
+     * Returns the application group. For example, the AWS auto-scaling group
+     *
+     * @return The group to use
+     */
+    default Optional<String> getGroup() {
+        return getMetadata().get(GROUP, String.class);
+    }
     /**
      * @return The service metadata
      */
@@ -75,6 +119,15 @@ public interface ServiceInstance {
      */
     default int getPort() {
         return getURI().getPort();
+    }
+
+    /**
+     * Resolve a URI relative to this service instance
+     * @param relativeURI The relative URI
+     * @return The relative URI
+     */
+    default URI resolve(URI relativeURI) {
+        return getURI().resolve(relativeURI);
     }
 
     /**

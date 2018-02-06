@@ -5,6 +5,7 @@ dependencies {
     compile project(":runtime")
     compile "io.netty:netty-handler-proxy:$nettyVersion"
     compileOnly "io.projectreactor:reactor-core:$reactorVersion"
+
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
