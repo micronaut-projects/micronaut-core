@@ -21,7 +21,7 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.HttpClient
-import org.particleframework.http.client.rxjava2.RxHttpClient
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Specification

@@ -23,6 +23,7 @@ import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
 import org.particleframework.http.client.BlockingHttpClient
 import org.particleframework.http.client.HttpPostSpec
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared

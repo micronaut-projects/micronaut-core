@@ -16,7 +16,7 @@
 package org.particleframework.http.server.netty
 
 import org.particleframework.context.ApplicationContext
-import org.particleframework.http.client.rxjava2.RxHttpClient
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared

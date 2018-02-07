@@ -20,8 +20,8 @@ import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.http.client.exceptions.HttpClientResponseException
-import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared

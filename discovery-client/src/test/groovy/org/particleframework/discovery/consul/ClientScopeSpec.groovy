@@ -20,7 +20,7 @@ import org.particleframework.context.annotation.Value
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.Client
-import org.particleframework.http.client.rxjava2.RxHttpClient
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.IgnoreIf
 import spock.lang.Specification
