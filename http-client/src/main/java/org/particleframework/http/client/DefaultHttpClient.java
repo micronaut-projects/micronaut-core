@@ -15,11 +15,14 @@
  */
 package org.particleframework.http.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.typesafe.netty.http.HttpStreamsClientHandler;
+import com.typesafe.netty.http.StreamedHttpResponse;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -34,7 +37,10 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.FlowableEmitter;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.Prototype;
@@ -42,6 +48,7 @@ import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.io.buffer.ByteBufferFactory;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.InstantiationUtils;
@@ -65,7 +72,9 @@ import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.codec.JsonStreamMediaTypeCodec;
+import org.particleframework.jackson.parser.JacksonProcessor;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,17 +88,15 @@ import java.io.Closeable;
 import java.net.Proxy.Type;
 import java.net.SocketAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty
@@ -98,7 +105,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Prototype
-public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
+public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
@@ -117,9 +124,9 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
     /**
      * Construct a client for the given arguments
      *
-     * @param loadBalancer The {@link LoadBalancer} to use for selecting servers
-     * @param configuration  The {@link HttpClientConfiguration} object
-     * @param codecRegistry  The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
+     * @param configuration The {@link HttpClientConfiguration} object
+     * @param codecRegistry The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
     @Inject
     public DefaultHttpClient(@Argument LoadBalancer loadBalancer,
@@ -159,23 +166,51 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         this(LoadBalancer.fixed(url));
     }
 
+    @Override
+    public HttpClient start() {
+        if (!isRunning()) {
+            this.group = createEventLoopGroup(configuration);
+        }
+        return this;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return !group.isShutdown();
+    }
+
+    @Override
+    @PreDestroy
+    public HttpClient stop() {
+        if (isRunning()) {
+            this.group.shutdownGracefully().addListener(f -> {
+                if (!f.isSuccess() && LOG.isErrorEnabled()) {
+                    Throwable cause = f.cause();
+                    LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
+                }
+            });
+        }
+        return this;
+    }
+
     /**
      * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
      * The client identifiers are equivalents to the value of {@link Client#id()}
+     *
      * @param clientIdentifiers The client identifiers
      */
     public void setClientIdentifiers(Set<String> clientIdentifiers) {
-        if(clientIdentifiers != null) {
+        if (clientIdentifiers != null) {
             this.clientIdentifiers = clientIdentifiers;
         }
     }
 
     /**
-     * @see #setClientIdentifiers(Set)
      * @param clientIdentifiers The client identifiers
+     * @see #setClientIdentifiers(Set)
      */
     public void setClientIdentifiers(String... clientIdentifiers) {
-        if(clientIdentifiers != null) {
+        if (clientIdentifiers != null) {
             this.clientIdentifiers = new HashSet<>(Arrays.asList(clientIdentifiers));
         }
     }
@@ -193,7 +228,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
      * @param mediaTypeCodecRegistry The registry to use. Should not be null
      */
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        if(mediaTypeCodecRegistry != null) {
+        if (mediaTypeCodecRegistry != null) {
             this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         }
     }
@@ -203,60 +238,166 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         return new BlockingHttpClient() {
             @Override
             public <I, O> HttpResponse<O> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
-                Publisher<HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
-                CompletableFuture<HttpResponse<O>> future = new CompletableFuture<>();
-                publisher.subscribe(new CompletionAwareSubscriber<HttpResponse<O>>() {
-                    boolean messageReceived = false;
-
-                    @Override
-                    protected void doOnSubscribe(Subscription subscription) {
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    protected void doOnNext(HttpResponse<O> message) {
-                        messageReceived = true;
-                        future.complete(message);
-                    }
-
-                    @Override
-                    protected void doOnError(Throwable t) {
-                        future.completeExceptionally(t);
-                    }
-
-                    @Override
-                    protected void doOnComplete() {
-                        if (!messageReceived) {
-                            future.completeExceptionally(new HttpClientException("Empty response"));
-                        }
-                    }
-                });
-                try {
-                    return future.get();
-                } catch (InterruptedException e) {
-                    throw new HttpClientException("Request execution exception: " + e.getMessage(), e);
-                } catch (ExecutionException e) {
-                    Throwable cause = e.getCause();
-                    if (cause instanceof RuntimeException) {
-                        throw ((RuntimeException) cause);
-                    } else {
-                        throw new HttpClientException("Request execution exception: " + e.getMessage(), e);
-                    }
-                }
+                Flowable<HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
+                return publisher.blockingFirst();
             }
         };
     }
 
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <I> Flowable<ByteBuffer<?>> dataStream(HttpRequest<I> request) {
+        return Flowable.fromPublisher(resolveRequestURI(request))
+                .flatMap(buildDataStreamPublisher(request));
+
+    }
 
     @Override
-    public <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
+    public <I> Flowable<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request) {
+        return Flowable.fromPublisher(resolveRequestURI(request))
+                .flatMap(buildExchangeStreamPublisher(request));
+    }
+
+    @Override
+    public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, org.particleframework.core.type.Argument<O> type) {
+
+        return Flowable.fromPublisher(resolveRequestURI(request))
+                .flatMap(buildJsonStreamPublisher(request, type));
+
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <I> Flowable<Map<String, Object>> jsonStream(HttpRequest<I> request) {
+        Flowable flowable = jsonStream(request, Map.class);
+        return flowable;
+    }
+
+    @Override
+    public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Class<O> type) {
+        return jsonStream(request, org.particleframework.core.type.Argument.of(type));
+    }
+
+    @Override
+    public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
-                       .switchMap(buildExchangePublisher(request, bodyType));
+                .switchMap(buildExchangePublisher(request, bodyType));
+    }
+
+    protected <I> Function<URI, Flowable<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(HttpRequest<I> request) {
+        return requestURI -> {
+            Flowable<HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            return streamResponsePublisher.switchMap(response -> {
+                if (!(response instanceof NettyStreamedHttpResponse)) {
+                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+                }
+                NettyStreamedHttpResponse<ByteBuffer<?>> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
+                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
+                return httpContentFlowable.map((Function<HttpContent, HttpResponse<ByteBuffer<?>>>) message -> {
+                    ByteBuf byteBuf = message.content();
+                    ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
+                    nettyStreamedHttpResponse.setBody(byteBuffer);
+                    return nettyStreamedHttpResponse;
+                });
+            });
+        };
+    }
+
+    protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(HttpRequest<I> request, org.particleframework.core.type.Argument<O> type) {
+        return requestURI -> {
+            Flowable<HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            return streamResponsePublisher.switchMap(response -> {
+                if (!(response instanceof NettyStreamedHttpResponse)) {
+                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+                }
+                JsonMediaTypeCodec mediaTypeCodec = (JsonMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
+                        .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
+
+                NettyStreamedHttpResponse<?> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
+                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
+                JacksonProcessor jacksonProcessor = new JacksonProcessor() {
+                    @Override
+                    public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
+                        httpContentFlowable.map(content -> ByteBufUtil.getBytes(content.content())).subscribe(this);
+                        super.subscribe(downstreamSubscriber);
+                    }
+                };
+                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+            });
+        };
+    }
+
+    protected <I> Function<URI, Flowable<ByteBuffer<?>>> buildDataStreamPublisher(HttpRequest<I> request) {
+        return requestURI -> {
+            Flowable<HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
+                ByteBuf byteBuf = message.content();
+                return byteBufferFactory.wrap(byteBuf);
+            };
+            return streamResponsePublisher.switchMap(response -> {
+                if (!(response instanceof NettyStreamedHttpResponse)) {
+                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+                }
+                NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
+                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
+                return httpContentFlowable.map(contentMapper);
+            });
+        };
+    }
+
+    protected <I> Flowable<HttpResponse<Object>> buildStreamExchange(HttpRequest<I> request, URI requestURI) {
+        SslContext sslContext = buildSslContext(requestURI);
+
+        AtomicReference<HttpRequest> requestWrapper = new AtomicReference<>(request);
+        Flowable<HttpResponse<Object>> streamResponsePublisher = Flowable.create(emitter -> {
+                    ChannelFuture channelFuture = doConnect(requestURI, sslContext);
+                    Disposable disposable = buildDisposableChannel(channelFuture);
+                    emitter.setDisposable(disposable);
+                    emitter.setCancellable(disposable::dispose);
+
+
+                    channelFuture
+                            .addListener((ChannelFutureListener) f -> {
+                                if (f.isSuccess()) {
+                                    Channel channel = f.channel();
+
+                                    io.netty.handler.codec.http.HttpRequest nettyRequest = prepareRequest(requestWrapper.get(), requestURI);
+
+                                    ChannelPipeline pipeline = channel.pipeline();
+                                    pipeline.remove(HANDLER_AGGREGATOR);
+                                    pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+
+                                        @Override
+                                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                            emitter.onError(cause);
+                                        }
+
+                                        @Override
+                                        protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+                                            NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                                            emitter.onNext(response);
+                                            emitter.onComplete();
+                                        }
+                                    });
+                                    channel.writeAndFlush(nettyRequest);
+                                } else {
+                                    Throwable cause = f.cause();
+                                    emitter.onError(
+                                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                                    );
+                                }
+                            });
+                }, BackpressureStrategy.BUFFER
+        );
+        // apply filters
+        streamResponsePublisher = Flowable.fromPublisher(applyFilterToResponsePublisher(request, requestWrapper, streamResponsePublisher));
+        return streamResponsePublisher;
     }
 
     protected <I, O> Function<URI, Publisher<? extends HttpResponse<O>>> buildExchangePublisher(HttpRequest<I> request, org.particleframework.core.type.Argument<O> bodyType) {
+        AtomicReference<HttpRequest> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
             Publisher<HttpResponse<O>> responsePublisher = Publishers.fromCompletableFuture(() -> {
                 CompletableFuture<HttpResponse<O>> completableFuture = new CompletableFuture<>();
@@ -267,22 +408,23 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                     if (future.isSuccess()) {
                         try {
                             Channel channel = connectionFuture.channel();
-                            MediaType requestContentType = request
+                            HttpRequest<I> finalRequest = requestWrapper.get();
+                            MediaType requestContentType = finalRequest
                                     .getContentType()
                                     .orElse(MediaType.APPLICATION_JSON_TYPE);
 
                             boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
                             io.netty.handler.codec.http.HttpRequest nettyRequest =
                                     buildNettyRequest(
-                                            request,
+                                            finalRequest,
                                             requestContentType,
                                             permitsBody);
 
 
-                            prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+                            prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
 
                             if (LOG.isTraceEnabled()) {
-                                traceRequest(request, nettyRequest);
+                                traceRequest(finalRequest, nettyRequest);
                             }
 
                             addFullHttpResponseHandler(channel, completableFuture, bodyType);
@@ -299,14 +441,8 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 });
                 return completableFuture;
             });
-            return applyFilterToResponsePublisher(request, responsePublisher);
+            return applyFilterToResponsePublisher(request, requestWrapper, responsePublisher);
         };
-    }
-
-    private void writeAndCloseRequest(Channel channel, io.netty.handler.codec.http.HttpRequest nettyRequest) {
-        channel.writeAndFlush(nettyRequest).addListener(f -> {
-            closeChannelAsync(channel);
-        });
     }
 
     protected void closeChannelAsync(Channel channel) {
@@ -325,38 +461,6 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         return Publishers.map(loadBalancer.select(null), server ->
                 server.resolve(request.getUri())
         );
-    }
-
-    private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
-        channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
-            @Override
-            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                if(fullResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
-                    // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                    fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                }
-                FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
-
-                HttpStatus status = response.getStatus();
-                if (status.getCode() >= 400) {
-                    completableFuture.completeExceptionally(new HttpClientResponseException(status.getReason(), response));
-                } else {
-                    completableFuture.complete(response);
-                }
-            }
-
-            @Override
-            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                if (cause instanceof TooLongFrameException) {
-                    completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));
-                } else if (cause instanceof ReadTimeoutException) {
-                    completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
-                } else {
-                    completableFuture.completeExceptionally(cause);
-                }
-            }
-        });
     }
 
 
@@ -450,21 +554,21 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         String requestPath = request.getPath();
         HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
-            if(filter instanceof Toggleable && !((Toggleable)filter).isEnabled()) {
+            if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
             Filter filterAnn = filter.getClass().getAnnotation(Filter.class);
             if (filterAnn != null) {
                 String[] clients = filterAnn.clients();
-                if(!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
-                    if( Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id)) ) {
+                if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
+                    if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
                         // no matching clients
                         continue;
                     }
                 }
                 HttpMethod[] methods = filterAnn.methods();
-                if(ArrayUtils.isNotEmpty(methods)) {
-                    if(!Arrays.asList(methods).contains(method)) {
+                if (ArrayUtils.isNotEmpty(methods)) {
+                    if (!Arrays.asList(methods).contains(method)) {
                         continue;
                     }
                 }
@@ -537,58 +641,13 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         }
     }
 
-    @Override
-    public HttpClient start() {
-        if (!isRunning()) {
-            this.group = createEventLoopGroup(configuration);
-        }
-        return this;
-    }
-
-    @Override
-    public boolean isRunning() {
-        return !group.isShutdown();
-    }
-
-    @Override
-    @PreDestroy
-    public HttpClient stop() {
-        if (isRunning()) {
-            this.group.shutdownGracefully().addListener(f -> {
-                if (!f.isSuccess() && LOG.isErrorEnabled()) {
-                    Throwable cause = f.cause();
-                    LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
-                }
-            });
-        }
-        return this;
-    }
-
-    private ClientFilterChain buildChain(List<HttpClientFilter> filters) {
-
-        AtomicInteger integer = new AtomicInteger();
-        int len = filters.size();
-        return new ClientFilterChain() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-                int pos = integer.incrementAndGet();
-                if (pos > len) {
-                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                }
-                HttpClientFilter httpFilter = filters.get(pos);
-                return httpFilter.doFilter(request, this);
-            }
-        };
-    }
-
-    protected <I, O> Publisher<HttpResponse<O>> applyFilterToResponsePublisher(HttpRequest<I> request, Publisher<HttpResponse<O>> responsePublisher) {
+    protected <I, O> Publisher<HttpResponse<O>> applyFilterToResponsePublisher(HttpRequest<I> request, AtomicReference<HttpRequest> requestWrapper, Publisher<HttpResponse<O>> responsePublisher) {
         if (filters.length > 0) {
             List<HttpClientFilter> httpClientFilters = resolveFilters(request);
             OrderUtil.reverseSort(httpClientFilters);
             httpClientFilters.add((req, chain) -> responsePublisher);
 
-            ClientFilterChain filterChain = buildChain(httpClientFilters);
+            ClientFilterChain filterChain = buildChain(requestWrapper, httpClientFilters);
             return (Publisher<HttpResponse<O>>) httpClientFilters.get(0)
                     .doFilter(request, filterChain);
         } else {
@@ -638,6 +697,85 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         return nettyRequest;
     }
 
+
+
+    protected <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
+        HttpHeaders headers = nettyRequest.headers();
+        headers.set(HttpHeaderNames.HOST, requestURI.getHost());
+        headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+
+        if (permitsBody) {
+            Optional<I> body = request.getBody();
+            if (body.isPresent()) {
+                MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+                headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                if (nettyRequest instanceof FullHttpRequest) {
+                    FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+                    headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
+                } else {
+                    headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                }
+            }
+        }
+    }
+
+    private void writeAndCloseRequest(Channel channel, io.netty.handler.codec.http.HttpRequest nettyRequest) {
+        channel.writeAndFlush(nettyRequest).addListener(f -> {
+            closeChannelAsync(channel);
+        });
+    }
+
+    private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
+        channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
+            @Override
+            protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+                if (fullResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
+                    // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                    fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                }
+                FullNettyClientHttpResponse<O> response
+                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
+
+                HttpStatus status = response.getStatus();
+                if (status.getCode() >= 400) {
+                    completableFuture.completeExceptionally(new HttpClientResponseException(status.getReason(), response));
+                } else {
+                    completableFuture.complete(response);
+                }
+            }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                if (cause instanceof TooLongFrameException) {
+                    completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                } else if (cause instanceof ReadTimeoutException) {
+                    completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
+                } else {
+                    completableFuture.completeExceptionally(cause);
+                }
+            }
+        });
+    }
+
+    private ClientFilterChain buildChain(AtomicReference<HttpRequest> requestWrapper, List<HttpClientFilter> filters) {
+
+        AtomicInteger integer = new AtomicInteger();
+        int len = filters.size();
+        return new ClientFilterChain() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
+
+                int pos = integer.incrementAndGet();
+                if (pos > len) {
+                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+                }
+                HttpClientFilter httpFilter = filters.get(pos);
+                return httpFilter.doFilter(requestWrapper.getAndSet(request), this);
+            }
+        };
+    }
+
     private io.netty.handler.codec.http.HttpRequest buildFormDataRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getNettyRequest((ByteBuf) null), false);
         Object requestBody = bodyValue;
@@ -671,7 +809,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             } else if (!all.isEmpty()) {
                 LOG.trace("{}: {}", name, all.get(0));
             }
-            if(HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
+            if (HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
                 FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
                 LOG.trace("Body");
                 LOG.trace("----");
@@ -688,24 +826,112 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
         );
     }
 
-    protected <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
-        HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, requestURI.getHost());
-        headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+    private <I> io.netty.handler.codec.http.HttpRequest prepareRequest(HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        MediaType requestContentType = request
+                .getContentType()
+                .orElse(MediaType.APPLICATION_JSON_TYPE);
 
-        if (permitsBody) {
-            Optional<I> body = request.getBody();
-            if (body.isPresent()) {
-                MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
-                headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
-                if (nettyRequest instanceof FullHttpRequest) {
-                    FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
-                    headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
-                } else {
-                    headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        io.netty.handler.codec.http.HttpRequest nettyRequest =
+                buildNettyRequest(
+                        request,
+                        requestContentType,
+                        permitsBody);
+
+
+        prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody);
+        return nettyRequest;
+    }
+
+    private <O> SimpleChannelInboundHandler<StreamedHttpResponse> newJsonStreamDecoder(org.particleframework.core.type.Argument<O> type, JsonMediaTypeCodec mediaTypeCodec, FlowableEmitter<O> emitter) {
+        return new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                emitter.onError(
+                        new HttpClientException("Client error:" + cause.getMessage(), cause)
+                );
+            }
+
+            @Override
+            protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
+                JacksonProcessor jacksonProcessor = new JacksonProcessor();
+                jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
+                    @Override
+                    protected void doOnSubscribe(Subscription subscription) {
+                        long demand = emitter.requested();
+                        subscription.request(demand);
+                    }
+
+                    @Override
+                    protected void doOnNext(JsonNode message) {
+                        O json = mediaTypeCodec.decode(type, message);
+                        emitter.onNext(json);
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
+                        emitter.onError(t);
+                    }
+
+                    @Override
+                    protected void doOnComplete() {
+                        emitter.onComplete();
+                    }
+                });
+                msg.subscribe(new CompletionAwareSubscriber<HttpContent>() {
+                    @Override
+                    protected void doOnSubscribe(Subscription subscription) {
+                        long demand = emitter.requested();
+                        jacksonProcessor.onSubscribe(subscription);
+                        subscription.request(demand);
+                    }
+
+                    @Override
+                    protected void doOnNext(HttpContent message) {
+                        try {
+                            jacksonProcessor.onNext(
+                                    ByteBufUtil.getBytes(message.content())
+                            );
+                        } catch (Exception e) {
+                            jacksonProcessor.onError(e);
+                        }
+                    }
+
+                    @Override
+                    protected void doOnError(Throwable t) {
+                        jacksonProcessor.onError(t);
+                    }
+
+                    @Override
+                    protected void doOnComplete() {
+                        jacksonProcessor.onComplete();
+                    }
+                });
+            }
+
+        };
+    }
+
+    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
+        return new Disposable() {
+            boolean disposed = false;
+
+            @Override
+            public void dispose() {
+                if (!disposed) {
+                    Channel channel = channelFuture.channel();
+                    if (channel.isOpen()) {
+                        closeChannelAsync(channel);
+                    }
+                    disposed = true;
                 }
             }
-        }
+
+            @Override
+            public boolean isDisposed() {
+                return disposed;
+            }
+        };
     }
 
     /**
@@ -738,7 +964,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
             }
             Optional<Duration> readTimeout = configuration.getReadTimeout();
             readTimeout.ifPresent(duration -> {
-                if(!duration.isNegative()) {
+                if (!duration.isNegative()) {
                     p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS));
                 }
             });
@@ -748,7 +974,7 @@ public class DefaultHttpClient implements HttpClient, Closeable, AutoCloseable {
                 @Override
                 protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
                     if (!HttpUtil.isContentLengthSet(aggregated)) {
-                        if(aggregated.content().readableBytes() > 0) {
+                        if (aggregated.content().readableBytes() > 0) {
                             super.finishAggregation(aggregated);
                         }
                     }

@@ -30,7 +30,7 @@ import org.particleframework.http.annotation.Filter
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Header
 import org.particleframework.http.client.Client
-import org.particleframework.http.client.rxjava2.RxHttpClient
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.http.filter.ClientFilterChain
 import org.particleframework.http.filter.HttpClientFilter
 import org.particleframework.runtime.server.EmbeddedServer

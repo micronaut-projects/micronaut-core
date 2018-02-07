@@ -16,14 +16,19 @@
 package org.particleframework.http.client
 
 import io.reactivex.Flowable
+import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
+import io.reactivex.internal.subscribers.BlockingFirstSubscriber
+import io.reactivex.internal.subscribers.BlockingSubscriber
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.buffer.ByteBuffer
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
-import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -42,12 +47,14 @@ class DataStreamSpec extends Specification {
 
     void "test read bytebuffer stream"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient,embeddedServer.getURL())
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
 
         when:
         List<byte[]> arrays = client.dataStream(HttpRequest.GET(
                 '/datastream/books'
-        )).map({buf -> buf.toByteArray()}).toList().blockingGet()
+        )).map({buf ->
+            buf.toByteArray()}
+        ).toList().blockingGet()
 
         then:
         arrays.size() == 2
@@ -59,9 +66,53 @@ class DataStreamSpec extends Specification {
 
     }
 
+    void "test read bytebuffer stream - regulate demand"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
+
+        when:
+        def publisher = client.dataStream(HttpRequest.GET(
+                '/datastream/books'
+        ))
+
+        List<byte[]> arrays = []
+        FlowableBlockingSubscribe.subscribe(publisher, new Subscriber<ByteBuffer<?>>() {
+            Subscription subscription
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(1)
+                subscription = s
+            }
+
+            @Override
+            void onNext(ByteBuffer<?> byteBuffer) {
+                arrays.add(byteBuffer.toByteArray())
+                subscription.cancel()
+            }
+
+            @Override
+            void onError(Throwable t) {
+
+            }
+
+            @Override
+            void onComplete() {
+
+            }
+        })
+
+        then:
+        arrays.size() == 1
+        new String(arrays[0]) == 'The Stand'
+
+        cleanup:
+        client.stop()
+
+    }
+
     void "test read response bytebuffer stream"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient,embeddedServer.getURL())
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
 
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(

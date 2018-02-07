@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client.rxjava2;
+package org.particleframework.http.client;
 
 import com.typesafe.netty.http.StreamedHttpResponse;
 import org.particleframework.core.annotation.Internal;
@@ -46,6 +46,10 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
         this.nettyResponse = response;
         this.status = HttpStatus.valueOf(response.status().code());
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
+    }
+
+    public StreamedHttpResponse getNettyResponse() {
+        return nettyResponse;
     }
 
     @Override

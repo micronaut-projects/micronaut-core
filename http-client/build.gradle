@@ -1,6 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
-    compileOnly "io.reactivex.rxjava2:rxjava:$rxJava2Version"
+    compile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
     compile project(":http-netty")
     compile project(":runtime")
     compile "io.netty:netty-handler-proxy:$nettyVersion"

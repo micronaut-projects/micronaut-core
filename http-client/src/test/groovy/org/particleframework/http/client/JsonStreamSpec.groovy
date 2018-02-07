@@ -2,16 +2,10 @@ package org.particleframework.http.client
 
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
-import org.particleframework.core.bind.BeanPropertyBinder
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
-import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.Delete
 import org.particleframework.http.annotation.Get
-import org.particleframework.http.annotation.Patch
-import org.particleframework.http.annotation.Post
-import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
@@ -22,7 +16,6 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Created by graemerocher on 19/01/2018.
@@ -34,7 +27,7 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand all"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
 
         when:
         List<Map> jsonObjects = client.jsonStream(HttpRequest.GET(
@@ -53,7 +46,7 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand all POJO"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
 
         when:
         List<Book> jsonObjects = client.jsonStream(HttpRequest.GET(
@@ -69,7 +62,7 @@ class JsonStreamSpec  extends Specification {
 
     void "test read JSON stream demand one"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
 
         when:
         def stream = client.jsonStream(HttpRequest.GET(
