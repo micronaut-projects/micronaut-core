@@ -19,6 +19,7 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.*;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.context.annotation.Prototype;
 import org.particleframework.context.annotation.Requires;
 
 import javax.inject.Singleton;
@@ -38,7 +39,7 @@ public class RibbonDefaultsFactory {
      * @param defaultConfig The default {@link IClientConfig}
      * @return The default {@link ServerListFilter} to use
      */
-    @Singleton
+    @Prototype
     @Primary
     @Requires(missingBeans = ServerListFilter.class)
     ServerListFilter defaultServerListFilter(IClientConfig defaultConfig) {
@@ -49,7 +50,7 @@ public class RibbonDefaultsFactory {
      *
      * @return The default {@link IPing} to use
      */
-    @Singleton
+    @Prototype
     @Primary
     @Requires(missingBeans = IPing.class)
     IPing defaultPing() {
@@ -60,7 +61,7 @@ public class RibbonDefaultsFactory {
      *
      * @return The default {@link IRule} to use
      */
-    @Singleton
+    @Prototype
     @Primary
     @Requires(missingBeans = IRule.class)
     IRule defaultRule(IClientConfig clientConfig) {

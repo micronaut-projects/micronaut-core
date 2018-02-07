@@ -15,39 +15,45 @@
  */
 package org.particleframework.discovery.eureka;
 
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.ServiceInstanceList;
+import org.particleframework.discovery.consul.ConsulConfiguration;
+import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.eureka.client.v2.EurekaClient;
-import org.particleframework.http.client.LoadBalancer;
-import org.particleframework.http.client.LoadBalancerProvider;
-import org.particleframework.http.client.exceptions.HttpClientException;
 
 import javax.inject.Singleton;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * @author graemerocher
+ * <p>A {@link ServiceInstanceList} for Consul which reads from the {@link EurekaConfiguration}</p>
+ *
+ * <p>The reason this is useful is if a {@link org.particleframework.runtime.context.scope.refresh.RefreshEvent} occurs then the
+ * {@link EurekaConfiguration} will be updated and the backing list of {@link ServiceInstance} changed at runtime.</p>
+ *
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class EurekaLoadBalancerProvider implements LoadBalancerProvider {
+public class EurekaServiceInstanceList implements ServiceInstanceList {
     private final EurekaConfiguration configuration;
 
-    public EurekaLoadBalancerProvider(EurekaConfiguration configuration) {
+    public EurekaServiceInstanceList(EurekaConfiguration configuration) {
         this.configuration = configuration;
     }
 
+
     @Override
-    public String getId() {
+    public String getID() {
         return EurekaClient.SERVICE_ID;
     }
 
     @Override
-    public LoadBalancer getLoadBalancer() {
+    public List<ServiceInstance> getInstances() {
         String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
-        try {
-            return LoadBalancer.fixed(new URL(spec));
-        } catch (MalformedURLException e) {
-            throw new HttpClientException("Invalid Consul URL: " + spec, e);
-        }
+        return Collections.singletonList(
+                ServiceInstance.builder(ConsulClient.SERVICE_ID, URI.create(spec)).build()
+        );
     }
 }

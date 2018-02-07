@@ -24,6 +24,7 @@ import com.netflix.loadbalancer.ServerListFilter
 import com.netflix.loadbalancer.ZoneAffinityServerListFilter
 import com.netflix.loadbalancer.ZoneAvoidanceRule
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.annotation.Prototype
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -50,17 +51,17 @@ class RibbonConfigSpec extends Specification {
         applicationContext.getBean(IClientConfig, Qualifiers.byName("foo")).get(CommonClientConfigKey.VipAddress) == 'test'
     }
 
-    @Singleton
+    @Prototype
     static class MyPing extends DummyPing {
 
     }
 
-    @Singleton
+    @Prototype
     static class MyZoneAvoidanceRule extends ZoneAvoidanceRule {
 
     }
 
-    @Singleton
+    @Prototype
     static class MyZoneAffinityFilter extends ZoneAffinityServerListFilter {
         MyZoneAffinityFilter(IClientConfig niwsClientConfig) {
             super(niwsClientConfig)

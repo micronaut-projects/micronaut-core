@@ -18,21 +18,12 @@ package org.particleframework.configurations.ribbon;
 import com.netflix.client.ClientException;
 import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.*;
-import org.particleframework.context.BeanContext;
-import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.Prototype;
-import org.particleframework.context.annotation.Replaces;
 import org.particleframework.core.async.publisher.Publishers;
-import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.http.client.LoadBalancer;
 import org.particleframework.http.client.exceptions.HttpClientException;
-import org.particleframework.http.client.loadbalance.DiscoveryClientRoundRobinLoadBalancer;
-import org.particleframework.inject.qualifiers.Qualifiers;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Inject;
-import java.net.URL;
 import java.util.List;
 
 /**
@@ -41,30 +32,20 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Replaces(DiscoveryClientRoundRobinLoadBalancer.class)
-@Prototype
 public class RibbonLoadBalancer implements LoadBalancer, ILoadBalancer {
 
     private final ILoadBalancer loadBalancer;
     private final LoadBalancerContext loadBalancerContext;
     private final IClientConfig clientConfig;
 
-    @Inject
     @SuppressWarnings("unchecked")
     public RibbonLoadBalancer(
-            @Argument String serviceID,
-            DiscoveryClient discoveryClient,
-            BeanContext beanContext,
-            IClientConfig defaultClientConfig,
-            ServerListFilter defaultFilter,
-            IRule defaultRule,
-            IPing defaultPing) {
+            IClientConfig niwsClientConfig,
+            ServerList serverList,
+            ServerListFilter serverListFilter,
+            IRule rule,
+            IPing ping) {
 
-        IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(defaultClientConfig);
-        IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID)).orElse(defaultRule);
-        IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElse(defaultPing);
-        ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElse(defaultFilter);
-        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElse(new DiscoveryClientServerList(discoveryClient, serviceID));
         this.loadBalancer = createLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);
         this.loadBalancerContext = new LoadBalancerContext(loadBalancer, niwsClientConfig);
         this.loadBalancerContext.initWithNiwsConfig(niwsClientConfig);

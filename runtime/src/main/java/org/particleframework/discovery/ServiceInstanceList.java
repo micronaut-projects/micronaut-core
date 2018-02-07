@@ -28,14 +28,10 @@ public interface ServiceInstanceList {
      * @return The service ID
      */
     String getID();
-    /**
-     * Updates the backing server list
-     *
-     * @param servers The servers
-     */
-    void update(List<ServiceInstance> servers);
 
     /**
+     * Returns the current list of services. Note: This method should NEVER block.
+     *
      * @return The instances
      */
     List<ServiceInstance> getInstances();
