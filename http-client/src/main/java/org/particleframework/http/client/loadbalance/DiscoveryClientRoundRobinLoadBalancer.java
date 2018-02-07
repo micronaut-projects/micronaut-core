@@ -15,23 +15,11 @@
  */
 package org.particleframework.http.client.loadbalance;
 
-import org.particleframework.context.annotation.Argument;
-import org.particleframework.context.annotation.Prototype;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
-import org.particleframework.discovery.exceptions.DiscoveryException;
-import org.particleframework.health.HealthStatus;
 import org.particleframework.http.client.LoadBalancer;
-import org.particleframework.http.client.exceptions.HttpClientException;
 import org.reactivestreams.Publisher;
-
-import javax.inject.Inject;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * <p>A {@link LoadBalancer} that uses the {@link DiscoveryClient} and a {@link ServiceInstance} ID to automatically
@@ -43,15 +31,12 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Prototype
-public class DiscoveryClientRoundRobinLoadBalancer implements LoadBalancer {
+public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoadBalancer {
 
     private final String serviceID;
     private final DiscoveryClient discoveryClient;
-    private final AtomicInteger index = new AtomicInteger(0);
 
-    @Inject
-    public DiscoveryClientRoundRobinLoadBalancer(@Argument String serviceID, DiscoveryClient discoveryClient) {
+    public DiscoveryClientRoundRobinLoadBalancer(String serviceID, DiscoveryClient discoveryClient) {
         this.serviceID = serviceID;
         this.discoveryClient = discoveryClient;
     }
@@ -59,21 +44,14 @@ public class DiscoveryClientRoundRobinLoadBalancer implements LoadBalancer {
     /**
      * @return The service ID
      */
+    @Override
     public String getServiceID() {
         return serviceID;
     }
 
     @Override
     public Publisher<ServiceInstance> select(Object discriminator) {
-        return Publishers.map(discoveryClient.getInstances(serviceID), serviceInstances -> {
-            List<ServiceInstance> availableServices = serviceInstances.stream().filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
-                                                                               .collect(Collectors.toList());
-            int len = availableServices.size();
-            if(len == 0) {
-                throw new DiscoveryException("No available services for ID: " + serviceID);
-            }
-            int i = index.getAndAccumulate(len, (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
-            return availableServices.get(i);
-        });
+        return Publishers.map(discoveryClient.getInstances(serviceID), this::getNextAvailable);
     }
+
 }

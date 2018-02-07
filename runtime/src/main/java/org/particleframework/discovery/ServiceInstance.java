@@ -21,6 +21,7 @@ import org.particleframework.health.HealthStatus;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -184,5 +185,68 @@ public interface ServiceInstance {
                 return URI.create("http://" + host + ":" + port);
             }
         };
+    }
+
+    /**
+     * A builder to builder a {@link ServiceInstance}
+     * @param id The id
+     * @param uri The URI
+     * @return The builder
+     */
+    static Builder builder(String id, URI uri) {
+        return new DefaultServiceInstance(id, uri);
+    }
+
+    /**
+     * A builder for building {@link ServiceInstance} references
+     */
+    interface Builder {
+        /**
+         * Sets the instance id
+         * @param id The instance id
+         * @return This builder
+         */
+        Builder instanceId(String id);
+
+        /**
+         * Sets the zone
+         * @param zone The zone
+         * @return This builder
+         */
+        Builder zone(String zone);
+
+        /**
+         * Sets the region
+         * @param region The region
+         * @return This builder
+         */
+        Builder region(String region);
+
+        /**
+         * Sets the application group
+         * @param group The group
+         * @return This builder
+         */
+        Builder group(String group);
+
+        /**
+         * Sets the application status
+         * @param status The status
+         * @return This builder
+         */
+        Builder status(HealthStatus status);
+
+
+        /**
+         * Sets the application metadata
+         * @param metadata The metadata
+         * @return This builder
+         */
+        Builder metadata(Map<String, String> metadata);
+
+        /**
+         * @return The instance
+         */
+        ServiceInstance build();
     }
 }

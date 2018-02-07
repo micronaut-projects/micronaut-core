@@ -19,12 +19,11 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.DiscoveryClient;
-import org.particleframework.http.client.loadbalance.DiscoveryClientRoundRobinLoadBalancer;
+import org.particleframework.discovery.ServiceInstanceList;
+import org.particleframework.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
+import org.particleframework.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import org.particleframework.runtime.server.EmbeddedServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -49,7 +48,7 @@ import java.util.Optional;
 @Singleton
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     private final Optional<EmbeddedServer> embeddedServer;
-    private final Map<String, LoadBalancerProvider> loadBalancerProviderMap;
+    private final Map<String, ServiceInstanceList> serviceInstanceLists;
     private final BeanContext beanContext;
 
     /**
@@ -57,22 +56,22 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
      *
      * @param embeddedServer An optional reference to the {@link EmbeddedServer}
      * @param beanContext The bean context
-     * @param providers Any other providers
+     * @param serviceInstanceLists Any other providers
      */
     public DefaultLoadBalancerResolver(
             Optional<EmbeddedServer> embeddedServer,
             BeanContext beanContext,
-            LoadBalancerProvider...providers) {
+            ServiceInstanceList...serviceInstanceLists) {
         this.embeddedServer = embeddedServer;
         this.beanContext = beanContext;
-        if(ArrayUtils.isNotEmpty(providers)) {
-            this.loadBalancerProviderMap = new HashMap<>(providers.length);
-            for (LoadBalancerProvider provider : providers) {
-                loadBalancerProviderMap.put(provider.getId(), provider);
+        if(ArrayUtils.isNotEmpty(serviceInstanceLists)) {
+            this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.length);
+            for (ServiceInstanceList provider : serviceInstanceLists) {
+                this.serviceInstanceLists.put(provider.getID(), provider);
             }
         }
         else {
-            this.loadBalancerProviderMap = Collections.emptyMap();
+            this.serviceInstanceLists = Collections.emptyMap();
         }
     }
 
@@ -83,8 +82,10 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         }
         String reference = serviceReferences[0];
 
-        if(loadBalancerProviderMap.containsKey(reference)) {
-            return Optional.ofNullable(loadBalancerProviderMap.get(reference).getLoadBalancer());
+        if(serviceInstanceLists.containsKey(reference)) {
+            ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(reference);
+            LoadBalancer loadBalancer = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList);
+            return Optional.ofNullable(loadBalancer);
         }
         else if(reference.startsWith("/")) {
             // current server reference
@@ -107,9 +108,8 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         else if(serviceReferences.length == 1){
             // if we've arrived here we have a reference to a service that requires service discovery
             // since this is only done at startup it is ok to block
-            LoadBalancer loadBalancer = createServiceInstanceLoadBalancer(serviceReferences[0]);
+            LoadBalancer loadBalancer = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceReferences[0]);
             return Optional.of(loadBalancer);
-
         }
         return Optional.empty();
     }

@@ -15,6 +15,8 @@
  */
 package org.particleframework.configurations.ribbon;
 
+import com.netflix.client.config.IClientConfig;
+import com.netflix.loadbalancer.AbstractServerList;
 import com.netflix.loadbalancer.Server;
 import com.netflix.loadbalancer.ServerList;
 import io.reactivex.Flowable;
@@ -30,7 +32,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DiscoveryClientServerList implements ServerList<Server> {
+public class DiscoveryClientServerList extends AbstractServerList<Server> {
     private final DiscoveryClient discoveryClient;
     private final String serviceID;
 
@@ -53,5 +55,10 @@ public class DiscoveryClientServerList implements ServerList<Server> {
     @Override
     public List<Server> getUpdatedListOfServers() {
         return getInitialListOfServers();
+    }
+
+    @Override
+    public void initWithNiwsConfig(IClientConfig clientConfig) {
+        // ignore
     }
 }

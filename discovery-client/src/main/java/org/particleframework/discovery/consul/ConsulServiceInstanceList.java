@@ -15,44 +15,47 @@
  */
 package org.particleframework.discovery.consul;
 
-import org.particleframework.discovery.consul.condition.RequiresConsul;
-import org.particleframework.http.client.LoadBalancer;
-import org.particleframework.http.client.LoadBalancerProvider;
-import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.ServiceInstanceList;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
+import org.particleframework.discovery.consul.condition.RequiresConsul;
 
 import javax.inject.Singleton;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * A loadbalance that discovers the consul URI from configuration
+ * <p>A {@link ServiceInstanceList} for Consul which reads from the {@link ConsulConfiguration}</p>
+ *
+ * <p>The reason this is useful is if a {@link org.particleframework.runtime.context.scope.refresh.RefreshEvent} occurs then the
+ * {@link ConsulConfiguration} will be updated and the backing list of {@link ServiceInstance} changed at runtime.</p>
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
 @RequiresConsul
-public class ConsulLoadBalancerProvider implements LoadBalancerProvider {
+public class ConsulServiceInstanceList implements ServiceInstanceList {
 
     private final ConsulConfiguration configuration;
 
-    public ConsulLoadBalancerProvider(ConsulConfiguration configuration) {
+    public ConsulServiceInstanceList(ConsulConfiguration configuration) {
         this.configuration = configuration;
+
     }
 
     @Override
-    public String getId() {
+    public String getID() {
         return ConsulClient.SERVICE_ID;
     }
 
     @Override
-    public LoadBalancer getLoadBalancer() {
+    public List<ServiceInstance> getInstances() {
         String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
-        try {
-            return LoadBalancer.fixed(new URL(spec));
-        } catch (MalformedURLException e) {
-            throw new HttpClientException("Invalid Consul URL: " + spec, e);
-        }
+        return Collections.singletonList(
+                ServiceInstance.builder(ConsulClient.SERVICE_ID, URI.create(spec)).build()
+        );
     }
+
 }
