@@ -65,15 +65,7 @@ public class RibbonLoadBalancer implements LoadBalancer, ILoadBalancer {
         IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElse(defaultPing);
         ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElse(defaultFilter);
         ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElse(new DiscoveryClientServerList(discoveryClient, serviceID));
-        this.loadBalancer = new ZoneAwareLoadBalancer(
-                niwsClientConfig,
-                rule,
-                ping,
-                serverList,
-                serverListFilter,
-                new PollingServerListUpdater(niwsClientConfig)
-
-        );
+        this.loadBalancer = createLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);
         this.loadBalancerContext = new LoadBalancerContext(loadBalancer, niwsClientConfig);
         this.loadBalancerContext.initWithNiwsConfig(niwsClientConfig);
         this.clientConfig = niwsClientConfig;
@@ -142,6 +134,29 @@ public class RibbonLoadBalancer implements LoadBalancer, ILoadBalancer {
     @Override
     public List<Server> getAllServers() {
         return loadBalancer.getAllServers();
+    }
+
+    /**
+     * Creates the {@link ILoadBalancer} to use. Defaults to {@link ZoneAwareLoadBalancer}. Subclasses can override to provide custom behaviour
+     *
+     * @param clientConfig The client config
+     * @param rule The {@link IRule}
+     * @param ping THe {@link IPing}
+     * @param serverListFilter The {@link ServerListFilter}
+     * @param serverList The {@link ServerList}
+     * @return The {@link ILoadBalancer} instance. Never null
+     */
+    @SuppressWarnings("unchecked")
+    protected ILoadBalancer createLoadBalancer(IClientConfig clientConfig, IRule rule, IPing ping, ServerListFilter serverListFilter, ServerList<Server> serverList) {
+        return new ZoneAwareLoadBalancer(
+                clientConfig,
+                rule,
+                ping,
+                serverList,
+                serverListFilter,
+                new PollingServerListUpdater(clientConfig)
+
+        );
     }
 
 }
