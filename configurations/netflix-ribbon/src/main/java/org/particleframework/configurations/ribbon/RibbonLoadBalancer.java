@@ -74,9 +74,9 @@ public class RibbonLoadBalancer implements LoadBalancer, ILoadBalancer {
                 new PollingServerListUpdater(niwsClientConfig)
 
         );
-        this.loadBalancerContext = new LoadBalancerContext(loadBalancer, defaultClientConfig);
+        this.loadBalancerContext = new LoadBalancerContext(loadBalancer, niwsClientConfig);
         this.loadBalancerContext.initWithNiwsConfig(niwsClientConfig);
-        this.clientConfig = defaultClientConfig;
+        this.clientConfig = niwsClientConfig;
     }
 
 

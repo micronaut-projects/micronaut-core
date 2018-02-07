@@ -170,6 +170,7 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
     public void close() throws IOException {
         // cleanup static references
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "instance", null);
+        ReflectionUtils.setFieldIfPossible(DynamicPropertyFactory.class, "config", null);
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "configMBean", null);
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "context", null);
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "customConfigurationInstalled", false);

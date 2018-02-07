@@ -27,6 +27,76 @@ import org.particleframework.inject.BeanFactory
  */
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
+    void "test setters with two arguments are not injected"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    private String host = "localhost";
+
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host, int port) {
+        this.host = host;
+    }
+}
+
+
+''')
+        then:
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedMethods.size() == 0
+    }
+
+    void "test setters with two arguments from abstract parent are not injected"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.ChildConfig', '''
+package test;
+
+import org.particleframework.context.annotation.*;
+
+
+abstract class MyConfig {
+    private String host = "localhost";
+
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host, int port) {
+        this.host = host;
+    }
+}
+
+@ConfigurationProperties("baz")
+class ChildConfig extends MyConfig {
+    String stuff;
+
+    public String getStuff() {
+        return stuff;
+    }
+
+    public void setStuff(String stuff) {
+        this.stuff = stuff;
+    }
+}
+
+
+''')
+        then:
+        beanDefinition.injectedFields.size() == 0
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].name == 'setStuff'
+    }
+
     void "test inheritance with setters"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.ChildConfig', '''

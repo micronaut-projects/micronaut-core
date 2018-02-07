@@ -15,7 +15,9 @@
  */
 package org.particleframework.configurations.ribbon;
 
+import com.netflix.client.config.CommonClientConfigKey;
 import com.netflix.client.config.IClientConfig;
+import com.netflix.client.config.IClientConfigKey;
 import com.netflix.loadbalancer.LoadBalancerContext;
 import com.netflix.loadbalancer.Server;
 import com.netflix.loadbalancer.reactive.LoadBalancerCommand;
@@ -80,7 +82,7 @@ public class RibbonRxHttpClient extends RxHttpClient {
 
     @Override
     public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
-        if(loadBalancer != null) {
+        if(isLoadBalancing()) {
 
             LoadBalancerCommand.Builder<HttpResponse<O>> commandBuilder = LoadBalancerCommand.builder();
             commandBuilder.withLoadBalancer(loadBalancer.getLoadBalancer())
@@ -100,5 +102,9 @@ public class RibbonRxHttpClient extends RxHttpClient {
         else {
             return super.exchange(request, bodyType);
         }
+    }
+
+    protected boolean isLoadBalancing() {
+        return loadBalancer != null && loadBalancer.getClientConfig().getPropertyAsBoolean(CommonClientConfigKey.InitializeNFLoadBalancer, true);
     }
 }

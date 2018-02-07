@@ -350,6 +350,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             boolean isCandidateMethod = !modelUtils.isStatic(method) &&
                                                             !modelUtils.isPrivate(method) &&
                                                             !modelUtils.isAbstract(method) &&
+                                                            method.getParameters().size() == 1 &&
                                                             NameUtils.isSetterName(method.getSimpleName().toString());
                             if(isCandidateMethod) {
                                 Element e = method.getEnclosingElement();
