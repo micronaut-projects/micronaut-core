@@ -287,6 +287,14 @@ public class ReflectionUtils {
                     // ignore
                 }
             }
+            else {
+                field.setAccessible(true);
+                try {
+                    field.set(type, null);
+                } catch (IllegalAccessException e) {
+                    // ignore
+                }
+            }
         }
     }
     /**

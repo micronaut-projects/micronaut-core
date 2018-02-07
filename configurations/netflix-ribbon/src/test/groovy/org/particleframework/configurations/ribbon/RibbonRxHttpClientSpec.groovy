@@ -23,7 +23,9 @@ import org.particleframework.http.client.Client
 import org.particleframework.http.client.HttpClient
 import org.particleframework.http.client.rxjava2.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
+import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 
@@ -33,27 +35,30 @@ import javax.inject.Inject
  */
 class RibbonRxHttpClientSpec extends Specification {
 
-    void "test basic ribbon load balancing"() {
 
-        given:
+    void "test basic ribbon load balancing configuration"() {
+
+        given:"A discovery server, two micro services and a client"
+
+        // the discovery server
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
 
-        EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+        def serverConfig = [
+                'consul.host'              : consulServer.host,
+                'consul.port'              : consulServer.port,
                 'particle.application.name': 'messageService'
-        ])
+        ]
 
-        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
-                'particle.application.name': 'messageService'
-        ])
+        // the two micro services
+        EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
+        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
 
+        // the client
         ApplicationContext context = ApplicationContext.run([
                 'consul.host': consulServer.host,
                 'consul.port': consulServer.port,
-                'ribbon.VipAddress': 'test'
+                'ribbon.VipAddress': 'test',
+                'ribbon.clients.messageService.VipAddress': 'bar'
         ])
         MessageService messageClient = context.getBean(MessageService)
 
@@ -62,7 +67,7 @@ class RibbonRxHttpClientSpec extends Specification {
         messageClient.client instanceof RibbonRxHttpClient
         messageClient.client.loadBalancer.isPresent()
         ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig
-        ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'test'
+        ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'bar'
         messageClient.getMessage().startsWith("Server ")
         messageClient.getMessage() != messageClient.getMessage()
 
@@ -70,7 +75,57 @@ class RibbonRxHttpClientSpec extends Specification {
         cleanup:
         messageServer?.stop()
         messageServer2?.stop()
+        context?.stop()
+        consulServer?.stop()
+    }
 
+    void "test that load balancer evicts non available server after interval"() {
+        given:"A discovery server, two micro services and a client"
+
+        // the discovery server
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
+
+        def serverConfig = [
+                'consul.host'              : consulServer.host,
+                'consul.port'              : consulServer.port,
+                'particle.application.name': 'messageService'
+        ]
+
+        // the two micro services
+        EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
+        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
+
+        // the client with a short refresh interval
+        ApplicationContext context = ApplicationContext.run([
+                'consul.host': consulServer.host,
+                'consul.port': consulServer.port,
+                'ribbon.ServerListRefreshInterval':1000 // ms
+        ])
+        MessageService messageClient = context.getBean(MessageService)
+
+        when:"The client is invoked"
+        def msg1 = messageClient.getMessage()
+        def msg2 = messageClient.getMessage()
+
+        then:"Different servers are hit"
+        msg1.startsWith("Server ")
+        msg2.startsWith("Server ")
+        msg1 != msg2
+
+        when:"One of the servers is taken down"
+        messageServer.stop()
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:"Eventually only one server is being used"
+        conditions.eventually {
+            messageClient.getMessage() == messageClient.getMessage()
+        }
+
+        cleanup:
+        messageServer?.stop()
+        messageServer2?.stop()
+        context?.stop()
+        consulServer?.stop()
     }
 
 
