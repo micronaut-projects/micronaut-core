@@ -121,6 +121,11 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
         }
     }
 
+    @Override
+    public String toString() {
+        return getId();
+    }
+
     /**
      * Creates an {@link InstanceInfo}
      *

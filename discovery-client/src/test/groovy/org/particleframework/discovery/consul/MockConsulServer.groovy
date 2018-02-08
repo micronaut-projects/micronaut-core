@@ -15,6 +15,7 @@
  */
 package org.particleframework.discovery.consul
 
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.async.publisher.Publishers
 import org.particleframework.discovery.consul.client.v1.CatalogEntry
 import org.particleframework.discovery.consul.client.v1.ConsulOperations
@@ -38,7 +39,9 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Controller("/v1")
 @Singleton
+@Requires(property = MockConsulServer.ENABLED)
 class MockConsulServer implements ConsulOperations {
+    public static final String ENABLED = 'enable.mock.consul'
 
     Map<String, ServiceEntry> services = new ConcurrentHashMap<>()
     final CatalogEntry nodeEntry

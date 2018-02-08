@@ -16,9 +16,11 @@
 package org.particleframework.http;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -49,6 +51,30 @@ public interface MutableHttpHeaders extends HttpHeaders {
         return allow(Arrays.asList(methods));
     }
 
+    /**
+     * Used to configure BASIC authentication.
+     *
+     * @param username The username
+     * @param password The password
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders auth(String username, String password) {
+        String token = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.ISO_8859_1));
+        add(HttpHeaders.AUTHORIZATION, token);
+        return this;
+    }
+
+    /**
+     * Used to configure BASIC authentication.
+     *
+     * @param userInfo The user info which is in the form "username:password"
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders auth(String userInfo) {
+        String token = "Basic " + Base64.getEncoder().encodeToString((userInfo).getBytes(StandardCharsets.ISO_8859_1));
+        add(HttpHeaders.AUTHORIZATION, token);
+        return this;
+    }
     /**
      * Set the allowed HTTP methods
      *

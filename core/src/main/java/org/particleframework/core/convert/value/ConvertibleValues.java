@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
  */
 public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Iterable<Map.Entry<String, V>> {
 
+    ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
+
     /**
      * @return The names of the values
      */
@@ -47,7 +49,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return Whether this values is empty
      */
     default boolean isEmpty() {
-        return this == ConvertibleValuesMap.EMPTY || getNames().isEmpty();
+        return this == ConvertibleValues.EMPTY || getNames().isEmpty();
     }
 
     /**
@@ -186,6 +188,6 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      */
     @SuppressWarnings("unchecked")
     static <V> ConvertibleValues<V> empty() {
-        return ConvertibleValuesMap.EMPTY;
+        return ConvertibleValues.EMPTY;
     }
 }

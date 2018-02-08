@@ -53,4 +53,12 @@ public class ApplicationInfo {
     public List<InstanceInfo> getInstances() {
         return instances;
     }
+
+    @Override
+    public String toString() {
+        return "ApplicationInfo{" +
+                "name='" + name + '\'' +
+                ", instances=" + instances +
+                '}';
+    }
 }

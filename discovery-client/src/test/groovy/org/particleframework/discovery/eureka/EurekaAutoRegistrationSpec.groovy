@@ -41,7 +41,7 @@ class EurekaAutoRegistrationSpec extends Specification{
         // run an application
         EmbeddedServer application = ApplicationContext.run(
                 EmbeddedServer,
-                ['consul.registration.enabled'              : false,
+                ['consul.client.registration.enabled'              : false,
                  'particle.application.name'                : serviceId] + eurekaConfiguration
         )
 

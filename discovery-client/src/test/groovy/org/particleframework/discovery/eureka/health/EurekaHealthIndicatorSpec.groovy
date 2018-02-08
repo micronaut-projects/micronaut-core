@@ -16,6 +16,7 @@
 package org.particleframework.discovery.eureka.health
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.discovery.eureka.MockEurekaServer
 import org.particleframework.health.HealthStatus
 import org.particleframework.management.endpoint.health.HealthResult
 import org.particleframework.runtime.server.EmbeddedServer
@@ -30,7 +31,8 @@ class EurekaHealthIndicatorSpec extends Specification {
     void "test eureka health indicator"() {
         given:
         EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
-                'jackson.serialization.WRAP_ROOT_VALUE': true
+                'jackson.serialization.WRAP_ROOT_VALUE': true,
+                (MockEurekaServer.ENABLED)             : true
         ])
 
         ApplicationContext applicationContext = ApplicationContext.run(

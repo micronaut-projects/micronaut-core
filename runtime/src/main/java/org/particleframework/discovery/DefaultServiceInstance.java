@@ -18,11 +18,11 @@ package org.particleframework.discovery;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.health.HealthStatus;
+import org.particleframework.http.HttpHeaders;
 
 import java.net.URI;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.net.URISyntaxException;
+import java.util.*;
 
 /**
  * @author Graeme Rocher
@@ -41,7 +41,21 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     DefaultServiceInstance(String id, URI uri) {
         this.id = id;
-        this.uri = uri;
+
+        String userInfo = uri.getUserInfo();
+        if(StringUtils.isNotEmpty(userInfo)) {
+            try {
+                this.uri = new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
+                this.metadata = ConvertibleValues.of(Collections.singletonMap(
+                        HttpHeaders.AUTHORIZATION_INFO, userInfo
+                ));
+            } catch (URISyntaxException e) {
+                throw new IllegalStateException("ServiceInstance URI is invalid: " + e.getMessage(), e);
+            }
+        }
+        else {
+            this.uri = uri;
+        }
     }
 
     @Override
@@ -134,7 +148,17 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
     @Override
     public Builder metadata(Map<String, String> metadata) {
         if(metadata != null) {
-            this.metadata = ConvertibleValues.of(metadata);
+            if(this.metadata == ConvertibleValues.EMPTY) {
+                this.metadata = ConvertibleValues.of(metadata);
+            }
+            else {
+                Map<String, String> newMetadata = new LinkedHashMap<>();
+                for (Map.Entry<String, String> entry : this.metadata) {
+                    newMetadata.put(entry.getKey(), entry.getValue());
+                }
+                newMetadata.putAll(metadata);
+                this.metadata = ConvertibleValues.of(newMetadata);
+            }
         }
         return this;
     }

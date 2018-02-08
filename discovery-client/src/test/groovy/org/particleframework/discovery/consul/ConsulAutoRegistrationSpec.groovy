@@ -45,7 +45,8 @@ class ConsulAutoRegistrationSpec extends Specification {
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
         DiscoveryClient discoveryClient = ApplicationContext.run(
                 DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'), "particle.caches.discoveryClient.enabled": false])
+                ['consul.client.host': System.getenv('CONSUL_HOST'),
+                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "particle.caches.discoveryClient.enabled": false])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -78,7 +79,8 @@ class ConsulAutoRegistrationSpec extends Specification {
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
         DiscoveryClient discoveryClient = ApplicationContext.run(
                 DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'), "particle.caches.discoveryClient.enabled": false])
+                ['consul.client.host': System.getenv('CONSUL_HOST'),
+                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "particle.caches.discoveryClient.enabled": false])
 
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
