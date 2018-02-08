@@ -15,6 +15,15 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.BeanResolutionContext;
+import org.particleframework.core.annotation.AnnotationMetadata;
+
+import java.lang.annotation.Annotation;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.stream.Stream;
+
 /**
  * Marks a bean definition that is delegating to another definition.
  *
@@ -27,4 +36,114 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
      * @return The target definition
      */
     BeanDefinition<T> getTarget();
+
+    @Override
+    default Optional<Class<? extends Annotation>> getScope() {
+        return getTarget().getScope();
+    }
+
+    @Override
+    default AnnotationMetadata getAnnotationMetadata() {
+        return getTarget().getAnnotationMetadata();
+    }
+
+    @Override
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
+        return getTarget().getRequiredMethod(name, argumentTypes);
+    }
+
+    @Override
+    default boolean isAbstract() {
+        return getTarget().isAbstract();
+    }
+
+    @Override
+    default boolean isSingleton() {
+        return getTarget().isSingleton();
+    }
+
+    @Override
+    default boolean isProvided() {
+        return getTarget().isProvided();
+    }
+
+    @Override
+    default boolean isIterable() {
+        return getTarget().isIterable();
+    }
+
+    @Override
+    default Class<T> getBeanType() {
+        return getTarget().getBeanType();
+    }
+
+    @Override
+    default ConstructorInjectionPoint<T> getConstructor() {
+        return getTarget().getConstructor();
+    }
+
+    @Override
+    default Collection<Class> getRequiredComponents() {
+        return getTarget().getRequiredComponents();
+    }
+
+    @Override
+    default Collection<MethodInjectionPoint> getInjectedMethods() {
+        return getTarget().getInjectedMethods();
+    }
+
+    @Override
+    default Collection<FieldInjectionPoint> getInjectedFields() {
+        return getTarget().getInjectedFields();
+    }
+
+    @Override
+    default Collection<MethodInjectionPoint> getPostConstructMethods() {
+        return getTarget().getPostConstructMethods();
+    }
+
+    @Override
+    default Collection<MethodInjectionPoint> getPreDestroyMethods() {
+        return getTarget().getPreDestroyMethods();
+    }
+
+    @Override
+    default String getName() {
+        return getTarget().getName();
+    }
+
+    @Override
+    default <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
+        return getTarget().findMethod(name, argumentTypes);
+    }
+
+    @Override
+    default <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
+        return getTarget().findPossibleMethods(name);
+    }
+
+    @Override
+    default T inject(BeanContext context, T bean) {
+        return getTarget().inject(context, bean);
+    }
+
+    @Override
+    default T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        return getTarget().inject(resolutionContext, context, bean);
+    }
+
+    @Override
+    default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+        return getTarget().getExecutableMethods();
+    }
+
+    @Override
+    default boolean isPrimary() {
+        return getTarget().isPrimary();
+    }
+
+    @Override
+    default boolean isEnabled(BeanContext context) {
+        return getTarget().isEnabled(context);
+    }
 }
