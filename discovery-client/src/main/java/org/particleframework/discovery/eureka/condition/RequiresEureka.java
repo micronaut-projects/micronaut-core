@@ -29,7 +29,6 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = EurekaConfiguration.HOST)
-@Requires(property = EurekaConfiguration.PORT)
+@Requires(property = EurekaConfiguration.PREFIX)
 public @interface RequiresEureka {
 }

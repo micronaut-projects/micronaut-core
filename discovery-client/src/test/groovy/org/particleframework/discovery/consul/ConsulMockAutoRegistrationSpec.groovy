@@ -46,15 +46,22 @@ import java.time.Duration
 class ConsulMockAutoRegistrationSpec extends Specification {
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
+
+    @AutoCleanup
+    @Shared
+    EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
+            'particle.server.port'                   : serverPort
+    ])
+
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ['particle.application.name'              : 'test-auto-reg',
-             'particle.server.port'                   : serverPort,
              "particle.caches.discoveryClient.enabled": false,
-             'consul.host'                            : 'localhost',
-             'consul.port'                            : serverPort]
+             'consul.client.host'                     : 'localhost',
+             'consul.client.port'                     : serverPort]
     )
+
     @Shared
     ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
     @Shared
@@ -90,8 +97,8 @@ class ConsulMockAutoRegistrationSpec extends Specification {
         when: "creating another server instance"
         def serviceName = 'another-server'
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
-                                                                               'consul.host'              : 'localhost',
-                                                                               'consul.port'              : serverPort])
+                                                                               'consul.client.host'       : 'localhost',
+                                                                               'consul.client.port'       : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -122,10 +129,10 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a service can be registered with tags"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
-                                                                               'consul.registration.tags' : ['foo', 'bar'],
-                                                                               'consul.host'              : 'localhost',
-                                                                               'consul.port'              : serverPort])
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'      : serviceName,
+                                                                               'consul.client.registration.tags': ['foo', 'bar'],
+                                                                               'consul.client.host'             : 'localhost',
+                                                                               'consul.client.port'             : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -143,11 +150,11 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a service can be registered with an HTTP health check"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'     : serviceName,
-                                                                               'consul.registration.check.http': true,
-                                                                               'consul.registration.tags'      : ['foo', 'bar'],
-                                                                               'consul.host'                   : 'localhost',
-                                                                               'consul.port'                   : serverPort])
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'            : serviceName,
+                                                                               'consul.client.registration.check.http': true,
+                                                                               'consul.client.registration.tags'      : ['foo', 'bar'],
+                                                                               'consul.client.host'                   : 'localhost',
+                                                                               'consul.client.port'                   : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
         String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
@@ -172,12 +179,12 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a service can be registered with an HTTP health check and deregisterCriticalServiceAfter"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'                               : serviceName,
-                                                                               'consul.registration.check.http'                          : true,
-                                                                               'consul.registration.check.deregisterCriticalServiceAfter': '90m',
-                                                                               'consul.registration.tags'                                : ['foo', 'bar'],
-                                                                               'consul.host'                                             : 'localhost',
-                                                                               'consul.port'                                             : serverPort])
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'                                      : serviceName,
+                                                                               'consul.client.registration.check.http'                          : true,
+                                                                               'consul.client.registration.check.deregisterCriticalServiceAfter': '90m',
+                                                                               'consul.client.registration.tags'                                : ['foo', 'bar'],
+                                                                               'consul.client.host'                                             : 'localhost',
+                                                                               'consul.client.port'                                             : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
         String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
@@ -202,12 +209,12 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a service can be registered with an HTTP health check and tlsSkipVerify"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'              : serviceName,
-                                                                               'consul.registration.check.http'         : true,
-                                                                               'consul.registration.check.tlsSkipVerify': true,
-                                                                               'consul.registration.tags'               : ['foo', 'bar'],
-                                                                               'consul.host'                            : 'localhost',
-                                                                               'consul.port'                            : serverPort])
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'                     : serviceName,
+                                                                               'consul.client.registration.check.http'         : true,
+                                                                               'consul.client.registration.check.tlsSkipVerify': true,
+                                                                               'consul.client.registration.tags'               : ['foo', 'bar'],
+                                                                               'consul.client.host'                            : 'localhost',
+                                                                               'consul.client.port'                            : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
         String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
@@ -232,12 +239,12 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a service can be registered with an HTTP health check and HTTP method"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'       : serviceName,
-                                                                               'consul.registration.check.http'  : true,
-                                                                               'consul.registration.check.method': 'POST',
-                                                                               'consul.registration.tags'        : ['foo', 'bar'],
-                                                                               'consul.host'                     : 'localhost',
-                                                                               'consul.port'                     : serverPort])
+        EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name'              : serviceName,
+                                                                               'consul.client.registration.check.http'  : true,
+                                                                               'consul.client.registration.check.method': 'POST',
+                                                                               'consul.client.registration.tags'        : ['foo', 'bar'],
+                                                                               'consul.client.host'                     : 'localhost',
+                                                                               'consul.client.port'                     : serverPort])
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
         String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
@@ -263,12 +270,11 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a asl token can be configured"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.aslToken': ['xxxxxxxxxxxx']])
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.client.aslToken': ['xxxxxxxxxxxx']])
 
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
-                                                                               'consul.aslToken'          : ['xxxxxxxxxxxx'],
-                                                                               'consul.host'              : 'localhost',
-                                                                               'consul.port'              : consulServer.getPort()])
+                                                                               'consul.client.aslToken'   : ['xxxxxxxxxxxx'],
+                                                                               'consul.client.port'       : consulServer.getPort()])
 
         ConsulClient consulClient = anotherServer.applicationContext.getBean(ConsulClient)
         PollingConditions conditions = new PollingConditions(timeout: 3)

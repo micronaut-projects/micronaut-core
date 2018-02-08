@@ -40,10 +40,10 @@ import spock.lang.Stepwise
 class ConsulClientSpec extends Specification {
 
     @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['consul.host': System.getenv('CONSUL_HOST'),
-            'consul.port': System.getenv('CONSUL_PORT'),
+            ['consul.client.host': System.getenv('CONSUL_HOST'),
+            'consul.client.port': System.getenv('CONSUL_PORT'),
              "particle.caches.discoveryClient.enabled": false,
-            'consul.readTimeout': '5s']
+            'consul.client.readTimeout': '5s']
     )
     @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
