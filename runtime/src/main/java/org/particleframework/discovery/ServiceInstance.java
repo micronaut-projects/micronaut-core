@@ -16,6 +16,7 @@
 package org.particleframework.discovery;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.health.HealthStatus;
 
 import java.net.URI;
@@ -83,7 +84,7 @@ public interface ServiceInstance {
      * @return The region
      */
     default Optional<String> getRegion() {
-        return getMetadata().get(ZONE, String.class);
+        return getMetadata().get(REGION, String.class);
     }
     /**
      * Returns the application group. For example, the AWS auto-scaling group
@@ -128,7 +129,22 @@ public interface ServiceInstance {
      * @return The relative URI
      */
     default URI resolve(URI relativeURI) {
-        return getURI().resolve(relativeURI);
+        URI thisUri = getURI();
+        // if the URI features credentials strip this out
+        if(StringUtils.isNotEmpty(thisUri.getUserInfo())) {
+            try {
+                thisUri = new URI(thisUri.getScheme(), null, thisUri.getHost(), thisUri.getPort(), thisUri.getPath(), thisUri.getQuery(), thisUri.getFragment());
+            } catch (URISyntaxException e) {
+                throw new IllegalStateException("ServiceInstance URI is invalid: " + e.getMessage(), e);
+            }
+        }
+        String rawQuery = thisUri.getRawQuery();
+        if(StringUtils.isNotEmpty(rawQuery)) {
+            return thisUri.resolve(relativeURI + "?" + rawQuery);
+        }
+        else {
+            return thisUri.resolve(relativeURI);
+        }
     }
 
     /**

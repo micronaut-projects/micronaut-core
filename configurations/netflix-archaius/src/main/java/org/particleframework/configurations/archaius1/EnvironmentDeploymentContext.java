@@ -15,6 +15,7 @@
  */
 package org.particleframework.configurations.archaius1;
 
+import com.netflix.config.ConfigurationBasedDeploymentContext;
 import com.netflix.config.ConfigurationManager;
 import com.netflix.config.DeploymentContext;
 import com.netflix.config.DynamicPropertyFactory;
@@ -29,7 +30,9 @@ import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -44,9 +47,7 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     private final Environment environment;
     private ServiceInstance instance;
-    private String deploymentStack;
-    private String region;
-    private String deployedAt;
+    private Map<ContextKey, String> customSettings = new ConcurrentHashMap<>();
 
     public EnvironmentDeploymentContext(EnvironmentConfiguration environment) {
         this.environment = environment.getEnvironment();
@@ -57,6 +58,9 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getDeploymentEnvironment() {
+        if(customSettings.containsKey(ContextKey.environment)) {
+            return customSettings.get(ContextKey.environment);
+        }
         Set<String> activeNames = environment.getActiveNames();
         if(!activeNames.isEmpty()) {
             return activeNames.iterator().next();
@@ -66,25 +70,31 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public void setDeploymentEnvironment(String env) {
-        // no-op
+        setContextValue(ContextKey.environment, env);
     }
 
     @Override
     public String getDeploymentDatacenter() {
-        if(deployedAt == null && instance != null) {
+        if(customSettings.containsKey(ContextKey.datacenter)) {
+            return customSettings.get(ContextKey.datacenter);
+        }
+        else if(instance != null) {
             return instance.getZone().orElse(null);
         }
-        return deployedAt;
+        return null;
     }
 
     @Override
     public void setDeploymentDatacenter(String deployedAt) {
-        this.deployedAt = deployedAt;
+        setContextValue(ContextKey.datacenter, deployedAt);
     }
 
     @Override
     public String getApplicationId() {
-        if(instance != null) {
+        if(customSettings.containsKey(ContextKey.appId)) {
+            return customSettings.get(ContextKey.appId);
+        }
+        else if(instance != null) {
             return instance.getId();
         }
         return Environment.DEFAULT_NAME;
@@ -92,17 +102,20 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public void setApplicationId(String appId) {
-
+        setContextValue(ContextKey.appId, appId);
     }
 
     @Override
     public void setDeploymentServerId(String serverId) {
-
+        setContextValue(ContextKey.serverId, serverId);
     }
 
     @Override
     public String getDeploymentServerId() {
-        if(instance != null) {
+        if(customSettings.containsKey(ContextKey.serverId)) {
+            return customSettings.get(ContextKey.serverId);
+        }
+        else if(instance != null) {
             return instance.getInstanceId().orElse(null);
         }
         return null;
@@ -110,14 +123,14 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public String getDeploymentStack() {
-        return deploymentStack;
+        return customSettings.get(ContextKey.stack);
     }
 
     @Override
     public String getValue(ContextKey key) {
         switch (key) {
             case appId: return getApplicationId();
-            case zone: return getDeploymentDatacenter();
+            case zone: return getZone();
             case environment: return getDeploymentEnvironment();
             case stack: return getDeploymentStack();
             case region: return getDeploymentRegion();
@@ -141,20 +154,33 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
 
     @Override
     public void setDeploymentStack(String stack) {
-        this.deploymentStack = stack;
+        setContextValue(ContextKey.stack, stack);
     }
 
     @Override
     public String getDeploymentRegion() {
-        if(region == null && instance != null) {
+        if(customSettings.containsKey(ContextKey.region)) {
+            return customSettings.get(ContextKey.region);
+        }
+        else if(instance != null) {
             return instance.getRegion().orElse(null);
         }
-        return region;
+        return null;
+    }
+
+    public String getZone() {
+        if(customSettings.containsKey(ContextKey.zone)) {
+            return customSettings.get(ContextKey.zone);
+        }
+        else if(instance != null) {
+            return instance.getZone().orElse(null);
+        }
+        return null;
     }
 
     @Override
     public void setDeploymentRegion(String region) {
-        this.region = region;
+        setContextValue(ContextKey.region, region);
     }
 
     @Override
@@ -172,7 +198,16 @@ public class EnvironmentDeploymentContext implements DeploymentContext, Applicat
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "instance", null);
         ReflectionUtils.setFieldIfPossible(DynamicPropertyFactory.class, "config", null);
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "configMBean", null);
-        ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "context", null);
+        ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "context", new ConfigurationBasedDeploymentContext());
         ReflectionUtils.setFieldIfPossible(ConfigurationManager.class, "customConfigurationInstalled", false);
+    }
+
+    private void setContextValue(ContextKey key, String env) {
+        if(env == null) {
+            customSettings.remove(key);
+        }
+        else {
+            customSettings.put(key, env);
+        }
     }
 }

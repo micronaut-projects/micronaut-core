@@ -16,6 +16,7 @@
 package org.particleframework.configurations.ribbon
 
 import com.netflix.client.config.CommonClientConfigKey
+import groovy.transform.NotYetImplemented
 import org.particleframework.context.ApplicationContext
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
@@ -34,6 +35,50 @@ import javax.inject.Inject
  * @since 1.0
  */
 class RibbonRxHttpClientSpec extends Specification {
+
+    @NotYetImplemented // Fails because of https://github.com/Netflix/ribbon/issues/361
+    void "test that clients can be configured to use a discovery server in a a particular zone"() {
+        given:"two discovery servers"
+        EmbeddedServer consul1 = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer consul2 = ApplicationContext.run(EmbeddedServer)
+
+        when:"applications are configured to only use discovery servers in a particular zone"
+        def consulConfig = [
+                'consul.zones.zone1': consul1.URI,
+                'consul.zones.zone2': consul2.URI
+
+        ]
+        // the server
+        def serverConfig = [
+                'particle.application.name': 'messageService'
+        ] + consulConfig
+
+        EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig + ['particle.application.instance.zone': 'zone1'])
+        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig + ['particle.application.instance.zone': 'zone2'])
+
+        // the client
+        ApplicationContext context = ApplicationContext.run([
+                'particle.application.instance.zone': 'zone2',
+                'ribbon.EnableZoneAffinity': true
+        ] + consulConfig)
+
+
+        MessageService messageClient = context.getBean(MessageService)
+
+        then:"The application only uses servers in zone 2 due to zone affinity"
+        messageClient.getMessage() == messageClient.getMessage()
+        messageClient.getMessage().contains(messageServer2.getPort().toString())
+
+        cleanup:
+        messageServer?.stop()
+        messageServer2?.stop()
+        context?.stop()
+        consul1?.stop()
+        consul2?.stop()
+
+
+    }
+
 
 
     void "test basic ribbon load balancing configuration"() {

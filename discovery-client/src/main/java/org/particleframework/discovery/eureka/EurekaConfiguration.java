@@ -20,14 +20,14 @@ import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
 import org.particleframework.discovery.DiscoveryConfiguration;
+import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.ServiceInstanceIdGenerator;
-import org.particleframework.discovery.eureka.client.v2.ConfigurableInstanceInfo;
-import org.particleframework.discovery.eureka.client.v2.DataCenterInfo;
-import org.particleframework.discovery.eureka.client.v2.InstanceInfo;
-import org.particleframework.discovery.eureka.client.v2.LeaseInfo;
+import org.particleframework.discovery.client.DiscoveryClientConfiguration;
+import org.particleframework.discovery.eureka.client.v2.*;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.http.client.HttpClientConfiguration;
 import org.particleframework.runtime.ApplicationConfiguration;
@@ -38,8 +38,13 @@ import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Configuration options for the Eureka client
@@ -48,15 +53,12 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties(EurekaConfiguration.PREFIX)
-public class EurekaConfiguration extends HttpClientConfiguration {
+public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     public static final String PREFIX = "eureka.client";
     public static final String HOST = PREFIX + ".host";
     public static final String PORT = PREFIX + ".port";
 
-    private String host = LOCALHOST;
-    private int port = 8761;
-    private boolean secure;
     private EurekaDiscoveryConfiguration discovery = new EurekaDiscoveryConfiguration();
     private EurekaRegistrationConfiguration registration;
 
@@ -65,25 +67,13 @@ public class EurekaConfiguration extends HttpClientConfiguration {
             Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
         this.registration = eurekaRegistrationConfiguration.orElse(null);
-    }
-
-    /**
-     * @return The Eureka instance host name. Defaults to 'localhost'.
-     **/
-    @Nonnull public String getHost() {
-        return host;
-    }
-
-    /**
-     * @return The default Eureka port
-     */
-    public int getPort() {
-        return port;
+        setPort(8761);
     }
 
     /**
      * @return The default discovery configuration
      */
+    @Override
     @Nonnull public EurekaDiscoveryConfiguration getDiscovery() {
         return discovery;
     }
@@ -91,19 +81,9 @@ public class EurekaConfiguration extends HttpClientConfiguration {
     /**
      * @return The default registration configuration
      */
+    @Override
     @Nullable public EurekaRegistrationConfiguration getRegistration() {
         return registration;
-    }
-
-    /**
-     * @return Is eureka exposed over HTTPS (defaults to false)
-     */
-    public boolean isSecure() {
-        return secure;
-    }
-
-    public void setSecure(boolean secure) {
-        this.secure = secure;
     }
 
     public void setDiscovery(EurekaDiscoveryConfiguration discovery) {
@@ -112,18 +92,13 @@ public class EurekaConfiguration extends HttpClientConfiguration {
         }
     }
 
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public void setHost(String host) {
-        if(StringUtils.isNotEmpty(host)) {
-            this.host = host;
-        }
-    }
-
     public boolean shouldLogAmazonMetadataErrors() {
         return true;
+    }
+
+    @Override
+    protected String getServiceID() {
+        return EurekaClient.SERVICE_ID;
     }
 
 

@@ -16,6 +16,7 @@
 package org.particleframework.discovery;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.health.HealthStatus;
 
 import java.net.URI;
@@ -141,5 +142,10 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
     @Override
     public ServiceInstance build() {
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return getURI().toString() + " (" + getId() +")";
     }
 }
