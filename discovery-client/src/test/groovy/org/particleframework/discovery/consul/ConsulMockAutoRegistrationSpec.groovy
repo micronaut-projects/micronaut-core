@@ -50,7 +50,8 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'particle.server.port'                   : serverPort
+            'particle.server.port'                   : serverPort,
+            (MockConsulServer.ENABLED):true
     ])
 
     @AutoCleanup
@@ -270,7 +271,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
     void "test that a asl token can be configured"() {
         when: "creating another server instance"
         def serviceName = 'another-server'
-        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.client.aslToken': ['xxxxxxxxxxxx']])
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, ['consul.client.aslToken': ['xxxxxxxxxxxx'],(MockConsulServer.ENABLED):true])
 
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['particle.application.name': serviceName,
                                                                                'consul.client.aslToken'   : ['xxxxxxxxxxxx'],

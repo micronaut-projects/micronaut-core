@@ -29,8 +29,6 @@ import java.util.stream.Collectors;
  */
 public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
-    static final ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
-
     protected final Map<? extends CharSequence, V> map;
     private final ConversionService<?> conversionService;
 

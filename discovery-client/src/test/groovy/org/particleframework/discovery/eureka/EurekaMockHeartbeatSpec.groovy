@@ -28,26 +28,27 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-class EurekaMockHeartbeatSpec extends Specification{
+class EurekaMockHeartbeatSpec extends Specification {
 
 
     void "test that the server reports a heartbeat to Eureka"() {
 
         given:
         EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
-                'jackson.serialization.WRAP_ROOT_VALUE': true
+                'jackson.serialization.WRAP_ROOT_VALUE': true,
+                (MockEurekaServer.ENABLED): true
         ])
 
         when: "An application is started and eureka configured"
-        String serviceId = 'myService'
+        String serviceId = 'heartbeatService'
         EmbeddedServer application = ApplicationContext.run(
                 EmbeddedServer,
-                ['consul.registration.enabled'              : false,
+                ['consul.client.registration.enabled'       : false,
                  'eureka.client.host'                       : eurekaServer.getHost(),
                  'eureka.client.port'                       : eurekaServer.getPort(),
                  'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                  'particle.application.name'                : serviceId,
-                 'particle.heartbeat.interval':'1s']
+                 'particle.heartbeat.interval'              : '1s']
         )
 
         DiscoveryClient discoveryClient = application.applicationContext.getBean(EurekaClient)

@@ -21,7 +21,9 @@ import org.particleframework.discovery.DiscoveryClient
 import org.particleframework.discovery.eureka.client.v2.EurekaClient
 import org.particleframework.discovery.eureka.client.v2.InstanceInfo
 import org.particleframework.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.Specification
+import spock.lang.Stepwise
 import spock.lang.Unroll
 import spock.util.concurrent.PollingConditions
 
@@ -31,6 +33,7 @@ import javax.validation.ConstraintViolationException
  * @author graemerocher
  * @since 1.0
  */
+@Stepwise
 class EurekaMockAutoRegistrationSpec extends Specification {
 
 
@@ -38,14 +41,16 @@ class EurekaMockAutoRegistrationSpec extends Specification {
 
         given:
         EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
-                'jackson.serialization.WRAP_ROOT_VALUE': true
+                'jackson.serialization.WRAP_ROOT_VALUE': true,
+                (MockEurekaServer.ENABLED): true
         ])
 
         when: "An application is started and eureka configured"
         String serviceId = 'myService'
         EmbeddedServer application = ApplicationContext.run(
                 EmbeddedServer,
-                ['consul.registration.enabled'              : false,
+                ['consul.client.registration.enabled'              : false,
+                 "particle.caches.discoveryClient.enabled": false,
                  'eureka.client.host'                       : eurekaServer.getHost(),
                  'eureka.client.port'                       : eurekaServer.getPort(),
                  'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
@@ -53,7 +58,7 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         )
 
         EurekaClient eurekaClient = application.applicationContext.getBean(EurekaClient)
-        PollingConditions conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
 
         then: "The application is registered"
         conditions.eventually {
@@ -93,7 +98,8 @@ class EurekaMockAutoRegistrationSpec extends Specification {
 
         given:
         EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
-                'jackson.serialization.WRAP_ROOT_VALUE': true
+                'jackson.serialization.WRAP_ROOT_VALUE': true,
+                (MockEurekaServer.ENABLED): true
         ])
 
         def map = ['consul.registration.enabled'              : false,
@@ -112,7 +118,7 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         )
 
         DiscoveryClient discoveryClient = application.applicationContext.getBean(EurekaClient)
-        PollingConditions conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
 
         expect: "The metadata is correct"
         conditions.eventually {

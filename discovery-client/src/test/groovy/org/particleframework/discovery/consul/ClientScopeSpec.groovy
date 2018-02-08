@@ -37,7 +37,7 @@ class ClientScopeSpec extends Specification {
     void "test that a client can be discovered using @Client scope"() {
         given:
         // a mock consul server
-        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer,[(MockConsulServer.ENABLED):true])
 
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
                 'consul.client.port': consulServer.port,

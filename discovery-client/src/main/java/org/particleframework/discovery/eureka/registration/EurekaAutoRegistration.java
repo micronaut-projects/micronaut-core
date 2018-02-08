@@ -69,8 +69,9 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
 
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
-        if( heartbeatConfiguration.isEnabled()) {
-            InstanceInfo instanceInfo = eurekaConfiguration.getRegistration().getInstanceInfo();
+        EurekaConfiguration.EurekaRegistrationConfiguration registration = eurekaConfiguration.getRegistration();
+        if( heartbeatConfiguration.isEnabled() && registration != null) {
+            InstanceInfo instanceInfo = registration.getInstanceInfo();
             if(status.equals(HealthStatus.UP)) {
                 eurekaClient.heartbeat(instanceInfo.getApp(), instanceInfo.getId()).subscribe(new Subscriber<HttpStatus>() {
                     @Override
@@ -147,27 +148,31 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void deregister(ServiceInstance instance) {
         EurekaConfiguration.EurekaRegistrationConfiguration registration = eurekaConfiguration.getRegistration();
-        InstanceInfo instanceInfo = registration.getInstanceInfo();
+        if(registration != null) {
+            InstanceInfo instanceInfo = registration.getInstanceInfo();
 
-        Publisher<HttpStatus> deregisterPublisher = eurekaClient.deregister(instanceInfo.getApp(), instanceInfo.getId());
-        performDeregistration(EUREKA_SERVICE_NAME, registration, deregisterPublisher, instanceInfo.getApp());
+            Publisher<HttpStatus> deregisterPublisher = eurekaClient.deregister(instanceInfo.getApp(), instanceInfo.getId());
+            performDeregistration(EUREKA_SERVICE_NAME, registration, deregisterPublisher, instanceInfo.getApp());
+        }
     }
 
     @Override
     protected void register(ServiceInstance instance) {
         EurekaConfiguration.EurekaRegistrationConfiguration registration = eurekaConfiguration.getRegistration();
-        InstanceInfo instanceInfo = registration.getInstanceInfo();
+        if(registration != null) {
+            InstanceInfo instanceInfo = registration.getInstanceInfo();
 
-        if(!registration.isExplicitInstanceId()) {
-            instanceInfo.setInstanceId(idGenerator.generateId(environment, instance));
+            if(!registration.isExplicitInstanceId()) {
+                instanceInfo.setInstanceId(idGenerator.generateId(environment, instance));
+            }
+
+            customizeInstanceInfo(instanceInfo);
+            validateApplicationName(instanceInfo.getApp());
+
+            Publisher<HttpStatus> registerPublisher = eurekaClient.register(instanceInfo.getApp(), instanceInfo);
+            Observable<HttpStatus> registerObservable = applyRetryPolicy(registration, registerPublisher);
+            performRegistration(EUREKA_SERVICE_NAME, registration, instanceInfo.getApp(), registerObservable);
         }
-
-        customizeInstanceInfo(instanceInfo);
-        validateApplicationName(instanceInfo.getApp());
-
-        Publisher<HttpStatus> registerPublisher = eurekaClient.register(instanceInfo.getApp(), instanceInfo);
-        Observable<HttpStatus> registerObservable = applyRetryPolicy(registration, registerPublisher);
-        performRegistration(EUREKA_SERVICE_NAME, registration, instanceInfo.getApp(), registerObservable);
     }
 
     /**

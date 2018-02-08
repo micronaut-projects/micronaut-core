@@ -15,6 +15,7 @@
  */
 package org.particleframework.discovery.eureka
 
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.async.publisher.Publishers
 import org.particleframework.discovery.eureka.client.v2.ApplicationInfo
 import org.particleframework.discovery.eureka.client.v2.EurekaOperations
@@ -38,9 +39,12 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Controller('/eureka')
 @Singleton
+@Requires(property = MockEurekaServer.ENABLED)
 class MockEurekaServer implements EurekaOperations{
     public static Map<String, Map<String, Boolean>> heartbeats = new ConcurrentHashMap<>()
     public static Map<String, Map<String, InstanceInfo>> instances = new ConcurrentHashMap<>()
+    public static final String ENABLED = 'enable.mock.eureka'
+
     @Override
     Publisher<HttpStatus> register(@NotBlank String appId, @Valid @NotNull @Body InstanceInfo instance) {
         instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>()})
@@ -50,8 +54,11 @@ class MockEurekaServer implements EurekaOperations{
 
     @Override
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId) {
-        instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>()})
-                 .remove(instanceId)
+        def instances = instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>() })
+        instances.remove(instanceId)
+        if(instances.isEmpty()) {
+            instances.remove(appId)
+        }
         return Publishers.just(HttpStatus.OK)
     }
 
@@ -74,7 +81,7 @@ class MockEurekaServer implements EurekaOperations{
 
     @Get('/apps')
     Publisher<MockApplicationInfos> getApplicationInfosInternal() {
-        return Publishers.just(new MockApplicationInfos(instances.collect { it ->
+        return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->
             new MockApplicationInfo(it.key, it.value.values() as List<InstanceInfo>)
         } as List<ApplicationInfo>))
     }
@@ -92,7 +99,7 @@ class MockEurekaServer implements EurekaOperations{
     @Get('/vips/{vipAddress}')
     Publisher<MockApplicationInfos> getApplicationVipsInternal(String vipAddress) {
         // this logic is wrong, i know.. we just test the call
-        return Publishers.just(new MockApplicationInfos(instances.collect { it ->
+        return Publishers.just(new MockApplicationInfos(instances.findAll { !it.value.isEmpty() }.collect { it ->
             new MockApplicationInfo(it.key, it.value.values() as List<InstanceInfo>)
         } as List<ApplicationInfo>))
     }

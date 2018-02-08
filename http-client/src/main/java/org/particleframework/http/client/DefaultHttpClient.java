@@ -458,8 +458,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     protected <I> Publisher<URI> resolveRequestURI(HttpRequest<I> request) {
-        return Publishers.map(loadBalancer.select(null), server ->
-                server.resolve(request.getUri())
+        return Publishers.map(loadBalancer.select(null), server -> {
+                    Optional<String> authInfo = server.getMetadata().get(org.particleframework.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                    if(authInfo.isPresent() && request instanceof MutableHttpRequest) {
+                        ((MutableHttpRequest)request).getHeaders().auth(authInfo.get());
+                    }
+                    return server.resolve(request.getUri());
+                }
+
         );
     }
 
@@ -696,7 +702,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         }
         return nettyRequest;
     }
-
 
 
     protected <I> void prepareHttpHeaders(URI requestURI, HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody) {
