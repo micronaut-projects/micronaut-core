@@ -38,8 +38,8 @@ class TtlHeartbeatSpec extends Specification {
         String serviceId = 'myService'
         EmbeddedServer application = ApplicationContext.run(
                 EmbeddedServer,
-                ['consul.host': consulServer.getHost(),
-                 'consul.port': consulServer.getPort(),
+                ['consul.client.host': consulServer.getHost(),
+                 'consul.client.port': consulServer.getPort(),
                  'particle.application.name': serviceId,
                  'particle.heartbeat.interval':'1s'] // short heart beat interval
         )

@@ -40,14 +40,12 @@ class ClientScopeSpec extends Specification {
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
 
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+                'consul.client.port': consulServer.port,
                 'particle.application.name': 'messageService'
         ])
 
         MessageService messageClient = ApplicationContext.run(MessageService, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port
+                'consul.client.port': consulServer.port
         ])
 
         expect:
@@ -62,28 +60,24 @@ class ClientScopeSpec extends Specification {
 
     }
 
-    @IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT') })
+    @IgnoreIf({ !System.getenv('CONSUL_PORT') })
     void "test that a client can be discovered using @Client scope with Consul "() {
         given:
         def consulServer = [
-                host:System.getenv('CONSUL_HOST'),
                 port:System.getenv('CONSUL_PORT')
         ]
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+                'consul.client.port': consulServer.port,
                 'particle.application.name': 'messageService'
         ])
 
         EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+                'consul.client.port': consulServer.port,
                 'particle.application.name': 'messageService'
         ])
 
         MessageService messageClient = ApplicationContext.run(MessageService, [
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port
+                'consul.client.port': consulServer.port
         ])
 
 

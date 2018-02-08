@@ -16,6 +16,7 @@
 package org.particleframework.discovery.consul.condition;
 
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.discovery.consul.ConsulConfiguration;
 
 import java.lang.annotation.*;
 
@@ -28,6 +29,6 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = "consul.host")
+@Requires(property = ConsulConfiguration.PREFIX)
 public @interface RequiresConsul {
 }

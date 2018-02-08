@@ -41,8 +41,10 @@ import java.util.Optional;
  * @since 1.0
  */
 @RequiresConsul
-@ConfigurationProperties(ConsulClient.SERVICE_ID)
+@ConfigurationProperties(ConsulConfiguration.PREFIX)
 public class ConsulConfiguration extends DiscoveryClientConfiguration {
+
+    public static final String PREFIX = "consul.client";
 
     private String aslToken;
 
