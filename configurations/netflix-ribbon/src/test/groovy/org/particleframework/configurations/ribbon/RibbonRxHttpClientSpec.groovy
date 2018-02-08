@@ -89,8 +89,8 @@ class RibbonRxHttpClientSpec extends Specification {
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
 
         def serverConfig = [
-                'consul.host'              : consulServer.host,
-                'consul.port'              : consulServer.port,
+                'consul.client.host'              : consulServer.host,
+                'consul.client.port'              : consulServer.port,
                 'particle.application.name': 'messageService'
         ]
 
@@ -100,8 +100,8 @@ class RibbonRxHttpClientSpec extends Specification {
 
         // the client
         ApplicationContext context = ApplicationContext.run([
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+                'consul.client.host': consulServer.host,
+                'consul.client.port': consulServer.port,
                 'ribbon.VipAddress': 'test',
                 'ribbon.clients.messageService.VipAddress': 'bar'
         ])
@@ -131,8 +131,8 @@ class RibbonRxHttpClientSpec extends Specification {
         EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
 
         def serverConfig = [
-                'consul.host'              : consulServer.host,
-                'consul.port'              : consulServer.port,
+                'consul.client.host'              : consulServer.host,
+                'consul.client.port'              : consulServer.port,
                 'particle.application.name': 'messageService'
         ]
 
@@ -142,8 +142,8 @@ class RibbonRxHttpClientSpec extends Specification {
 
         // the client with a short refresh interval
         ApplicationContext context = ApplicationContext.run([
-                'consul.host': consulServer.host,
-                'consul.port': consulServer.port,
+                'consul.client.host': consulServer.host,
+                'consul.client.port': consulServer.port,
                 'ribbon.ServerListRefreshInterval':1000 // ms
         ])
         MessageService messageClient = context.getBean(MessageService)
