@@ -82,12 +82,8 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         }
         String reference = serviceReferences[0];
 
-        if(serviceInstanceLists.containsKey(reference)) {
-            ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(reference);
-            LoadBalancer loadBalancer = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList);
-            return Optional.ofNullable(loadBalancer);
-        }
-        else if(reference.startsWith("/")) {
+
+        if(reference.startsWith("/")) {
             // current server reference
             if(embeddedServer.isPresent()) {
                 URL url = embeddedServer.get().getURL();
@@ -105,25 +101,21 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 return Optional.empty();
             }
         }
-        else if(serviceReferences.length == 1){
-            // if we've arrived here we have a reference to a service that requires service discovery
-            // since this is only done at startup it is ok to block
-            LoadBalancer loadBalancer = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceReferences[0]);
-            return Optional.of(loadBalancer);
+        else {
+            return resolveLoadBalancerForServiceID(reference);
         }
-        return Optional.empty();
     }
 
-
-    /**
-     * Creates the default {@link LoadBalancer} implementation. Subclasses can override to provide custom load balancing strategies
-     *
-     *
-     * @param serviceId The service ID
-     * @return The {@link LoadBalancer}
-     */
-    protected LoadBalancer createServiceInstanceLoadBalancer(String serviceId) {
-        return beanContext.createBean(LoadBalancer.class, serviceId);
+    protected Optional<? extends LoadBalancer> resolveLoadBalancerForServiceID(String serviceID) {
+        if(serviceInstanceLists.containsKey(serviceID)) {
+            ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
+            LoadBalancer loadBalancer = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList);
+            return Optional.ofNullable(loadBalancer);
+        }
+        else {
+            LoadBalancer loadBalancer = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceID);
+            return Optional.of(loadBalancer);
+        }
     }
 
 }

@@ -89,6 +89,7 @@ public class ConsulServiceInstance implements ServiceInstance {
         return uri;
     }
 
+
     @Override
     public ConvertibleValues<String> getMetadata() {
         ConvertibleValues<String> metadata = this.metadata;

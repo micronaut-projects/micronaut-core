@@ -17,6 +17,7 @@ package org.particleframework.discovery.consul;
 
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.ServiceInstanceList;
+import org.particleframework.discovery.client.DiscoveryServerInstanceList;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.consul.condition.RequiresConsul;
 
@@ -36,26 +37,14 @@ import java.util.List;
  */
 @Singleton
 @RequiresConsul
-public class ConsulServiceInstanceList implements ServiceInstanceList {
-
-    private final ConsulConfiguration configuration;
+public class ConsulServiceInstanceList extends DiscoveryServerInstanceList {
 
     public ConsulServiceInstanceList(ConsulConfiguration configuration) {
-        this.configuration = configuration;
-
+        super(configuration);
     }
 
     @Override
     public String getID() {
         return ConsulClient.SERVICE_ID;
     }
-
-    @Override
-    public List<ServiceInstance> getInstances() {
-        String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
-        return Collections.singletonList(
-                ServiceInstance.builder(ConsulClient.SERVICE_ID, URI.create(spec)).build()
-        );
-    }
-
 }

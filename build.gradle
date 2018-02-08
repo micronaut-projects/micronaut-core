@@ -106,6 +106,7 @@ subprojects { subproject ->
         testCompile "org.objenesis:objenesis:1.4"
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
+        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly 'org.ow2.asm:asm:5.2'
         compileOnly 'org.ow2.asm:asm-commons:5.2'
 

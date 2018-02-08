@@ -16,6 +16,8 @@
 package org.particleframework.discovery.eureka
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.discovery.ServiceInstance
+import org.particleframework.discovery.eureka.client.v2.EurekaClient
 import org.particleframework.runtime.ApplicationConfiguration
 import spock.lang.Specification
 
@@ -24,20 +26,58 @@ import spock.lang.Specification
  * @since 1.0
  */
 class EurekaClientConfigSpec extends Specification {
+    void 'test configure default zone'() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'eureka.client.defaultZone': value
+        )
+        EurekaConfiguration config = applicationContext.getBean(EurekaConfiguration)
+        List<ServiceInstance> serviceInstances = config.allZones
+
+        expect:
+        serviceInstances == result
+
+        where:
+        value                           | result
+        'localhost:8087'                | [newServiceInstance("http://$value")]
+        'localhost:8087,localhost:8088' | [newServiceInstance("http://localhost:8087"), newServiceInstance("http://localhost:8088")]
+    }
+
+    void 'test configure other zones'() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'eureka.client.zones.test': value
+        )
+        EurekaConfiguration config = applicationContext.getBean(EurekaConfiguration)
+        List<ServiceInstance> serviceInstances = config.allZones
+
+        expect:
+        serviceInstances == result
+        serviceInstances.every() { it.zone.isPresent() && it.zone.get() == 'test'}
+
+        where:
+        value                           | result
+        'localhost:8087'                | [newServiceInstance("http://$value")]
+        'localhost:8087,localhost:8088' | [newServiceInstance("http://localhost:8087"), newServiceInstance("http://localhost:8088")]
+    }
+
+    private ServiceInstance newServiceInstance(String url) {
+        ServiceInstance.builder(EurekaClient.SERVICE_ID, new URI(url)).build()
+    }
 
     void "test configure registration client"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'eureka.client.registration.enabled':false,
-                'eureka.client.discovery.enabled':false,
-                (ApplicationConfiguration.APPLICATION_NAME):'foo',
-                (ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID):'foo-1',
-                'eureka.client.registration.asgName':'myAsg',
-                'eureka.client.registration.countryId':'10',
-                'eureka.client.registration.ipAddr':'10.10.10.10',
-                'eureka.client.registration.vipAddress':'something',
-                'eureka.client.registration.leaseInfo.durationInSecs':'60',
-                'eureka.client.registration.metadata.foo':'bar'
+                'eureka.client.registration.enabled': false,
+                'eureka.client.discovery.enabled': false,
+                (ApplicationConfiguration.APPLICATION_NAME): 'foo',
+                (ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID): 'foo-1',
+                'eureka.client.registration.asgName': 'myAsg',
+                'eureka.client.registration.countryId': '10',
+                'eureka.client.registration.ipAddr': '10.10.10.10',
+                'eureka.client.registration.vipAddress': 'something',
+                'eureka.client.registration.leaseInfo.durationInSecs': '60',
+                'eureka.client.registration.metadata.foo': 'bar'
         )
         EurekaConfiguration config = applicationContext.getBean(EurekaConfiguration)
 
@@ -52,6 +92,6 @@ class EurekaClientConfigSpec extends Specification {
         config.registration.instanceInfo.countryId == 10
         config.registration.instanceInfo.vipAddress == 'something'
         config.registration.instanceInfo.leaseInfo.durationInSecs == 60
-        config.registration.instanceInfo.metadata == [foo:'bar']
+        config.registration.instanceInfo.metadata == [foo: 'bar']
     }
 }

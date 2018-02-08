@@ -18,6 +18,7 @@ package org.particleframework.discovery.consul;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.util.Toggleable;
 import org.particleframework.discovery.DiscoveryConfiguration;
+import org.particleframework.discovery.client.DiscoveryClientConfiguration;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.discovery.consul.condition.RequiresConsul;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
@@ -41,26 +42,22 @@ import java.util.Optional;
  */
 @RequiresConsul
 @ConfigurationProperties(ConsulClient.SERVICE_ID)
-public class ConsulConfiguration extends HttpClientConfiguration {
-
-    private String host = LOCALHOST;
-
-    private int port = 8500;
+public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     private String aslToken;
-
-    private boolean secure;
 
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
 
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
 
     public ConsulConfiguration() {
+        setPort(8500);
     }
 
     @Inject
     public ConsulConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+        setPort(8500);
     }
 
     /**
@@ -71,22 +68,9 @@ public class ConsulConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * @return The agent host name. Defaults to 'localhost'.
-     **/
-    public String getHost() {
-        return host;
-    }
-
-    /**
-     * @return The agent port. Defaults to 'localhost'.
-     **/
-    public int getPort() {
-        return port;
-    }
-
-    /**
      * @return The registration configuration
      */
+    @Override
     public ConsulRegistrationConfiguration getRegistration() {
         return registration;
     }
@@ -94,19 +78,9 @@ public class ConsulConfiguration extends HttpClientConfiguration {
     /**
      * @return The discovery configuration
      */
+    @Override
     public ConsulDiscoveryConfiguration getDiscovery() {
         return discovery;
-    }
-
-    /**
-     * @return Is Consul exposed over HTTPS (defaults to false)
-     */
-    public boolean isSecure() {
-        return secure;
-    }
-
-    public void setSecure(boolean secure) {
-        this.secure = secure;
     }
 
     public void setDiscovery(ConsulDiscoveryConfiguration discovery) {
@@ -117,12 +91,9 @@ public class ConsulConfiguration extends HttpClientConfiguration {
         this.aslToken = aslToken;
     }
 
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
+    @Override
+    protected String getServiceID() {
+        return ConsulClient.SERVICE_ID;
     }
 
     public void setRegistration(ConsulRegistrationConfiguration registration) {
@@ -339,11 +310,9 @@ public class ConsulConfiguration extends HttpClientConfiguration {
     @Override
     public String toString() {
         return "ConsulConfiguration{" +
-                "host='" + host + '\'' +
-                ", port=" + port +
-                ", aslToken='" + aslToken + '\'' +
+                "aslToken='" + aslToken + '\'' +
                 ", registration=" + registration +
                 ", discovery=" + discovery +
-                '}';
+                "} " + super.toString();
     }
 }

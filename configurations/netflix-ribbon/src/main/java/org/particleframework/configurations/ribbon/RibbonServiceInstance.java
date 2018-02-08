@@ -19,6 +19,7 @@ import com.netflix.loadbalancer.LoadBalancerContext;
 import com.netflix.loadbalancer.Server;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.health.HealthStatus;
 
 import java.net.URI;
 import java.util.Optional;
@@ -47,6 +48,16 @@ public class RibbonServiceInstance implements ServiceInstance {
     @Override
     public String getId() {
         return server.getMetaInfo().getServiceIdForDiscovery();
+    }
+
+    @Override
+    public HealthStatus getHealthStatus() {
+        return server.isAlive() ? HealthStatus.UP : HealthStatus.DOWN;
+    }
+
+    @Override
+    public Optional<String> getInstanceId() {
+        return Optional.ofNullable(server.getMetaInfo().getInstanceId());
     }
 
     @Override

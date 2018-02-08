@@ -122,6 +122,17 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
 
+        // Object -> List
+        addConverter(Object.class, List.class, (object, targetType, context) -> {
+            Optional<Argument<?>> firstTypeVariable = context.getFirstTypeVariable();
+            Argument<?> argument = firstTypeVariable.orElse(Argument.OBJECT_ARGUMENT);
+            Optional converted = DefaultConversionService.this.convert(object, context.with(argument));
+            if(converted.isPresent()) {
+                return Optional.of(Collections.singletonList(converted.get()));
+            }
+            return Optional.empty();
+        });
+
         // String -> Class
         addConverter(CharSequence.class, Class.class, (object, targetType, context) -> {
             ClassLoader classLoader = targetType.getClassLoader();
@@ -130,6 +141,16 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             return ClassUtils.forName(object.toString(), classLoader);
         });
+
+        // URI -> URL
+        addConverter(URI.class, URL.class, uri -> {
+            try {
+                return uri.toURL();
+            } catch (MalformedURLException e) {
+                return null;
+            }
+        });
+
 
         // InputStream -> String
         addConverter(InputStream.class, String.class, (object, targetType, context) -> {
@@ -292,7 +313,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> URL
         addConverter(CharSequence.class, URL.class, (CharSequence object, Class<URL> targetType, ConversionContext context) -> {
             try {
-                return Optional.of(new URL(object.toString()));
+                String spec = object.toString();
+                if(!spec.contains("://")) {
+                    spec = "http://" + spec;
+                }
+                return Optional.of(new URL(spec));
             } catch (MalformedURLException e) {
                 context.reject(object, e);
                 return Optional.empty();
