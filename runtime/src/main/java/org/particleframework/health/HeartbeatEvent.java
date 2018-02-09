@@ -29,14 +29,12 @@ import java.util.Optional;
  * @since 1.0
  */
 public class HeartbeatEvent extends AbstractServiceInstanceEvent {
-    /**
-     * Constructs a prototypical Event.
-     *
-     * @param source The object on which the Event initially occurred.
-     * @throws IllegalArgumentException if source is null.
-     */
-    public HeartbeatEvent(ServiceInstance source) {
+
+    private final HealthStatus status;
+
+    public HeartbeatEvent(ServiceInstance source, HealthStatus status) {
         super(source);
+        this.status = status;
     }
 
     /**
@@ -45,6 +43,6 @@ public class HeartbeatEvent extends AbstractServiceInstanceEvent {
      * @return The current health status
      */
     public HealthStatus getStatus() {
-        return HealthStatus.UP; // TODO return calculated status
+        return status;
     }
 }
