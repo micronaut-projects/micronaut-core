@@ -3,6 +3,7 @@ package org.particleframework.inject;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.BeanResolutionContext;
 import org.particleframework.context.annotation.EachProperty;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadataDelegate;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.ReflectionUtils;
@@ -103,20 +104,6 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes);
 
     /**
-     * Finds a single {@link ExecutableMethod} for the given name and argument types
-     *
-     * @param name          The method name
-     * @param argumentTypes The argument types
-     * @return An optional {@link ExecutableMethod}
-     * @throws IllegalStateException If the method cannot be found
-     */
-    @SuppressWarnings("unchecked")
-    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
-        return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
-                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
-    }
-
-    /**
      * Finds possible methods for the given method name
      *
      * @param name The method name
@@ -147,6 +134,21 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The {@link ExecutableMethod} instances for this definition
      */
     Collection<ExecutableMethod<T,?>> getExecutableMethods();
+
+
+    /**
+     * Finds a single {@link ExecutableMethod} for the given name and argument types
+     *
+     * @param name          The method name
+     * @param argumentTypes The argument types
+     * @return An optional {@link ExecutableMethod}
+     * @throws IllegalStateException If the method cannot be found
+     */
+    @SuppressWarnings("unchecked")
+    default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class... argumentTypes) {
+        return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
+                .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
+    }
 
     /**
      * @return Whether the bean definition is abstract

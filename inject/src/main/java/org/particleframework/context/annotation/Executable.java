@@ -38,4 +38,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 public @interface Executable {
+
+    /**
+     * Whether the {@link ExecutableMethod} should be processed at startup by the registered {@link org.particleframework.context.processor.ExecutableMethodProcessor}
+     * instances. The default is false to ensure fast startup, but for certain types of components pre-processing at startup is required ( for example scheduled tasks )
+     *
+     * @return Whether to process the {@link ExecutableMethod} at startup
+     */
+    boolean preprocess() default false;
 }

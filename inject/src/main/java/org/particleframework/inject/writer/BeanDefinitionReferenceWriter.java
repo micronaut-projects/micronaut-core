@@ -34,6 +34,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private String replaceBeanName;
     private boolean contextScope = false;
     private String replaceBeanDefinitionName;
+    private boolean requiresMethodProcessing;
 
     public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
         super(beanDefinitionName  + REF_SUFFIX, annotationMetadata);
@@ -89,6 +90,14 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         this.replaceBeanDefinitionName = replaceBeanName;
     }
 
+    /**
+     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true
+     *
+     * @param shouldPreProcess True if they should be pre-processed
+     */
+    public void setRequiresMethodProcessing(boolean shouldPreProcess) {
+        this.requiresMethodProcessing = shouldPreProcess;
+    }
     /**
      * Obtains the class name of the bean definition to be written. Java Annotation Processors need
      * this information to create a JavaFileObject using a Filer.
@@ -151,6 +160,16 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             isContextScopeMethod.visitMaxs(1, 1);
 
         }
+
+        //noinspection Duplicates
+        if(requiresMethodProcessing) {
+            GeneratorAdapter requiresMethodProcessing = startPublicMethod(classWriter, "requiresMethodProcessing", boolean.class.getName());
+            requiresMethodProcessing.push(true);
+            requiresMethodProcessing.visitInsn(IRETURN);
+            requiresMethodProcessing.visitMaxs(1,1);
+            requiresMethodProcessing.visitEnd();
+        }
+
         writeGetAnnotationMetadataMethod(classWriter);
 
         // start method: getReplacesBeanTypeName()

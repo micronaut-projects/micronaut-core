@@ -55,7 +55,7 @@ public interface ExecutableMethodProcessor<A extends Annotation> extends Annotat
     /**
      * The process method will be called for every {@link ExecutableMethod} that is annotated with the type parameter A
      *
-     * @param beanDefinition
+     * @param beanDefinition The bean definition to process
      * @param method The executable method
      */
     @Override

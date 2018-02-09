@@ -147,6 +147,15 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      * Create a simple {@link ConversionContext} for the given generic type variables
      *
      * @param argument The argument
+     * @return The conversion context
+     */
+    static <T> ArgumentConversionContext<T> of(Class<T> argument) {
+        return of(Argument.of(argument), null,null);
+    }
+    /**
+     * Create a simple {@link ConversionContext} for the given generic type variables
+     *
+     * @param argument The argument
      * @param locale The locale
      * @return The conversion context
      */
@@ -164,7 +173,7 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      */
     static <T> ArgumentConversionContext<T> of(Argument<T> argument, @Nullable Locale locale, @Nullable Charset charset) {
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
-        Locale finalLocale = locale != null ? locale : Locale.ENGLISH;
+        Locale finalLocale = locale != null ? locale : Locale.getDefault();
         return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);
     }
 

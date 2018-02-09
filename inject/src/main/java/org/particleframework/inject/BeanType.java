@@ -15,6 +15,8 @@
  */
 package org.particleframework.inject;
 
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 
 /**
@@ -41,4 +43,14 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
         return getBeanType().getName();
     }
 
+    /**
+     * By default, when the {@link BeanContext} is started, the {@link BeanDefinition#getExecutableMethods()} are not processed by registered {@link org.particleframework.context.processor.ExecutableMethodProcessor}
+     * instances unless this method returns true.
+     *
+     * @see Executable#preprocess()
+     * @return Whether the bean definition requires method processing
+     */
+    default boolean requiresMethodProcessing() {
+        return false;
+    }
 }

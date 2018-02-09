@@ -16,6 +16,8 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.Type;
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.BeanDefinition;
 
@@ -341,4 +343,21 @@ public interface BeanDefinitionVisitor {
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderEnd();
+
+    /**
+     * By default, when the {@link BeanContext} is started, the {@link BeanDefinition#getExecutableMethods()} are not processed by registered {@link org.particleframework.context.processor.ExecutableMethodProcessor}
+     * instances unless this method returns true.
+     *
+     * @see Executable#preprocess()
+     * @return Whether the bean definition requires method processing
+     */
+    default boolean requiresMethodProcessing() {
+        return false;
+    }
+    /**
+     * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true
+     *
+     * @param shouldPreProcess True if they should be pre-processed
+     */
+    void setRequiresMethodProcessing(boolean shouldPreProcess);
 }

@@ -52,9 +52,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
-        if (object == null) {
+        if (object == null || targetType == null || context == null) {
             return Optional.empty();
         }
         if(targetType == Object.class) {

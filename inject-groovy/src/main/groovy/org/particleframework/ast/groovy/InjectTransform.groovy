@@ -99,6 +99,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             try {
                 String beanDefinitionName = beanDefWriter.beanDefinitionName
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, beanDefWriter.annotationMetadata)
+
+                beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing());
                 beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(beanClassNode, Context))
 
                 Optional<String> replacesOpt = AstAnnotationUtils
@@ -320,6 +322,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
+            BeanDefinitionVisitor currentBeanWriter = getBeanWriter()
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
                 methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
@@ -467,7 +470,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         if (methodAnnotationMetadata.hasStereotype(PostConstruct.name)) {
-                            getBeanWriter().visitPostConstructMethod(
+                            currentBeanWriter.visitPostConstructMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -476,7 +479,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     qualifierTypes,
                                     genericTypeMap)
                         } else if (methodAnnotationMetadata.hasStereotype(PreDestroy.name)) {
-                            getBeanWriter().visitPreDestroyMethod(
+                            currentBeanWriter.visitPreDestroyMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -485,7 +488,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     qualifierTypes,
                                     genericTypeMap)
                         } else {
-                            getBeanWriter().visitMethodInjectionPoint(
+                            currentBeanWriter.visitMethodInjectionPoint(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -513,7 +516,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
-                        ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
+                        boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "preprocess", Boolean.class).orElse(false);
+                        if(preprocess) {
+                            currentBeanWriter.setRequiresMethodProcessing(true)
+                        }
+                        ExecutableMethodWriter executableMethodWriter = currentBeanWriter.visitExecutableMethod(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
@@ -555,7 +562,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Parameter parameter = methodNode.parameters[0]
 
-                        getBeanWriter().visitSetterValue(
+                        currentBeanWriter.visitSetterValue(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 resolveQualifier(parameter),
                                 false,

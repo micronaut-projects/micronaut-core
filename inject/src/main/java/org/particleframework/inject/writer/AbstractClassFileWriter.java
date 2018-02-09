@@ -35,6 +35,19 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
 
+    protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
+
+    static {
+        NAME_TO_TYPE_MAP.put("void", "V");
+        NAME_TO_TYPE_MAP.put("boolean", "Z");
+        NAME_TO_TYPE_MAP.put("char", "C");
+        NAME_TO_TYPE_MAP.put("int", "I");
+        NAME_TO_TYPE_MAP.put("byte", "B");
+        NAME_TO_TYPE_MAP.put("long", "J");
+        NAME_TO_TYPE_MAP.put("double", "D");
+        NAME_TO_TYPE_MAP.put("float", "F");
+    }
+
     protected static Type getTypeReference(String className, String... genericTypes) {
         String referenceString = getTypeDescriptor(className, genericTypes);
         return Type.getType(referenceString);
@@ -284,6 +297,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
     }
     protected static String getTypeDescriptor(String className, String... genericTypes) {
+        if(NAME_TO_TYPE_MAP.containsKey(className)) {
+            return NAME_TO_TYPE_MAP.get(className);
+        }
         if("void".equals(className)) {
             return "V";
         }
@@ -520,60 +536,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                         getMethodDescriptor(returnType, argumentTypes));
     }
 
-    protected GeneratorAdapter writeGetAnnotatedElementsMethod(
-            ClassVisitor classWriter,
-            Type superType,
-            List<? extends TypeAnnotationSource> annotationSourceList) {
-        // override the getAnnotatedElements() method
-        Method annotationElementsMethod =
-                Method.getMethod("java.lang.reflect.AnnotatedElement[] getAnnotatedElements()");
-        String annotationElementsMethodName = annotationElementsMethod.getName();
-        String annotationElementsMethodDescriptor = annotationElementsMethod.getDescriptor();
-        GeneratorAdapter generator = new GeneratorAdapter(
-                classWriter.visitMethod(ACC_PUBLIC, annotationElementsMethodName, annotationElementsMethodDescriptor, null, null),
-                ACC_PUBLIC,
-                annotationElementsMethodName,
-                annotationElementsMethodDescriptor
-
-        );
-        generator.loadThis(); // load this
-        // 1st arg: call super.getAnnotatedElements()
-        generator.loadThis();
-        generator.visitMethodInsn(
-                INVOKESPECIAL,
-                superType.getInternalName(),
-                annotationElementsMethodName,
-                annotationElementsMethodDescriptor,
-                false
-        );
-
-        // 2nd arg: the additional elements
-        int len = annotationSourceList.size();
-        AbstractClassFileWriter.pushNewArray(generator, AnnotatedElement.class, len); // arg 2: the additional elements
-        for (int i = 0; i < len; i++) {
-
-            generator.push(i);
-            TypeAnnotationSource typeAnnotationSource = annotationSourceList.get(i);
-            if(typeAnnotationSource instanceof MethodAnnotationSource) {
-                MethodAnnotationSource methodAnnotationSource = (MethodAnnotationSource) typeAnnotationSource;
-                BeanDefinitionWriter.pushGetMethodFromTypeCall(generator, getTypeReference(methodAnnotationSource.declaringType), methodAnnotationSource.methodName, methodAnnotationSource.parameters.values());
-            }
-            else {
-                generator.push(getTypeReference(typeAnnotationSource.declaringType));
-            }
-            generator.arrayStore(Type.getType(AnnotatedElement.class));
-            if(i != len - 1) {
-                generator.dup();
-            }
-        }
-
-        // invoke: ArrayUtils.concat(a1, a2)
-        java.lang.reflect.Method javaMethod = ReflectionUtils.getRequiredMethod(ArrayUtils.class, "concat", Object[].class, Object[].class);
-        Method concatMethod = Method.getMethod(javaMethod);
-        generator.invokeStatic(Type.getType(ArrayUtils.class), concatMethod);
-        generator.returnValue();
-        return generator;
-    }
 
     /**
      * Write the class to the target directory

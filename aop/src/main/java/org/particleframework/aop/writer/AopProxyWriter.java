@@ -926,6 +926,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void setRequiresMethodProcessing(boolean shouldPreProcess) {
+        proxyBeanDefinitionWriter.setRequiresMethodProcessing(shouldPreProcess);
+    }
+
+    @Override
+    public boolean requiresMethodProcessing() {
+        return proxyBeanDefinitionWriter.requiresMethodProcessing();
+    }
+
+    @Override
     public String getProxiedTypeName() {
         return targetClassFullName;
     }
