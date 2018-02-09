@@ -1466,6 +1466,7 @@ public class DefaultBeanContext implements BeanContext {
         return (Collection) beanCandidateCache.get(beanType, aClass -> (Collection)findBeanCandidates(beanType, null));
     }
 
+    @SuppressWarnings("unchecked")
     private <T> Collection<T> getBeansOfTypeInternal(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
@@ -1519,8 +1520,8 @@ public class DefaultBeanContext implements BeanContext {
                             beansOfTypeList.add((T) instance);
                             processedDefinitions.add(reg.beanDefinition);
                         } else {
-                            Qualifier registeredQualifer = entry.getKey().qualifier;
-                            if (registeredQualifer == null) {
+                            Qualifier registeredQualifier = entry.getKey().qualifier;
+                            if (registeredQualifier == null) {
                                 Optional result = qualifier.reduce(beanType, Stream.of(reg.beanDefinition)).findFirst();
                                 if (result.isPresent()) {
                                     if (LOG.isTraceEnabled()) {
@@ -1530,7 +1531,7 @@ public class DefaultBeanContext implements BeanContext {
                                     beansOfTypeList.add((T) instance);
                                     processedDefinitions.add(reg.beanDefinition);
                                 }
-                            } else if (registeredQualifer != null && qualifier.equals(registeredQualifer)) {
+                            } else if (qualifier.equals(registeredQualifier)) {
                                 if (LOG.isTraceEnabled()) {
                                     LOG.trace("Found existing bean for type {} {}: {} ", qualifier, beanType.getName(), instance);
                                 }
@@ -1573,7 +1574,10 @@ public class DefaultBeanContext implements BeanContext {
                 int candidateCount = candidates.size();
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream)
-                                      .filter(c -> !processedDefinitions.contains(c));
+                                      .filter(c -> {
+
+                                          return !processedDefinitions.contains(c);
+                                      });
 
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
                 for (BeanDefinition<T> candidate : candidateList) {

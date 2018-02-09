@@ -188,16 +188,17 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-
         BeanDefinitionDelegate<?> that = (BeanDefinitionDelegate<?>) o;
-
-        return definition.equals(that.definition);
+        return Objects.equals(definition, that.definition) &&
+                Objects.equals(resolveName().orElse(null), that.resolveName().orElse(null));
     }
 
     @Override
     public int hashCode() {
-        return definition.hashCode();
+        return Objects.hash(definition, resolveName().orElse(null));
     }
+
+
 
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
         if(definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
