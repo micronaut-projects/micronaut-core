@@ -21,7 +21,7 @@ import org.particleframework.context.annotation.Value
 import org.particleframework.context.env.Environment
 import org.particleframework.inject.qualifiers.Qualifiers
 import org.particleframework.runtime.context.scope.refresh.RefreshEvent
-import org.particleframework.runtime.executor.IOExecutorServiceConfig
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig
 import spock.lang.Specification
 
 import java.util.concurrent.Executor

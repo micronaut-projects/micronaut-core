@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.executor;
+package org.particleframework.scheduling.executor;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
-import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.reflect.InstantiationUtils;
 
 import java.util.concurrent.ExecutorService;

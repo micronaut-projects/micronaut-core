@@ -18,7 +18,7 @@ package org.particleframework.management.endpoint.health.indicator;
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.runtime.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;

@@ -19,6 +19,7 @@ import grails.gorm.transactions.Transactional
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Executable
 import org.particleframework.inject.ExecutableMethod
+import org.particleframework.scheduling.executor.ExecutorSelector
 import spock.lang.Specification
 
 import javax.inject.Singleton

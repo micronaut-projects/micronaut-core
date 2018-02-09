@@ -18,6 +18,10 @@ package org.particleframework.runtime.executor
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.PropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
+import org.particleframework.scheduling.executor.ExecutorConfiguration
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig
+import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig
+import org.particleframework.scheduling.executor.UserExecutorConfiguration
 import spock.lang.Specification
 import spock.lang.Unroll
 

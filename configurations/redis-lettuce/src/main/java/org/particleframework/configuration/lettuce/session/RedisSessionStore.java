@@ -35,7 +35,7 @@ import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.qualifiers.Qualifiers;
-import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
+import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 import org.particleframework.session.*;
 import org.particleframework.session.event.SessionCreatedEvent;
 import org.particleframework.session.event.SessionDeletedEvent;

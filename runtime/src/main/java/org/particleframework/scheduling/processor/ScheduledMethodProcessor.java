@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.scheduling;
+package org.particleframework.scheduling.processor;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
