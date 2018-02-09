@@ -48,4 +48,74 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'foo.bar[baz]' | '10'        | 'foo.bar[baz]' | Integer | 10
         'foo.bar[baz]' | '10'        | 'foo.bar'      | Map     | [baz: '10']
     }
+
+    @Unroll
+    void "test resolve placeholders for property #property and #value"() {
+        given:
+        def values = [
+                'foo.bar': '10',
+                'foo.baz': 20
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [(property): value] + values)
+        )
+
+        expect:
+
+        resolver.getProperty(key, Object).isPresent()
+        resolver.getProperty(key, type).get() == expected
+        resolver.containsProperty(key)
+
+        where:
+        property      | value                                       | key           | type    | expected
+        'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}' | 'my.property' | String  | '10 + 50 + 10'
+        'my.property' | '${foo.bar}'                                | 'my.property' | String  | '10'
+        'my.property' | '${not.there:50}'                           | 'my.property' | String  | '50'
+        'my.property' | '${foo.bar} + ${foo.bar}'                   | 'my.property' | String  | '10 + 10'
+        'my.property' | '${foo.bar[0]}'                             | 'my.property' | List    | ['10']
+        'my.property' | '${foo.bar[0]}'                             | 'my.property' | Integer | 10
+        'my.property' | '${USER}'                                   | 'my.property' | String  | System.getenv('USER')
+    }
+
+
+
+    void "test resolve placeholders for maps"() {
+        given:
+        def values = [
+                'foo.bar': '10',
+                'foo.baz': 20,
+                'my.property.one':'${foo.bar} + ${not.there:50} + ${foo.bar}',
+                'my.property.two':'${foo.bar}',
+                'my.property.three':'${foo.bar } + ${ foo.baz}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+
+        resolver.getProperty('my.property', Map).isPresent()
+        resolver.getProperty('my.property', Map).get() == [one:'10 + 50 + 10', two:'10', three:'10 + 20']
+    }
+
+
+    void "test resolve placeholders for properties"() {
+        given:
+        def values = [
+                'foo.bar': '10',
+                'foo.baz': 20,
+                'my.property.one':'${foo.bar} + ${not.there:50} + ${foo.bar}',
+                'my.property.two':'${foo.bar}',
+                'my.property.three':'${foo.bar } + ${ foo.baz}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+        Properties properties = new Properties()
+        properties.putAll([one:'10 + 50 + 10', two:'10', three:'10 + 20'])
+        expect:
+
+        resolver.getProperty('my.property', Properties).isPresent()
+        resolver.getProperty('my.property', Properties).get() == properties
+    }
 }
