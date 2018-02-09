@@ -16,9 +16,15 @@
 package org.particleframework.discovery.consul.client.v1;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
+ * Models a Consul Health Entry. See https://www.consul.io/api/health.html
+ *
  * @author graemerocher
  * @since 1.0
  */
@@ -26,6 +32,8 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 public class HealthEntry {
     private NodeEntry node;
     private ServiceEntry service;
+    @SuppressWarnings("unchecked")
+    private List<Check> checks = Collections.EMPTY_LIST;
 
     /**
      * @return The node for this health entry
@@ -34,15 +42,32 @@ public class HealthEntry {
         return node;
     }
 
-    public void setNode(NodeEntry node) {
-        this.node = node;
-    }
-
+    /**
+     * @return The service for the health entry
+     */
     public ServiceEntry getService() {
         return service;
     }
 
-    public void setService(ServiceEntry service) {
+    /**
+     * @return The checks
+     */
+    public List<Check> getChecks() {
+        return checks;
+    }
+
+    @JsonDeserialize(contentAs = CheckEntry.class)
+    void setChecks(List<Check> checks) {
+        this.checks = checks;
+    }
+
+    void setNode(NodeEntry node) {
+        this.node = node;
+    }
+
+    void setService(ServiceEntry service) {
         this.service = service;
     }
+
+
 }

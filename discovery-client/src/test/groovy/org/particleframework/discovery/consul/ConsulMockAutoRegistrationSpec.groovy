@@ -101,7 +101,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
                                                                                'consul.client.host'       : 'localhost',
                                                                                'consul.client.port'       : serverPort])
 
-        PollingConditions conditions = new PollingConditions(timeout: 3)
+        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
 
         then:
         conditions.eventually {

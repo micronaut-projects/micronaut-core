@@ -28,7 +28,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-public class TTLCheck extends Check {
+public class TTLCheck extends NewCheck {
     private Duration ttl;
 
     @JsonProperty("TTL")
@@ -52,7 +52,7 @@ public class TTLCheck extends Check {
         this.ttl = ConversionService.SHARED.convert(ttl, Duration.class).orElseThrow(()-> new IllegalArgumentException("Invalid TTL Returned"));
     }
 
-    public Check ttl(Duration interval) {
+    public NewCheck ttl(Duration interval) {
         if(interval != null) {
             this.ttl = interval;
         }

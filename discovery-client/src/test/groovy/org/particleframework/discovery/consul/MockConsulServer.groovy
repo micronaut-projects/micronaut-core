@@ -18,8 +18,11 @@ package org.particleframework.discovery.consul
 import org.particleframework.context.annotation.Requires
 import org.particleframework.core.async.publisher.Publishers
 import org.particleframework.discovery.consul.client.v1.CatalogEntry
+import org.particleframework.discovery.consul.client.v1.Check
 import org.particleframework.discovery.consul.client.v1.ConsulOperations
 import org.particleframework.discovery.consul.client.v1.HealthEntry
+import org.particleframework.discovery.consul.client.v1.MockCheckEntry
+import org.particleframework.discovery.consul.client.v1.MockHealthEntry
 import org.particleframework.discovery.consul.client.v1.NewServiceEntry
 import org.particleframework.discovery.consul.client.v1.ServiceEntry
 import org.particleframework.http.HttpStatus
@@ -44,6 +47,7 @@ class MockConsulServer implements ConsulOperations {
     public static final String ENABLED = 'enable.mock.consul'
 
     Map<String, ServiceEntry> services = new ConcurrentHashMap<>()
+    Map<String, MockCheckEntry> checks = new ConcurrentHashMap<>()
     final CatalogEntry nodeEntry
 
     static NewServiceEntry lastNewEntry
@@ -58,6 +62,9 @@ class MockConsulServer implements ConsulOperations {
     @Override
     Publisher<HttpStatus> pass(String checkId, Optional<String> note) {
         passingReports.add(checkId)
+        String service = nameFromCheck(checkId)
+        checks.get(service).setStatus(Check.Status.PASSING.name().toLowerCase())
+
         return Publishers.just(HttpStatus.OK)
     }
 
@@ -68,7 +75,15 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<HttpStatus> fail(String checkId, Optional<String> note) {
+        String service = nameFromCheck(checkId)
+        checks.get(service).setStatus(Check.Status.CRITICAL.name().toLowerCase())
         return Publishers.just(HttpStatus.OK)
+    }
+
+    private String nameFromCheck(String checkId) {
+        String service = checkId.substring("service:".length())
+        service = service.substring(0, service.indexOf(':'))
+        service
     }
 
     @Override
@@ -89,12 +104,15 @@ class MockConsulServer implements ConsulOperations {
     @Override
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry) {
         lastNewEntry = entry
-        services.put(entry.getName(), new ServiceEntry(entry))
+        def service = entry.getName()
+        services.put(service, new ServiceEntry(entry))
+        checks.computeIfAbsent(service, { String key -> new MockCheckEntry(service)})
         return Publishers.just(HttpStatus.OK)
     }
 
     @Override
     Publisher<HttpStatus> deregister(@NotNull String service) {
+        checks.remove(service)
         def s = services.find { it.value.ID.isPresent() ? it.value.ID.get().equals(service) : it.value.name == service }
         if(s) {
             services.remove(s.value.name)
@@ -116,9 +134,10 @@ class MockConsulServer implements ConsulOperations {
         ServiceEntry serviceEntry = services.get(service)
         List<HealthEntry> healthEntries = []
         if(serviceEntry != null) {
-            def entry = new HealthEntry()
+            def entry = new MockHealthEntry()
             entry.setNode(nodeEntry)
             entry.setService(serviceEntry)
+            entry.setChecks([checks.computeIfAbsent(service, { String key -> new MockCheckEntry(service)})])
             healthEntries.add(entry)
         }
         return Publishers.just(healthEntries)
