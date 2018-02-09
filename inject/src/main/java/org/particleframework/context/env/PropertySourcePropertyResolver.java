@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.env;
 
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.util.CollectionUtils;
@@ -182,15 +183,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
                 Class<T> requiredType = conversionContext.getArgument().getType();
                 if(value != null) {
+                    value = resolvePlaceHoldersIfNecessary(value);
                     return conversionService.convert(value, conversionContext);
-                }
-                else if(Map.class.isAssignableFrom(requiredType)) {
-                    Map<String, Object> subMap = resolveSubMap(name, entries);
-                    return conversionService.convert(subMap, requiredType, conversionContext);
                 }
                 else if(Properties.class.isAssignableFrom(requiredType)) {
                     Properties properties = resolveSubProperties(name, entries);
                     return Optional.of((T) properties);
+                }
+                else if(Map.class.isAssignableFrom(requiredType)) {
+                    Map<String, Object> subMap = resolveSubMap(name, entries);
+                    return conversionService.convert(subMap, requiredType, conversionContext);
                 }
                 else if(PropertyResolver.class.isAssignableFrom(requiredType)) {
                     Map<String, Object> subMap = resolveSubMap(name, entries);
@@ -199,6 +201,65 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return Optional.empty();
+    }
+
+    private Object resolvePlaceHoldersIfNecessary(Object value) {
+        if(value instanceof CharSequence) {
+            String str = value.toString();
+            int i = str.indexOf("${");
+            if(i > -1) {
+                value = resolvePlaceholders(str, i);
+            }
+        }
+        return value;
+    }
+
+    private String resolvePlaceholders(String str, int startIndex) {
+        StringBuilder builder = new StringBuilder(str.substring(0, startIndex));
+        String restOfString = str.substring(startIndex + 2, str.length());
+        int i = restOfString.indexOf('}');
+        if(i > - 1) {
+            String expr = restOfString.substring(0, i).trim();
+            if(restOfString.length() > i) {
+                restOfString = restOfString.substring(i+1, restOfString.length());
+            }
+            String defaultValue = null;
+            int j = expr.indexOf(':');
+            if(j > -1) {
+                defaultValue = expr.substring(j + 1, expr.length());
+                expr = expr.substring(0, j);
+            }
+            if(expr.indexOf('.') > -1) {
+                if(defaultValue != null) {
+                    builder.append( getProperty(expr, String.class, defaultValue) );
+                }
+                else {
+                    String finalExpr = expr;
+                    builder.append( getProperty(expr, String.class).orElseThrow(()-> new ConfigurationException("Could not resolve placeholder ${"+ finalExpr +"} in value: " + str)) );
+                }
+            }
+            else if(expr.matches("^[\\p{Lu}_]+")) {
+                String v = System.getenv(expr);
+                if(StringUtils.isNotEmpty(v)) {
+                    builder.append(v);
+                }
+                else if(defaultValue != null) {
+                    builder.append(defaultValue);
+                }
+                else {
+                    throw  new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
+                }
+            }
+
+            i = restOfString.indexOf("${");
+            if(i > -1) {
+                builder.append(resolvePlaceholders(restOfString, i));
+            }
+        }
+        else {
+            throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
+        }
+        return builder.toString();
     }
 
     protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
@@ -211,7 +272,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     Object value = entry.getValue();
                     if(value != null) {
                         String key = entry.getKey().substring(prefix.length());
-                        properties.put(key, value.toString());
+                        properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
                     }
                 });
 
@@ -226,15 +287,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             if (map.getKey().startsWith(prefix)) {
                 String subMapKey = map.getKey().substring(prefix.length());
                 int index = subMapKey.indexOf('.');
+                Object value =  resolvePlaceHoldersIfNecessary(map.getValue());
                 if (index == -1) {
-                    subMap.put(subMapKey, map.getValue());
+                    subMap.put(subMapKey, value);
                 } else {
                     String mapKey = subMapKey.substring(0, index);
                     if (!subMap.containsKey(mapKey)) {
                         subMap.put(mapKey, new LinkedHashMap<>());
                     }
                     Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
-                    nestedMap.put(subMapKey.substring(index + 1), map.getValue());
+                    nestedMap.put(subMapKey.substring(index + 1), value);
                 }
             }
         }
