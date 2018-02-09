@@ -322,7 +322,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
-            BeanDefinitionVisitor currentBeanWriter = getBeanWriter()
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
                 methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
@@ -470,7 +469,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode.parameters, paramsToType, qualifierTypes, genericTypeMap)
 
                         if (methodAnnotationMetadata.hasStereotype(PostConstruct.name)) {
-                            currentBeanWriter.visitPostConstructMethod(
+                            getBeanWriter().visitPostConstructMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -479,7 +478,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     qualifierTypes,
                                     genericTypeMap)
                         } else if (methodAnnotationMetadata.hasStereotype(PreDestroy.name)) {
-                            currentBeanWriter.visitPreDestroyMethod(
+                            getBeanWriter().visitPreDestroyMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -488,7 +487,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     qualifierTypes,
                                     genericTypeMap)
                         } else {
-                            currentBeanWriter.visitMethodInjectionPoint(
+                            getBeanWriter().visitMethodInjectionPoint(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -518,9 +517,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "preprocess", Boolean.class).orElse(false);
                         if(preprocess) {
-                            currentBeanWriter.setRequiresMethodProcessing(true)
+                            getBeanWriter().setRequiresMethodProcessing(true)
                         }
-                        ExecutableMethodWriter executableMethodWriter = currentBeanWriter.visitExecutableMethod(
+                        ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
@@ -562,7 +561,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         Parameter parameter = methodNode.parameters[0]
 
-                        currentBeanWriter.visitSetterValue(
+                        getBeanWriter().visitSetterValue(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                 resolveQualifier(parameter),
                                 false,

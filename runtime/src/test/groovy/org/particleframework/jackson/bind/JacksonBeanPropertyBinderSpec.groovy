@@ -17,6 +17,7 @@ package org.particleframework.jackson.bind
 
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
+import org.particleframework.context.ApplicationContext
 import org.particleframework.context.BeanContext
 import org.particleframework.jackson.bind.JacksonBeanPropertyBinder
 import spock.lang.Specification
@@ -31,7 +32,7 @@ class JacksonBeanPropertyBinderSpec extends Specification {
     @Unroll
     void "test bind map properties to object"() {
         given:
-        JacksonBeanPropertyBinder binder = BeanContext.run().getBean(JacksonBeanPropertyBinder)
+        JacksonBeanPropertyBinder binder = ApplicationContext.run().getBean(JacksonBeanPropertyBinder)
         def result = binder.bind(type.newInstance(), map)
 
         expect:
