@@ -23,7 +23,7 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.management.endpoint.beans.BeanDefinitionData;
 import org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector;
 import org.particleframework.management.endpoint.beans.BeansEndpoint;
-import org.particleframework.runtime.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Named;

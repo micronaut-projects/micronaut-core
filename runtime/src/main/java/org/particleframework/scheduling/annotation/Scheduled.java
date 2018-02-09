@@ -16,7 +16,7 @@
 package org.particleframework.scheduling.annotation;
 
 import org.particleframework.context.annotation.Executable;
-import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
+import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 
 import java.lang.annotation.*;
 

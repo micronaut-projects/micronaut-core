@@ -31,7 +31,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
-import org.particleframework.runtime.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;

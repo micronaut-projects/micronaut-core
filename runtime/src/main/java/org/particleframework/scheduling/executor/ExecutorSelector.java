@@ -13,31 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.executor;
+package org.particleframework.scheduling.executor;
 
-import java.util.concurrent.Executors;
+import org.particleframework.inject.MethodReference;
+
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
- * An enum modelling different {@link java.util.concurrent.Executor} types that mirror the methods defined in the {@link java.util.concurrent.Executors} class
+ * Interface that allows customizing the selection of the {@link ExecutorService} to run an operation on
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public enum ExecutorType {
+public interface ExecutorSelector {
+
     /**
-     * @see java.util.concurrent.Executors#newScheduledThreadPool(int)
+     * Select an {@link ExecutorService} for the given {@link MethodReference}
+     *
+     * @param method The {@link MethodReference}
+     * @return An optional {@link ExecutorService}. If an {@link ExecutorService} cannot be established {@link Optional#empty()} is returned
      */
-    SCHEDULED,
-    /**
-     * @see Executors#newCachedThreadPool()
-     */
-    CACHED,
-    /**
-     * @see Executors#newFixedThreadPool(int)
-     */
-    FIXED,
-    /**
-     * @see Executors#newWorkStealingPool()
-     */
-    WORK_STEALING
+    Optional<ExecutorService> select(MethodReference method);
 }

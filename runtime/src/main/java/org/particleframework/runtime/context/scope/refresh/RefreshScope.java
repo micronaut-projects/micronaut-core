@@ -29,7 +29,7 @@ import org.particleframework.inject.BeanIdentifier;
 import org.particleframework.inject.DisposableBeanDefinition;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.context.scope.Refreshable;
-import org.particleframework.runtime.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 
 import javax.inject.Named;
 import javax.inject.Provider;

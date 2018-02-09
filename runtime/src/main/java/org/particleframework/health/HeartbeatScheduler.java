@@ -23,7 +23,7 @@ import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.event.AbstractServiceInstanceEvent;
 import org.particleframework.discovery.event.ServiceShutdownEvent;
 import org.particleframework.discovery.event.ServiceStartedEvent;
-import org.particleframework.runtime.executor.ScheduledExecutorServiceConfig;
+import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.runtime.server.EmbeddedServerInstance;
 

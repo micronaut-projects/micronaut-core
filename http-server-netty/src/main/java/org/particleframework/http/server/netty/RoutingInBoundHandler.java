@@ -56,7 +56,7 @@ import org.particleframework.http.server.netty.multipart.NettyPart;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
 import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
-import org.particleframework.runtime.executor.ExecutorSelector;
+import org.particleframework.scheduling.executor.ExecutorSelector;
 import org.particleframework.web.router.*;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;

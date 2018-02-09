@@ -247,7 +247,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     builder.append(defaultValue);
                 }
                 else {
-                    throw  new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
+                    throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
                 }
             }
 

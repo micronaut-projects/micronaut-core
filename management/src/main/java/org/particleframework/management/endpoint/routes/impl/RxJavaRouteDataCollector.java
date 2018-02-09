@@ -7,7 +7,7 @@ import org.particleframework.http.MediaType;
 import org.particleframework.management.endpoint.routes.RouteData;
 import org.particleframework.management.endpoint.routes.RouteDataCollector;
 import org.particleframework.management.endpoint.routes.RoutesEndpoint;
-import org.particleframework.runtime.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.particleframework.web.router.UriRoute;
 import org.reactivestreams.Publisher;
 

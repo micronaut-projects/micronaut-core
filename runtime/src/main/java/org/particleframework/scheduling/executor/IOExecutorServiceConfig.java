@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License. 
  */
-package org.particleframework.runtime.executor;
+package org.particleframework.scheduling.executor;
 
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
@@ -23,23 +23,24 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * A default executor service for scheduling adhoc tasks via {@link java.util.concurrent.ScheduledExecutorService}
+ * Configures the default I/O thread pool if none is configured by the user
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(missingProperty = "particle.server.executors.scheduled")
+@Requires(missingProperty = "particle.server.executors.io")
 @Factory
-public class ScheduledExecutorServiceConfig {
+public class IOExecutorServiceConfig {
+
     /**
      * The name of the default IO executor service
      */
-    public static final String NAME = "scheduled";
+    public static final String NAME = "io";
 
     @Singleton
     @Bean
-    @Named(ScheduledExecutorServiceConfig.NAME)
+    @Named(IOExecutorServiceConfig.NAME)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
+        return UserExecutorConfiguration.of(ExecutorType.CACHED);
     }
 }
