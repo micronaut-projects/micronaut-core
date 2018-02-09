@@ -16,7 +16,10 @@
 package org.particleframework.discovery.consul;
 
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.util.CollectionUtils;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.consul.client.v1.Check;
 import org.particleframework.discovery.consul.client.v1.HealthEntry;
 import org.particleframework.discovery.consul.client.v1.NodeEntry;
 import org.particleframework.discovery.consul.client.v1.ServiceEntry;
@@ -29,6 +32,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * A {@link ServiceInstance} for Consul
@@ -64,6 +68,26 @@ public class ConsulServiceInstance implements ServiceInstance {
         } catch (URISyntaxException e) {
             throw new DiscoveryException("Invalid service URI: " + uriStr);
         }
+    }
+
+    @Override
+    public HealthStatus getHealthStatus() {
+        List<Check> checks = healthEntry.getChecks();
+        if(CollectionUtils.isNotEmpty(checks)) {
+            Stream<Check> criticalStream = checks.stream().filter(c -> c.status() == Check.Status.CRITICAL);
+            Optional<Check> first = criticalStream.findFirst();
+            if(first.isPresent()) {
+                Check check = first.get();
+                String notes = check.getNotes();
+                if(StringUtils.isNotEmpty(notes)) {
+                    return HealthStatus.DOWN.describe(notes);
+                }
+                else {
+                    return HealthStatus.DOWN;
+                }
+            }
+        }
+        return HealthStatus.UP;
     }
 
     /**

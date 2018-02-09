@@ -756,7 +756,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 } else if (cause instanceof ReadTimeoutException) {
                     completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
                 } else {
-                    completableFuture.completeExceptionally(cause);
+                    completableFuture.completeExceptionally(new HttpClientException("Error occurred reading HTTP response: " + cause.getMessage(),cause));
                 }
             }
         });

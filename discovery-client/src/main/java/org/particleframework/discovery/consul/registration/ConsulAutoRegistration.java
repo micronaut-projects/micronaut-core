@@ -164,7 +164,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
             serviceEntry.id(serviceId);
 
             if (instance instanceof EmbeddedServerInstance) {
-                Check check = null;
+                NewCheck check = null;
                 EmbeddedServerInstance embeddedServerInstance = (EmbeddedServerInstance) instance;
                 ApplicationConfiguration applicationConfiguration = embeddedServerInstance.getEmbeddedServer().getApplicationConfiguration();
                 ApplicationConfiguration.InstanceConfiguration instanceConfiguration = applicationConfiguration.getInstance();
@@ -210,7 +210,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
 
                 if (check != null) {
-                    check.status(Check.HealthStatus.PASSING);
+                    check.status(Check.Status.PASSING);
                     checkConfig.getDeregisterCriticalServiceAfter().ifPresent(check::deregisterCriticalServiceAfter);
                     checkConfig.getNotes().ifPresent(check::notes);
                     checkConfig.getId().ifPresent(check::id);

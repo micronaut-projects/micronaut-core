@@ -38,7 +38,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class HTTPCheck extends Check {
+public class HTTPCheck extends NewCheck {
 
     private Duration interval;
     private final URL url;
@@ -162,7 +162,7 @@ public class HTTPCheck extends Check {
     }
 
     @Override
-    public HTTPCheck status(HealthStatus status) {
+    public HTTPCheck status(Status status) {
         return (HTTPCheck) super.status(status);
     }
 

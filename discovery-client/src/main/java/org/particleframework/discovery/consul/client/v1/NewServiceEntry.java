@@ -38,25 +38,25 @@ public class NewServiceEntry extends AbstractServiceEntry {
         super(serviceName);
     }
 
-    private List<Check> checks = new ArrayList<>(1);
+    private List<NewCheck> checks = new ArrayList<>(1);
 
     /**
      * See https://www.consul.io/api/agent/service.html#checks
      *
      * @return The health checks to perform
      */
-    public List<Check> getChecks() {
+    public List<NewCheck> getChecks() {
         return checks;
     }
 
-    public NewServiceEntry checks(List<Check> checks) {
+    public NewServiceEntry checks(List<NewCheck> checks) {
         if(checks != null) {
             this.checks.addAll(checks);
         }
         return this;
     }
 
-    public NewServiceEntry check(Check check) {
+    public NewServiceEntry check(NewCheck check) {
         if(check != null) {
             this.checks.add(check);
         }

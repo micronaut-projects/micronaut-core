@@ -16,9 +16,12 @@
 package org.particleframework.core.bind;
 
 import org.particleframework.core.convert.ArgumentConversionContext;
+import org.particleframework.core.convert.ConversionError;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -85,9 +88,17 @@ public interface ArgumentBinder<T, S> {
         Optional<T> getValue();
 
         /**
+         * @return The {@link ConversionError} instances that occurred
+         */
+        @SuppressWarnings("unchecked")
+        default List<ConversionError> getConversionErrors() {
+            return Collections.EMPTY_LIST;
+        }
+
+        /**
          * @return Was the binding requirement satisfied
          */
-        default boolean isSatisfied() { return true; }
+        default boolean isSatisfied() { return getConversionErrors() == Collections.EMPTY_LIST; }
 
         /**
          * @return Is the value present and satisfied

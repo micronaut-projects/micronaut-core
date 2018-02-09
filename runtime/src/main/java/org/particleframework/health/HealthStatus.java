@@ -29,9 +29,9 @@ import java.util.Optional;
 public class HealthStatus implements Comparable<HealthStatus> {
 
     private final String name;
-    private final Optional<String> description;
-    private final Optional<Boolean> operational;
-    private final Optional<Integer> severity;
+    private final String description;
+    private final Boolean operational;
+    private final Integer severity;
 
     /**
      * Indicates the service is operational
@@ -49,15 +49,24 @@ public class HealthStatus implements Comparable<HealthStatus> {
             throw new IllegalArgumentException("Name cannot be null when creating a health status");
         }
         this.name = name;
-        this.description = Optional.ofNullable(description);
-        this.operational = Optional.ofNullable(operational);
-        this.severity = Optional.ofNullable(severity);
+        this.description = description;
+        this.operational = operational;
+        this.severity = severity;
     }
 
     public HealthStatus(@NotNull String name) {
         this(name, null, null, null);
     }
 
+
+    /**
+     * Describe an existing {@link HealthStatus}
+     * @param description The description
+     * @return The new health status
+     */
+    public HealthStatus describe(String description) {
+        return new HealthStatus(name, description, operational, severity);
+    }
 
     /**
      * @return The name of the status
@@ -70,7 +79,7 @@ public class HealthStatus implements Comparable<HealthStatus> {
      * @return The description of the status
      */
     public Optional<String> getDescription() {
-        return description;
+        return Optional.ofNullable(description);
     }
 
     /**
@@ -79,7 +88,7 @@ public class HealthStatus implements Comparable<HealthStatus> {
      * @return Empty if partially operational.
      */
     public Optional<Boolean> getOperational() {
-        return operational;
+        return Optional.ofNullable(operational);
     }
 
     /**
@@ -89,7 +98,7 @@ public class HealthStatus implements Comparable<HealthStatus> {
      * @return Empty if no severity specified.
      */
     public Optional<Integer> getSeverity() {
-        return severity;
+        return Optional.ofNullable(severity);
     }
 
     @Override
@@ -119,18 +128,18 @@ public class HealthStatus implements Comparable<HealthStatus> {
      */
     @Override
     public int compareTo(HealthStatus o) {
-        if (operational.isPresent() && o.operational.isPresent()) {
-            return operational.get().compareTo(o.operational.get()) * -1;
-        } else if (operational.isPresent()) {
-            return operational.get() == Boolean.TRUE ? -1 : 1;
-        } else if (o.operational.isPresent()) {
-            return o.operational.get() == Boolean.TRUE ? 1 : -1;
+        if (operational != null && o.operational != null) {
+            return operational.compareTo(o.operational) * -1;
+        } else if (operational != null) {
+            return operational == Boolean.TRUE ? -1 : 1;
+        } else if (o.operational != null) {
+            return o.operational == Boolean.TRUE ? 1 : -1;
         } else {
-            if (severity.isPresent() && o.severity.isPresent()) {
-                return severity.get().compareTo(o.severity.get());
-            } else if (severity.isPresent()) {
+            if (severity != null && o.severity != null) {
+                return severity.compareTo(o.severity);
+            } else if (severity != null) {
                 return 1;
-            } else if (o.severity.isPresent()) {
+            } else if (o.severity != null) {
                 return -1;
             } else {
                 return 0;
@@ -138,4 +147,13 @@ public class HealthStatus implements Comparable<HealthStatus> {
         }
     }
 
+    @Override
+    public String toString() {
+        return "HealthStatus{" +
+                "name='" + name + '\'' +
+                ", description=" + description +
+                ", operational=" + operational +
+                ", severity=" + severity +
+                '}';
+    }
 }
