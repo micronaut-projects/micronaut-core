@@ -48,15 +48,18 @@ public class HeartbeatScheduler implements ApplicationEventListener<AbstractServ
     private final ScheduledExecutorService executorService;
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ApplicationEventPublisher eventPublisher;
+    private final CurrentHealthStatus currentHealthStatus;
     private ScheduledFuture<?> scheduledFixture;
 
     public HeartbeatScheduler(
             HeartbeatConfiguration heartbeatConfiguration,
+            CurrentHealthStatus currentHealthStatus,
             ApplicationEventPublisher publisher,
             @Named(ScheduledExecutorServiceConfig.NAME) ExecutorService executorService) {
         if(!(executorService instanceof ScheduledExecutorService)) {
             throw new ConfigurationException("Configured executor service named ["+ScheduledExecutorServiceConfig.NAME+"] must be an instance of " + ScheduledExecutorService.class.getName());
         }
+        this.currentHealthStatus = currentHealthStatus;
         this.executorService = (ScheduledExecutorService) executorService;
         this.heartbeatConfiguration = heartbeatConfiguration;
         this.eventPublisher = publisher;
@@ -71,7 +74,7 @@ public class HeartbeatScheduler implements ApplicationEventListener<AbstractServ
                 if(source instanceof EmbeddedServerInstance) {
                     long interval = heartbeatConfiguration.getInterval().toMillis();
                     this.scheduledFixture = executorService.scheduleAtFixedRate(
-                            ()-> eventPublisher.publishEvent(new HeartbeatEvent(source)),
+                            ()-> eventPublisher.publishEvent(new HeartbeatEvent(source, currentHealthStatus.current())),
                             interval,
                             interval,
                             TimeUnit.MILLISECONDS

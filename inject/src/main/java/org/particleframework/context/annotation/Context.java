@@ -16,6 +16,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>WARNING: This annotation should be used sparingly as Particle is designed in such a way as to encourage minimal bean creation during startup.</p>
  *
+ * <p>NOTE: This annotation can also be used as a meta annotation</p>
+ *
  * @see Singleton @Singleton
  */
 @Singleton
