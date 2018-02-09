@@ -11,7 +11,6 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.convert.TypeConverterRegistrar;
 import org.particleframework.core.io.ResourceLoader;
-import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.type.Argument;
@@ -157,7 +156,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     }
 
                     @Override
-                    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
+                    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
                         // no-op .. @Context scope beans are not started for bootstrap
                     }
                 };
@@ -250,7 +249,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
         Collection<TypeConverter> typeConverters = getBeansOfType(TypeConverter.class);
         for (TypeConverter typeConverter : typeConverters) {
             Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
@@ -269,7 +268,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             registrar.register(conversionService);
         }
 
-        super.initializeContext(contextScopeBeans);
+        super.initializeContext(contextScopeBeans, processedBeans);
     }
 
     @Override

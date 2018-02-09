@@ -173,6 +173,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
                     new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, annotationMetadata);
+            beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
+
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
             processed.add(className);
             beanDefinitionReferenceWriter.setContextScope(
@@ -573,10 +575,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         void visitExecutableMethod(ExecutableElement method, AnnotationMetadata methodAnnotationMetadata) {
             TypeMirror returnType = method.getReturnType();
+
             Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnType);
             ExecutableElementParamInfo params = populateParameterData(method);
 
             BeanDefinitionVisitor beanWriter = beanDefinitionWriters.get(this.concreteClass.getQualifiedName());
+
+            // This method requires pre-processing. See Executable#preprocess()
+            boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "preprocess", Boolean.class).orElse(false);
+            if(preprocess) {
+                beanWriter.setRequiresMethodProcessing(true);
+            }
+
 
             Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
             if (typeRef == null) typeRef = modelUtils.resolveTypeReference(concreteClass);

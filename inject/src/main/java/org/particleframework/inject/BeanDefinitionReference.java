@@ -1,6 +1,7 @@
 package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 import org.particleframework.core.annotation.AnnotationSource;
@@ -54,5 +55,7 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @return Is the underlying bean type present on the classpath
      */
     boolean isPresent();
+
+
 
 }

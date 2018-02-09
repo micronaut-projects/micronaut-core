@@ -17,9 +17,11 @@ package org.particleframework.context;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.particleframework.context.annotation.Executable;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.event.*;
 import org.particleframework.context.exceptions.*;
+import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.context.scope.CustomScope;
 import org.particleframework.context.scope.CustomScopeRegistry;
 import org.particleframework.core.annotation.AnnotationUtil;
@@ -48,11 +50,13 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The default context implementation
+ * The default context implementations
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -725,8 +729,9 @@ public class DefaultBeanContext implements BeanContext {
      * Initialize the context with the given {@link org.particleframework.context.annotation.Context} scope beans
      *
      * @param contextScopeBeans The context scope beans
+     * @param processedBeans The beans that require {@link org.particleframework.context.processor.ExecutableMethodProcessor} handling
      */
-    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
 
         for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
             try {
@@ -737,6 +742,52 @@ public class DefaultBeanContext implements BeanContext {
                 }
             } catch (Throwable e) {
                 throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
+            }
+        }
+
+        if(!processedBeans.isEmpty()) {
+
+            @SuppressWarnings("unchecked") Stream<BeanDefinitionMethodReference<?, ?>> methodStream = processedBeans
+                    .parallelStream()
+                    .map((Function<BeanDefinitionReference, BeanDefinition<?>>) reference -> {
+                        try {
+                            return reference.load();
+                        } catch (Exception e) {
+                            throw new BeanInstantiationException("Bean definition [" + reference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                        }
+                    }).flatMap(beanDefinition ->
+                            beanDefinition.getExecutableMethods()
+                                          .parallelStream()
+                                          .map((Function<ExecutableMethod<?, ?>, BeanDefinitionMethodReference<?, ?>>) executableMethod ->
+                                                  BeanDefinitionMethodReference.of((BeanDefinition)beanDefinition, executableMethod)
+                                          )
+                    );
+
+            Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = methodStream
+                    .collect(
+                            Collectors.groupingBy((Function<ExecutableMethod<?, ?>, Class<? extends Annotation>>) executableMethod ->
+                                    executableMethod.getAnnotationTypeByStereotype(Executable.class)
+                    .orElseThrow(()->
+                new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
+            )));
+
+            for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
+                Class<? extends Annotation> annotationType = entry.getKey();
+                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType)).forEach(processor -> {
+                    for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
+                        //noinspection unchecked
+                        processor.process(method.getBeanDefinition(), method);
+                    }
+                });
+            }
+        }
+        for (BeanDefinitionReference reference : processedBeans) {
+            try {
+                BeanDefinition<?> beanDefinition = reference.load();
+                Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
+            }
+            catch(Throwable e) {
+
             }
         }
     }
@@ -1340,6 +1391,7 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanDefinitionClasses() {
 
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
+        List<BeanDefinitionReference> processedBeans = new ArrayList<>();
         Map<String, BeanDefinitionReference> beanDefinitionsClassesByType = new HashMap<>();
         Map<String, BeanDefinitionReference> beanDefinitionsClassesByDefinition = new HashMap<>();
         Map<String, BeanDefinitionReference> replacementsByType = new LinkedHashMap<>();
@@ -1369,6 +1421,9 @@ public class DefaultBeanContext implements BeanContext {
             beanDefinitionsClassesByDefinition.put(beanDefinitionReference.toString(), beanDefinitionReference);
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
+            }
+            if(beanDefinitionReference.requiresMethodProcessing()) {
+                processedBeans.add(beanDefinitionReference);
             }
         }
 
@@ -1402,7 +1457,7 @@ public class DefaultBeanContext implements BeanContext {
 
         this.beanDefinitionsClasses.addAll(beanDefinitionsClassesByDefinition.values());
 
-        initializeContext(contextScopeBeans);
+        initializeContext(contextScopeBeans, processedBeans);
     }
 
 

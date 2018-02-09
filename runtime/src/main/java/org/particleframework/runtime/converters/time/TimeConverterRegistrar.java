@@ -15,6 +15,7 @@
  */
 package org.particleframework.runtime.converters.time;
 
+import org.particleframework.context.annotation.Context;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.ConversionContext;
@@ -45,7 +46,7 @@ import java.util.regex.Pattern;
 @Requires(notEnv = Environment.ANDROID)
 public class TimeConverterRegistrar implements TypeConverterRegistrar{
 
-    private static final Pattern DURATION_MATCHER = Pattern.compile("(\\d+)([s|m|h|d])(s?)");
+    private static final Pattern DURATION_MATCHER = Pattern.compile("^(\\d+)([s|m|h|d])(s?)$");
     @Override
     public void register(ConversionService<?> conversionService) {
         // CharSequence -> Duration
@@ -53,32 +54,43 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar{
                 CharSequence.class,
                 Duration.class,
                 (object, targetType, context) -> {
-                    String value = object.toString();
-                    Matcher matcher = DURATION_MATCHER.matcher(value);
-                    if(matcher.find()) {
-                        String amount = matcher.group(1);
-                        char type = matcher.group(2).charAt(0);
+                    String value = object.toString().trim();
+                    if(value.startsWith("P")) {
                         try {
-                            switch (type) {
-                                case 's':
-                                    return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
-                                case 'm':
-                                    String ms = matcher.group(3);
-                                    if(StringUtils.hasText(ms)) {
-                                        return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
-                                    }
-                                    else {
-                                        return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
-                                    }
-                                case 'h':
-                                    return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
-                                case 'd':
-                                    return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
-                            }
-                        } catch (NumberFormatException e) {
-                            context.reject(e);
+                            return Optional.of(Duration.parse(value));
+                        } catch (DateTimeParseException e) {
+                            context.reject(value, e);
+                            return Optional.empty();
                         }
                     }
+                    else {
+                        Matcher matcher = DURATION_MATCHER.matcher(value);
+                        if(matcher.find()) {
+                            String amount = matcher.group(1);
+                            char type = matcher.group(2).charAt(0);
+                            try {
+                                switch (type) {
+                                    case 's':
+                                        return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
+                                    case 'm':
+                                        String ms = matcher.group(3);
+                                        if(StringUtils.hasText(ms)) {
+                                            return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
+                                        }
+                                        else {
+                                            return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
+                                        }
+                                    case 'h':
+                                        return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
+                                    case 'd':
+                                        return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                                }
+                            } catch (NumberFormatException e) {
+                                context.reject(value, e);
+                            }
+                        }
+                    }
+                    context.reject(value, new DateTimeParseException("Unparseable date format ("+value+"). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
                     return Optional.empty();
                 }
         );

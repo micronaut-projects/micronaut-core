@@ -83,7 +83,7 @@ public interface ConversionService<Impl extends ConversionService> {
      * @return The optional
      */
     default <T> Optional<T> convert(Object object, Argument<T> targetType) {
-        return convert(object, ConversionContext.of(targetType));
+        return convert(object, targetType.getType(), ConversionContext.of(targetType));
     }
     /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned

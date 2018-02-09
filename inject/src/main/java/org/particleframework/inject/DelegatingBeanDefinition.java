@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Marks a bean definition that is delegating to another definition.
+ * An interface for wrapping a {@link BeanDefinition} with another that delegates and potentially decorates the {@link BeanDefinition} instance
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -36,6 +36,11 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
      * @return The target definition
      */
     BeanDefinition<T> getTarget();
+
+    @Override
+    default boolean requiresMethodProcessing() {
+        return getTarget().requiresMethodProcessing();
+    }
 
     @Override
     default Optional<Class<? extends Annotation>> getScope() {

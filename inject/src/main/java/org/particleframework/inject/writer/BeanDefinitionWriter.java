@@ -202,6 +202,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final AnnotationMetadata annotationMetadata;
     private ConfigBuilder currentConfigBuilder;
     private int optionalInstanceIndex;
+    private boolean preprocessMethods = false;
 
 
     /**
@@ -436,6 +437,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             finalizeInjectMethod();
             finalizeBuildMethod();
             finalizeAnnotationMetadata();
+            if(preprocessMethods) {
+                GeneratorAdapter requiresMethodProcessing = startPublicMethod(classWriter, "requiresMethodProcessing", boolean.class.getName());
+                requiresMethodProcessing.push(true);
+                requiresMethodProcessing.visitInsn(IRETURN);
+                requiresMethodProcessing.visitMaxs(1,1);
+                requiresMethodProcessing.visitEnd();
+            }
             constructorVisitor.visitInsn(RETURN);
             constructorVisitor.visitMaxs(DEFAULT_MAX_STACK, 1);
             if (buildMethodVisitor != null) {
@@ -871,6 +879,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitConfigBuilderEnd() {
         currentConfigBuilder = null;
+    }
+
+    @Override
+    public void setRequiresMethodProcessing(boolean shouldPreProcess) {
+        this.preprocessMethods = shouldPreProcess;
+    }
+
+
+    @Override
+    public boolean requiresMethodProcessing() {
+        return this.preprocessMethods;
     }
 
     /**
