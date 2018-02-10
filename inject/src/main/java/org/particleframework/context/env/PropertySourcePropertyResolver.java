@@ -223,33 +223,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             if(restOfString.length() > i) {
                 restOfString = restOfString.substring(i+1, restOfString.length());
             }
-            String defaultValue = null;
-            int j = expr.indexOf(':');
-            if(j > -1) {
-                defaultValue = expr.substring(j + 1, expr.length());
-                expr = expr.substring(0, j);
-            }
-            if(expr.indexOf('.') > -1) {
-                if(defaultValue != null) {
-                    builder.append( getProperty(expr, String.class, defaultValue) );
-                }
-                else {
-                    String finalExpr = expr;
-                    builder.append( getProperty(expr, String.class).orElseThrow(()-> new ConfigurationException("Could not resolve placeholder ${"+ finalExpr +"} in value: " + str)) );
-                }
-            }
-            else if(expr.matches("^[\\p{Lu}_]+")) {
-                String v = System.getenv(expr);
-                if(StringUtils.isNotEmpty(v)) {
-                    builder.append(v);
-                }
-                else if(defaultValue != null) {
-                    builder.append(defaultValue);
-                }
-                else {
-                    throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
-                }
-            }
+            resolveExpression(builder, str, expr);
 
             i = restOfString.indexOf("${");
             if(i > -1) {
@@ -260,6 +234,43 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
         }
         return builder.toString();
+    }
+
+    private void resolveExpression(StringBuilder builder, String str, String expr) {
+        String defaultValue = null;
+        int j = expr.indexOf(':');
+        if(j > -1) {
+            defaultValue = expr.substring(j + 1, expr.length());
+            expr = expr.substring(0, j);
+        }
+        if(expr.indexOf('.') > -1) {
+            if(defaultValue != null) {
+                if(defaultValue.contains(":")) {
+                    StringBuilder resolved = new StringBuilder();
+                    resolveExpression(resolved,  expr, defaultValue);
+                    builder.append( getProperty(expr, String.class, resolved.toString()) );
+                }
+                else {
+                    builder.append( getProperty(expr, String.class, defaultValue) );
+                }
+            }
+            else {
+                String finalExpr = expr;
+                builder.append( getProperty(expr, String.class).orElseThrow(()-> new ConfigurationException("Could not resolve placeholder ${"+ finalExpr +"} in value: " + str)) );
+            }
+        }
+        else if(expr.matches("^[\\p{Lu}_]+")) {
+            String v = System.getenv(expr);
+            if(StringUtils.isNotEmpty(v)) {
+                builder.append(v);
+            }
+            else if(defaultValue != null) {
+                builder.append(defaultValue);
+            }
+            else {
+                throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
+            }
+        }
     }
 
     protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
