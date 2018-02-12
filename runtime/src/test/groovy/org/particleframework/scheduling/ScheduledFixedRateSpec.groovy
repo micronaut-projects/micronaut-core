@@ -16,6 +16,7 @@
 package org.particleframework.scheduling
 
 import org.particleframework.context.ApplicationContext
+import org.particleframework.context.annotation.Requires
 import org.particleframework.scheduling.annotation.Scheduled
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -31,7 +32,10 @@ class ScheduledFixedRateSpec extends Specification {
 
     void 'test schedule task at fixed delay or rate '() {
         given:
-        ApplicationContext beanContext = ApplicationContext.run()
+        ApplicationContext beanContext = ApplicationContext.run(
+                'some.configuration':'10ms',
+                'scheduled-test.task.enabled':true
+        )
 
         PollingConditions conditions = new PollingConditions()
 
@@ -55,16 +59,22 @@ class ScheduledFixedRateSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyTask {
         boolean wasRun = false
         boolean wasDelayedRun = false
         boolean fixedDelayWasRun = false
+        boolean configuredWasRun = false
 
         @Scheduled(fixedRate = '10ms')
         void runSomething() {
             wasRun = true
         }
 
+        @Scheduled(fixedRate = '${some.configuration}')
+        void runScheduleConfigured() {
+            configuredWasRun = true
+        }
         @Scheduled(fixedDelay = '10ms')
         void runFixedDelay() {
             fixedDelayWasRun = true

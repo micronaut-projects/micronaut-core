@@ -119,6 +119,10 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     Collection<String> getPackages();
 
     /**
+     * @return The placeholder resolver
+     */
+    PropertyPlaceholderResolver getPlaceholderResolver();
+    /**
      * Refresh the environment from the list of {@link PropertySource} instances and return a diff of the changes
      *
      * @return The values that changed

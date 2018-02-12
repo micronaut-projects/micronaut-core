@@ -93,6 +93,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public PropertyPlaceholderResolver getPlaceholderResolver() {
+        return this.propertyPlaceholderResolver;
+    }
+
+    @Override
     public Stream<Class> scan(Class<? extends Annotation> annotation) {
         return annotationScanner.scan(annotation, getPackages());
     }

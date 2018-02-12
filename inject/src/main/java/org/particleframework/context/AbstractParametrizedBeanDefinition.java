@@ -45,8 +45,8 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
     }
 
-    protected AbstractParametrizedBeanDefinition(boolean singleton, Class<T> type, Constructor<T> constructor, Argument[] arguments) {
-        super(singleton, type, constructor, arguments);
+    protected AbstractParametrizedBeanDefinition(Class<T> type, Constructor<T> constructor, Argument[] arguments) {
+        super(type, constructor, arguments);
         this.requiredArguments = resolveRequiredArguments();
     }
 

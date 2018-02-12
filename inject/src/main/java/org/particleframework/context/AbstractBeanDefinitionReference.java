@@ -28,7 +28,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private final String beanDefinitionTypeName;
     private Class beanDefinition;
     private Boolean present;
-    private Map<Integer,Boolean> enabled = new ConcurrentHashMap<>(2);
 
     public AbstractBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName) {
         this.beanTypeName = beanTypeName;
@@ -81,6 +80,13 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
         } else {
             throw new BeanInstantiationException("Cannot load bean for type [" + beanTypeName + "]. The type is not present on the classpath");
         }
+    }
+
+    @Override
+    public BeanDefinition load(BeanContext context) {
+        BeanDefinition definition = load();
+        ((AbstractBeanDefinition)definition).configure(context);
+        return definition;
     }
 
     @Override

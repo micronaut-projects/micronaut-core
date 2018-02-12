@@ -973,7 +973,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
 
-            boolean isSingleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
             boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
             BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
                     packageElement.getQualifiedName().toString(),
@@ -982,7 +981,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             ? elementUtils.getBinaryName(typeElement).toString()
                             : providerTypeParam.toString(),
                     isInterface,
-                    isSingleton, annotationMetadata);
+                    annotationMetadata);
             return beanDefinitionWriter;
         }
 
@@ -1043,7 +1042,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
-                    annotationMetadata.hasDeclaredStereotype(Singleton.class),
                     annotationMetadata);
             return beanDefinitionWriter;
         }

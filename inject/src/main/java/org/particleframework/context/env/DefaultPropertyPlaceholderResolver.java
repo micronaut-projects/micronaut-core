@@ -69,6 +69,9 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             if(i > -1) {
                 builder.append(resolvePlaceholders(restOfString, i));
             }
+            else {
+                builder.append(restOfString);
+            }
         }
         else {
             throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);

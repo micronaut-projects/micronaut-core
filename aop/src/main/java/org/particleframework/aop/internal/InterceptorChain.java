@@ -16,6 +16,8 @@
 package org.particleframework.aop.internal;
 
 import org.particleframework.aop.*;
+import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
@@ -25,6 +27,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -150,7 +153,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     @Internal
-    public static Interceptor[] resolveAroundInterceptors(ExecutableMethod<?,?> method, Interceptor...interceptors) {
+    public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?,?> method, Interceptor...interceptors) {
+        instrumentAnnotationMetadata(beanContext, method);
         return resolveInterceptorsInternal(method, Around.class, interceptors);
     }
 
@@ -163,13 +167,21 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
      * @return The filtered array of interceptors
      */
     @Internal
-    public static Interceptor[] resolveIntroductionInterceptors(ExecutableMethod<?,?> method, Interceptor...interceptors) {
-        Interceptor[] aroundInterceptors = resolveAroundInterceptors(method, interceptors);
+    public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor...interceptors) {
+        instrumentAnnotationMetadata(beanContext, method);
+        Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
         if(introductionInterceptors.length == 0) {
             throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
         }
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
+    }
+
+    private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
+        if(beanContext instanceof ApplicationContext && method.getAnnotationMetadata() instanceof DefaultAnnotationMetadata) {
+            // ensure metadata is environment aware
+            ((DefaultAnnotationMetadata) method.getAnnotationMetadata()).configure(beanContext);
+        }
     }
 
 

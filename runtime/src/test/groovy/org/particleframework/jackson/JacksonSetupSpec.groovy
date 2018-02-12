@@ -23,8 +23,8 @@ class JacksonSetupSpec extends Specification {
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
 
-//        cleanup:
-//        applicationContext.close()
+        cleanup:
+        applicationContext?.close()
     }
 
 
@@ -46,6 +46,6 @@ class JacksonSetupSpec extends Specification {
         applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 }

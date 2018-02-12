@@ -13,6 +13,8 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.*;
+
+import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
@@ -51,7 +53,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String.class,
             Class[].class
     ));
-    private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(AbstractBeanDefinition.class, boolean.class, Class.class, Constructor.class, Argument[].class)
+    private static final Constructor<AbstractBeanDefinition> CONSTRUCTOR_ABSTRACT_BEAN_DEFINITION = ReflectionUtils.findConstructor(
+            AbstractBeanDefinition.class,
+            Class.class,
+            Constructor.class,
+            Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Particle found on the class path"));
     private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
@@ -142,7 +148,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
 
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
-            boolean.class, Class.class, Constructor.class, Argument[].class
+            Class.class, Constructor.class, Argument[].class
     ));
 
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_METHOD_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
@@ -158,7 +164,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final String beanDefinitionInternalName;
     private final Type beanType;
     private final Type providedType;
-    private final boolean isSingleton;
     private final Set<Class> interfaceTypes;
     private final Map<String, ExecutableMethodWriter> methodExecutors = new LinkedHashMap<>();
     private final String providedBeanClassName;
@@ -216,7 +221,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 String className,
                                 boolean isSingleton,
                                 AnnotationMetadata annotationMetadata) {
-        this(packageName, className, packageName + '.' + className, false, isSingleton, annotationMetadata);
+        this(packageName, className, packageName + '.' + className, false, annotationMetadata);
     }
 
 
@@ -226,15 +231,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param packageName       The package name of the bean
      * @param className         The class name, without the package, of the bean
      * @param providedClassName The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
-     * @param isSingleton       Is the scope a singleton
      */
     public BeanDefinitionWriter(String packageName,
                                 String className,
                                 String providedClassName,
                                 boolean isInterface,
-                                boolean isSingleton,
                                 AnnotationMetadata annotationMetadata) {
-        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface, isSingleton, annotationMetadata);
+        this(packageName, className, packageName + ".$" + className + "Definition", providedClassName, isInterface,  annotationMetadata);
     }
 
 
@@ -245,14 +248,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param className         The class name, without the package, of the bean
      * @param providedClassName The type this bean definition provides, which differs from the class name in the case of factory beans
      * @param isInterface       Whether the provided type is an interface
-     * @param isSingleton       Is the scope a singleton
      */
     public BeanDefinitionWriter(String packageName,
                                 String className,
                                 String beanDefinitionName,
                                 String providedClassName,
                                 boolean isInterface,
-                                boolean isSingleton,
                                 AnnotationMetadata annotationMetadata) {
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.packageName = packageName;
@@ -266,7 +267,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.beanType = getTypeReference(beanFullClassName);
         this.providedType = getTypeReference(providedBeanClassName);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
-        this.isSingleton = isSingleton;
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
@@ -286,7 +286,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public boolean isSingleton() {
-        return isSingleton;
+        return annotationMetadata.hasDeclaredStereotype(Singleton.class);
     }
 
     @Override
@@ -1792,21 +1792,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // ALOAD 0
             defaultConstructor.visitVarInsn(ALOAD, 0);
 
-            // 1st argument: pass either true or false to second argument of super(..) for singleton status
-            if (isSingleton) {
-                defaultConstructor.visitInsn(ICONST_1);
-            } else {
-                defaultConstructor.visitInsn(ICONST_0);
-            }
-
-            // 2nd argument: pass the bean definition type as the third argument to super(..)
+            // 1st argument: pass the bean definition type as the third argument to super(..)
             defaultConstructor.visitLdcInsn(beanType);
 
-            // 3rd Argument: pass the constructor used to create the bean as the third argument
+            // 2nd Argument: pass the constructor used to create the bean as the third argument
             defaultConstructorVisitor.getStatic(beanDefinitionType, FIELD_CONSTRUCTOR, TYPE_CONSTRUCTOR);
 
-
-            // 4th argument: An array of Argument instances
+            // 3rd argument: An array of Argument instances
 
             // now invoke super(..) if no arg constructor
             if (argumentTypes.isEmpty()) {

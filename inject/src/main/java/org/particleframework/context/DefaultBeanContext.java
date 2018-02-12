@@ -606,7 +606,7 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                     reduced.parallel()
-                            .map(BeanDefinitionReference::load)
+                            .map(ref-> ref.load(this))
                             .filter(candidate -> candidate.isEnabled(this))
             );
             candidates = candidateStream.collect(Collectors.toList());
@@ -628,7 +628,7 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
             List collection = beanDefinitionsClasses
                     .stream()
-                    .map(BeanDefinitionReference::load)
+                    .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
             return (Collection<BeanDefinition<?>>) collection;
@@ -736,7 +736,7 @@ public class DefaultBeanContext implements BeanContext {
         for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
             try {
 
-                BeanDefinition beanDefinition = contextScopeBean.load();
+                BeanDefinition beanDefinition = contextScopeBean.load(this);
                 if (beanDefinition.isEnabled(this)) {
                     createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
                 }
@@ -749,13 +749,20 @@ public class DefaultBeanContext implements BeanContext {
 
             @SuppressWarnings("unchecked") Stream<BeanDefinitionMethodReference<?, ?>> methodStream = processedBeans
                     .parallelStream()
+                    // is the bean reference enabled
+                    .filter(ref -> ref.isEnabled(this))
+                    // ok - continue and load it
                     .map((Function<BeanDefinitionReference, BeanDefinition<?>>) reference -> {
                         try {
-                            return reference.load();
+                            return reference.load(this);
                         } catch (Exception e) {
                             throw new BeanInstantiationException("Bean definition [" + reference.getName() + "] could not be loaded: " + e.getMessage(), e);
                         }
-                    }).flatMap(beanDefinition ->
+                    })
+                    // is the bean itself enabled
+                    .filter(bean -> bean.isEnabled(this))
+                    // ok continue and get all of the ExecutableMethod references
+                    .flatMap(beanDefinition ->
                             beanDefinition.getExecutableMethods()
                                           .parallelStream()
                                           .map((Function<ExecutableMethod<?, ?>, BeanDefinitionMethodReference<?, ?>>) executableMethod ->
@@ -763,6 +770,8 @@ public class DefaultBeanContext implements BeanContext {
                                           )
                     );
 
+            // group the method references by annotation type such that we have a map of Annotation -> MethodReference
+            // ie. Class<Scheduled> -> @Scheduled void someAnnotation()
             Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = methodStream
                     .collect(
                             Collectors.groupingBy((Function<ExecutableMethod<?, ?>, Class<? extends Annotation>>) executableMethod ->
@@ -771,23 +780,16 @@ public class DefaultBeanContext implements BeanContext {
                 new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
             )));
 
+            // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
                 Class<? extends Annotation> annotationType = entry.getKey();
-                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType)).forEach(processor -> {
+                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
+                        .forEach(processor -> {
                     for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
                         //noinspection unchecked
                         processor.process(method.getBeanDefinition(), method);
                     }
                 });
-            }
-        }
-        for (BeanDefinitionReference reference : processedBeans) {
-            try {
-                BeanDefinition<?> beanDefinition = reference.load();
-                Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
-            }
-            catch(Throwable e) {
-
             }
         }
     }
@@ -817,7 +819,7 @@ public class DefaultBeanContext implements BeanContext {
 
                         return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
-                    .map(ref -> (BeanDefinition<T>) ref.load());
+                    .map(ref -> (BeanDefinition<T>) ref.load(this));
 
             if(filter != null) {
                 candidateStream= candidateStream.filter(candidate -> !candidate.equals(filter));
@@ -862,7 +864,7 @@ public class DefaultBeanContext implements BeanContext {
 
                             return candidateType != null && candidateType.isInstance(instance);
                         })
-                        .map(BeanDefinitionReference::load)
+                        .map(ref -> ref.load(this))
                         .filter(candidate -> candidate.isEnabled(this))
                         .collect(Collectors.toList());
 
