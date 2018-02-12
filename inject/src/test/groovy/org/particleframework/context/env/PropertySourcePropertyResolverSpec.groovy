@@ -62,14 +62,16 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
 
-                resolver.getProperty(key, Object).isPresent()
+        resolver.getProperty(key, Object).isPresent()
         resolver.getProperty(key, type).get() == expected
         resolver.containsProperty(key)
 
         where:
         property      | value                                       | key           | type    | expected
         'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
+        'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
         'my.property' | '${not.there:also.not.there:50}'            | 'my.property' | String  | '50'
+        'my.property' | '${not.there:also.not.there:}'              | 'my.property' | String  | ''
         'my.property' | '${not.there:USER:50}'                      | 'my.property' | String  | System.getenv('USER')
         'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}' | 'my.property' | String  | '10 + 50 + 10'
         'my.property' | '${foo.bar}'                                | 'my.property' | String  | '10'

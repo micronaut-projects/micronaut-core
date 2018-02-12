@@ -15,7 +15,6 @@
  */
 package org.particleframework.context.env;
 
-import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.util.CollectionUtils;
@@ -26,7 +25,6 @@ import org.particleframework.core.value.PropertyResolver;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances</p>
@@ -36,6 +34,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
     protected final ConversionService<?> conversionService;
+    protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String,PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
@@ -48,6 +47,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
+        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this);
     }
 
     /**
@@ -205,73 +205,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if(value instanceof CharSequence) {
-            String str = value.toString();
-            int i = str.indexOf("${");
-            if(i > -1) {
-                value = resolvePlaceholders(str, i);
-            }
+            return propertyPlaceholderResolver.resolveRequiredPlaceholder(value.toString());
         }
         return value;
     }
 
-    private String resolvePlaceholders(String str, int startIndex) {
-        StringBuilder builder = new StringBuilder(str.substring(0, startIndex));
-        String restOfString = str.substring(startIndex + 2, str.length());
-        int i = restOfString.indexOf('}');
-        if(i > - 1) {
-            String expr = restOfString.substring(0, i).trim();
-            if(restOfString.length() > i) {
-                restOfString = restOfString.substring(i+1, restOfString.length());
-            }
-            resolveExpression(builder, str, expr);
 
-            i = restOfString.indexOf("${");
-            if(i > -1) {
-                builder.append(resolvePlaceholders(restOfString, i));
-            }
-        }
-        else {
-            throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
-        }
-        return builder.toString();
-    }
-
-    private void resolveExpression(StringBuilder builder, String str, String expr) {
-        String defaultValue = null;
-        int j = expr.indexOf(':');
-        if(j > -1) {
-            defaultValue = expr.substring(j + 1, expr.length());
-            expr = expr.substring(0, j);
-        }
-        if(expr.indexOf('.') > -1) {
-            if(defaultValue != null) {
-                if(defaultValue.contains(":")) {
-                    StringBuilder resolved = new StringBuilder();
-                    resolveExpression(resolved,  expr, defaultValue);
-                    builder.append( getProperty(expr, String.class, resolved.toString()) );
-                }
-                else {
-                    builder.append( getProperty(expr, String.class, defaultValue) );
-                }
-            }
-            else {
-                String finalExpr = expr;
-                builder.append( getProperty(expr, String.class).orElseThrow(()-> new ConfigurationException("Could not resolve placeholder ${"+ finalExpr +"} in value: " + str)) );
-            }
-        }
-        else if(expr.matches("^[\\p{Lu}_]+")) {
-            String v = System.getenv(expr);
-            if(StringUtils.isNotEmpty(v)) {
-                builder.append(v);
-            }
-            else if(defaultValue != null) {
-                builder.append(defaultValue);
-            }
-            else {
-                throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
-            }
-        }
-    }
 
     protected Properties resolveSubProperties(String name, Map<String, Object> entries) {
         // special handling for maps for resolving sub keys
