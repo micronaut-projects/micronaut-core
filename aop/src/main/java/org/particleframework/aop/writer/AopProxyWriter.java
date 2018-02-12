@@ -68,9 +68,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     ));
     private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
-    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", ExecutableMethod.class, Interceptor[].class);
+    private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
 
-    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", ExecutableMethod.class, Interceptor[].class);
+    private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
 
     private static final Constructor CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
             new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Particle?")
@@ -273,10 +273,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructorQualfierTypes = qualifierTypes;
         this.constructorGenericTypes = genericTypes;
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
-        if(isProxyTarget) {
-            this.beanContextArgumentIndex = argumentTypes.size();
-            constructorNewArgumentTypes.put("beanContext", BeanContext.class);
-        }
+        this.beanContextArgumentIndex = argumentTypes.size();
+        constructorNewArgumentTypes.put("beanContext", BeanContext.class);
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
     }
@@ -1107,18 +1105,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private void pushResolveInterceptorsCall(GeneratorAdapter proxyConstructorGenerator, int i) {
         // The following will initialize the array of interceptor instances
-        // eg. this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(proxyMethods[0], interceptors);
+        // eg. this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(beanContext, proxyMethods[0], interceptors);
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.getField(proxyType, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS);
         proxyConstructorGenerator.push(i);
 
-        // First argument ie. proxyMethods[0]
+        // First argument. The bean context
+        proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
+
+        // Second argument ie. proxyMethods[0]
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.getField(proxyType, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS);
         proxyConstructorGenerator.push(i);
         proxyConstructorGenerator.visitInsn(AALOAD);
 
-        // Second argument ie. interceptors
+        // Third argument ie. interceptors
         proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
         if(isIntroduction) {
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD));

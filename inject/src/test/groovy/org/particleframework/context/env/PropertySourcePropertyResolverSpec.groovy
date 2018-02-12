@@ -68,6 +68,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         where:
         property      | value                                       | key           | type    | expected
+        'my.property' | '/${foo.bar}/stuff'                         | 'my.property' | String  | '/10/stuff'
         'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
         'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
         'my.property' | '${not.there:also.not.there:50}'            | 'my.property' | String  | '50'

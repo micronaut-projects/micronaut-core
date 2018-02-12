@@ -15,6 +15,9 @@
  */
 package org.particleframework.inject.annotation;
 
+import org.particleframework.context.ApplicationContext;
+import org.particleframework.context.BeanContext;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.annotation.Internal;
@@ -57,8 +60,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                     annotationClass = aClass.get();
                 }
                 Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, ConvertibleValues.of(annotationValue.getValues()));
-                if(annotation != null)
-                    result.add(annotation);
+                result.add(annotation);
             }
             if(!result.isEmpty()) {
                 return Optional.of(result.toArray((Object[]) Array.newInstance(annotationClass, result.size())));
@@ -77,6 +79,7 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
     private Annotation[] declaredAnnotationArray;
     private final Map<String, Annotation> annotationMap;
     private final Map<String, Annotation> declaredAnnotationMap;
+    private Environment environment;
 
 
     @Internal
@@ -109,6 +112,20 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         this.annotationMap = allAnnotations != null ? new ConcurrentHashMap<>(allAnnotations.size()) : null;
         this.annotationsByStereotype = annotationsByStereotype;
     }
+
+    /**
+     * Configures annotation metadata for the environment. This is an internal method and should not be called directly
+     *
+     * @param context The context
+     */
+    @Internal
+    public void configure(BeanContext context) {
+        if(context instanceof ApplicationContext) {
+            ApplicationContext applicationContext = (ApplicationContext) context;
+            this.environment = applicationContext.getEnvironment();
+        }
+    }
+
 
     @Override
     public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
@@ -171,10 +188,10 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         if(allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if(values != null) {
-                return ConvertibleValues.of(values);
+                return convertibleValuesOf(values);
             }
             else if(allStereotypes != null) {
-                return ConvertibleValues.of( allStereotypes.get(annotation) );
+                return convertibleValuesOf(allStereotypes.get(annotation));
             }
         }
         return ConvertibleValuesMap.empty();
@@ -186,10 +203,10 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         if(declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
             if(values != null) {
-                return ConvertibleValues.of(values);
+                return convertibleValuesOf(values);
             }
             else if(declaredStereotypes != null) {
-                return ConvertibleValues.of( declaredStereotypes.get(annotation) );
+                return convertibleValuesOf( declaredStereotypes.get(annotation) );
             }
         }
         return ConvertibleValuesMap.empty();
@@ -200,10 +217,23 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         if(allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if(values != null) {
-                return OptionalValues.of(valueType, values);
+                if(environment != null) {
+                    return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
+                }
+                else {
+                    return OptionalValues.of(valueType, values);
+                }
             }
             else {
-                return OptionalValues.of( valueType, allStereotypes.get(annotation) );
+                values = allStereotypes.get(annotation);
+                if(values != null) {
+                    if(environment != null) {
+                        return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
+                    }
+                    else {
+                        return OptionalValues.of( valueType, values);
+                    }
+                }
             }
         }
         return OptionalValues.empty();
@@ -296,6 +326,15 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 existing.putAll(values);
             }
             currentAnnotationValues.put(annotation, existing);
+        }
+    }
+
+    private ConvertibleValues<Object> convertibleValuesOf(Map<CharSequence, Object> values) {
+        if(environment != null) {
+            return EnvironmentConvertibleValuesMap.of(environment, values);
+        }
+        else {
+            return ConvertibleValues.of(values);
         }
     }
 

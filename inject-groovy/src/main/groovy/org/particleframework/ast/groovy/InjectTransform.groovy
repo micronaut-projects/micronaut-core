@@ -336,7 +336,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         factoryMethodBeanDefinitionName,
                         producedType.name,
                         producedType.isInterface(),
-                        methodAnnotationMetadata.hasDeclaredStereotype(Singleton),
                         methodAnnotationMetadata
                 )
 
@@ -840,7 +839,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             classNode.isInterface(),
-                            annotationMetadata.hasDeclaredStereotype(Singleton), annotationMetadata)
+                            annotationMetadata)
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(

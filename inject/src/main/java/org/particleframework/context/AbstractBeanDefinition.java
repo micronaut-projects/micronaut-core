@@ -22,6 +22,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
+import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
 import javax.annotation.PostConstruct;
@@ -33,6 +34,7 @@ import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -96,15 +98,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Internal
-    protected AbstractBeanDefinition(boolean singleton,
-                                     Class<T> type,
+    protected AbstractBeanDefinition(Class<T> type,
                                      Constructor<T> constructor,
                                      Argument... arguments) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
         this.isProvided = annotationMetadata.hasDeclaredStereotype(Provided.class);
-        this.singleton = singleton;
+        this.singleton = annotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
         this.constructor = new DefaultConstructorInjectionPoint<>(this, constructor, arguments);
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
@@ -250,6 +251,34 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
         return Collections.unmodifiableCollection(this.executableMethodMap.values());
     }
+
+
+    /**
+     * Configures the bean for the given {@link BeanContext}. If the context features an {@link org.particleframework.context.env.Environment} this
+     * method configures the annotation metadata such that environment aware values are returned
+     *
+     * @param context The bean context
+     */
+    void configure(BeanContext context) {
+        AnnotationMetadata am = getAnnotationMetadata();
+        if(am instanceof DefaultAnnotationMetadata) {
+            ((DefaultAnnotationMetadata) am).configure(context);
+        }
+        for (MethodInjectionPoint methodInjectionPoint : methodInjectionPoints) {
+            AnnotationMetadata annotationMetadata = methodInjectionPoint.getAnnotationMetadata();
+            if(annotationMetadata instanceof DefaultAnnotationMetadata) {
+                ((DefaultAnnotationMetadata)annotationMetadata).configure(context);
+            }
+        }
+
+        executableMethodMap.values().parallelStream().forEach(method -> {
+            AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
+            if(annotationMetadata instanceof DefaultAnnotationMetadata) {
+                ((DefaultAnnotationMetadata)annotationMetadata).configure(context);
+            }
+        });
+    }
+
 
     /**
      * Resolves the proxied bean instance for this bean
@@ -1516,6 +1545,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             }
         }
     }
+
 
     private class MethodKey {
         final String name;

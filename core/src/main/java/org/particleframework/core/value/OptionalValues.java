@@ -94,7 +94,7 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
         if(values == null) {
             return empty();
         }
-        return new MapOptionalValues<>(type, values);
+        return new OptionalValuesMap<>(type, values);
     }
 
 

@@ -2,6 +2,7 @@ package org.particleframework.inject;
 
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationMetadataProvider;
 import org.particleframework.core.annotation.AnnotationSource;
@@ -40,11 +41,18 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
     String getReplacesBeanDefinitionName();
 
     /**
-     * Loads the component definition
+     * Loads the bean definition
      *
      * @return The loaded component definition or null if it shouldn't be loaded
      */
     BeanDefinition<T> load();
+
+    /**
+     * Loads the bean definition for the current {@link BeanContext}
+     *
+     * @return The loaded bean definition or null if it shouldn't be loaded
+     */
+    BeanDefinition<T> load(BeanContext context);
 
     /**
      * @return Is this class context scope

@@ -24,8 +24,8 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-class MapOptionalMultiValues<V> extends MapOptionalValues<List<V>> implements OptionalMultiValues<V> {
-    public MapOptionalMultiValues(Class<?> type, Map<CharSequence, ?> values) {
+class OptionalMultiValuesMap<V> extends OptionalValuesMap<List<V>> implements OptionalMultiValues<V> {
+    public OptionalMultiValuesMap(Class<?> type, Map<CharSequence, ?> values) {
         super(type, values);
     }
 }

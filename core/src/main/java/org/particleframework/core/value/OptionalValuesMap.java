@@ -26,20 +26,21 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class MapOptionalValues<T> implements OptionalValues<T> {
+public class OptionalValuesMap<T> implements OptionalValues<T> {
     private final Class<?> type;
-    private final Map<CharSequence, ?> values;
-    private final ValueResolver resolver;
+    protected final ValueResolver resolver;
+    protected final Map<CharSequence, ?> values;
 
-    public MapOptionalValues(Class<?> type, Map<CharSequence, ?> values) {
+    protected OptionalValuesMap(Class<?> type, Map<CharSequence, ?> values) {
         this.type = type;
         this.values = values;
         this.resolver = new MapValueResolver<>(values);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Optional<T> get(CharSequence name) {
-        return resolver.get(name, (Class)type);
+        return resolver.get(name, type);
     }
 
     @SuppressWarnings("unchecked")
@@ -58,7 +59,7 @@ class MapOptionalValues<T> implements OptionalValues<T> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        MapOptionalValues that = (MapOptionalValues) o;
+        OptionalValuesMap that = (OptionalValuesMap) o;
 
         return values.equals(that.values);
     }

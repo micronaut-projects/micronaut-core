@@ -48,6 +48,6 @@ public interface OptionalMultiValues<V> extends OptionalValues<List<V>> {
      * @return The values
      */
     static <T> OptionalMultiValues<T> of(Map<CharSequence, List<T>> values ) {
-        return new MapOptionalMultiValues<>(List.class, values);
+        return new OptionalMultiValuesMap<>(List.class, values);
     }
 }
