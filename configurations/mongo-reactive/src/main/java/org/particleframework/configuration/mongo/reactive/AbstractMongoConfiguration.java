@@ -73,6 +73,16 @@ abstract class AbstractMongoConfiguration {
      */
     public void setUri(String uri) {
         this.uri = uri;
+        Optional<ConnectionString> connectionString = getConnectionString();
+        if(connectionString.isPresent()) {
+            ConnectionString cs = connectionString.get();
+
+            getServerSettings().applyConnectionString(cs);
+            getClusterSettings().applyConnectionString(cs);
+            getPoolSettings().applyConnectionString(cs);
+            getSslSettings().applyConnectionString(cs);
+            getSocketSettings().applyConnectionString(cs);
+        }
     }
 
 
@@ -90,22 +100,13 @@ abstract class AbstractMongoConfiguration {
      * @return Builds the {@link MongoClientSettings}
      */
     public MongoClientSettings buildSettings() {
-        Optional<ConnectionString> connectionString = getConnectionString();
         ClusterSettings.Builder clusterSettings = getClusterSettings();
         SslSettings.Builder sslSettings = getSslSettings();
         ConnectionPoolSettings.Builder poolSettings = getPoolSettings();
         SocketSettings.Builder socketSettings = getSocketSettings();
         ServerSettings.Builder serverSettings = getServerSettings();
 
-        if(connectionString.isPresent()) {
-            ConnectionString cs = connectionString.get();
 
-            serverSettings.applyConnectionString(cs);
-            clusterSettings.applyConnectionString(cs);
-            poolSettings.applyConnectionString(cs);
-            sslSettings.applyConnectionString(cs);
-            socketSettings.applyConnectionString(cs);
-        }
         MongoClientSettings.Builder clientSettings = getClientSettings();
         clientSettings.clusterSettings(clusterSettings.build())
                       .serverSettings(serverSettings.build())

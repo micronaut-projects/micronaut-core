@@ -15,14 +15,11 @@
  */
 package org.particleframework.configuration.mongo.reactive;
 
-import com.mongodb.ConnectionString;
 import com.mongodb.async.client.MongoClientSettings;
 import com.mongodb.connection.*;
 import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.Requires;
-
-import java.util.Optional;
 
 /**
  * The default MongoDB configuration class
@@ -30,10 +27,15 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Requires(property = MongoSettings.MONGODB_URI)
-@Requires(missingProperty = MongoSettings.MONGODB_ADDRESSES)
+@Requires(property = MongoSettings.PREFIX)
+@Requires(missingProperty = MongoSettings.MONGODB_SERVERS)
 @ConfigurationProperties(MongoSettings.PREFIX)
 public class MongoConfiguration extends AbstractMongoConfiguration {
+
+    @Override
+    public void setUri(String uri) {
+        super.setUri(uri);
+    }
 
     @ConfigurationBuilder(prefixes = "")
     protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();

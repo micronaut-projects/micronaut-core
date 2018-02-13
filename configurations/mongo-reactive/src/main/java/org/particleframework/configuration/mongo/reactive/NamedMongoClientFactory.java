@@ -21,6 +21,7 @@ import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.EachBean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.runtime.context.scope.Refreshable;
 
 /**
  * Factory for named {@link MongoClient} instances. Creates the injectable {@link Primary} bean
@@ -33,6 +34,7 @@ public class NamedMongoClientFactory {
 
     @Bean(preDestroy = "close")
     @EachBean(NamedMongoConfiguration.class)
+    @Refreshable
     MongoClient mongoClient(NamedMongoConfiguration configuration) {
         return MongoClients.create(configuration.buildSettings());
     }

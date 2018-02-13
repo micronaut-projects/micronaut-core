@@ -31,10 +31,6 @@ public interface MongoSettings {
      */
     String MONGODB_URI = PREFIX + ".uri";
     /**
-     * The MongoDB URIs setting
-     */
-    String MONGODB_ADDRESSES = PREFIX + ".addresses";
-    /**
      * The MongoDB servers settings
      */
     String MONGODB_SERVERS = PREFIX + ".servers";

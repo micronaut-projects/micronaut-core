@@ -15,7 +15,10 @@
  */
 package org.particleframework.configuration.mongo.reactive;
 
+import com.mongodb.async.client.MongoClientSettings;
+import com.mongodb.connection.*;
 import org.particleframework.context.annotation.Argument;
+import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.EachProperty;
 
 /**
@@ -25,15 +28,66 @@ import org.particleframework.context.annotation.EachProperty;
  * @since 1.0
  */
 @EachProperty(value = MongoSettings.MONGODB_SERVERS)
-public class NamedMongoConfiguration extends MongoConfiguration {
+public class NamedMongoConfiguration extends AbstractMongoConfiguration {
 
     private final String serverName;
+    @ConfigurationBuilder(prefixes = "")
+    protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();
+
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "cluster")
+    protected ClusterSettings.Builder clusterSettings = ClusterSettings.builder();
+
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "server")
+    protected ServerSettings.Builder serverSettings = ServerSettings.builder();
+
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "connectionPool")
+    protected ConnectionPoolSettings.Builder poolSettings = ConnectionPoolSettings.builder();
+
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "socket")
+    protected SocketSettings.Builder socketSettings = SocketSettings.builder();
+
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "ssl")
+    protected SslSettings.Builder sslSettings = SslSettings.builder();
+
 
     public NamedMongoConfiguration(@Argument String serverName) {
         this.serverName = serverName;
     }
 
+    /**
+     * @return The name of the server
+     */
     public String getServerName() {
         return serverName;
+    }
+
+    @Override
+    public ClusterSettings.Builder getClusterSettings() {
+        return clusterSettings;
+    }
+
+    @Override
+    public MongoClientSettings.Builder getClientSettings() {
+        return clientSettings;
+    }
+
+    @Override
+    public ServerSettings.Builder getServerSettings() {
+        return serverSettings;
+    }
+
+    @Override
+    public ConnectionPoolSettings.Builder getPoolSettings() {
+        return poolSettings;
+    }
+
+    @Override
+    public SocketSettings.Builder getSocketSettings() {
+        return socketSettings;
+    }
+
+    @Override
+    public SslSettings.Builder getSslSettings() {
+        return sslSettings;
     }
 }
