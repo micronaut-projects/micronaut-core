@@ -1,3 +1,5 @@
+mainClassName = "example.pets.Application"
+
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
 
@@ -11,4 +13,7 @@ dependencies {
     testCompile "org.particleframework:inject-java:${projectVersion}"
     testCompile "org.particleframework:http-client:${projectVersion}"
     testRuntime "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+}
+shadowJar {
+    mergeServiceFiles()
 }
