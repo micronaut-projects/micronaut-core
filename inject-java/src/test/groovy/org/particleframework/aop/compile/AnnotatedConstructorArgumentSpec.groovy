@@ -44,7 +44,7 @@ class MyBean {
 
     private String myValue;
     
-    MyBean(@Value("foo.bar") String val) {
+    MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
     

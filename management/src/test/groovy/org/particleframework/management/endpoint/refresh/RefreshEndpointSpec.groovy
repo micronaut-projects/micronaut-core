@@ -95,7 +95,7 @@ class RefreshEndpointSpec extends Specification {
 
         final MyConfig config
 
-        @Value('foo.bar')
+        @Value('${foo.bar}')
         String foo
 
         RefreshBean(MyConfig config) {

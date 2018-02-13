@@ -16,6 +16,7 @@
 package org.particleframework.context;
 
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.context.env.PropertySource;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.util.StringUtils;
@@ -32,7 +33,7 @@ import java.util.function.Consumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ApplicationContext extends BeanContext, PropertyResolver {
+public interface ApplicationContext extends BeanContext, PropertyResolver, PropertyPlaceholderResolver {
 
     /**
      * @return The default conversion service

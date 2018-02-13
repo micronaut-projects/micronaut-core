@@ -48,7 +48,7 @@ public class ValidatorFactoryProvider {
     @Inject
     protected Optional<ParameterNameProvider> parameterNameProvider = Optional.empty();
 
-    @Value("hibernate.validator.ignoreXmlConfiguration:true")
+    @Value("${hibernate.validator.ignoreXmlConfiguration:true}")
     protected boolean ignoreXmlConfiguration = true;
 
     @Singleton

@@ -41,7 +41,7 @@ public class DefaultRedisClusterClientFactory {
     @Bean(preDestroy = "shutdown")
     @Singleton
     @Primary
-    public RedisClusterClient redisClient(@Value("particle.redis.uris") String...uris) {
+    public RedisClusterClient redisClient(@Value("${particle.redis.uris}") String...uris) {
         if(ArrayUtils.isEmpty(uris)) {
             throw new ConfigurationException("Redis URIs must be specified");
         }

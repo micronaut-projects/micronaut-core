@@ -38,7 +38,7 @@ class MockConsulAuth implements HttpServerFilter, Toggleable{
 
     final Optional<String> token
 
-    MockConsulAuth(@Value('consul.client.aslToken') Optional<String> token) {
+    MockConsulAuth(@Value('${consul.client.aslToken}') Optional<String> token) {
         this.token = token
     }
 

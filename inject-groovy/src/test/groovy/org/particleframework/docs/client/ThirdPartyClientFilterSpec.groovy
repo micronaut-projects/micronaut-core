@@ -100,7 +100,7 @@ class BintrayService {
     @Client(BintrayApi.URL)
     RxHttpClient client
 
-    @Value('bintray.organization')
+    @Value('${bintray.organization}')
     String org
 
     Flowable<HttpResponse<String>> fetchRepositories() {
@@ -117,10 +117,10 @@ class BintrayService {
 @Filter('/repos/**') // <1>
 class BintrayFilter implements HttpClientFilter {
 
-    @Value('bintray.username')
+    @Value('${bintray.username}')
     String username
 
-    @Value('bintray.token')
+    @Value('${bintray.token}')
     String token
 
     @Override

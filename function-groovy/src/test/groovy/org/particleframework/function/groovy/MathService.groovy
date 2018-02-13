@@ -25,7 +25,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MathService {
-    @Value('math.multiplier')
+    @Value('${math.multiplier}')
     Integer multiplier = 1
 
     int round(float value) {

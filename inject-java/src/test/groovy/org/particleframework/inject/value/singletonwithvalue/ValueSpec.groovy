@@ -8,8 +8,9 @@ class ValueSpec extends Specification {
 
     void "test configuration injection with @Value"() {
         given:
-        System.setProperty("foo.bar", "8080")
-        ApplicationContext context = new DefaultApplicationContext("test").start()
+        ApplicationContext context = ApplicationContext.run(
+                "foo.bar":"8080"
+        )
         A a = context.getBean(A)
         B b = context.getBean(B)
 
@@ -23,7 +24,5 @@ class ValueSpec extends Specification {
         b.fromConstructor == 8080
         b.a != null
 
-        cleanup:
-        System.setProperty("foo.bar", "")
     }
 }
