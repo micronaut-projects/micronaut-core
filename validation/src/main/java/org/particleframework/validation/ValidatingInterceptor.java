@@ -70,18 +70,23 @@ public class ValidatingInterceptor implements MethodInterceptor {
             return context.proceed();
         } else {
             Method targetMethod = context.getTargetMethod();
-
-            Set<ConstraintViolation<Object>> constraintViolations = executableValidator
-                    .validateParameters(
-                            context.getTarget(),
-                            targetMethod,
-                            context.getParameterValues()
-                    );
-            if (constraintViolations.isEmpty()) {
+            if(targetMethod.getParameterTypes().length == 0) {
                 return context.proceed();
-            } else {
-                throw new ConstraintViolationException(constraintViolations);
             }
+            else {
+                Set<ConstraintViolation<Object>> constraintViolations = executableValidator
+                        .validateParameters(
+                                context.getTarget(),
+                                targetMethod,
+                                context.getParameterValues()
+                        );
+                if (constraintViolations.isEmpty()) {
+                    return context.proceed();
+                } else {
+                    throw new ConstraintViolationException(constraintViolations);
+                }
+            }
+
         }
     }
 }
