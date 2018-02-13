@@ -63,6 +63,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         expect:
 
         resolver.getProperty(key, Object).isPresent()
+        resolver.getProperty(key, type)
         resolver.getProperty(key, type).get() == expected
         resolver.containsProperty(key)
 
@@ -81,6 +82,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${foo.bar[0]}'                             | 'my.property' | List    | ['10']
         'my.property' | '${foo.bar[0]}'                             | 'my.property' | Integer | 10
         'my.property' | '${USER}'                                   | 'my.property' | String  | System.getenv('USER')
+        'my.property' | '${JAVA_HOME}'                              | 'my.property' | String  | System.getenv('JAVA_HOME')
     }
 
 
