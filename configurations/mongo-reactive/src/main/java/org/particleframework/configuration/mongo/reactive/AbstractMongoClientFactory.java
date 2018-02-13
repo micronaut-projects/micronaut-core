@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.particleframework.configuration.mongo.reactive;
+
+import com.mongodb.reactivestreams.client.MongoClient;
 
 /**
- * Configuration group for Mongo Reactive Streams
- *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-@Configuration
-@RequiresMongo
-package org.particleframework.configuration.mongo.reactive;
-import org.particleframework.configuration.mongo.reactive.condition.RequiresMongo;
-import org.particleframework.context.annotation.Configuration;
+public abstract class AbstractMongoClientFactory {
+}

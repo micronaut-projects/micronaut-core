@@ -16,6 +16,7 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.ConvertibleValuesMap;
@@ -43,9 +44,17 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
+        PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if(value instanceof CharSequence) {
-            String resolved = environment.getPlaceholderResolver().resolveRequiredPlaceholder(value.toString());
+            String resolved = placeholderResolver.resolveRequiredPlaceholder(value.toString());
             return environment.convert(resolved, conversionContext);
+        }
+        else if(value instanceof String[]) {
+            String[] a = (String[]) value;
+            for (int i = 0; i < a.length; i++) {
+                a[i] = placeholderResolver.resolveRequiredPlaceholder(a[i]);
+            }
+            return environment.convert(a, conversionContext);
         }
         else {
             return super.get(name, conversionContext);

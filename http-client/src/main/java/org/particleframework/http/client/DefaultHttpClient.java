@@ -734,16 +734,18 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                if (fullResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
+                HttpResponseStatus status = fullResponse.status();
+                int statusCode = status.code();
+                if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                     fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
+                boolean errorStatus = statusCode >= 400;
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
+                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
 
-                HttpStatus status = response.getStatus();
-                if (status.getCode() >= 400) {
-                    completableFuture.completeExceptionally(new HttpClientResponseException(status.getReason(), response));
+                if (errorStatus) {
+                    completableFuture.completeExceptionally(new HttpClientResponseException(status.reasonPhrase(), response));
                 } else {
                     completableFuture.complete(response);
                 }
