@@ -1,0 +1,5 @@
+include "api"
+include "appointments"
+include "clinics"
+include "people"
+include "pets"

@@ -15,6 +15,8 @@
  */
 package example.api.v1;
 
+import javax.validation.constraints.NotBlank;
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -23,6 +25,14 @@ public class Pet {
 
     private String name;
 
+    public Pet(String name) {
+        this.name = name;
+    }
+
+    public Pet() {
+    }
+
+    @NotBlank
     public String getName() {
         return name;
     }

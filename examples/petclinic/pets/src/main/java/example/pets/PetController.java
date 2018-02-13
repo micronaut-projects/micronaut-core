@@ -16,14 +16,20 @@
 package example.pets;
 
 import com.mongodb.reactivestreams.client.MongoClient;
+import com.mongodb.reactivestreams.client.MongoCollection;
+import com.mongodb.reactivestreams.client.Success;
 import example.api.v1.Pet;
 import example.api.v1.PetOperations;
 import io.reactivex.Flowable;
+import io.reactivex.Single;
+import io.reactivex.functions.Function;
+import org.bson.Document;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.http.annotation.Controller;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -35,20 +41,34 @@ import java.util.List;
 public class PetController implements PetOperations {
 
     private final String databaseName;
+    private final String collectionName;
     private MongoClient mongoClient;
 
     public PetController(
             @Value("pets.database.name") String databaseName,
+            @Value("pets.some.value") String collectionName,
+//            @Value("pets.collection.name:pets") String collectionName, TODO: doesn't work
             MongoClient mongoClient) {
+        this.collectionName = collectionName;
         this.databaseName = databaseName;
         this.mongoClient = mongoClient;
     }
 
     @Override
-    public Publisher<Pet> list() {
+    public Single<List<Pet>> list() {
+        return Flowable.fromPublisher(getCollection()
+                    .find(Pet.class)).toList();
+    }
+
+    @Override
+    public Single<Pet> save(@Valid Pet pet) {
+        return Single.fromPublisher(getCollection().insertOne(pet))
+                     .map(success -> pet);
+    }
+
+    private MongoCollection<Pet> getCollection() {
         return mongoClient
-                    .getDatabase(databaseName)
-                    .getCollection("pets")
-                    .find(Pet.class);
+                .getDatabase(databaseName)
+                .getCollection(collectionName, Pet.class);
     }
 }

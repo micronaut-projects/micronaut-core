@@ -18,6 +18,7 @@ package example.pets;
 import example.api.v1.Pet;
 import example.api.v1.PetOperations;
 import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
 
@@ -32,5 +33,5 @@ public interface PetControllerTestClient extends PetOperations {
 
     @Override
     @Get("/")
-    Flowable<Pet> list();
+    Single<List<Pet>> list();
 }

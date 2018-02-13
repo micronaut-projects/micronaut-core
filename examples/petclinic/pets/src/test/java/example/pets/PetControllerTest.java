@@ -36,9 +36,7 @@ public class PetControllerTest {
 
     @BeforeClass
     public static void setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap(
-                "particle.http.client.readTimeout","10m"
-        ));
+        embeddedServer = ApplicationContext.run(EmbeddedServer.class);
     }
 
     @AfterClass
@@ -54,9 +52,20 @@ public class PetControllerTest {
 
         List<Pet> pets = client
                             .list()
-                            .toList()
-                            .onErrorReturnItem(Collections.emptyList())
                             .blockingGet();
         assertEquals(pets.size(), 0);
+
+//        client.save(new Pet("")).blockingGet();
+
+        Pet dino = client.save(new Pet("Dino")).blockingGet();
+
+        assertNotNull(dino);
+
+        pets = client
+                .list()
+                .blockingGet();
+        assertEquals(pets.size(), 1);
+        assertEquals(pets.iterator().next().getName(), dino.getName());
+
     }
 }

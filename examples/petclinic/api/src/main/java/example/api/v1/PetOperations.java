@@ -15,17 +15,24 @@
  */
 package example.api.v1;
 
+import io.reactivex.Single;
 import org.particleframework.http.annotation.Get;
-import org.reactivestreams.Publisher;
+import org.particleframework.http.annotation.Post;
+import org.particleframework.validation.Validated;
 
+import javax.validation.Valid;
 import java.util.List;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Validated
 public interface PetOperations {
 
     @Get("/")
-    Publisher<Pet> list();
+    Single<List<Pet>> list();
+
+    @Post("/")
+    Single<Pet> save(@Valid Pet pet);
 }
