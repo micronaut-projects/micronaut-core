@@ -16,13 +16,10 @@
 package org.particleframework.docs.server.routes;
 
 // tag::imports[]
-import okhttp3.*;
 import org.junit.*;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
-import java.net.URL;
-
 import static org.junit.Assert.*;
 // end::imports[]
 
