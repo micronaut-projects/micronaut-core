@@ -22,4 +22,6 @@ subprojects {
         compile "org.particleframework:management:${projectVersion}"
         runtime "ch.qos.logback:logback-classic:1.2.3"
     }
+
+
 }
