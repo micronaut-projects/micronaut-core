@@ -26,6 +26,7 @@ import io.reactivex.functions.Function;
 import org.bson.Document;
 import org.particleframework.context.annotation.Value;
 import org.particleframework.http.annotation.Controller;
+import org.particleframework.validation.Validated;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -38,6 +39,7 @@ import java.util.List;
  */
 @Controller("/${pets.api.version}/pets")
 @Singleton
+@Validated
 public class PetController implements PetOperations {
 
     private final String databaseName;

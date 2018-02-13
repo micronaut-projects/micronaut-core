@@ -643,7 +643,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private AopProxyWriter resolveAopProxyWriter(BeanDefinitionVisitor beanWriter,
                                                      OptionalValues<Boolean> aopSettings,
                                                      boolean isFactoryType,
-                                                     ExecutableElementParamInfo constructorParamterInfo,
+                                                     ExecutableElementParamInfo constructorParameterInfo,
                                                      Object... interceptorTypes) {
             String beanName = beanWriter.getBeanDefinitionName();
             Name proxyKey = createProxyKey(beanName);
@@ -660,11 +660,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
 
 
-                if (constructorParamterInfo != null) {
+                if (constructorParameterInfo != null) {
                     aopProxyWriter.visitBeanDefinitionConstructor(
-                            constructorParamterInfo.getParameters(),
-                            constructorParamterInfo.getQualifierTypes(),
-                            constructorParamterInfo.getGenericTypes()
+                            constructorParameterInfo.getParameters(),
+                            constructorParameterInfo.getQualifierTypes(),
+                            constructorParameterInfo.getGenericTypes()
                     );
                 } else {
                     aopProxyWriter.visitBeanDefinitionConstructor();
@@ -672,10 +672,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 if (isFactoryType) {
                     aopProxyWriter
-                            .visitSuperFactoryType(beanName);
+                            .visitSuperBeanDefinitionFactory(beanName);
                 } else {
                     aopProxyWriter
-                            .visitSuperType(beanName);
+                            .visitSuperBeanDefinition(beanName);
                 }
                 aopWriter = aopProxyWriter;
                 beanDefinitionWriters.put(
@@ -974,7 +974,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
 
             boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
-            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
+            return new BeanDefinitionWriter(
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
                     providerTypeParam == null
@@ -982,7 +982,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             : providerTypeParam.toString(),
                     isInterface,
                     annotationMetadata);
-            return beanDefinitionWriter;
         }
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
@@ -1021,9 +1020,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
-            Optional<String> scopeAnn =
-                    annotationMetadata.getAnnotationNameByStereotype(Scope.class);
-
             Element element = typeUtils.asElement(producedType);
             TypeElement producedElement = modelUtils.classElementFor(element);
 
@@ -1036,14 +1032,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String shortClassName = modelUtils.simpleBinaryNameFor(producedElement);
             String upperCaseMethodName = NameUtils.capitalize(method.getSimpleName().toString());
             String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + "Definition";
-            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
+            return new BeanDefinitionWriter(
                     packageName,
                     shortClassName,
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
                     annotationMetadata);
-            return beanDefinitionWriter;
         }
 
 
