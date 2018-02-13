@@ -15,7 +15,6 @@
  */
 package org.particleframework.docs.server.json
 
-import okhttp3.*
 import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
