@@ -179,7 +179,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     findOverriddenInterfaceMethod(executableElement, overridden, supertype);
 
                 }
-                supertype = (TypeElement) ((DeclaredType) supertype.getSuperclass()).asElement();
+                TypeMirror superclass = supertype.getSuperclass();
+                if(superclass instanceof DeclaredType) {
+                    supertype = (TypeElement) ((DeclaredType) superclass).asElement();
+                }
+                else {
+                    break;
+                }
             }
         }
         return overridden;

@@ -4,16 +4,13 @@ import com.mongodb.reactivestreams.client.MongoClient
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import spock.lang.Specification
 
-class MongoConfigurationSpec extends FlapdoodleSpec {
+class MongoConfigurationSpec extends Specification {
     
     void "test a basic connection"() {
-        given:
-        int port = SocketUtils.findAvailableTcpPort()
-        startServer(port)
-        
         when:
-        ApplicationContext applicationContext = ApplicationContext.run('particle.mongo.uri': "mongodb://localhost:${port}")
+        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:27017")
         MongoClient mongoClient = applicationContext.getBean(MongoClient)
         
         then:

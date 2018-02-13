@@ -37,7 +37,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad Request"
+        e.message == "No!! Invalid JSON"
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -73,7 +73,7 @@ class JsonBodyBindingSpec extends AbstractParticleSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad Request"
+        e.message == "No!! Invalid JSON"
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:

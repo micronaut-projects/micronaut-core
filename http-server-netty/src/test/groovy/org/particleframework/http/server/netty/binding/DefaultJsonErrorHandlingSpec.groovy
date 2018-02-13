@@ -44,7 +44,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractParticleSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad Request"
+        e.message == "Invalid JSON"
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:

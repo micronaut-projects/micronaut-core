@@ -193,7 +193,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("unchecked")
     @Override
     public Optional<Class<? extends Annotation>> getScope() {
-        return getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
+        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(Scope.class);
     }
 
     @Override

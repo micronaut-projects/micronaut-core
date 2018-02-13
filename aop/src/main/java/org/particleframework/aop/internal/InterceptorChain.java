@@ -64,7 +64,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         this.isIntroduction = target instanceof Introduced;
         if(isIntroduction) {
             this.interceptors[this.interceptors.length-1] = context -> {
-                throw new UnsupportedOperationException("Introduction advice reached the end of the chain and possible implementations were found");
+                throw new UnsupportedOperationException("Introduction advice reached the end of the chain and no possible implementations were found");
             };
         }
         else {
