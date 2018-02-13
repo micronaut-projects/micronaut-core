@@ -43,9 +43,8 @@ public class PetController implements PetOperations {
     private MongoClient mongoClient;
 
     public PetController(
-            @Value("pets.database.name") String databaseName,
-            @Value("pets.some.value") String collectionName,
-//            @Value("pets.collection.name:pets") String collectionName, TODO: doesn't work
+            @Value("${pets.database.name}") String databaseName,
+            @Value("${pets.collection.name:pets}") String collectionName,
             MongoClient mongoClient) {
         this.collectionName = collectionName;
         this.databaseName = databaseName;
