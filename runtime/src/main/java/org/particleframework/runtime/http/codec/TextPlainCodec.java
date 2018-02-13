@@ -44,7 +44,7 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     private final Charset defaultCharset;
 
-    @Inject public TextPlainCodec(@Value(ApplicationConfiguration.DEFAULT_CHARSET) Optional<Charset> defaultCharset) {
+    @Inject public TextPlainCodec(@Value("${" + ApplicationConfiguration.DEFAULT_CHARSET + "}") Optional<Charset> defaultCharset) {
         this.defaultCharset = defaultCharset.orElse(StandardCharsets.UTF_8);
     }
 

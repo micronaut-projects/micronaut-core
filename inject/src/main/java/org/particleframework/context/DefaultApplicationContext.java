@@ -6,6 +6,7 @@ import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.PropertySource;
 import org.particleframework.context.env.PropertySourceLocator;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
@@ -381,6 +382,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         return super.findConcreteCandidate(beanType, qualifier, candidates);
+    }
+
+    @Override
+    public Optional<String> resolvePlaceholders(String str) {
+        return getEnvironment().getPlaceholderResolver().resolvePlaceholders(str);
+    }
+
+    @Override
+    public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
+        return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
     }
 
     private static class BootstrapPropertySource implements PropertySource {

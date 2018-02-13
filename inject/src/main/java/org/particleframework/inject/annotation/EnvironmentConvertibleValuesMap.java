@@ -46,13 +46,13 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
         V value = map.get(name);
         PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if(value instanceof CharSequence) {
-            String resolved = placeholderResolver.resolveRequiredPlaceholder(value.toString());
+            String resolved = placeholderResolver.resolveRequiredPlaceholders(value.toString());
             return environment.convert(resolved, conversionContext);
         }
         else if(value instanceof String[]) {
             String[] a = (String[]) value;
             for (int i = 0; i < a.length; i++) {
-                a[i] = placeholderResolver.resolveRequiredPlaceholder(a[i]);
+                a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
             }
             return environment.convert(a, conversionContext);
         }
@@ -66,7 +66,7 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     public Collection<V> values() {
         return super.values().stream().map(v -> {
             if(v instanceof CharSequence) {
-                v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholder(v.toString());
+                v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholders(v.toString());
             }
             return v;
         }).collect(Collectors.toList());

@@ -11,7 +11,7 @@ public class B {
 
     public B(
         A a,
-        @Value("foo.bar") int port
+        @Value("${foo.bar}") int port
     ) {
         this.fromConstructor = port;
         this.a = a;

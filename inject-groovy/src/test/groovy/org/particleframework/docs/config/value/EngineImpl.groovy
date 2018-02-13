@@ -28,7 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class EngineImpl implements Engine {
 
-    @Value('my.engine.cylinders:6') // <1>
+    @Value('${my.engine.cylinders:6}') // <1>
     protected int cylinders
 
     @Override

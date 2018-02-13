@@ -15,8 +15,7 @@ class ValueSpec extends Specification {
 
     void "test configuration injection with @Value"() {
         given:
-        System.setProperty("foo.bar", "8080")
-        ApplicationContext context = new DefaultApplicationContext("test").start()
+        ApplicationContext context = ApplicationContext.run('foo.bar':'8080')
         A a = context.getBean(A)
         B b = context.getBean(B)
 
@@ -30,8 +29,6 @@ class ValueSpec extends Specification {
         b.fromConstructor == 8080
         b.a != null
 
-        cleanup:
-        System.setProperty("foo.bar", "")
     }
 
 
@@ -39,26 +36,26 @@ class ValueSpec extends Specification {
     static class A {
         int fromConstructor
 
-        A(@Value('foo.bar') int port) {
+        A(@Value('${foo.bar}') int port) {
             this.fromConstructor = port
         }
 
-        @Value('foo.bar')
+        @Value('${foo.bar}')
         Optional<Integer> optionalPort
 
-        @Value('foo.another')
+        @Value('${foo.another}')
         Optional<Integer> optionalPort2
 
-        @Value('foo.bar')
+        @Value('${foo.bar}')
         int port
 
         private int anotherPort
 
-        @Value('foo.bar') protected int fieldPort
+        @Value('${foo.bar}') protected int fieldPort
 
-        @Value('default.port:9090') protected int defaultPort
+        @Value('${default.port:9090}') protected int defaultPort
 
-        @Inject void setAnotherPort(@Value('foo.bar') int port) {
+        @Inject void setAnotherPort(@Value('${foo.bar}') int port) {
             anotherPort = port
         }
 
@@ -79,7 +76,7 @@ class ValueSpec extends Specification {
     static class B {
         int fromConstructor
         A a
-        B(A a, @Value('foo.bar')int port) {
+        B(A a, @Value('${foo.bar}')int port) {
             this.fromConstructor = port
             this.a = a
         }

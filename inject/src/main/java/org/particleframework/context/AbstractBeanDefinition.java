@@ -17,6 +17,7 @@
 
 import org.particleframework.context.annotation.*;
 import org.particleframework.context.annotation.Type;
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.naming.NameUtils;
@@ -604,7 +605,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolveValueString(resolutionContext, context, declaringClass, injectionPoint.getDeclaringBean().getBeanType(), argumentName, valAnn);
                     ApplicationContext applicationContext = (ApplicationContext) context;
-                    Optional value = resolveValue(applicationContext, argument, valString);
+                    Optional value = resolveValue(applicationContext, argument, valAnn, valString);
                     if (argumentType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
@@ -849,13 +850,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         path.pushConstructorResolve(this, argument);
         try {
             Object result;
-            if (context instanceof PropertyResolver) {
-                PropertyResolver propertyResolver = (PropertyResolver) context;
+            if (context instanceof ApplicationContext) {
+                ApplicationContext propertyResolver = (ApplicationContext) context;
                 Value valAnn = argument.findAnnotation(Value.class)
                         .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
 
                 String prop = valAnn.value();
-                Optional<?> value = propertyResolver.getProperty(prop, ConversionContext.of(argument));
+                Optional<?> value = resolveValue(propertyResolver, argument, valAnn, prop);
                 if (argument.getType() == Optional.class) {
                     return resolveOptionalObject(value);
                 } else {
@@ -987,7 +988,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                             valueAnn
                     );
                     Argument fieldArgument = injectionPoint.asArgument();
-                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, valString);
+                    Optional value = resolveValue((ApplicationContext) context, fieldArgument, valueAnn, valString);
                     if (fieldType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
@@ -1241,35 +1242,31 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         );
     }
 
-    private Optional resolveValue(ApplicationContext context, Argument<?> argument, String valString) {
-        Optional value = resolveValueFromContext(context, argument, valString);
-        if (!value.isPresent() && isConfigurationProperties()) {
-            String cliOption = resolveCliOption(argument.getName());
-            if (cliOption != null) {
-                return resolveValueFromContext(context,
-                        argument,
-                        cliOption);
+    private Optional resolveValue(
+            ApplicationContext context,
+            Argument<?> argument,
+            Value val,
+            String valString) {
+
+        if(val != null) {
+
+            return context.resolvePlaceholders(valString).flatMap(v ->
+                    context.getConversionService().convert(v, argument)
+            );
+        }
+        else {
+            Optional<?> value = context.getProperty(valString, argument);
+            if (!value.isPresent() && isConfigurationProperties()) {
+                String cliOption = resolveCliOption(argument.getName());
+                if (cliOption != null) {
+                    return context.getProperty(cliOption, argument);
+                }
             }
+            return value;
+
         }
-        return value;
     }
 
-    private Optional resolveValueFromContext(ApplicationContext context, Argument<?> argument, String valString) {
-        int i = valString.indexOf(':');
-        Object defaultValue = null;
-        if (i > -1) {
-            defaultValue = valString.substring(i + 1, valString.length());
-            valString = valString.substring(0, i);
-        }
-        Optional value;
-        ArgumentConversionContext conversionContext = ConversionContext.of(argument);
-        value = context.getProperty(valString, conversionContext);
-
-        if (defaultValue != null && !value.isPresent()) {
-            value = context.getConversionService().convert(defaultValue, conversionContext);
-        }
-        return value;
-    }
 
     private String resolveValueString(BeanResolutionContext resolutionContext, BeanContext beanContext, Class<?> declaringClass, Class<?> beanType, String name, Value val) {
         String valString;

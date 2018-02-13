@@ -20,7 +20,6 @@ import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.value.OptionalValuesMap;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -40,13 +39,13 @@ class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
         return values.entrySet().stream().map((Function<Map.Entry<CharSequence, ?>, Map.Entry<CharSequence, ?>>) entry -> {
             Object value = entry.getValue();
             if(value instanceof CharSequence) {
-                value = placeholderResolver.resolveRequiredPlaceholder(value.toString());
+                value = placeholderResolver.resolveRequiredPlaceholders(value.toString());
                 ((Map.Entry)entry).setValue(value);
             }
             else if(value instanceof String[]) {
                 String[] a = (String[]) value;
                 for (int i = 0; i < a.length; i++) {
-                    a[i] = placeholderResolver.resolveRequiredPlaceholder(a[i]);
+                    a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
                 }
                 ((Map.Entry)entry).setValue(a);
             }
