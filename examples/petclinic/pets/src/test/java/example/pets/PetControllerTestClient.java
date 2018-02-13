@@ -15,23 +15,13 @@
  */
 package example.pets;
 
-import example.api.v1.Pet;
 import example.api.v1.PetOperations;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
-
-import java.util.List;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 @Client("/${pets.api.version}/pets")
-public interface PetControllerTestClient extends PetOperations {
-
-    @Override
-    @Get("/")
-    Single<List<Pet>> list();
+interface PetControllerTestClient extends PetOperations {
 }

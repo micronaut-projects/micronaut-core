@@ -167,7 +167,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                parent.isSingleton(),
                 parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
     }
@@ -204,7 +203,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                isSingleton, annotationMetadata);
+                annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
@@ -277,6 +276,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         constructorNewArgumentTypes.put("beanContext", BeanContext.class);
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
+    }
+
+    @Override
+    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, qualifierTypes, genericTypes);
     }
 
     /**
@@ -508,7 +512,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
+        if(!isInterface) {
+            proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(
+                    targetClassFullName,
+                    constructorArgumentTypes,
+                    constructorQualfierTypes,
+                    constructorGenericTypes
+
+            );
+        }
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
+
 
         GeneratorAdapter targetDefinitionGenerator = null;
         if(parentWriter != null) {
@@ -790,13 +804,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSuperType(String name) {
-        proxyBeanDefinitionWriter.visitSuperType(name);
+    public void visitSuperBeanDefinition(String name) {
+        proxyBeanDefinitionWriter.visitSuperBeanDefinition(name);
     }
 
     @Override
-    public void visitSuperFactoryType(String beanName) {
-        proxyBeanDefinitionWriter.visitSuperFactoryType(beanName);
+    public void visitSuperBeanDefinitionFactory(String beanName) {
+        proxyBeanDefinitionWriter.visitSuperBeanDefinitionFactory(beanName);
     }
 
     @Override

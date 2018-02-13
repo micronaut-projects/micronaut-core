@@ -593,10 +593,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String beanDefinitionName = getBeanWriter().getBeanDefinitionName()
                 if (isFactoryType) {
                     proxyWriter
-                            .visitSuperFactoryType(beanDefinitionName)
+                            .visitSuperBeanDefinitionFactory(beanDefinitionName)
                 } else {
                     proxyWriter
-                            .visitSuperType(beanDefinitionName)
+                            .visitSuperBeanDefinition(beanDefinitionName)
                 }
 
 
@@ -845,7 +845,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
-                            annotationMetadata.hasDeclaredStereotype(Singleton), annotationMetadata)
+                            annotationMetadata)
                 }
                 beanDefinitionWriters.put(classNode, beanWriter)
 

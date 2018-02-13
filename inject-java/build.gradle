@@ -1,13 +1,11 @@
-//configurations.all {
-//    it.exclude(group:"org.slf4j",module:"jcl-over-slf4j")
-//}
-
 dependencies {
     compile project(":inject")
-    compileOnly project(":aop")
 
+
+    compileOnly project(":aop")
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:2.0.0.Final'
+
     testCompile project(":aop")
     testCompile "org.hibernate:hibernate-core:5.1.5.Final"
     testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
@@ -17,9 +15,6 @@ dependencies {
     testCompile 'org.mongodb:mongo-java-driver:3.6.1'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile "org.codehaus.groovy:groovy-json:$groovyVersion"
-//    testCompile 'com.datastax.cassandra:cassandra-driver-core:3.3.2', {
-//        transitive = false
-//    }
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 
