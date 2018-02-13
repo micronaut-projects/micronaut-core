@@ -18,6 +18,7 @@ package org.particleframework.docs.server.routes;
 // tag::imports[]
 import org.junit.*;
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
 import static org.junit.Assert.*;
@@ -27,9 +28,7 @@ import static org.junit.Assert.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class MessageControllerTest {
-
-
+public class IssuesControllerTest {
 
     // tag::setup[]
     private static EmbeddedServer server;
@@ -56,12 +55,12 @@ public class MessageControllerTest {
 
     // tag::test[]
     @Test
-    public void testHello() throws Exception {
-        String body = client.toBlocking().retrieve("/message/hello/John"); // <2>
+    public void testIssue() throws Exception {
+        String body = client.toBlocking().retrieve("/issues/show/12"); // <2>
         assertNotNull(body);
         assertEquals( // <3>
                 body,
-                "Hello John!"
+                "Issue # 12!"
         );
     }
     // end::test[]

@@ -29,11 +29,11 @@ import javax.inject.Singleton;
 // tag::class[]
 @Controller // <1>
 @Singleton
-public class MessageController {
+public class IssuesController {
 
-    @Get("/hello/{name}") // <2>
-    String hello(String name) {
-        return "Hello " + name + "!"; // <3>
+    @Get("/show/{number}") // <2>
+    String issue(Integer number) {
+        return "Issue # " + number + "!"; // <3>
     }
 }
 // end::class[]
