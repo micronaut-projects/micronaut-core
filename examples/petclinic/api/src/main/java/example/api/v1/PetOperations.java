@@ -16,6 +16,7 @@
 package example.api.v1;
 
 import io.reactivex.Single;
+import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.annotation.Post;
 import org.particleframework.validation.Validated;
@@ -34,5 +35,5 @@ public interface PetOperations {
     Single<List<Pet>> list();
 
     @Post("/")
-    Single<Pet> save(@Valid Pet pet);
+    Single<Pet> save(@Valid @Body Pet pet);
 }

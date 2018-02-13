@@ -20,6 +20,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.http.HttpStatus;
+import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.runtime.server.EmbeddedServer;
 
 import java.util.Collections;
@@ -55,7 +57,12 @@ public class PetControllerTest {
                             .blockingGet();
         assertEquals(pets.size(), 0);
 
-//        client.save(new Pet("")).blockingGet();
+        try {
+            client.save(new Pet("")).blockingGet();
+            fail("Should have thrown a constraint violation");
+        } catch (HttpClientResponseException e) {
+            assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
+        }
 
         Pet dino = client.save(new Pet("Dino")).blockingGet();
 
