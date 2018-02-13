@@ -2,7 +2,10 @@ dependencies {
     compile project(":runtime")
     compile project(":validation")
     compileOnly project(":inject-java")
-    compile "org.mongodb:mongodb-driver-reactivestreams:1.7.0"
+    compile "org.mongodb:mongodb-driver-reactivestreams:1.7.0", {
+        exclude group:'org.mongodb', module:'mongodb-driver-async'
+    }
+    compile "org.mongodb:mongodb-driver-async:3.6.1"
     compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
     testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
     testCompile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
