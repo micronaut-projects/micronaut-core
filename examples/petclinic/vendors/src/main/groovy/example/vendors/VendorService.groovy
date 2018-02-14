@@ -13,42 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.api.v1;
+package example.vendors
 
-import javax.validation.constraints.NotBlank;
+import grails.gorm.services.Service
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-public class Pet {
+@Service(Vendor)
+interface VendorService {
+    List<Vendor> list()
 
-    private PetType type = PetType.DOG;
-    private String name;
-
-    public Pet(String name) {
-        this.name = name;
-    }
-
-    protected Pet() {
-    }
-
-    @NotBlank
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public PetType getType() {
-        return type;
-    }
-
-    public void setType(PetType type) {
-        if(type != null) {
-            this.type = type;
-        }
-    }
+    Vendor save(String name)
 }

@@ -15,40 +15,26 @@
  */
 package example.api.v1;
 
-import javax.validation.constraints.NotBlank;
-
 /**
  * @author graemerocher
  * @since 1.0
  */
-public class Pet {
+public class Vendor {
 
-    private PetType type = PetType.DOG;
     private String name;
 
-    public Pet(String name) {
+    public Vendor(String name) {
         this.name = name;
     }
 
-    protected Pet() {
+    protected Vendor() {
     }
 
-    @NotBlank
     public String getName() {
         return name;
     }
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public PetType getType() {
-        return type;
-    }
-
-    public void setType(PetType type) {
-        if(type != null) {
-            this.type = type;
-        }
     }
 }
