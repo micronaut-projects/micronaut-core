@@ -61,7 +61,6 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
 
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
-        System.out.println("generatedClasses = " + generatedClasses.keySet());
         if(loadedClasses.containsKey(name)) {
             return loadedClasses.get(name);
         }

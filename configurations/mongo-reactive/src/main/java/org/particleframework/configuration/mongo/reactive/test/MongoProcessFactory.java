@@ -27,6 +27,7 @@ import de.flapdoodle.embed.mongo.distribution.Version;
 import de.flapdoodle.embed.process.runtime.Network;
 import org.particleframework.configuration.mongo.reactive.MongoConfiguration;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.env.Environment;
 import org.particleframework.context.event.BeanCreatedEvent;
 import org.particleframework.context.event.BeanCreatedEventListener;
 import org.particleframework.context.exceptions.ConfigurationException;
@@ -46,6 +47,7 @@ import java.util.Optional;
  */
 @Requires(classes = MongodProcess.class)
 @Requires(beans = MongoConfiguration.class)
+@Requires(env = Environment.TEST)
 @Singleton
 public class MongoProcessFactory implements BeanCreatedEventListener<MongoConfiguration>, Closeable {
 

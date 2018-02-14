@@ -23,23 +23,23 @@ import javax.validation.constraints.NotBlank;
  */
 public class Pet {
 
-    private PetType type = PetType.DOG;
-    private String name;
+    protected PetType type = PetType.DOG;
+    private final String vendor;
+    private final String name;
 
-    public Pet(String name) {
+    public Pet(String vendor, String name) {
+        this.vendor = vendor;
         this.name = name;
     }
 
-    protected Pet() {
+    @NotBlank
+    public String getVendor() {
+        return vendor;
     }
 
     @NotBlank
     public String getName() {
         return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public PetType getType() {

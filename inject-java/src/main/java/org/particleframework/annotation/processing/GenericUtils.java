@@ -12,7 +12,6 @@ import java.util.*;
 
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
-import static javax.lang.model.type.TypeKind.WILDCARD;
 
 class GenericUtils {
 
@@ -129,6 +128,16 @@ class GenericUtils {
 
                 TypeKind kind = mirror.getKind();
                 switch (kind) {
+                    case TYPEVAR:
+                        TypeVariable tv = (TypeVariable) mirror;
+                        TypeMirror upperBound = tv.getUpperBound();
+                        TypeMirror lowerBound = tv.getLowerBound();
+                        if(upperBound.getKind() != TypeKind.NULL) {
+                            resolvedParameters.put(parameterName, resolveTypeReference(upperBound));
+                        }
+                        else if(lowerBound.getKind() != TypeKind.NULL) {
+                            resolvedParameters.put(parameterName, resolveTypeReference(lowerBound));
+                        }
                     case ARRAY:
                     case BOOLEAN:
                     case BYTE:
@@ -162,6 +171,7 @@ class GenericUtils {
         }
         return resolvedParameters;
     }
+
 
     private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
         DeclaredType declaredType = (DeclaredType)mirror;
