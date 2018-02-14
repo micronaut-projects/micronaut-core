@@ -6,8 +6,12 @@ dependencies {
     compile project(":api")
     compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
     compile "org.particleframework:http-server-netty:${projectVersion}"
+    compile "org.particleframework:discovery-client:${projectVersion}"
 
+    
     compile "org.particleframework.configuration:mongo-reactive:${projectVersion}"
+
+    compile "org.particleframework:runtime:${projectVersion}"
 
     testCompile "junit:junit:4.12"
     testCompile "org.particleframework:inject-java:${projectVersion}"

@@ -1,1 +1,12 @@
-{}
+{
+  "particle": {
+    "application": {
+      "name":"storefront"
+    }
+  },
+  "consul": {
+    "client": {
+      "defaultZone":"${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
+    }
+  }
+}

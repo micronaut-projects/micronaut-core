@@ -46,19 +46,27 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
         V value = map.get(name);
         PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if(value instanceof CharSequence) {
-            String resolved = placeholderResolver.resolveRequiredPlaceholders(value.toString());
-            return environment.convert(resolved, conversionContext);
+            String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
+            return environment.convert(str, conversionContext);
         }
         else if(value instanceof String[]) {
             String[] a = (String[]) value;
             for (int i = 0; i < a.length; i++) {
-                a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
+                a[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
             return environment.convert(a, conversionContext);
         }
         else {
             return super.get(name, conversionContext);
         }
+    }
+
+    private String doResolveIfNecessary(CharSequence value, PropertyPlaceholderResolver placeholderResolver) {
+        String str = value.toString();
+        if(str.contains("${")) {
+            str = placeholderResolver.resolveRequiredPlaceholders(str);
+        }
+        return str;
     }
 
     @SuppressWarnings("unchecked")

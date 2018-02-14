@@ -52,6 +52,8 @@ class VendorControllerSpec extends Specification {
         then:
         v != null
         v.name == "Fred"
+        vendorOperations.list().blockingGet().size() == 1
+
     }
 
     @Client('/${vendors.api.version}/vendors')
