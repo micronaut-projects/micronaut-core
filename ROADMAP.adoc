@@ -27,6 +27,13 @@ class Foo {
     }
 }
 ```
+#### @DefaultScope annotation
+
+We need a meta annotation to allow specifying the default scope to fallback to if no scope is defined
+
+#### Generate ConfigurationProperties documentation
+
+We should generate asciidoc documentation for @ConfigurationProperties
 
 #### Generic Type Abstraction for Factory Beans
 
@@ -113,5 +120,3 @@ An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client.
 - Rate limiting
 - Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
 - Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
-
-
