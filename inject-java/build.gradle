@@ -2,6 +2,7 @@ dependencies {
     compile project(":inject")
 
 
+
     compileOnly project(":aop")
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly 'javax.validation:validation-api:2.0.0.Final'

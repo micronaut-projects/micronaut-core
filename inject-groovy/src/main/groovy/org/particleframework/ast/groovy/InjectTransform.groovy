@@ -18,6 +18,8 @@ import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuild
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
+import org.particleframework.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import org.particleframework.ast.groovy.utils.PublicAbstractMethodVisitor
 import org.particleframework.ast.groovy.utils.PublicMethodVisitor
 import org.particleframework.context.annotation.*
 import org.particleframework.core.annotation.AnnotationMetadata
@@ -89,7 +91,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        boolean defineClassesInMemory = source.configuration.optimizationOptions?.get(PARTICLE_DEFINE_CLASSES)
+        boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
         Map<String,ByteArrayOutputStream> classStreams = null
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
@@ -153,13 +155,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
         if(classStreams != null) {
             // for testing try to load them into current classloader
-            GroovyClassLoader classLoader = source.classLoader
+            InMemoryByteCodeGroovyClassLoader classLoader = (InMemoryByteCodeGroovyClassLoader) source.classLoader
 
             if(defineClassesInMemory) {
 
                 if(classLoader != null) {
                     for (streamEntry in classStreams) {
-                        classLoader.defineClass(streamEntry.key, streamEntry.value.toByteArray())
+                        classLoader.addClass(streamEntry.key, streamEntry.value.toByteArray())
                     }
                 }
             }
@@ -271,7 +273,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
             AnnotationMetadata typeAnnotationMetadata = aopProxyWriter.getAnnotationMetadata()
-            PublicMethodVisitor publicMethodVisitor = new PublicMethodVisitor(sourceUnit) {
+            PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(sourceUnit) {
 
                 @Override
                 void accept(MethodNode methodNode) {
@@ -288,7 +290,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     AnnotationMetadata annotationMetadata
-                    if (AstAnnotationUtils.isAnnotated(methodNode)) {
+                    if (AstAnnotationUtils.isAnnotated(methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
                         annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
@@ -308,11 +310,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     )
                 }
 
-                @Override
-                protected boolean isAcceptable(MethodNode methodNode
-                ) {
-                    return methodNode.isAbstract() && !methodNode.isFinal() && !methodNode.isStatic() && !methodNode.isSynthetic()
-                }
             }
             publicMethodVisitor.accept(node)
         }
