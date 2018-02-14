@@ -252,7 +252,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Object> methodQualifier = params.getQualifierTypes();
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
                         AnnotationMetadata annotationMetadata;
-                        if( annotationUtils.isAnnotated(method) ) {
+                        if( annotationUtils.isAnnotated(method) || JavaAnnotationMetadataBuilder.hasAnnotation(method, Override.class) ) {
                             annotationMetadata = annotationUtils.getAnnotationMetadata(classElement, method);
                         }
                         else {

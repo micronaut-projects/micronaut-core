@@ -27,8 +27,8 @@ import org.codehaus.groovy.control.SourceUnit
  */
 @CompileStatic
 abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
-    final SourceUnit sourceUnit;
-    private final Set<String> processed = new HashSet<>();
+    final SourceUnit sourceUnit
+    private final Set<String> processed = new HashSet<>()
     PublicMethodVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
     }
