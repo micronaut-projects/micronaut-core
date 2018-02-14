@@ -13,27 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.api.v1;
+package example.storefront
 
-import io.reactivex.Single;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Get;
-import org.particleframework.http.annotation.Post;
-import org.particleframework.validation.Validated;
-
-import javax.validation.Valid;
-import java.util.List;
+import example.api.v1.PetOperations
+import org.particleframework.http.client.Client
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Validated
-public interface PetOperations<T extends Pet> {
+@Client("pets")
+interface PetClient extends PetOperations {
 
-    @Get("/")
-    Single<List<T>> list();
-
-    @Post("/")
-    Single<T> save(@Valid @Body T pet);
 }

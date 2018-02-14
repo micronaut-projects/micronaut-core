@@ -1110,6 +1110,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     }
 
+
+
     private String getPropertyMetadataTypeReference(TypeMirror valueType) {
         return modelUtils.isOptional(valueType) ? genericUtils.getFirstTypeArgument(valueType).map(TypeMirror::toString).orElse(valueType.toString()) : valueType.toString();
     }

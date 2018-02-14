@@ -13,27 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.api.v1;
+package example.pets;
 
-import io.reactivex.Single;
-import org.particleframework.http.annotation.Body;
-import org.particleframework.http.annotation.Get;
-import org.particleframework.http.annotation.Post;
-import org.particleframework.validation.Validated;
-
-import javax.validation.Valid;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.bson.codecs.pojo.annotations.BsonCreator;
+import org.bson.codecs.pojo.annotations.BsonProperty;
+import example.api.v1.Pet;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Validated
-public interface PetOperations<T extends Pet> {
-
-    @Get("/")
-    Single<List<T>> list();
-
-    @Post("/")
-    Single<T> save(@Valid @Body T pet);
+public class PetEntity extends Pet {
+    @BsonCreator
+    @JsonCreator
+    public PetEntity(
+            @JsonProperty("vendor")
+            @BsonProperty("vendor") String vendor,
+            @JsonProperty("name")
+            @BsonProperty("name") String name) {
+        super(vendor, name);
+    }
 }

@@ -70,7 +70,13 @@ class AstGenericUtils {
 
                 resolvedGenericTypes.put(entry.key, Object.class)
             } else {
-                resolvedGenericTypes.put(entry.key, Object.class)
+                ClassNode type = gt.type
+                if(type != null) {
+                    resolvedGenericTypes.put(entry.key, resolveTypeReference(type))
+                }
+                else {
+                    resolvedGenericTypes.put(entry.key, Object.class)
+                }
             }
 
         }

@@ -38,7 +38,12 @@ public class PetControllerTest {
 
     @BeforeClass
     public static void setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        embeddedServer = ApplicationContext.run(
+                EmbeddedServer.class,
+                Collections.singletonMap(
+                        "consul.client.registration.enabled",false
+                )
+        );
     }
 
     @AfterClass
@@ -58,13 +63,13 @@ public class PetControllerTest {
         assertEquals(pets.size(), 0);
 
         try {
-            client.save(new Pet("")).blockingGet();
+            client.save(new Pet("", "")).blockingGet();
             fail("Should have thrown a constraint violation");
         } catch (HttpClientResponseException e) {
             assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
         }
 
-        Pet dino = client.save(new Pet("Dino")).blockingGet();
+        Pet dino = client.save(new Pet("Dino", "Fred")).blockingGet();
 
         assertNotNull(dino);
 

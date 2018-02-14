@@ -36,7 +36,7 @@ import java.util.List;
 @Controller("/${pets.api.version}/pets")
 @Singleton
 @Validated
-public class PetController implements PetOperations {
+public class PetController implements PetOperations<PetEntity> {
 
     private final String databaseName;
     private final String collectionName;
@@ -52,13 +52,13 @@ public class PetController implements PetOperations {
     }
 
     @Override
-    public Single<List<Pet>> list() {
+    public Single<List<PetEntity>> list() {
         return Flowable.fromPublisher(getCollection()
-                    .find(Pet.class)).toList();
+                    .find(PetEntity.class)).toList();
     }
 
     @Override
-    public Single<Pet> save(@Valid Pet pet) {
+    public Single<PetEntity> save(@Valid PetEntity pet) {
         return Single.fromPublisher(getCollection().insertOne(pet))
                      .map(success -> pet);
     }
