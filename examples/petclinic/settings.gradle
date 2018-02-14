@@ -1,5 +1,5 @@
 include "api"
-include "appointments"
-include "clinics"
+include "storefront"
+include "vendors"
 include "people"
 include "pets"

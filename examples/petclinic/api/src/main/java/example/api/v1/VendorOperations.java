@@ -15,40 +15,21 @@
  */
 package example.api.v1;
 
-import javax.validation.constraints.NotBlank;
+import io.reactivex.Single;
+import org.particleframework.http.annotation.Get;
+import org.particleframework.http.annotation.Post;
+
+import java.util.List;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-public class Pet {
+public interface VendorOperations {
 
-    private PetType type = PetType.DOG;
-    private String name;
+    @Get("/")
+    Single<List<Vendor>> list();
 
-    public Pet(String name) {
-        this.name = name;
-    }
-
-    protected Pet() {
-    }
-
-    @NotBlank
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public PetType getType() {
-        return type;
-    }
-
-    public void setType(PetType type) {
-        if(type != null) {
-            this.type = type;
-        }
-    }
+    @Post("/")
+    Single<Vendor> save(String name);
 }

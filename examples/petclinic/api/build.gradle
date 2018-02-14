@@ -1,3 +1,6 @@
 dependencies {
     compile "org.particleframework:http:${projectVersion}"
 }
+compileJava {
+    options.compilerArgs += ["-parameters"]
+}
