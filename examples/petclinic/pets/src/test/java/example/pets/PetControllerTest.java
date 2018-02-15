@@ -57,19 +57,19 @@ public class PetControllerTest {
     public void testListPets() {
         PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
 
-        List<Pet> pets = client
+        List<PetEntity> pets = client
                             .list()
                             .blockingGet();
         assertEquals(pets.size(), 0);
 
         try {
-            client.save(new Pet("", "")).blockingGet();
+            client.save(new PetEntity("", "")).blockingGet();
             fail("Should have thrown a constraint violation");
         } catch (HttpClientResponseException e) {
             assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
         }
 
-        Pet dino = client.save(new Pet("Dino", "Fred")).blockingGet();
+        Pet dino = client.save(new PetEntity("Dino", "Fred")).blockingGet();
 
         assertNotNull(dino);
 

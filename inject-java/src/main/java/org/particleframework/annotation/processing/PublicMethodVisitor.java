@@ -21,7 +21,6 @@ import javax.lang.model.util.AbstractTypeVisitor8;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * An adapter that implements all methods of the {@link TypeVisitor} interface. Subclasses can selectively override
@@ -67,7 +66,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
                         // if the method has already been processed then it is overridden so ignore
                         if(!processed.contains(qualifiedName)) {
                             processed.add(qualifiedName);
-                            accept(theMethod, p);
+                            accept(type, theMethod, p);
                         }
                     }
 
@@ -98,7 +97,7 @@ public abstract class PublicMethodVisitor<R,P> extends AbstractTypeVisitor8<R,P>
         return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL);
     }
 
-    protected abstract void accept(ExecutableElement method, P p);
+    protected abstract void accept(DeclaredType type, ExecutableElement method, P p);
 
     @Override
     public R visitError(ErrorType t, P p) {

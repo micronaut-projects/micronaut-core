@@ -730,6 +730,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                                         Object returnType,
+                                                        Object genericReturnType,
                                                         Map<String, Object> returnTypeGenericTypes,
                                                         String methodName,
                                                         Map<String, Object> argumentTypes,
@@ -750,6 +751,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         executableMethodWriter.visitMethod(
                 declaringType,
                 returnType,
+                genericReturnType,
                 returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
@@ -1939,7 +1941,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
     }
 
-    private static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
+    static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
         Map nestedTypes = null;
         Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
         Object objectType;
@@ -1961,7 +1963,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         generatorAdapter.push(argumentName);
 
         // 3rd argument: generic types
-        boolean hasGenerics = nestedTypes != null;
+        boolean hasGenerics = nestedTypes != null && !nestedTypes.isEmpty();
         if (hasGenerics) {
             buildTypeArguments(generatorAdapter, nestedTypes);
         }

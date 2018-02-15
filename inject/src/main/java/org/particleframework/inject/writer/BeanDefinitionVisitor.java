@@ -280,6 +280,7 @@ public interface BeanDefinitionVisitor {
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                Object returnType,
+                               Object genericReturnType,
                                Map<String, Object> returnTypeGenericTypes,
                                String methodName,
                                Map<String, Object> argumentTypes,
