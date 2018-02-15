@@ -16,6 +16,7 @@
 package example.storefront
 
 import example.api.v1.PetOperations
+import io.reactivex.Single
 import org.particleframework.http.client.Client
 
 /**
@@ -25,4 +26,6 @@ import org.particleframework.http.client.Client
 @Client("pets")
 interface PetClient extends PetOperations {
 
+    @Override
+    Single<List> byVendor(String name) 
 }

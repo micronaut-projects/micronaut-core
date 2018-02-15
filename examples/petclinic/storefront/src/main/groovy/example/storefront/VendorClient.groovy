@@ -15,30 +15,17 @@
  */
 package example.storefront
 
-import groovy.transform.CompileStatic
-import org.particleframework.context.event.ApplicationEventListener
-import org.particleframework.runtime.server.event.ServerStartupEvent
-
-import javax.inject.Singleton
+import example.api.v1.Vendor
+import example.api.v1.VendorOperations
+import io.reactivex.Single
+import org.particleframework.http.client.Client
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@CompileStatic
-@Singleton
-class Startup implements ApplicationEventListener<ServerStartupEvent> {
-
-    final PetClient petClient
-    final VendorClient vendorClient
-
-    Startup(PetClient petClient, VendorClient vendorClient) {
-        this.petClient = petClient
-        this.vendorClient = vendorClient
-    }
-
+@Client("vendor")
+interface VendorClient extends VendorOperations{
     @Override
-    void onApplicationEvent(ServerStartupEvent event) {
-        println petClient.list().blockingGet()
-    }
+    Single<Vendor> save(String name)
 }

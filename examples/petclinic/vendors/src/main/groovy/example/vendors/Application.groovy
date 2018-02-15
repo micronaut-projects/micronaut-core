@@ -17,13 +17,4 @@ package example.vendors
 
 import org.particleframework.runtime.ParticleApplication
 
-/**
- * @author graemerocher
- * @since 1.0
- */
-class Application {
-    
-    static void main(String[] args) {
-        ParticleApplication.run(Application)
-    }
-}
+ParticleApplication.run(getClass())
