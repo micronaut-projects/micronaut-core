@@ -20,6 +20,8 @@ import com.mongodb.connection.*;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.EachProperty;
+import org.particleframework.context.env.Environment;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 /**
  * Creates a named configuration for each entry under {@link MongoSettings#MONGODB_SERVERS}
@@ -50,7 +52,8 @@ public class NamedMongoConfiguration extends AbstractMongoConfiguration {
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
 
-    public NamedMongoConfiguration(@Argument String serverName) {
+    public NamedMongoConfiguration(@Argument String serverName, ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
         this.serverName = serverName;
     }
 
@@ -89,5 +92,10 @@ public class NamedMongoConfiguration extends AbstractMongoConfiguration {
     @Override
     public SslSettings.Builder getSslSettings() {
         return sslSettings;
+    }
+
+    @Override
+    protected String getApplicationName() {
+        return applicationConfiguration.getName().map(n -> n + "-" +  serverName).orElse(Environment.DEFAULT_NAME + "-" + serverName);
     }
 }

@@ -20,6 +20,7 @@ import com.mongodb.connection.*;
 import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 /**
  * The default MongoDB configuration class
@@ -31,11 +32,6 @@ import org.particleframework.context.annotation.Requires;
 @Requires(missingProperty = MongoSettings.MONGODB_SERVERS)
 @ConfigurationProperties(MongoSettings.PREFIX)
 public class MongoConfiguration extends AbstractMongoConfiguration {
-
-    @Override
-    public void setUri(String uri) {
-        super.setUri(uri);
-    }
 
     @ConfigurationBuilder(prefixes = "")
     protected MongoClientSettings.Builder clientSettings = MongoClientSettings.builder();
@@ -55,6 +51,15 @@ public class MongoConfiguration extends AbstractMongoConfiguration {
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "ssl")
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
+
+    public MongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
+    }
+
+    @Override
+    public void setUri(String uri) {
+        super.setUri(uri);
+    }
 
     /**
      * @return The {@link ClusterSettings#builder()}

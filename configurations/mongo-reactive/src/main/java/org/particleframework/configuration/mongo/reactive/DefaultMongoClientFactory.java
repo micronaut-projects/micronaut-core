@@ -31,7 +31,7 @@ import org.particleframework.runtime.context.scope.Refreshable;
  */
 @Requires(beans = MongoConfiguration.class)
 @Factory
-public class DefaultMongoClientFactory extends AbstractMongoClientFactory {
+public class DefaultMongoClientFactory {
 
     @Bean(preDestroy = "close")
     @Refreshable
@@ -39,5 +39,4 @@ public class DefaultMongoClientFactory extends AbstractMongoClientFactory {
     MongoClient mongoClient(MongoConfiguration mongoConfiguration) {
         return MongoClients.create(mongoConfiguration.buildSettings());
     }
-
 }

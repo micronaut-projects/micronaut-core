@@ -2,6 +2,7 @@ dependencies {
     compile project(":runtime")
     compile project(":validation")
     compileOnly project(":inject-java")
+    compileOnly project(":management")
     compile "org.mongodb:mongodb-driver-reactivestreams:1.7.0", {
         exclude group:'org.mongodb', module:'mongodb-driver-async'
     }

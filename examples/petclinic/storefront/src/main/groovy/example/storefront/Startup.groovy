@@ -15,6 +15,8 @@
  */
 package example.storefront
 
+import example.storefront.client.v1.PetClient
+import example.storefront.client.v1.VendorClient
 import groovy.transform.CompileStatic
 import org.particleframework.context.event.ApplicationEventListener
 import org.particleframework.runtime.server.event.ServerStartupEvent
