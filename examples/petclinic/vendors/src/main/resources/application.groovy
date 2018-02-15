@@ -1,4 +1,4 @@
-particle.application.name="vendors"
+//particle.application.name="vendors"
 consul.client.defaultZone='${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}'
 vendors.api.version="v1"
 hibernate {

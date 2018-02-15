@@ -23,9 +23,9 @@ import javax.validation.constraints.NotBlank;
  */
 public class Pet {
 
+    private final String name;
     protected PetType type = PetType.DOG;
     private final String vendor;
-    private final String name;
 
     public Pet(String vendor, String name) {
         this.vendor = vendor;
@@ -50,5 +50,14 @@ public class Pet {
         if(type != null) {
             this.type = type;
         }
+    }
+
+    @Override
+    public String toString() {
+        return "Pet{" +
+                "name='" + name + '\'' +
+                ", type=" + type +
+                ", vendor='" + vendor + '\'' +
+                '}';
     }
 }
