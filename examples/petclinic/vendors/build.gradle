@@ -1,0 +1,20 @@
+apply plugin: 'groovy'
+
+dependencies {
+    compileOnly "org.particleframework:inject-groovy:${projectVersion}"
+
+    compile project(":api")
+    compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+    compile "org.particleframework.configuration:hibernate-gorm:${projectVersion}"
+
+    compile "org.particleframework:http-server-netty:${projectVersion}"
+    compile "org.particleframework:discovery-client:${projectVersion}"
+
+    runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
+    runtime 'com.h2database:h2:1.4.196'
+
+    testCompile "org.particleframework:inject-groovy:${projectVersion}"
+    testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
+        exclude module:'groovy-all'
+    }
+}

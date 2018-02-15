@@ -27,6 +27,13 @@ class Foo {
     }
 }
 ```
+#### @DefaultScope annotation
+
+We need a meta annotation to allow specifying the default scope to fallback to if no scope is defined
+
+#### Generate ConfigurationProperties documentation
+
+We should generate asciidoc documentation for @ConfigurationProperties
 
 #### Generic Type Abstraction for Factory Beans
 
@@ -46,9 +53,6 @@ class TypeConverterFactory {
 
 At compile time we know the types but at runtime the lambda loses type information. We need to add an API to obtain type information for a bean from the factory.
 
-#### Property Placeholder Support
-
-Need to be able to specify placeholders in annotations and in configuration that are resolved at runtime.
 
 #### AOP API
 
@@ -62,7 +66,6 @@ We need to implement AOP annotations for:
 
 - Retry
 - Hystrix
-- Scheduled
 
 #### Configuration Sharing
 
@@ -117,5 +120,3 @@ An HTTP gateway that loads on port 8080 and uses the aforementioned HTTP client.
 - Rate limiting
 - Route matching on HTTP Request (Path, Method, Header, Host, etc…​)
 - Filters to modify downstream HTTP Request and HTTP Response (Add/Remove Headers, Add/Remove Parameters, Rewrite Path etc…​)
-
-

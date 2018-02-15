@@ -167,7 +167,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                parent.isSingleton(),
                 parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
     }
@@ -204,7 +203,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
-                isSingleton, annotationMetadata);
+                annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
 
@@ -279,6 +278,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
     }
 
+    @Override
+    public void visitProxiedBeanDefinitionConstructor(Object declaringType, Map<String, Object> argumentTypes, Map<String, Object> qualifierTypes, Map<String, Map<String, Object>> genericTypes) {
+        proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(declaringType, argumentTypes, qualifierTypes, genericTypes);
+    }
+
     /**
      * Visit a method that is to be proxied
      *
@@ -291,6 +295,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
+                                  Object genericReturnType,
                                   Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
@@ -299,7 +304,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   AnnotationMetadata annotationMetadata) {
 
         // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
-        visitExecutableMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
+        visitExecutableMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes, annotationMetadata);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -360,7 +365,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 }
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            executableMethodWriter.visitMethod(declaringType, returnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
+            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, qualifierTypes, genericTypes);
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
@@ -508,7 +513,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeConstructor(getTypeReference(targetClassFullName), new Method(CONSTRUCTOR_NAME, superConstructorDescriptor));
         }
 
+        if(!isInterface) {
+            proxyBeanDefinitionWriter.visitProxiedBeanDefinitionConstructor(
+                    targetClassFullName,
+                    constructorArgumentTypes,
+                    constructorQualfierTypes,
+                    constructorGenericTypes
+
+            );
+        }
         proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(constructorNewArgumentTypes, constructorQualfierTypes, constructorGenericTypes);
+
 
         GeneratorAdapter targetDefinitionGenerator = null;
         if(parentWriter != null) {
@@ -790,13 +805,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitSuperType(String name) {
-        proxyBeanDefinitionWriter.visitSuperType(name);
+    public void visitSuperBeanDefinition(String name) {
+        proxyBeanDefinitionWriter.visitSuperBeanDefinition(name);
     }
 
     @Override
-    public void visitSuperFactoryType(String beanName) {
-        proxyBeanDefinitionWriter.visitSuperFactoryType(beanName);
+    public void visitSuperBeanDefinitionFactory(String beanName) {
+        proxyBeanDefinitionWriter.visitSuperBeanDefinitionFactory(beanName);
     }
 
     @Override
@@ -861,6 +876,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public ExecutableMethodWriter visitExecutableMethod(
             Object declaringType,
             Object returnType,
+            Object genericReturnType,
             Map<String, Object> returnTypeGenericTypes,
             String methodName,
             Map<String, Object> argumentTypes,
@@ -871,6 +887,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 proxyBeanDefinitionWriter.visitExecutableMethod(
                         declaringType,
                         returnType,
+                        genericReturnType,
                         returnTypeGenericTypes,
                         methodName,
                         argumentTypes,

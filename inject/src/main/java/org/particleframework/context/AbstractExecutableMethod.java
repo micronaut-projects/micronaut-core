@@ -43,22 +43,20 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     private final Argument[] arguments;
     private final Class declaringType;
-    private final Annotation[] annotations;
     private final ReturnType returnType;
     private final Method method;
 
     protected AbstractExecutableMethod(Method method,
-                                       Argument<?>[] genericReturnTypes,
+                                       Argument genericReturnType,
                                        Argument...arguments) {
         this.method = method;
-        this.returnType = new ReturnTypeImpl(method, genericReturnTypes);
-        this.annotations = method.getAnnotations();
+        this.returnType = new ReturnTypeImpl(method, genericReturnType);
         this.declaringType = method.getDeclaringClass();
         this.arguments = arguments == null || arguments.length == 0 ? Argument.ZERO_ARGUMENTS : arguments;
     }
 
-    protected AbstractExecutableMethod(Method method, Argument<?>[] genericReturnTypes) {
-        this(method, genericReturnTypes, Argument.ZERO_ARGUMENTS);
+    protected AbstractExecutableMethod(Method method, Argument genericReturnType) {
+        this(method, genericReturnType, Argument.ZERO_ARGUMENTS);
     }
 
     @Override
@@ -143,24 +141,17 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
     class ReturnTypeImpl implements ReturnType<Object> {
         private final Method method;
-        private final Map<String, Argument<?>> typeVariables;
+        private final Argument<?> genericReturnType;
 
-        public ReturnTypeImpl(Method method, Argument<?>[] genericReturnType) {
+        ReturnTypeImpl(Method method, Argument genericReturnType) {
             this.method = method;
-            if(genericReturnType == null || genericReturnType.length == 0) {
-                typeVariables = Collections.emptyMap();
-            }
-            else {
-                typeVariables = new LinkedHashMap<>(genericReturnType.length);
-                for (Argument<?> argument : genericReturnType) {
-                    typeVariables.put(argument.getName(), argument);
-                }
-            }
+            this.genericReturnType = genericReturnType != null ? genericReturnType : Argument.of(method.getReturnType());
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public Class<Object> getType() {
-            return (Class<Object>) method.getReturnType();
+            return (Class<Object>) genericReturnType.getType();
         }
 
 
@@ -171,7 +162,7 @@ public abstract class AbstractExecutableMethod implements ExecutableMethod {
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            return typeVariables;
+            return genericReturnType.getTypeVariables();
         }
     }
 }

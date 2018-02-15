@@ -73,7 +73,8 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
-        if(!consulConfiguration.getRegistration().getCheck().isHttp()) {
+        ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
+        if(registration != null && !registration.getCheck().isHttp()) {
 
             String checkId = "service:" + idGenerator.generateId(environment, instance);
 
@@ -140,89 +141,93 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
     @Override
     protected void deregister(ServiceInstance instance) {
-        String applicationName = instance.getId();
-        String serviceId = idGenerator.generateId(environment, instance);
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        Publisher<HttpStatus> deregisterPublisher = consulClient.deregister(serviceId);
-        final String discoveryService = "Consul";
-        performDeregistration(discoveryService, registration, deregisterPublisher, applicationName);
+        if(registration != null) {
+            String applicationName = instance.getId();
+            String serviceId = idGenerator.generateId(environment, instance);
+            Publisher<HttpStatus> deregisterPublisher = consulClient.deregister(serviceId);
+            final String discoveryService = "Consul";
+            performDeregistration(discoveryService, registration, deregisterPublisher, applicationName);
+        }
     }
 
     @Override
     protected void register(ServiceInstance instance) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        String applicationName = instance.getId();
-        validateApplicationName(applicationName);
-        if (StringUtils.isNotEmpty(applicationName)) {
-            NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
-            List<String> tags = new ArrayList<>(registration.getTags());
-            serviceEntry.address(instance.getHost())
-                    .port(instance.getPort())
-                    .tags(tags);
+        if(registration != null) {
+            String applicationName = instance.getId();
+            validateApplicationName(applicationName);
+            if (StringUtils.isNotEmpty(applicationName)) {
+                NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
+                List<String> tags = new ArrayList<>(registration.getTags());
+                serviceEntry.address(instance.getHost())
+                        .port(instance.getPort())
+                        .tags(tags);
 
-            String serviceId = idGenerator.generateId(environment, instance);
-            serviceEntry.id(serviceId);
+                String serviceId = idGenerator.generateId(environment, instance);
+                serviceEntry.id(serviceId);
 
-            if (instance instanceof EmbeddedServerInstance) {
-                NewCheck check = null;
-                EmbeddedServerInstance embeddedServerInstance = (EmbeddedServerInstance) instance;
-                ApplicationConfiguration applicationConfiguration = embeddedServerInstance.getEmbeddedServer().getApplicationConfiguration();
-                ApplicationConfiguration.InstanceConfiguration instanceConfiguration = applicationConfiguration.getInstance();
-                instanceConfiguration.getGroup().ifPresent(g -> {
-                            validateName(g, "Instance Group");
-                            tags.add(ServiceInstance.GROUP + "=" + g);
+                if (instance instanceof EmbeddedServerInstance) {
+                    NewCheck check = null;
+                    EmbeddedServerInstance embeddedServerInstance = (EmbeddedServerInstance) instance;
+                    ApplicationConfiguration applicationConfiguration = embeddedServerInstance.getEmbeddedServer().getApplicationConfiguration();
+                    ApplicationConfiguration.InstanceConfiguration instanceConfiguration = applicationConfiguration.getInstance();
+                    instanceConfiguration.getGroup().ifPresent(g -> {
+                                validateName(g, "Instance Group");
+                                tags.add(ServiceInstance.GROUP + "=" + g);
+                            }
+
+                    );
+                    instanceConfiguration.getZone().ifPresent(z -> {
+                                validateName(z, "Instance Zone");
+                                tags.add(ServiceInstance.ZONE + "=" + z);
+                            }
+                    );
+
+                    ConsulConfiguration.ConsulRegistrationConfiguration.CheckConfiguration checkConfig = registration.getCheck();
+                    if (checkConfig.isEnabled()) {
+
+                        if (heartbeatConfiguration.isEnabled() && !checkConfig.isHttp()) {
+                            TTLCheck ttlCheck = new TTLCheck();
+                            ttlCheck.ttl(heartbeatConfiguration.getInterval().plus(Duration.ofSeconds(10)));
+                            check = ttlCheck;
+                        } else {
+
+                            URL serverURL = ((EmbeddedServerInstance) instance).getEmbeddedServer().getURL();
+                            HTTPCheck httpCheck;
+                            try {
+                                httpCheck = new HTTPCheck(
+                                        new URL(serverURL, registration.getHealthPath().orElse("/health"))
+                                );
+                            } catch (MalformedURLException e) {
+                                throw new DiscoveryException("Invalid health path configured: " + registration.getHealthPath());
+                            }
+
+                            httpCheck.interval(checkConfig.getInterval());
+                            httpCheck.method(checkConfig.getMethod())
+                                    .headers(ConvertibleMultiValues.of(checkConfig.getHeaders()));
+
+                            checkConfig.getTlsSkipVerify().ifPresent(httpCheck::setTLSSkipVerify);
+                            check = httpCheck;
                         }
-
-                );
-                instanceConfiguration.getZone().ifPresent(z -> {
-                            validateName(z, "Instance Zone");
-                            tags.add(ServiceInstance.ZONE + "=" + z);
-                        }
-                );
-
-                ConsulConfiguration.ConsulRegistrationConfiguration.CheckConfiguration checkConfig = registration.getCheck();
-                if (checkConfig.isEnabled()) {
-
-                    if (heartbeatConfiguration.isEnabled() && !checkConfig.isHttp()) {
-                        TTLCheck ttlCheck = new TTLCheck();
-                        ttlCheck.ttl(heartbeatConfiguration.getInterval().plus(Duration.ofSeconds(10)));
-                        check = ttlCheck;
-                    } else {
-
-                        URL serverURL = ((EmbeddedServerInstance) instance).getEmbeddedServer().getURL();
-                        HTTPCheck httpCheck;
-                        try {
-                            httpCheck = new HTTPCheck(
-                                    new URL(serverURL, registration.getHealthPath().orElse("/health"))
-                            );
-                        } catch (MalformedURLException e) {
-                            throw new DiscoveryException("Invalid health path configured: " + registration.getHealthPath());
-                        }
-
-                        httpCheck.interval(checkConfig.getInterval());
-                        httpCheck.method(checkConfig.getMethod())
-                                .headers(ConvertibleMultiValues.of(checkConfig.getHeaders()));
-
-                        checkConfig.getTlsSkipVerify().ifPresent(httpCheck::setTLSSkipVerify);
-                        check = httpCheck;
                     }
+
+
+                    if (check != null) {
+                        check.status(Check.Status.PASSING);
+                        checkConfig.getDeregisterCriticalServiceAfter().ifPresent(check::deregisterCriticalServiceAfter);
+                        checkConfig.getNotes().ifPresent(check::notes);
+                        checkConfig.getId().ifPresent(check::id);
+                        serviceEntry.check(check);
+                    }
+
                 }
 
-
-                if (check != null) {
-                    check.status(Check.Status.PASSING);
-                    checkConfig.getDeregisterCriticalServiceAfter().ifPresent(check::deregisterCriticalServiceAfter);
-                    checkConfig.getNotes().ifPresent(check::notes);
-                    checkConfig.getId().ifPresent(check::id);
-                    serviceEntry.check(check);
-                }
-
+                customizeServiceEntry(instance, serviceEntry);
+                Publisher<HttpStatus> registerFlowable = consulClient.register(serviceEntry);
+                Observable<HttpStatus> registrationObservable = applyRetryPolicy(registration, registerFlowable);
+                performRegistration("Consul", registration, applicationName, registrationObservable);
             }
-
-            customizeServiceEntry(instance, serviceEntry);
-            Publisher<HttpStatus> registerFlowable = consulClient.register(serviceEntry);
-            Observable<HttpStatus> registrationObservable = applyRetryPolicy(registration, registerFlowable);
-            performRegistration("Consul", registration, applicationName, registrationObservable);
         }
     }
 

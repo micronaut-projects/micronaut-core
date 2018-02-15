@@ -21,10 +21,7 @@
  * @since 1.0
  */
 @Configuration
-@Requires(classes = MongoClient.class)
-@Requires(property = "particle.mongo")
+@RequiresMongo
 package org.particleframework.configuration.mongo.reactive;
-
-import com.mongodb.reactivestreams.client.MongoClient;
+import org.particleframework.configuration.mongo.reactive.condition.RequiresMongo;
 import org.particleframework.context.annotation.Configuration;
-import org.particleframework.context.annotation.Requires;

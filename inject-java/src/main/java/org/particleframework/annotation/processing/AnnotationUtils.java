@@ -36,7 +36,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @author Dean Wette
  */
-class AnnotationUtils {
+public class AnnotationUtils {
 
     private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(100).build();
 
@@ -134,4 +134,6 @@ class AnnotationUtils {
         }
         return false;
     }
+
+
 }

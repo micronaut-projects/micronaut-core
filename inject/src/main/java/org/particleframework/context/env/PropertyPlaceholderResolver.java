@@ -40,7 +40,7 @@ public interface PropertyPlaceholderResolver {
      * @return The optional string or {@link Optional#empty()} if resolution was not possible
      * @throws ConfigurationException If the placeholders could not be resolved
      */
-    default String resolveRequiredPlaceholder(String str) throws ConfigurationException {
+    default String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return resolvePlaceholders(str).orElseThrow(()-> new ConfigurationException("Unable to resolve placeholders for property: " + str));
     }
 }

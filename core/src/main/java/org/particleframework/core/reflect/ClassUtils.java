@@ -27,6 +27,7 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(double.class.getName(), double.class);
         COMMON_CLASS_MAP.put(float.class.getName(), float.class);
         COMMON_CLASS_MAP.put(char.class.getName(), char.class);
+        COMMON_CLASS_MAP.put(short.class.getName(), short.class);
 
         COMMON_CLASS_MAP.put(boolean[].class.getName(), boolean[].class);
         COMMON_CLASS_MAP.put(byte[].class.getName(), byte[].class);
@@ -35,11 +36,13 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(double[].class.getName(), double[].class);
         COMMON_CLASS_MAP.put(float[].class.getName(), float[].class);
         COMMON_CLASS_MAP.put(char[].class.getName(), char[].class);
+        COMMON_CLASS_MAP.put(short[].class.getName(), short[].class);
 
         COMMON_CLASS_MAP.put(Boolean.class.getName(), Boolean.class);
         COMMON_CLASS_MAP.put(Byte.class.getName(), Byte.class);
         COMMON_CLASS_MAP.put(Integer.class.getName(), Integer.class);
         COMMON_CLASS_MAP.put(Long.class.getName(), Long.class);
+        COMMON_CLASS_MAP.put(Short.class.getName(), Short.class);
         COMMON_CLASS_MAP.put(Double.class.getName(),Double.class);
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);

@@ -179,14 +179,20 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     findOverriddenInterfaceMethod(executableElement, overridden, supertype);
 
                 }
-                supertype = (TypeElement) ((DeclaredType) supertype.getSuperclass()).asElement();
+                TypeMirror superclass = supertype.getSuperclass();
+                if(superclass instanceof DeclaredType) {
+                    supertype = (TypeElement) ((DeclaredType) superclass).asElement();
+                }
+                else {
+                    break;
+                }
             }
         }
         return overridden;
     }
 
-    private boolean hasAnnotation(ExecutableElement overriddenMethod, Class<? extends Annotation> ann) {
-        List<? extends AnnotationMirror> annotationMirrors = overriddenMethod.getAnnotationMirrors();
+    public static boolean hasAnnotation(ExecutableElement method, Class<? extends Annotation> ann) {
+        List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             if(annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
                 return true;

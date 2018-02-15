@@ -1,0 +1,23 @@
+mainClassName = "example.pets.Application"
+
+dependencies {
+    compileOnly "org.particleframework:inject-java:${projectVersion}"
+
+    compile project(":api")
+    compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+    compile "org.particleframework:http-server-netty:${projectVersion}"
+    compile "org.particleframework:discovery-client:${projectVersion}"
+
+    
+    compile "org.particleframework.configuration:mongo-reactive:${projectVersion}"
+
+    compile "org.particleframework:runtime:${projectVersion}"
+
+    testCompile "junit:junit:4.12"
+    testCompile "org.particleframework:inject-java:${projectVersion}"
+    testCompile "org.particleframework:http-client:${projectVersion}"
+    testRuntime "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+}
+shadowJar {
+    mergeServiceFiles()
+}

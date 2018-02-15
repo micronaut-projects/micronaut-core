@@ -1,0 +1,13 @@
+apply plugin: 'groovy'
+
+dependencies {
+  compileOnly "org.particleframework:inject-groovy:${projectVersion}"
+  compile "org.particleframework:runtime-groovy:${projectVersion}"
+  compile "org.particleframework:http-server-netty:${projectVersion}"
+  compile project(":api")
+  compile "org.particleframework:http-client:${projectVersion}"
+
+  testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
+        exclude module:'groovy-all'
+  }
+}

@@ -88,6 +88,7 @@ public class ParticleApplication {
         try {
             long start = System.currentTimeMillis();
             applicationContext.start();
+
             Optional<EmbeddedServer> embeddedContainerBean = applicationContext.findBean(EmbeddedServer.class);
 
             embeddedContainerBean.ifPresent((embeddedServer -> {
@@ -98,6 +99,8 @@ public class ParticleApplication {
                         long took = end - start;
                         LOG.info("Startup completed in {}ms. Server Running: {}", took, embeddedServer.getURL());
                     }
+                    Runtime.getRuntime().addShutdownHook(new Thread(embeddedServer::stop));
+
                 } catch (Throwable e) {
                     handleStartupException(applicationContext.getEnvironment(), e);
                 }

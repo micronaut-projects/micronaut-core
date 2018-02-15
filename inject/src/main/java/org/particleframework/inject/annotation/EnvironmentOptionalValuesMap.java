@@ -16,10 +16,12 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.value.OptionalValuesMap;
 
 import java.util.Map;
-import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Extended version of {@link OptionalValuesMap} that resolved place holders
@@ -27,18 +29,28 @@ import java.util.Optional;
  * @since 1.0
  */
 class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
-    private final Environment environment;
-
     EnvironmentOptionalValuesMap(Class<?> type, Map<CharSequence, ?> values, Environment environment) {
-        super(type, values);
-        this.environment = environment;
+        super(type, resolveValues(environment, values));
     }
 
-    @Override
-    public Optional<V> get(CharSequence name) {
-        if(name != null) {
-            name = environment.getPlaceholderResolver().resolveRequiredPlaceholder(name.toString());
-        }
-        return super.get(name);
+    @SuppressWarnings("unchecked")
+    private static Map<CharSequence, ?> resolveValues(Environment environment, Map<CharSequence, ?> values) {
+        PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
+        return values.entrySet().stream().map((Function<Map.Entry<CharSequence, ?>, Map.Entry<CharSequence, ?>>) entry -> {
+            Object value = entry.getValue();
+            if(value instanceof CharSequence) {
+                value = placeholderResolver.resolveRequiredPlaceholders(value.toString());
+                ((Map.Entry)entry).setValue(value);
+            }
+            else if(value instanceof String[]) {
+                String[] a = (String[]) value;
+                for (int i = 0; i < a.length; i++) {
+                    a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
+                }
+                ((Map.Entry)entry).setValue(a);
+            }
+            return entry;
+        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
+
 }

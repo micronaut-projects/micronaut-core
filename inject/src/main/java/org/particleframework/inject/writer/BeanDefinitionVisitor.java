@@ -32,6 +32,9 @@ import java.util.Map;
  * @since 1.0
  */
 public interface BeanDefinitionVisitor {
+    /**
+     * The suffix use for generated AOP intercepted types
+     */
     String PROXY_SUFFIX = "$Intercepted";
 
     /**
@@ -40,7 +43,7 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionConstructor();
 
     /**
-     * @return Wetherh the provided type an interface
+     * @return Whether the provided type an interface
      */
     boolean isInterface();
 
@@ -58,18 +61,18 @@ public interface BeanDefinitionVisitor {
     void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType);
 
     /**
-     * Alter the super class of this bean definition
+     * Alter the super class of this bean definition. The passed class should be a subclass of {@link org.particleframework.context.AbstractBeanDefinition}
      *
      * @param name The super type
      */
-    void visitSuperType(String name);
+    void visitSuperBeanDefinition(String name);
 
     /**
-     * Alter the super class of this bean to use another factory bean
+     * Alter the super class of this bean definition to use another factory bean
      *
      * @param beanName The bean name
      */
-    void visitSuperFactoryType(String beanName);
+    void visitSuperBeanDefinitionFactory(String beanName);
 
     /**
      * @return The full class name of the bean
@@ -112,6 +115,20 @@ public interface BeanDefinitionVisitor {
                                         Map<String, Object> qualifierTypes,
                                         Map<String, Map<String, Object>> genericTypes);
 
+
+    /**
+     * Visits the constructor of the parent class used in the case a proxied bean definition
+     *
+     * @param argumentTypes  The argument type names for each parameter
+     * @param qualifierTypes The qualifier type names for each parameter
+     * @param genericTypes   The generic types for each parameter
+     */
+    void visitProxiedBeanDefinitionConstructor (
+            Object declaringType,
+            Map<String, Object> argumentTypes,
+            Map<String, Object> qualifierTypes,
+            Map<String, Map<String, Object>> genericTypes
+    );
     /**
      * Finalize the bean definition to the given output stream
      */
@@ -259,10 +276,11 @@ public interface BeanDefinitionVisitor {
      * @param qualifierTypes The qualifier types of each argument. Can be null.
      * @param genericTypes   The generic types of each argument. Can be null.
      * @param annotationMetadata The annotation metadata for the method
-     * @return The {@link ExecutableMethodWriter}. Calls should call {@link ExecutableMethodWriter#visitEnd()}  to finalize the method
+     * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
                                Object returnType,
+                               Object genericReturnType,
                                Map<String, Object> returnTypeGenericTypes,
                                String methodName,
                                Map<String, Object> argumentTypes,
@@ -332,10 +350,16 @@ public interface BeanDefinitionVisitor {
      * @param returnType The return type
      * @param methodName The method name
      * @param paramType The method type
-     * @param generics
+     * @param generics The generic types of the method
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics);
+    void visitConfigBuilderMethod(
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName,
+            Object paramType,
+            Map<String, Object> generics);
 
     /**
      * Finalize a configuration builder field

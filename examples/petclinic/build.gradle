@@ -1,0 +1,27 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '2.0.2'
+    id 'java'
+    id "application"
+}
+
+
+
+subprojects {
+    apply plugin:"java"
+    apply plugin:"application"
+    apply plugin: 'com.github.johnrengelman.shadow'
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+
+    dependencies {
+        compile "org.particleframework:discovery-client:${projectVersion}"
+        compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+        runtime "org.particleframework:management:${projectVersion}"
+        runtime "ch.qos.logback:logback-classic:1.2.3"
+    }
+
+
+}

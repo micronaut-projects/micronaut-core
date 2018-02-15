@@ -19,8 +19,8 @@ import io.reactivex.Flowable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.discovery.consul.client.v1.ConsulClient;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.management.endpoint.health.HealthResult;
-import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;

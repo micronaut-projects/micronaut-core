@@ -50,6 +50,9 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected void writeGetAnnotationMetadataMethod(ClassWriter classWriter) {
         GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
         annotationMetadataMethod.loadThis();
+
+        // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
+        // then we setup an annotation metadata reference from the method to the class (or inherited method) metadata
         if(annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
             String className = reference.getClassName();

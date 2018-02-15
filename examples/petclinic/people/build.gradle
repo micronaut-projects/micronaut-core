@@ -1,0 +1,6 @@
+dependencies {
+  compileOnly "org.particleframework:inject-java:${projectVersion}"
+  compile "org.particleframework:http-server-netty:${projectVersion}"
+
+  testCompile "junit:junit:4.12"
+}

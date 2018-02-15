@@ -37,7 +37,7 @@ import org.reactivestreams.Publisher
 class MockEurekaAuth implements HttpServerFilter{
     final String userInfo
 
-    MockEurekaAuth(@Value('test.eureka.userinfo') String userInfo) {
+    MockEurekaAuth(@Value('${test.eureka.userinfo}') String userInfo) {
         this.userInfo = userInfo
     }
 

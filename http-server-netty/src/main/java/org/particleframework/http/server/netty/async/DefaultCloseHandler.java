@@ -17,10 +17,10 @@ package org.particleframework.http.server.netty.async;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.*;
+import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +31,7 @@ import java.nio.channels.ClosedChannelException;
  * A future that executes the standard close procedure
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture> {
@@ -57,12 +58,11 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error writing Netty response: " + cause.getMessage(), cause);
                 }
-                Channel channel = context.channel();
-                if (channel.isWritable()) {
-                    context.pipeline().fireExceptionCaught(cause);
-                } else {
-                    channel.close();
-                }
+
+                // if we have arrived to this point something has gone wrong streaming the response the client
+                // so we just queue an internal server error response to return to the client
+                context.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
+                       .addListener(ChannelFutureListener.CLOSE);
             }
         } else if (!HttpUtil.isKeepAlive(request) || response.status().code() >= 300) {
             future.channel().close();

@@ -99,6 +99,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public void visitMethod(Object declaringType,
                             Object returnType,
+                            Object genericReturnType,
                             Map<String, Object> returnTypeGenericTypes,
                             String methodName,
                             Map<String, Object> argumentTypes,
@@ -154,8 +155,19 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         // 1st argument Class.getMethod(..)
         pushGetMethodFromTypeCall(constructorWriter, declaringTypeObject, methodName, argumentTypeClasses);
 
-        // 2nd argument the return type generics
-        buildTypeArguments(constructorWriter, returnTypeGenericTypes);
+        // 2nd argument the generic return type
+        // Argument.of(genericReturnType, returnTypeGenericTypes)
+        if(genericReturnType instanceof Class && ((Class) genericReturnType).isPrimitive()) {
+            constructorWriter.visitInsn(ACONST_NULL);
+        }
+        else {
+            buildArgumentWithGenerics(
+                    constructorWriter,
+                    methodName,
+                    Collections.singletonMap(genericReturnType, returnTypeGenericTypes)
+            );
+        }
+
 
         if (hasArgs) {
 
@@ -168,9 +180,9 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     genericTypes
             );
             // now invoke super(..) if no arg constructor
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class, Argument[].class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument.class, Argument[].class);
         } else {
-            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument[].class);
+            invokeConstructor(executorMethodConstructor, AbstractExecutableMethod.class, Method.class, Argument.class);
         }
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);

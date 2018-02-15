@@ -108,7 +108,7 @@ class RefreshScopeSpec extends Specification {
 
         final MyConfig config
 
-        @Value('foo.bar')
+        @Value('${foo.bar}')
         String foo
 
         RefreshBean(MyConfig config) {
@@ -129,7 +129,7 @@ class RefreshScopeSpec extends Specification {
 
         final MyConfig config
         final SecondConfig secondConfig
-        @Value('foo.bar')
+        @Value('${foo.bar}')
         String foo
 
         RefreshBean2(MyConfig config, SecondConfig secondConfig1) {
