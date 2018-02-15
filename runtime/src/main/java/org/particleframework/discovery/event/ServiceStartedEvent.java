@@ -15,7 +15,16 @@
  */
 package org.particleframework.discovery.event;
 
+import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.context.env.DefaultEnvironment;
+import org.particleframework.context.env.Environment;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.cloud.AmazonMetadataResolver;
+import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
+
+import javax.inject.Inject;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * An event fired when registering a service
@@ -30,7 +39,22 @@ public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
      * @param source The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
+
+    @Inject
+    Environment environment;
+
+    @Inject
+    DefaultEnvironment defaultEnvironment;
+
+
     public ServiceStartedEvent(ServiceInstance source) {
         super(source);
+        //Environment is null, how do I get this properly??
+        //Set activeNames = environment.getActiveNames();
+        //if (activeNames.contains(Environment.AMAZON_EC2)) {
+            AmazonMetadataResolver resolver = new AmazonMetadataResolver();
+            Optional metaData = resolver.resolve(ComputePlatform.AMAZON_EC2);
+        //}
+
     }
 }
