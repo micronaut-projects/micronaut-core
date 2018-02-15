@@ -1,0 +1,20 @@
+Static resource resolution is disabled by default.
+
+The following configuration options are available through link:{api}/org/particleframework/web/router/resource/StaticResourceConfiguration.html[StaticResourceConfiguration]:
+|=======
+|enabled |boolean |Whether static resources will be resolved at all
+|mapping |String |The path resources should be served from. Uses ant path matching. Options might be `/\****` or `/static/****`
+|paths |List<String> |A list of paths either starting with `classpath:` or `file:`. You can serve files from anywhere on disk or the classpath. For example to serve static resources from `src/main/resources/public`, you would use `classpath:public` as the path.
+|=======
+
+Here is what an example YML configuration might look like:
+
+[source,yaml]
+----
+router:
+    static:
+        resources:
+            enabled: true
+            mapping: /static/**
+            paths: classpath:public
+----
