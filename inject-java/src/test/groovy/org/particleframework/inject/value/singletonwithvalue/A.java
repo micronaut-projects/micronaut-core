@@ -11,29 +11,29 @@ public class A {
     int fromConstructor;
 
     public A(
-        @Value("foo.bar") int port) {
+        @Value("${foo.bar}") int port) {
         this.fromConstructor = port;
     }
 
-    @Value("foo.bar")
+    @Value("${foo.bar}")
     Optional<Integer> optionalPort;
 
-    @Value("foo.another")
+    @Value("${foo.another}")
     Optional<Integer> optionalPort2;
 
-    @Value("foo.bar")
+    @Value("${foo.bar}")
     int port;
 
     private int anotherPort;
 
-    @Value("foo.bar")
+    @Value("${foo.bar}")
     protected int fieldPort;
 
-    @Value("default.port:9090")
+    @Value("${default.port:9090}")
     protected int defaultPort;
 
     @Inject
-    void setAnotherPort(@Value("foo.bar") int port) {
+    void setAnotherPort(@Value("${foo.bar}") int port) {
         anotherPort = port;
     }
 

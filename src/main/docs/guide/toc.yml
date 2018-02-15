@@ -36,6 +36,7 @@ httpServer:
   title: The HTTP Server
   runningServer: Running the Embedded Server 
   routing: HTTP Routing
+  staticResources: Serving Static Resources
   binding: Simple Request Binding
   requestResponse: The HttpRequest and HttpResponse
   reactiveServer:

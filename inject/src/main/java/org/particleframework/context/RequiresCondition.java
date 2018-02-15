@@ -159,6 +159,9 @@ public class RequiresCondition implements Condition {
                     return resolvedValue == null || resolvedValue.equals(value);
                 }
             }
+            else {
+                return false;
+            }
         }
         return true;
     }

@@ -59,30 +59,23 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator,ByteBuf> byteBufferFactory,
-            Argument<B> bodyType) {
+            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
+            Argument<B> bodyType, boolean errorStatus) {
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
-        this.body = getBody(bodyType).orElse(null);
+        Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
+        if(rawBodyType != null) {
+            this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+        }
+        else {
+            this.body = null;
+        }
     }
 
-
-    FullNettyClientHttpResponse(
-            io.netty.handler.codec.http.HttpResponse response,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator,ByteBuf> byteBufferFactory) {
-        this.status = HttpStatus.valueOf(response.status().code());
-        this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
-        this.attributes = new MutableConvertibleValuesMap<>();
-        this.nettyHttpResponse = response;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.byteBufferFactory = byteBufferFactory;
-        this.body = null;
-    }
 
     @Override
     public String reason() {
@@ -119,7 +112,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     @Override
     public <T> Optional<T> getBody(Argument<T> type) {
         if (type == null) return Optional.empty();
-        if( !(this.nettyHttpResponse instanceof FullHttpResponse)) return Optional.empty();
+        if (!(this.nettyHttpResponse instanceof FullHttpResponse)) return Optional.empty();
 
         io.netty.handler.codec.http.FullHttpResponse fullResponse = (FullHttpResponse) this.nettyHttpResponse;
         if (type.getType() == ByteBuffer.class) {
@@ -142,7 +135,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                         });
                     }
                     ByteBuf content = fullResponse.content();
-            return convertByteBuf(content, type);
+                    return convertByteBuf(content, type);
                 }
 
         );
@@ -154,11 +147,10 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             return Optional.empty();
         }
         if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
-            if(CharSequence.class.isAssignableFrom(type.getType())) {
+            if (CharSequence.class.isAssignableFrom(type.getType())) {
                 Charset charset = getContentType().flatMap(ct -> ct.getCharset()).orElse(StandardCharsets.UTF_8);
                 return Optional.of(content.toString(charset));
-            }
-            else {
+            } else {
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                 if (foundCodec.isPresent()) {
                     MediaTypeCodec codec = foundCodec.get();

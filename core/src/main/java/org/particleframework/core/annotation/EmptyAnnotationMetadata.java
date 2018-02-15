@@ -56,6 +56,11 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
+    public Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+        return Collections.emptySet();
+    }
+
+    @Override
     public ConvertibleValues<Object> getValues(String annotation) {
         return ConvertibleValues.empty();
     }

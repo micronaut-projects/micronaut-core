@@ -24,4 +24,3 @@
 package org.particleframework.discovery.consul;
 
 import org.particleframework.context.annotation.Configuration;
-import org.particleframework.discovery.consul.condition.RequiresConsul;

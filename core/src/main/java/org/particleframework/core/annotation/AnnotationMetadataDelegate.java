@@ -36,6 +36,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().hasDeclaredAnnotation(annotation);
     }
 
+
+
     @Override
     default boolean hasAnnotation(String annotation) {
         return getAnnotationMetadata().hasAnnotation(annotation);
@@ -54,6 +56,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default Set<String> getAnnotationNamesByStereotype(String stereotype) {
         return getAnnotationMetadata().getAnnotationNamesByStereotype(stereotype);
+    }
+
+    @Override
+    default Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+        return getAnnotationMetadata().getDeclaredAnnotationNamesTypeByStereotype(stereotype);
     }
 
     @Override

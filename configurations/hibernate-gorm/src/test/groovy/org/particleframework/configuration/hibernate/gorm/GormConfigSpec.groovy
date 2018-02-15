@@ -60,7 +60,7 @@ class GormConfigSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         then:
-        bookService.dbCreate
+        bookService.dbCreate == 'create-drop'
         bookService.list().size() == 0
 
         cleanup:
@@ -100,7 +100,7 @@ class Book {
 @Singleton
 abstract class BookService {
 
-    @Value('dataSource.dbCreate')
+    @Value('${dataSource.dbCreate}')
     String dbCreate
 
     abstract List<Book> list()

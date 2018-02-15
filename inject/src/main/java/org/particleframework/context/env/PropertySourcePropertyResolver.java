@@ -205,7 +205,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if(value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholder(value.toString());
+            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
         }
         return value;
     }

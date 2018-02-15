@@ -39,14 +39,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Override
     public Optional<String> resolvePlaceholders(String str) {
         try {
-            return resolvePlaceholders(str);
+            int i = str.indexOf(PREFIX);
+            if(i > -1) {
+                return Optional.of(resolvePlaceholders(str, i));
+            }
+            return Optional.of(str);
         } catch (ConfigurationException e) {
             return Optional.empty();
         }
     }
 
     @Override
-    public String resolveRequiredPlaceholder(String str) throws ConfigurationException {
+    public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         int i = str.indexOf(PREFIX);
         if(i > -1) {
             return resolvePlaceholders(str, i);

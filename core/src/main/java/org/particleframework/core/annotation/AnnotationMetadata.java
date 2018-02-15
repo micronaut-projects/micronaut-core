@@ -100,6 +100,14 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return A set of annotation names
      */
     Set<String> getAnnotationNamesByStereotype(String stereotype);
+
+    /**
+     * Resolve all of the annotations names for the given stereotype that are declared annotations
+     * @param stereotype The stereotype
+     * @return The declared annotations
+     */
+    Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
+
     /**
      * Get all of the values for the given annotation
      *
@@ -173,6 +181,15 @@ public interface AnnotationMetadata extends AnnotatedElement {
         return getAnnotationNamesByStereotype(stereotype).stream().findFirst();
     }
 
+
+    /**
+     * Find the first annotation name for the given stereotype
+     * @param stereotype The stereotype
+     * @return The annotation name
+     */
+    default Optional<String> getDeclaredAnnotationNameTypeByStereotype(String stereotype) {
+        return getDeclaredAnnotationNamesTypeByStereotype(stereotype).stream().findFirst();
+    }
     /**
      * Find the first annotation name for the given stereotype
      * @param stereotype The stereotype
@@ -182,6 +199,26 @@ public interface AnnotationMetadata extends AnnotatedElement {
         return getAnnotationTypeByStereotype(stereotype.getName());
     }
 
+    /**
+     * Find the first declared annotation name for the given stereotype
+     * @param stereotype The stereotype
+     * @return The annotation name
+     */
+    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
+        return getDeclaredAnnotationTypeByStereotype(stereotype.getName());
+    }
+    /**
+     * Find the first annotation name for the given stereotype
+     * @param stereotype The stereotype
+     * @return The annotation name
+     */
+    @SuppressWarnings("unchecked")
+    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(String stereotype) {
+        return getDeclaredAnnotationNameTypeByStereotype(stereotype).flatMap(name -> {
+            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
+            return opt.map(aClass -> (Class<? extends Annotation>) aClass);
+        });
+    }
     /**
      * Find the first annotation name for the given stereotype
      * @param stereotype The stereotype

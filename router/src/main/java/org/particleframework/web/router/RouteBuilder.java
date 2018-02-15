@@ -22,6 +22,7 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.filter.HttpFilter;
+import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.http.annotation.Controller;
 
@@ -974,6 +975,27 @@ public interface RouteBuilder {
             return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
 
+
+        /**
+         * Resolve the URI to use for the given type
+         *
+         * @param beanDefinition The type
+         * @return The URI to use
+         */
+        default String resolveUri(BeanDefinition<?> beanDefinition) {
+            Controller annotation = beanDefinition.getAnnotation(Controller.class);
+            String uri = annotation != null ? annotation.value() : null;
+            if(uri != null) {
+                int len = uri.length();
+                if(len == 1 && uri.charAt(0) == '/' ) {
+                    return "";
+                }
+                if(len > 0) {
+                    return uri;
+                }
+            }
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanDefinition.getBeanType());
+        }
         /**
          * Resolve the URI to use for the given type
          *

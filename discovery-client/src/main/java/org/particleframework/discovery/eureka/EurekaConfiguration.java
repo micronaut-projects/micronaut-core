@@ -125,9 +125,9 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
         public EurekaRegistrationConfiguration(
                 EmbeddedServer embeddedServer,
-                @Value(ApplicationConfiguration.APPLICATION_NAME) String applicationName,
-                @Value(EurekaRegistrationConfiguration.IP_ADDRESS) Optional<String> ipAddress,
-                @Value(ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID) Optional<String> instanceId,
+                @Value("${" + ApplicationConfiguration.APPLICATION_NAME + "}") String applicationName,
+                @Value("${" +EurekaRegistrationConfiguration.IP_ADDRESS + "}") Optional<String> ipAddress,
+                @Value("${" +ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID + "}") Optional<String> instanceId,
                 Optional<DataCenterInfo> dataCenterInfo) {
             this.explicitInstanceId = instanceId.isPresent();
             if(ipAddress.isPresent()) {

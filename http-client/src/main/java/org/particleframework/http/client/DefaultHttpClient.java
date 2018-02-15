@@ -381,6 +381,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                             emitter.onComplete();
                                         }
                                     });
+                                    if(LOG.isDebugEnabled()) {
+                                        LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                                    }
+                                    if (LOG.isTraceEnabled()) {
+                                        traceRequest(requestWrapper.get(), nettyRequest);
+                                    }
+
                                     channel.writeAndFlush(nettyRequest);
                                 } else {
                                     Throwable cause = f.cause();
@@ -422,7 +429,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
 
                             prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
-
+                            if(LOG.isDebugEnabled()) {
+                                LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                            }
                             if (LOG.isTraceEnabled()) {
                                 traceRequest(finalRequest, nettyRequest);
                             }
@@ -734,16 +743,18 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                if (fullResponse.status().code() == HttpStatus.NO_CONTENT.getCode()) {
+                HttpResponseStatus status = fullResponse.status();
+                int statusCode = status.code();
+                if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                     fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
+                boolean errorStatus = statusCode >= 400;
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType);
+                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
 
-                HttpStatus status = response.getStatus();
-                if (status.getCode() >= 400) {
-                    completableFuture.completeExceptionally(new HttpClientResponseException(status.getReason(), response));
+                if (errorStatus) {
+                    completableFuture.completeExceptionally(new HttpClientResponseException(status.reasonPhrase(), response));
                 } else {
                     completableFuture.complete(response);
                 }
@@ -803,7 +814,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     private void traceRequest(HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
-        LOG.trace("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
         HttpHeaders headers = nettyRequest.headers();
         for (String name : headers.names()) {
             List<String> all = headers.getAll(name);

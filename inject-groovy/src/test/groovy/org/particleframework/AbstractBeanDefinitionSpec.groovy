@@ -18,6 +18,7 @@ package org.particleframework
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.particleframework.ast.groovy.InjectTransform
+import org.particleframework.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.inject.BeanDefinition
 import spock.lang.Specification
@@ -34,9 +35,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def configuration = new CompilerConfiguration()
-        configuration.optimizationOptions.put(InjectTransform.PARTICLE_DEFINE_CLASSES, true)
-        def classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration)
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
         classLoader.parseClass(classStr)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }

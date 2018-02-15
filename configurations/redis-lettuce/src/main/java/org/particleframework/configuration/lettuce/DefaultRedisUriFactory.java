@@ -33,7 +33,7 @@ public class DefaultRedisUriFactory {
     @Bean
     @Primary
     @Singleton
-    RedisURI redisURI(@Value("particle.redis.uri") String uri) {
+    RedisURI redisURI(@Value("${particle.redis.uri}") String uri) {
         return RedisURI.create(uri);
     }
 }

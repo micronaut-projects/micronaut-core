@@ -35,52 +35,47 @@ class AstGenericUtils {
      * @param classNode The class node
      * @return A type reference. Either a java.lang.Class or a string representing the name of the class
      */
-    static Object resolveTypeReference(ClassNode classNode) {
+    static Object resolveTypeReference(ClassNode classNode, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
         if (classNode == null) {
             return null
         } else {
+            if(classNode.isGenericsPlaceHolder() && classNode.genericsTypes) {
+                String typeVar = classNode.genericsTypes[0].name
+                if(boundTypes.containsKey(typeVar)) {
+                    return boundTypes.get(typeVar).name
+                }
+            }
+            else if(classNode.isArray() && classNode.componentType.isGenericsPlaceHolder()) {
+                GenericsType[] componentGenericTypes = classNode.componentType.genericsTypes
+                if(componentGenericTypes) {
+                    String typeVar = componentGenericTypes[0].name
+                    if(boundTypes.containsKey(typeVar)) {
+                        return boundTypes.get(typeVar).makeArray().name
+                    }
+                }
+            }
             return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
         }
     }
 
     /**
      * Build the generics information for the given type
-     * @param parameterType The parameter type
+     * @param classNode The parameter type
      * @return The generics information
      */
-    static Map<String, Object> buildGenericTypeInfo(ClassNode parameterType) {
+    static Map<String, Object> buildGenericTypeInfo(ClassNode classNode, Map<String, ClassNode> boundTypes) {
+
+        if (!classNode.isUsingGenerics() || !classNode.isRedirectNode()) Collections.emptyMap()
+
         Map<String, Object> resolvedGenericTypes = [:]
-        Map<String, GenericsType> placeholders = GenericsUtils.extractPlaceholders(parameterType)
-        for (entry in placeholders) {
-            GenericsType gt = entry.value
-            if (!gt.isPlaceholder()) {
-                resolvedGenericTypes.put(entry.key, resolveTypeReference(gt.type))
-            } else if (gt.isWildcard()) {
-                ClassNode[] upperBounds = gt.upperBounds
-                if (upperBounds != null && upperBounds.length == 1) {
-                    resolvedGenericTypes.put(entry.key, resolveTypeReference(upperBounds[0]))
-                    continue
-                }
-
-                ClassNode lowerBounds = gt.lowerBound
-                if (lowerBounds != null) {
-                    resolvedGenericTypes.put(entry.key, resolveTypeReference(lowerBounds))
-                    continue
-                }
-
-                resolvedGenericTypes.put(entry.key, Object.class)
-            } else {
-                resolvedGenericTypes.put(entry.key, Object.class)
-            }
-
-        }
-        resolvedGenericTypes
+        extractPlaceholders(classNode, resolvedGenericTypes, boundTypes)
+        return resolvedGenericTypes
     }
 
 
     static Map<String, Object> extractPlaceholders(ClassNode cn) {
         Map<String, Object> ret = new HashMap<String, Object>()
-        extractPlaceholders(cn, ret)
+        extractPlaceholders(cn, ret, Collections.emptyMap())
         return ret
     }
 
@@ -90,11 +85,11 @@ class AstGenericUtils {
      * @param node
      * @param map
      */
-    static void extractPlaceholders(ClassNode node, Map<String, Object> map) {
+    static void extractPlaceholders(ClassNode node, Map<String, Object> map, Map<String, ClassNode> boundTypes) {
         if (node == null) return
 
         if (node.isArray()) {
-            extractPlaceholders(node.getComponentType(), map)
+            extractPlaceholders(node.getComponentType(), map, boundTypes)
             return
         }
 
@@ -117,7 +112,7 @@ class AstGenericUtils {
                         if (lowerBound!=null) {
                             def newMap = new LinkedHashMap()
                             map.put(name, Collections.singletonMap(cn.name,newMap))
-                            extractPlaceholders(lowerBound, newMap)
+                            extractPlaceholders(lowerBound, newMap,boundTypes)
                         }
                         ClassNode[] upperBounds = value.getUpperBounds()
                         if (upperBounds!=null) {
@@ -125,7 +120,7 @@ class AstGenericUtils {
                                 def newMap = new LinkedHashMap()
                                 map.put(name, Collections.singletonMap(cn.name,newMap))
 
-                                extractPlaceholders(upperBound, newMap)
+                                extractPlaceholders(upperBound, newMap,boundTypes)
                             }
                         }
                     } else if (!value.isPlaceholder()) {
@@ -135,7 +130,14 @@ class AstGenericUtils {
                         else {
                             def newMap = new LinkedHashMap()
                             map.put(name, Collections.singletonMap(cn.name,newMap))
-                            extractPlaceholders(cn, newMap)
+                            extractPlaceholders(cn, newMap, boundTypes)
+                        }
+                    } else {
+                        if(boundTypes.containsKey(value.name)) {
+                            map.put(name, resolveTypeReference(boundTypes.get(value.name)))
+                        }
+                        else {
+                            map.put(name, resolveTypeReference(value.type))
                         }
                     }
 

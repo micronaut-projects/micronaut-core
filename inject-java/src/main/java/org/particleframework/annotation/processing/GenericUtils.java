@@ -12,7 +12,6 @@ import java.util.*;
 
 import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
-import static javax.lang.model.type.TypeKind.WILDCARD;
 
 class GenericUtils {
 
@@ -97,27 +96,27 @@ class GenericUtils {
         return Optional.ofNullable(typeMirror);
     }
 
-    Map<String, Object> resolveGenericTypes(TypeMirror type) {
+    Map<String, Object> resolveGenericTypes(TypeMirror type, Map<String, Object> boundTypes) {
         if (type.getKind().isPrimitive() || type.getKind() == VOID || type.getKind() == ARRAY) {
             return Collections.emptyMap();
         }
         if(type instanceof DeclaredType) {
 
             DeclaredType declaredType = (DeclaredType) type;
-            return resolveGenericTypes(declaredType, (TypeElement) declaredType.asElement());
+            return resolveGenericTypes(declaredType, (TypeElement) declaredType.asElement(), boundTypes);
         }
         else if(type instanceof TypeVariable) {
             TypeVariable var = (TypeVariable) type;
             TypeMirror upperBound = var.getUpperBound();
             if(upperBound instanceof DeclaredType) {
-                return resolveGenericTypes(upperBound);
+                return resolveGenericTypes(upperBound, boundTypes);
             }
         }
         return Collections.emptyMap();
     }
 
 
-    Map<String, Object> resolveGenericTypes(DeclaredType type, TypeElement typeElement) {
+    Map<String, Object> resolveGenericTypes(DeclaredType type, TypeElement typeElement, Map<String, Object> boundTypes) {
         List<? extends TypeMirror> typeArguments = type.getTypeArguments();
         Map<String, Object> resolvedParameters = new LinkedHashMap<>();
         List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
@@ -129,6 +128,22 @@ class GenericUtils {
 
                 TypeKind kind = mirror.getKind();
                 switch (kind) {
+                    case TYPEVAR:
+                        TypeVariable tv = (TypeVariable) mirror;
+                        if(boundTypes.containsKey(tv.toString())) {
+                            resolvedParameters.put(parameterName, boundTypes.get(tv.toString()));
+                        }
+                        else {
+                            TypeMirror upperBound = tv.getUpperBound();
+                            TypeMirror lowerBound = tv.getLowerBound();
+                            if(upperBound.getKind() != TypeKind.NULL) {
+                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, Collections.emptyMap()));
+                            }
+                            else if(lowerBound.getKind() != TypeKind.NULL) {
+                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, Collections.emptyMap()));
+                            }
+                        }
+                        continue;
                     case ARRAY:
                     case BOOLEAN:
                     case BYTE:
@@ -138,64 +153,77 @@ class GenericUtils {
                     case INT:
                     case LONG:
                     case SHORT:
-                        resolveGenericTypeParameterForPrimitiveOrArray(resolvedParameters, parameterName, mirror);
-                    break;
+                        resolveGenericTypeParameterForPrimitiveOrArray(resolvedParameters, parameterName, mirror, boundTypes);
+                        continue;
                     case DECLARED:
-                        resolveGenericTypeParameter(resolvedParameters, parameterName, mirror);
-                    break;
+                        resolveGenericTypeParameter(resolvedParameters, parameterName, mirror, boundTypes);
+                        continue;
                     case WILDCARD:
                         WildcardType wcType = (WildcardType) mirror;
                         TypeMirror extendsBound = wcType.getExtendsBound();
                         TypeMirror superBound = wcType.getSuperBound();
                         if (extendsBound != null) {
-                            resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound);
+                            resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound, boundTypes);
                         }
                         else if (superBound != null) {
-                            resolveGenericTypeParameter(resolvedParameters, parameterName, superBound);
+                            resolveGenericTypeParameter(resolvedParameters, parameterName, superBound, boundTypes);
                         }
                         else {
                             resolvedParameters.put(parameterName, Object.class);
                         }
-
                 }
             }
         }
         return resolvedParameters;
     }
 
-    private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
+
+    private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         DeclaredType declaredType = (DeclaredType)mirror;
         List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
         if(nestedArguments.isEmpty()) {
             resolvedParameters.put(
                     parameterName,
-                    resolveTypeReference(typeUtils.erasure(mirror))
+                    resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters)
             );
         }
         else {
             resolvedParameters.put(
                     parameterName,
                     Collections.singletonMap(
-                            resolveTypeReference(typeUtils.erasure(mirror)),
-                            resolveGenericTypes(declaredType)
+                            resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                            resolveGenericTypes(declaredType, boundTypes)
                     )
             );
         }
     }
 
-    private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror) {
+    private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         resolvedParameters.put(
                 parameterName,
                 Collections.singletonMap(
-                        resolveTypeReference(typeUtils.erasure(mirror)),
-                        resolveGenericTypes(mirror)
+                        resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                        resolveGenericTypes(mirror, boundTypes)
                 )
         );
     }
 
     Object resolveTypeReference(TypeMirror mirror) {
+        return resolveTypeReference(mirror, Collections.emptyMap());
+    }
+
+    Object resolveTypeReference(TypeMirror mirror, Map<String, Object> boundTypes) {
         TypeKind kind = mirror.getKind();
         switch (kind) {
+            case TYPEVAR:
+                TypeVariable tv = (TypeVariable) mirror;
+                String name = tv.toString();
+                if(boundTypes.containsKey(name)) {
+                    return boundTypes.get(name);
+                }
+                else {
+                    return modelUtils.resolveTypeReference(mirror);
+                }
             case WILDCARD:
                 WildcardType wcType = (WildcardType) mirror;
                 TypeMirror extendsBound = wcType.getExtendsBound();
@@ -203,18 +231,21 @@ class GenericUtils {
                 if (extendsBound == null && superBound == null) {
                     return Object.class.getName();
                 } else if (extendsBound != null) {
-                    return resolveTypeReference(typeUtils.erasure(extendsBound));
+                    return resolveTypeReference(typeUtils.erasure(extendsBound), boundTypes);
                 } else if (superBound != null) {
-                    return resolveTypeReference(superBound);
+                    return resolveTypeReference(superBound, boundTypes);
                 } else {
-                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound));
+                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound), boundTypes);
                 }
             case ARRAY:
                 ArrayType arrayType = (ArrayType) mirror;
-                Object reference = resolveTypeReference(arrayType.getComponentType());
+                Object reference = resolveTypeReference(arrayType.getComponentType(), boundTypes);
                 if(reference instanceof Class) {
                     Class componentType = (Class) reference;
                     return Array.newInstance(componentType, 0).getClass();
+                }
+                else if(reference instanceof  String) {
+                    return reference + "[]";
                 }
                 else {
                     return modelUtils.resolveTypeReference(mirror);
@@ -232,7 +263,7 @@ class GenericUtils {
                     return type.get();
                 }
                 else {
-                    throw new IllegalStateException("Unknown primitive type");
+                    throw new IllegalStateException("Unknown primitive type: " + mirror.toString());
                 }
             default:
                 return modelUtils.resolveTypeReference(mirror);
@@ -260,5 +291,21 @@ class GenericUtils {
             enclosing = enclosing.getEnclosingElement();
         }
         return null;
+    }
+
+    public Map<String, Object> resolveBoundTypes(DeclaredType type) {
+        Map<String,Object> boundTypes = new LinkedHashMap<>(2);
+        TypeElement element = (TypeElement) type.asElement();
+
+        List<? extends TypeParameterElement> typeParameters = element.getTypeParameters();
+        List<? extends TypeMirror> typeArguments = type.getTypeArguments();
+        if(typeArguments.size() == typeParameters.size()) {
+            Iterator<? extends TypeMirror> i = typeArguments.iterator();
+            for (TypeParameterElement typeParameter : typeParameters) {
+                boundTypes.put(typeParameter.toString(), resolveTypeReference(i.next(), boundTypes));
+            }
+        }
+
+        return boundTypes;
     }
 }

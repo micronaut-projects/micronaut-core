@@ -34,6 +34,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Default implementation of {@link AnnotationMetadata}
@@ -175,6 +177,27 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
         }
         if(allAnnotations != null && allAnnotations.containsKey(stereotype)) {
             return CollectionUtils.setOf(stereotype);
+        }
+        if(declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+            return CollectionUtils.setOf(stereotype);
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+        if(annotationsByStereotype != null) {
+            Set<String> annotations = annotationsByStereotype.get(stereotype);
+            if(annotations != null) {
+                if(declaredAnnotations != null) {
+                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
+                    return Collections.unmodifiableSet(annotations);
+                }
+                else {
+                    // no declared
+                    return Collections.emptySet();
+                }
+            }
         }
         if(declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
             return CollectionUtils.setOf(stereotype);

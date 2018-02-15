@@ -16,6 +16,7 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.context.env.Environment;
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.ConvertibleValuesMap;
@@ -43,13 +44,29 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
+        PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if(value instanceof CharSequence) {
-            String resolved = environment.getPlaceholderResolver().resolveRequiredPlaceholder(value.toString());
-            return environment.convert(resolved, conversionContext);
+            String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
+            return environment.convert(str, conversionContext);
+        }
+        else if(value instanceof String[]) {
+            String[] a = (String[]) value;
+            for (int i = 0; i < a.length; i++) {
+                a[i] = doResolveIfNecessary(a[i], placeholderResolver);
+            }
+            return environment.convert(a, conversionContext);
         }
         else {
             return super.get(name, conversionContext);
         }
+    }
+
+    private String doResolveIfNecessary(CharSequence value, PropertyPlaceholderResolver placeholderResolver) {
+        String str = value.toString();
+        if(str.contains("${")) {
+            str = placeholderResolver.resolveRequiredPlaceholders(str);
+        }
+        return str;
     }
 
     @SuppressWarnings("unchecked")
@@ -57,7 +74,7 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     public Collection<V> values() {
         return super.values().stream().map(v -> {
             if(v instanceof CharSequence) {
-                v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholder(v.toString());
+                v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholders(v.toString());
             }
             return v;
         }).collect(Collectors.toList());

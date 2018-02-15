@@ -53,7 +53,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public String getDescription() {
-        return "compositeClient";
+        return "compositeDiscoveryClient";
     }
 
     @Override
