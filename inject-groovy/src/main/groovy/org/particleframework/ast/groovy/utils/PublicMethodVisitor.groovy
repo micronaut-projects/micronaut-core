@@ -29,6 +29,8 @@ import org.codehaus.groovy.control.SourceUnit
 abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
     final SourceUnit sourceUnit
     private final Set<String> processed = new HashSet<>()
+    private ClassNode current
+
     PublicMethodVisitor(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
     }
@@ -40,10 +42,11 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
 
     void accept(ClassNode classNode) {
         while(classNode.name != Object.class.getName()) {
-
+            this.current = classNode
             classNode.visitContents(this)
             for(i in classNode.getAllInterfaces()) {
                 if(i.name != GroovyObject.class.name) {
+                    this.current = i
                     i.visitContents(this)
                 }
             }
@@ -59,7 +62,7 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
             def key = node.getText()
             if(!processed.contains(key)) {
                 processed.add(key)
-                accept(node)
+                accept(current ?: node.declaringClass, node)
             }
         }
     }
@@ -68,5 +71,5 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
         node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isFinal()
     }
 
-    abstract void accept(MethodNode methodNode)
+    abstract void accept(ClassNode classNode, MethodNode methodNode)
 }

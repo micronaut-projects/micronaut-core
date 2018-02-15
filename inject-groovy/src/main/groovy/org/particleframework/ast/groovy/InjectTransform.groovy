@@ -4,6 +4,7 @@ import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import org.codehaus.groovy.ast.*
+import org.codehaus.groovy.ast.tools.GenericsUtils
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -276,12 +277,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(sourceUnit) {
 
                 @Override
-                void accept(MethodNode methodNode) {
+                void accept(ClassNode classNode, MethodNode methodNode) {
                     Map<String, Object> targetMethodParamsToType = [:]
                     Map<String, Object> targetMethodQualifierTypes = [:]
                     Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                    Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType)
-                    Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType)
+                    Map<String,ClassNode> boundTypes = GenericsUtils.createGenericsSpec(classNode)
+                    Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType, boundTypes)
+                    Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
+                            methodNode.returnType,
+                            boundTypes
+                    )
                     populateParameterData(
                             methodNode.parameters,
                             targetMethodParamsToType,
@@ -300,6 +305,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     aopProxyWriter.visitAroundMethod(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                            AstGenericUtils.resolveTypeReference(methodNode.returnType),
                             resolvedReturnType,
                             resolvedGenericTypes,
                             methodNode.name,
@@ -366,12 +372,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                         @Override
-                        void accept(MethodNode targetBeanMethodNode) {
+                        void accept(ClassNode classNode, MethodNode targetBeanMethodNode) {
                             Map<String, Object> targetMethodParamsToType = [:]
                             Map<String, Object> targetMethodQualifierTypes = [:]
                             Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                            Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType)
-                            Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(targetBeanMethodNode.returnType)
+                            Map<String,ClassNode> boundTypes = GenericsUtils.createGenericsSpec(classNode)
+                            Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType, boundTypes)
+                            Object returnTypeReference = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType)
+                            Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
+                                    targetBeanMethodNode.returnType,
+                                    boundTypes
+                            )
+
                             populateParameterData(
                                     targetBeanMethodNode.parameters,
                                     targetMethodParamsToType,
@@ -389,8 +401,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             ExecutableMethodWriter writer = beanMethodWriter.visitExecutableMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    returnTypeReference,
                                     resolvedReturnType,
-                                    returnTypeGenerics,
+                                    resolvedGenericTypes,
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
@@ -400,8 +413,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             proxyWriter.visitAroundMethod(
                                     AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    returnTypeReference,
                                     resolvedReturnType,
-                                    returnTypeGenerics,
+                                    resolvedGenericTypes,
                                     targetBeanMethodNode.name,
                                     targetMethodParamsToType,
                                     targetMethodQualifierTypes,
@@ -504,7 +518,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
                         defineBeanDefinition(concreteClass)
-                        Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType)
+                        Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
 
                         Map<String, Object> paramsToType = [:]
                         Map<String, Object> qualifierTypes = [:]
@@ -517,6 +531,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                         ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
                                 AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                 returnTypeGenerics,
                                 methodName,
@@ -540,6 +555,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
                                         AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                         AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                         returnTypeGenerics,
                                         methodName,
@@ -740,7 +756,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 GenericsType[] genericsTypes = fieldType.genericsTypes
                 Map<String, Object> genericTypeList = null
                 if (genericsTypes != null && genericsTypes.length > 0) {
-                    genericTypeList = AstGenericUtils.buildGenericTypeInfo(fieldType)
+                    genericTypeList = AstGenericUtils.buildGenericTypeInfo(fieldType, GenericsUtils.createGenericsSpec(concreteClass))
                 } else if (fieldType.isArray()) {
                     genericTypeList = [:]
                     genericTypeList.put(fieldNode.name, AstGenericUtils.resolveTypeReference(fieldType.componentType))
@@ -800,6 +816,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     aopWriter.visitAroundMethod(
                             propertyNode.getDeclaringClass().name,
+                            void.class,
                             void.class,
                             Collections.emptyMap(),
                             getSetterName(propertyNode.name),
@@ -922,7 +939,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             PublicMethodVisitor visitor = new PublicMethodVisitor(sourceUnit) {
                 @Override
-                void accept(MethodNode method) {
+                void accept(ClassNode cn, MethodNode method) {
                     Parameter[] params = method.getParameters()
                     String methodName = method.getName()
                     String prefix = getMethodPrefix(methodName)

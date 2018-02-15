@@ -15,7 +15,6 @@
  */
 package example.pets;
 
-import example.api.v1.Pet;
 import example.api.v1.PetOperations;
 import org.particleframework.http.client.Client;
 
@@ -24,5 +23,5 @@ import org.particleframework.http.client.Client;
  * @since 1.0
  */
 @Client("/${pets.api.version}/pets")
-interface PetControllerTestClient extends PetOperations<Pet> {
+interface PetControllerTestClient extends PetOperations<PetEntity> {
 }
