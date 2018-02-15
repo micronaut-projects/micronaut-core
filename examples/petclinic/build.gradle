@@ -19,7 +19,7 @@ subprojects {
     dependencies {
         compile "org.particleframework:discovery-client:${projectVersion}"
         compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
-        compile "org.particleframework:management:${projectVersion}"
+        runtime "org.particleframework:management:${projectVersion}"
         runtime "ch.qos.logback:logback-classic:1.2.3"
     }
 

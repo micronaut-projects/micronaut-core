@@ -21,7 +21,9 @@ import com.mongodb.async.client.MongoClientSettings;
 import com.mongodb.connection.*;
 import com.mongodb.reactivestreams.client.MongoClients;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import org.particleframework.context.env.Environment;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import javax.validation.constraints.NotBlank;
 import java.util.Collections;
@@ -40,6 +42,12 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 abstract class AbstractMongoConfiguration {
 
     protected String uri;
+
+    protected final ApplicationConfiguration applicationConfiguration;
+
+    public AbstractMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
+        this.applicationConfiguration = applicationConfiguration;
+    }
 
     /**
      * @return The MongoDB URI
@@ -108,6 +116,7 @@ abstract class AbstractMongoConfiguration {
 
 
         MongoClientSettings.Builder clientSettings = getClientSettings();
+        clientSettings.applicationName(getApplicationName());
         clientSettings.clusterSettings(clusterSettings.build())
                       .serverSettings(serverSettings.build())
                       .connectionPoolSettings(poolSettings.build())
@@ -120,5 +129,9 @@ abstract class AbstractMongoConfiguration {
 
         );
         return clientSettings.build();
+    }
+
+    protected String getApplicationName() {
+        return applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
     }
 }
