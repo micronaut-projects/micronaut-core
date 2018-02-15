@@ -15,7 +15,10 @@
  */
 package example.pets;
 
+import com.mongodb.reactivestreams.client.MongoClient;
 import example.api.v1.Pet;
+import io.reactivex.Flowable;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -53,6 +56,16 @@ public class PetControllerTest {
         }
     }
 
+    @After
+    public void cleanupData() {
+        ApplicationContext applicationContext = embeddedServer.getApplicationContext();
+        MongoClient mongoClient = applicationContext.getBean(MongoClient.class);
+        PetsConfiguration config = applicationContext.getBean(PetsConfiguration.class);
+        // drop the data
+        Flowable.fromPublisher(mongoClient.getDatabase(config.getDatabaseName())
+                    .drop()).blockingFirst();
+    }
+
     @Test
     public void testListPets() {
         PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
@@ -69,7 +82,7 @@ public class PetControllerTest {
             assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
         }
 
-        Pet dino = client.save(new PetEntity("Dino", "Fred")).blockingGet();
+        Pet dino = client.save(new PetEntity("Fred", "Dino")).blockingGet();
 
         assertNotNull(dino);
 
@@ -79,5 +92,16 @@ public class PetControllerTest {
         assertEquals(pets.size(), 1);
         assertEquals(pets.iterator().next().getName(), dino.getName());
 
+    }
+
+    @Test
+    public void testFindByVendor() {
+        PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
+
+        Pet dino = client.save(new PetEntity("Fred", "Dino")).blockingGet();
+
+        assertNotNull(dino);
+
+        assertEquals(1, client.byVendor("Fred").blockingGet().size());
     }
 }

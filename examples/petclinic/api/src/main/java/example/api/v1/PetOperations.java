@@ -34,6 +34,9 @@ public interface PetOperations<T extends Pet> {
     @Get("/")
     Single<List<T>> list();
 
+    @Get("/vendor/{name}")
+    Single<List<T>> byVendor(String name);
+
     @Post("/")
     Single<T> save(@Valid @Body T pet);
 }

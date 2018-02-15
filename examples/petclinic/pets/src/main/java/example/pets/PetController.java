@@ -15,6 +15,7 @@
  */
 package example.pets;
 
+import com.mongodb.client.model.Filters;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import example.api.v1.Pet;
@@ -38,23 +39,30 @@ import java.util.List;
 @Validated
 public class PetController implements PetOperations<PetEntity> {
 
-    private final String databaseName;
-    private final String collectionName;
+    private final PetsConfiguration configuration;
     private MongoClient mongoClient;
 
     public PetController(
-            @Value("${pets.database.name}") String databaseName,
-            @Value("${pets.collection.name:pets}") String collectionName,
+            PetsConfiguration configuration,
             MongoClient mongoClient) {
-        this.collectionName = collectionName;
-        this.databaseName = databaseName;
+        this.configuration = configuration;
         this.mongoClient = mongoClient;
     }
 
     @Override
     public Single<List<PetEntity>> list() {
-        return Flowable.fromPublisher(getCollection()
-                    .find(PetEntity.class)).toList();
+        return Flowable.fromPublisher(
+                getCollection()
+                    .find()
+        ).toList();
+    }
+
+    @Override
+    public Single<List<PetEntity>> byVendor(String name) {
+        return Flowable.fromPublisher(
+                getCollection()
+                    .find(Filters.eq("vendor", name))
+        ).toList();
     }
 
     @Override
@@ -63,9 +71,9 @@ public class PetController implements PetOperations<PetEntity> {
                      .map(success -> pet);
     }
 
-    private MongoCollection<Pet> getCollection() {
+    private MongoCollection<PetEntity> getCollection() {
         return mongoClient
-                .getDatabase(databaseName)
-                .getCollection(collectionName, Pet.class);
+                .getDatabase(configuration.getDatabaseName())
+                .getCollection(configuration.getCollectionName(), PetEntity.class);
     }
 }
