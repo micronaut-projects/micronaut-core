@@ -381,6 +381,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                             emitter.onComplete();
                                         }
                                     });
+                                    if(LOG.isDebugEnabled()) {
+                                        LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                                    }
+                                    if (LOG.isTraceEnabled()) {
+                                        traceRequest(requestWrapper.get(), nettyRequest);
+                                    }
+
                                     channel.writeAndFlush(nettyRequest);
                                 } else {
                                     Throwable cause = f.cause();
@@ -422,7 +429,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
 
                             prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
-
+                            if(LOG.isDebugEnabled()) {
+                                LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                            }
                             if (LOG.isTraceEnabled()) {
                                 traceRequest(finalRequest, nettyRequest);
                             }
@@ -805,7 +814,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     }
 
     private void traceRequest(HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
-        LOG.trace("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
         HttpHeaders headers = nettyRequest.headers();
         for (String name : headers.names()) {
             List<String> all = headers.getAll(name);
