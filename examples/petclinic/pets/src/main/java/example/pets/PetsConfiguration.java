@@ -13,19 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.storefront;
+package example.pets;
 
-import example.api.v1.Vendor;
-import example.api.v1.VendorOperations;
-import io.reactivex.Single;
-import org.particleframework.http.client.Client;
+import org.particleframework.context.annotation.ConfigurationProperties;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Client("vendors")
-public interface VendorClient extends VendorOperations {
-    @Override
-    Single<Vendor> save(String name);
+@ConfigurationProperties("pets")
+public class PetsConfiguration {
+    private String databaseName = "petstore";
+    private String collectionName = "pets";
+
+    public String getDatabaseName() {
+        return databaseName;
+    }
+
+    public void setDatabaseName(String databaseName) {
+        this.databaseName = databaseName;
+    }
+
+    public String getCollectionName() {
+        return collectionName;
+    }
+
+    public void setCollectionName(String collectionName) {
+        this.collectionName = collectionName;
+    }
 }
