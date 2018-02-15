@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health;
+package org.particleframework.management.health.indicator;
 
 import org.particleframework.health.HealthStatus;
 
@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * <p>Used to represent the output of a {@link org.particleframework.management.endpoint.health.indicator.HealthIndicator}.</p>
+ * <p>Used to represent the output of a {@link org.particleframework.management.health.indicator.HealthIndicator}.</p>
  *
  * @author James Kleeh
  * @since 1.0

@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health.indicator;
+package org.particleframework.management.health.indicator;
 
 import org.particleframework.core.order.Ordered;
-import org.particleframework.management.endpoint.health.HealthResult;
 import org.reactivestreams.Publisher;
 
 /**
- * <p>Describes an indicator of health of the application. Used by the {@link org.particleframework.management.endpoint.health.aggregator.HealthAggregator} to create
+ * <p>Describes an indicator of health of the application. Used by the {@link org.particleframework.management.health.aggregator.HealthAggregator} to create
  * a response combining all indicators. </p>
  *
  * @author James Kleeh

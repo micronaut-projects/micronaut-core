@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health.indicator;
+package org.particleframework.management.health.indicator;
 
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
-import org.particleframework.management.endpoint.health.HealthResult;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;

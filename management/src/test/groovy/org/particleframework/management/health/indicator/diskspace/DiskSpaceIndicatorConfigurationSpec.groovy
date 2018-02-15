@@ -1,7 +1,6 @@
-package org.particleframework.management.endpoint.health.indicator.diskspace
+package org.particleframework.management.health.indicator.diskspace
 
 import org.particleframework.context.ApplicationContext
-import org.particleframework.context.env.MapPropertySource
 import org.particleframework.context.env.PropertySource
 import spock.lang.Specification
 

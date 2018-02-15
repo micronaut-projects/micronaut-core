@@ -51,7 +51,7 @@ public @interface Scheduled {
     /**
      * A String representation of the {@link java.time.Duration} between executions. For example 10m == 10 minutes
      *
-     * @return The fixed delay
+     * @return The fixed rate
      */
     String fixedRate() default "";
 

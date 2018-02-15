@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health.indicator.diskspace;
+package org.particleframework.management.health.indicator.diskspace;
 
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.management.endpoint.health.HealthEndpoint;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.management.endpoint.health.indicator.AbstractHealthIndicator;
+import org.particleframework.management.health.indicator.AbstractHealthIndicator;
 
 import javax.inject.Singleton;
 import java.io.File;
@@ -26,7 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * <p>A {@link org.particleframework.management.endpoint.health.indicator.HealthIndicator} used to display
+ * <p>A {@link org.particleframework.management.health.indicator.HealthIndicator} used to display
  * information about the disk space of the server. Returns {@link HealthStatus#DOWN} if the free space
  * is less than the configured threshold.</p>
  *
