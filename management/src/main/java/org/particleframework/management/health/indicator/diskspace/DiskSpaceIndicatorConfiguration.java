@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health.indicator.diskspace;
+package org.particleframework.management.health.indicator.diskspace;
 
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.convert.format.ReadableBytes;

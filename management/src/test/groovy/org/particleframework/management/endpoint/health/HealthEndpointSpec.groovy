@@ -6,8 +6,8 @@ import okhttp3.Request
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.http.HttpStatus
-import org.particleframework.management.endpoint.health.aggregator.RxJavaHealthAggregator
-import org.particleframework.management.endpoint.health.indicator.diskspace.DiskSpaceIndicator
+import org.particleframework.management.health.aggregator.RxJavaHealthAggregator
+import org.particleframework.management.health.indicator.diskspace.DiskSpaceIndicator
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 

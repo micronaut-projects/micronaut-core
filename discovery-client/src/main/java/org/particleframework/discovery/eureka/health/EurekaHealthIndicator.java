@@ -19,8 +19,8 @@ import io.reactivex.Flowable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.discovery.eureka.client.v2.EurekaClient;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.management.endpoint.health.HealthResult;
-import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthResult;
 
 import javax.inject.Singleton;
 import java.util.Collections;

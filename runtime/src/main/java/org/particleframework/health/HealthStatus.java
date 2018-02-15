@@ -23,6 +23,7 @@ import java.util.Optional;
  * <p>The status of a health indicator</p>
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Immutable
@@ -34,13 +35,21 @@ public class HealthStatus implements Comparable<HealthStatus> {
     private final Integer severity;
 
     /**
+     * The default name to use for an {@link #UP} status
+     */
+    public static final String NAME_UP = "UP";
+    /**
+     * The default name to use for an {@link #DOWN} status
+     */
+    public static final String NAME_DOWN = "DOWN";
+    /**
      * Indicates the service is operational
      */
-    public static final HealthStatus UP = new HealthStatus("UP", null, true, null);
+    public static final HealthStatus UP = new HealthStatus(NAME_UP, null, true, null);
     /**
      * Indicates the service is down and unavailable
      */
-    public static final HealthStatus DOWN = new HealthStatus("DOWN", null, false, 1000);
+    public static final HealthStatus DOWN = new HealthStatus(NAME_DOWN, null, false, 1000);
 
     public static final HealthStatus UNKNOWN = new HealthStatus("UNKNOWN");
 

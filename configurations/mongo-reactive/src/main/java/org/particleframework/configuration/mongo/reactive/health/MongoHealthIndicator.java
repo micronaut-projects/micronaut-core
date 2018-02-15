@@ -20,13 +20,12 @@ import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.management.endpoint.health.HealthResult;
-import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.Collections;
-import java.util.List;
 
 /**
  * @author graemerocher

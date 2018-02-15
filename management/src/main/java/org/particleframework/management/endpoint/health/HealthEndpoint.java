@@ -17,8 +17,8 @@ package org.particleframework.management.endpoint.health;
 
 import org.particleframework.management.endpoint.Endpoint;
 import org.particleframework.management.endpoint.Read;
-import org.particleframework.management.endpoint.health.aggregator.HealthAggregator;
-import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.particleframework.management.health.aggregator.HealthAggregator;
+import org.particleframework.management.health.indicator.HealthIndicator;
 import org.reactivestreams.Publisher;
 
 /**

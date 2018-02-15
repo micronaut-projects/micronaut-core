@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.management.endpoint.health.aggregator;
+package org.particleframework.management.health.aggregator;
 
-import org.particleframework.management.endpoint.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthIndicator;
 import org.reactivestreams.Publisher;
 
 /**
