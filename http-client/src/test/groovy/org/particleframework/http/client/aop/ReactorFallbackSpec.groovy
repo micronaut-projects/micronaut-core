@@ -22,7 +22,9 @@ import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Patch
 import org.particleframework.http.annotation.Post
 import org.particleframework.http.client.Client
+import org.particleframework.http.client.Fallback
 import org.particleframework.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -35,67 +37,104 @@ import java.util.concurrent.atomic.AtomicLong
  * @author graemerocher
  * @since 1.0
  */
-class ReactorCrudSpec extends Specification {
+class ReactorFallbackSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    void "test it is possible to implement CRUD operations with Reactor"() {
+    void "test that fallbacks are called for Reactor responses"() {
         given:
         BookClient client = context.getBean(BookClient)
 
         when:
         Book book = client.get(99)
-                          .block()
+                .block()
         List<Book> books = client.list().block()
+        List<Book> stream = client.stream().toIterable().toList()
 
         then:
-        book == null
+        book.title == "Fallback Book"
         books.size() == 0
+        stream.size() == 1
+        stream.first().title == "Fallback Book"
 
         when:
         book = client.save("The Stand").block()
 
         then:
         book != null
-        book.title == "The Stand"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.get(book.id).block()
+        book = client.get(1).block()
 
         then:
         book != null
-        book.title == "The Stand"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.update(book.id, "The Shining").block()
+        book = client.update(1, "The Shining").block()
 
         then:
         book != null
-        book.title == "The Shining"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.delete(book.id).block()
+        book = client.delete(1).block()
 
-        then:
-        book != null
-
-        when:
-        book = client.get(book.id)
-                .block()
         then:
         book == null
+
+        when:
+        book = client.get(1)
+                .block()
+        then:
+        book.title == "Fallback Book"
     }
 
 
-    @Client('/reactor/books')
+    @Client('/reactor/fallback/books')
     static interface BookClient extends BookApi {
     }
 
-    @Controller("/reactor/books")
+    @Fallback
+    static class BookFallback implements BookApi {
+
+        @Override
+        Mono<Book> get(Long id) {
+            return Mono.just(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        Mono<List<Book>> list() {
+            return Mono.just([])
+        }
+
+        @Override
+        Flux<Book> stream() {
+            Flux.just(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        Mono<Book> delete(Long id) {
+            return Mono.empty()
+        }
+
+        @Override
+        Mono<Book> save(String title) {
+            return Mono.just(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        Mono<Book> update(Long id, String title) {
+            return Mono.just(new Book(title: "Fallback Book"))
+        }
+    }
+
+    @Controller("/reactor/fallback/books")
     @Singleton
     static class BookController implements BookApi {
 
@@ -104,43 +143,32 @@ class ReactorCrudSpec extends Specification {
 
         @Override
         Mono<Book> get(Long id) {
-            Book book = books.get(id)
-            if(book)
-                return Mono.just(book)
-            Mono.empty()
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
         Mono<List<Book>> list() {
-            return Mono.just(books.values().toList())
+            Mono.error(new RuntimeException("bad"))
+        }
+
+        @Override
+        Flux<Book> stream() {
+            Flux.error(new RuntimeException("bad"))
         }
 
         @Override
         Mono<Book> delete(Long id) {
-            Book book = books.remove(id)
-            if(book) {
-                return Mono.just(book)
-            }
-            return Mono.empty()
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
         Mono<Book> save(String title) {
-            Book book = new Book(title: title, id:currentId.incrementAndGet())
-            books[book.id] = book
-            return Mono.just(book)
+            Mono.error(new RuntimeException("bad"))
         }
 
         @Override
         Mono<Book> update(Long id, String title) {
-            Book book = books[id]
-            if(book != null) {
-                book.title = title
-                return Mono.just(book)
-            }
-            else {
-                return Mono.empty()
-            }
+            Mono.error(new RuntimeException("bad"))
         }
     }
 
@@ -151,6 +179,9 @@ class ReactorCrudSpec extends Specification {
 
         @Get('/')
         Mono<List<Book>> list()
+
+        @Get('/stream')
+        Flux<Book> stream()
 
         @Delete("/{id}")
         Mono<Book> delete(Long id)
@@ -168,5 +199,3 @@ class ReactorCrudSpec extends Specification {
         String title
     }
 }
-
-

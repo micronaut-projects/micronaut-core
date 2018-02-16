@@ -30,6 +30,7 @@ import org.particleframework.inject.MethodExecutionHandle;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * Adds custom support for {@link Maybe} to handle NOT_FOUND results
@@ -41,7 +42,7 @@ import java.util.concurrent.Callable;
 @Requires(classes = Flowable.class)
 public class RxReactiveClientResultTransformer implements ReactiveClientResultTransformer {
     @Override
-    public Object transform(Object publisherResult, Callable<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
+    public Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
         if(publisherResult instanceof Maybe) {
             Maybe<?> maybe = (Maybe) publisherResult;
             // add 404 handling for maybe
@@ -53,7 +54,7 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
                     }
                 }
 
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.call();
+                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
                     Object result = fallbackHandle.invoke(parameters);
@@ -67,7 +68,7 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
         else if(publisherResult instanceof Single) {
             Single<?> single = (Single) publisherResult;
             return single.onErrorResumeNext(throwable -> {
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.call();
+                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
                     Object result = fallbackHandle.invoke(parameters);
@@ -81,7 +82,7 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
         else if(publisherResult instanceof Flowable) {
             Flowable<?> single = (Flowable) publisherResult;
             return single.onErrorResumeNext(throwable -> {
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.call();
+                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
                     Object result = fallbackHandle.invoke(parameters);

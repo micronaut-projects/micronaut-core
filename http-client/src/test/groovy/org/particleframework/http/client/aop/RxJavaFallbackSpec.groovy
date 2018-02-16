@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client.aop
 
+import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.context.ApplicationContext
@@ -26,6 +27,7 @@ import org.particleframework.http.annotation.Post
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.Fallback
 import org.particleframework.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -40,7 +42,7 @@ class RxJavaFallbackSpec extends Specification{
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    void "test CRUD operations on generated client that returns blocking responses"() {
+    void "test that fallbacks are called for RxJava responses"() {
         given:
         BookClient client = context.getBean(BookClient)
 
@@ -49,9 +51,13 @@ class RxJavaFallbackSpec extends Specification{
                 .blockingGet()
         List<Book> books = client.list().blockingGet()
 
+        List<Book> stream = Flowable.fromPublisher(client.stream()).toList().blockingGet()
+
         then:
         book.title == "Fallback Book"
         books.size() == 0
+        stream.size() == 1
+        stream.first().title == "Fallback Book"
 
         when:
         book = client.save("The Stand").blockingGet()
@@ -109,6 +115,11 @@ class RxJavaFallbackSpec extends Specification{
         }
 
         @Override
+        Publisher<Book> stream() {
+            return Flowable.fromArray(new Book(title: "Fallback Book"))
+        }
+
+        @Override
         Maybe<Book> delete(Long id) {
             return Maybe.empty()
         }
@@ -141,6 +152,11 @@ class RxJavaFallbackSpec extends Specification{
         }
 
         @Override
+        Publisher<Book> stream() {
+            Flowable.error(new RuntimeException("bad"))
+        }
+
+        @Override
         Maybe<Book> delete(Long id) {
             Maybe.error(new RuntimeException("bad"))
         }
@@ -163,6 +179,9 @@ class RxJavaFallbackSpec extends Specification{
 
         @Get('/')
         Single<List<Book>> list()
+
+        @Get('/stream')
+        Publisher<Book> stream()
 
         @Delete("/{id}")
         Maybe<Book> delete(Long id)
