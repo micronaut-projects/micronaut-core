@@ -60,6 +60,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 
 /**
  * Introduction advice that implements the {@link Client} annotation
@@ -247,12 +248,30 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 HttpClientResponseException e = (HttpClientResponseException) t;
                                 if( e.getStatus() == HttpStatus.NOT_FOUND) {
                                     future.complete(null);
-                                }
-                                else {
-                                    future.completeExceptionally(t);
+                                    return;
                                 }
                             }
-                            future.completeExceptionally(t);
+                            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context.getDeclaringType(), context);
+                            if(fallbackMethod.isPresent()) {
+                                try {
+                                    CompletableFuture<Object> resultingFuture = (CompletableFuture) fallbackMethod.get()
+                                                                                                        .invoke(context.getParameterValues());
+                                    resultingFuture.whenComplete((o, throwable) -> {
+                                        if(throwable == null) {
+                                            future.complete(o);
+                                        }
+                                        else {
+                                            future.completeExceptionally(throwable);
+                                        }
+                                    });
+                                } catch (Exception e) {
+                                    future.completeExceptionally(new HttpClientException("Error invoking fallback for type ["+context.getDeclaringType()+"]: " + e.getMessage() ,e));
+                                }
+
+                            }
+                            else {
+                                future.completeExceptionally(t);
+                            }
                         }
 
                         @Override

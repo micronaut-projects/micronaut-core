@@ -55,7 +55,12 @@ public class ReactorReactiveClientResultTransformer implements ReactiveClientRes
                 Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result = fallbackHandle.invoke(parameters);
+                    Object result;
+                    try {
+                        result = fallbackHandle.invoke(parameters);
+                    } catch (Exception e) {
+                        return Mono.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
+                    }
                     return ConversionService.SHARED.convert(result, Mono.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
                 }
                 else {
@@ -70,7 +75,12 @@ public class ReactorReactiveClientResultTransformer implements ReactiveClientRes
                 Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result = fallbackHandle.invoke(parameters);
+                    Object result;
+                    try {
+                        result = fallbackHandle.invoke(parameters);
+                    } catch (Exception e) {
+                        return Flux.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
+                    }
                     return ConversionService.SHARED.convert(result, Flux.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
                 }
                 else {

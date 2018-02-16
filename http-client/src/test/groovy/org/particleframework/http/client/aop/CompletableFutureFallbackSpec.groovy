@@ -22,6 +22,7 @@ import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Patch
 import org.particleframework.http.annotation.Post
 import org.particleframework.http.client.Client
+import org.particleframework.http.client.Fallback
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -35,22 +36,22 @@ import java.util.concurrent.atomic.AtomicLong
  * @author graemerocher
  * @since 1.0
  */
-class CompletableFutureCrudSpec extends Specification {
+class CompletableFutureFallbackSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    void "test it is possible to implement CRUD operations with CompletableFuture"() {
+    void "test that fallbacks are called for CompletableFuture responses"() {
         given:
         BookClient client = context.getBean(BookClient)
 
         when:
         Book book = client.get(99)
-                          .get()
+                .get()
         List<Book> books = client.list().get()
 
         then:
-        book == null
+        book.title == "Fallback Book"
         books.size() == 0
 
         when:
@@ -58,44 +59,73 @@ class CompletableFutureCrudSpec extends Specification {
 
         then:
         book != null
-        book.title == "The Stand"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.get(book.id).get()
+        book = client.get(1).get()
 
         then:
         book != null
-        book.title == "The Stand"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.update(book.id, "The Shining").get()
+        book = client.update(1, "The Shining").get()
 
         then:
         book != null
-        book.title == "The Shining"
-        book.id == 1
+        book.title == "Fallback Book"
+        book.id == null
 
         when:
-        book = client.delete(book.id).get()
+        book = client.delete(1).get()
 
-        then:
-        book != null
-
-        when:
-        book = client.get(book.id)
-                .get()
         then:
         book == null
+
+        when:
+        book = client.get(1)
+                .get()
+        then:
+        book.title == "Fallback Book"
     }
 
 
-    @Client('/future/books')
+    @Client('/future/fallback/books')
     static interface BookClient extends BookApi {
     }
 
-    @Controller("/future/books")
+    @Fallback
+    static class BookFallback implements BookApi {
+
+        @Override
+        CompletableFuture<Book> get(Long id) {
+            return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        CompletableFuture<List<Book>> list() {
+            return CompletableFuture.completedFuture([])
+        }
+
+        @Override
+        CompletableFuture<Book> delete(Long id) {
+            return CompletableFuture.completedFuture(null)
+        }
+
+        @Override
+        CompletableFuture<Book> save(String title) {
+            return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        CompletableFuture<Book> update(Long id, String title) {
+            return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
+        }
+    }
+
+    @Controller("/future/fallback/books")
     @Singleton
     static class BookController implements BookApi {
 
@@ -104,35 +134,37 @@ class CompletableFutureCrudSpec extends Specification {
 
         @Override
         CompletableFuture<Book> get(Long id) {
-            Book book = books.get(id)
-            return CompletableFuture.completedFuture(book)
+            CompletableFuture f = new CompletableFuture()
+            f.completeExceptionally(new RuntimeException("bad"))
+            return f
         }
 
         @Override
         CompletableFuture<List<Book>> list() {
-            return CompletableFuture.completedFuture(books.values().toList())
+            CompletableFuture f = new CompletableFuture()
+            f.completeExceptionally(new RuntimeException("bad"))
+            return f
         }
 
         @Override
         CompletableFuture<Book> delete(Long id) {
-            Book book = books.remove(id)
-            return CompletableFuture.completedFuture(book)
+            CompletableFuture f = new CompletableFuture()
+            f.completeExceptionally(new RuntimeException("bad"))
+            return f
         }
 
         @Override
         CompletableFuture<Book> save(String title) {
-            Book book = new Book(title: title, id:currentId.incrementAndGet())
-            books[book.id] = book
-            return CompletableFuture.completedFuture(book)
+            CompletableFuture f = new CompletableFuture()
+            f.completeExceptionally(new RuntimeException("bad"))
+            return f
         }
 
         @Override
         CompletableFuture<Book> update(Long id, String title) {
-            Book book = books[id]
-            if(book != null) {
-                book.title = title
-            }
-            return CompletableFuture.completedFuture( book)
+            CompletableFuture f = new CompletableFuture()
+            f.completeExceptionally(new RuntimeException("bad"))
+            return f
         }
     }
 

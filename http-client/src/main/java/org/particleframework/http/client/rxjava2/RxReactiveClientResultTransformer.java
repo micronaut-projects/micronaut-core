@@ -29,7 +29,6 @@ import org.particleframework.inject.MethodExecutionHandle;
 
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 /**
@@ -57,7 +56,12 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
                 Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result = fallbackHandle.invoke(parameters);
+                    Object result;
+                    try {
+                        result = fallbackHandle.invoke(parameters);
+                    } catch (Exception e) {
+                        return Maybe.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
+                    }
                     return ConversionService.SHARED.convert(result, Maybe.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
                 }
                 else {
@@ -71,7 +75,12 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
                 Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result = fallbackHandle.invoke(parameters);
+                    Object result;
+                    try {
+                        result = fallbackHandle.invoke(parameters);
+                    } catch (Exception e) {
+                        return Single.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
+                    }
                     return ConversionService.SHARED.convert(result, Single.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
                 }
                 else {
@@ -85,7 +94,12 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
                 Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
                 if(fallback.isPresent()) {
                     ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result = fallbackHandle.invoke(parameters);
+                    Object result;
+                    try {
+                        result = fallbackHandle.invoke(parameters);
+                    } catch (Exception e) {
+                        return Flowable.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
+                    }
                     return ConversionService.SHARED.convert(result, Flowable.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
                 }
                 else {
