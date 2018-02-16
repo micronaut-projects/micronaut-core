@@ -19,12 +19,9 @@ import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import org.particleframework.context.annotation.Requires;
-import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpStatus;
-import org.particleframework.http.client.ReactiveClientResultTransformer;
-import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.http.client.AbstractReactiveClientResultTransformer;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
-import org.particleframework.inject.ExecutionHandle;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import javax.inject.Singleton;
@@ -39,7 +36,7 @@ import java.util.function.Supplier;
  */
 @Singleton
 @Requires(classes = Flowable.class)
-public class RxReactiveClientResultTransformer implements ReactiveClientResultTransformer {
+public class RxReactiveClientResultTransformer extends AbstractReactiveClientResultTransformer {
     @Override
     public Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
         if(publisherResult instanceof Maybe) {
@@ -53,58 +50,19 @@ public class RxReactiveClientResultTransformer implements ReactiveClientResultTr
                     }
                 }
 
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
-                if(fallback.isPresent()) {
-                    ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result;
-                    try {
-                        result = fallbackHandle.invoke(parameters);
-                    } catch (Exception e) {
-                        return Maybe.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
-                    }
-                    return ConversionService.SHARED.convert(result, Maybe.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
-                }
-                else {
-                    return Maybe.error(throwable);
-                }
+                return fallbackOr(fallbackResolver, throwable, Maybe.error(throwable), parameters);
             });
         }
         else if(publisherResult instanceof Single) {
             Single<?> single = (Single) publisherResult;
-            return single.onErrorResumeNext(throwable -> {
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
-                if(fallback.isPresent()) {
-                    ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result;
-                    try {
-                        result = fallbackHandle.invoke(parameters);
-                    } catch (Exception e) {
-                        return Single.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
-                    }
-                    return ConversionService.SHARED.convert(result, Single.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
-                }
-                else {
-                    return Single.error(throwable);
-                }
-            });
+            return single.onErrorResumeNext(throwable ->
+                    fallbackOr(fallbackResolver, throwable, Single.error(throwable), parameters)
+            );
         }
         else if(publisherResult instanceof Flowable) {
             Flowable<?> single = (Flowable) publisherResult;
             return single.onErrorResumeNext(throwable -> {
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
-                if(fallback.isPresent()) {
-                    ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result;
-                    try {
-                        result = fallbackHandle.invoke(parameters);
-                    } catch (Exception e) {
-                        return Flowable.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
-                    }
-                    return ConversionService.SHARED.convert(result, Flowable.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
-                }
-                else {
-                    return Flowable.error(throwable);
-                }
+                return fallbackOr(fallbackResolver, throwable, Flowable.error(throwable), parameters);
             });
         }
         return publisherResult;

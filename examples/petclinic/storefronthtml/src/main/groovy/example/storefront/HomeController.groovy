@@ -20,14 +20,12 @@ import io.reactivex.Single
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.CookieValue
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Produces
-import org.particleframework.http.cookie.Cookie
-import org.particleframework.http.cookie.CookieFactory
 
 import javax.inject.Inject
 import javax.inject.Singleton
-import org.particleframework.http.annotation.Cookie
 
 /**
  * @author graemerocher
@@ -52,7 +50,7 @@ class HomeController {
 
     @Produces(MediaType.TEXT_HTML)
     @Get('/')
-    HttpResponse<Single<String>> index(@Cookie("micronautUUId") Optional<String> micronautUUIdCookie) {
+    HttpResponse<Single<String>> index(@CookieValue("micronautUUId") Optional<String> micronautUUIdCookie) {
         if ( micronautUUIdCookie.isPresent() ) {
             return HttpResponse.ok(homeHtmlRenderer.render())
         }

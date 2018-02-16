@@ -102,6 +102,6 @@ public class PetControllerTest {
 
         assertNotNull(dino);
 
-        assertEquals(1, client.byVendor("Fred").blockingGet().size());
+        assertEquals(2, client.byVendor("Fred").blockingGet().size());
     }
 }

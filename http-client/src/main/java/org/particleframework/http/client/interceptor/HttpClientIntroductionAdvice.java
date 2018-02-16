@@ -50,6 +50,8 @@ import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -70,6 +72,8 @@ import java.util.function.BiConsumer;
  */
 @Singleton
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
     public static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
     private final BeanContext beanContext;
@@ -203,6 +207,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             HttpClient httpClient = reg.httpClient;
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
+            final Class<Object> methodDeclaringType = context.getDeclaringType();
             if(Publishers.isPublisher(javaReturnType) || isFuture) {
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 Class<?> argumentType = publisherArgument.getType();
@@ -251,8 +256,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                     return;
                                 }
                             }
-                            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context.getDeclaringType(), context);
+                            if(LOG.isErrorEnabled()) {
+                                LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + t.getMessage(), t);
+                            }
+
+                            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(methodDeclaringType, context);
                             if(fallbackMethod.isPresent()) {
+
+                                if(LOG.isDebugEnabled()) {
+                                    LOG.debug("Client [{}] resolved fallback: {}", methodDeclaringType.getName(), fallbackMethod.get() );
+                                }
+
                                 try {
                                     CompletableFuture<Object> resultingFuture = (CompletableFuture) fallbackMethod.get()
                                                                                                         .invoke(context.getParameterValues());
@@ -265,7 +279,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                         }
                                     });
                                 } catch (Exception e) {
-                                    future.completeExceptionally(new HttpClientException("Error invoking fallback for type ["+context.getDeclaringType()+"]: " + e.getMessage() ,e));
+                                    future.completeExceptionally(new HttpClientException("Error invoking fallback for type ["+ methodDeclaringType +"]: " + e.getMessage() ,e));
                                 }
 
                             }
@@ -286,7 +300,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
                     );
                     for (ReactiveClientResultTransformer transformer : transformers) {
-                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(context.getDeclaringType(), context), context.getParameterValues());
+                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(methodDeclaringType, context), context.getParameterValues());
                     }
                     return finalPublisher;
                 }
@@ -303,15 +317,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     try {
                         blockingHttpClient.exchange(request);
                         return null;
-                    } catch (Exception e) {
-                        Class<Object> declaringType = context.getDeclaringType();
-                        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(declaringType, context);
-                        if(fallback.isPresent())  {
-                            return fallback.get().invoke(context.getParameterValues());
-                        }
-                        else {
-                            throw e;
-                        }
+                    } catch (HttpClientException e) {
+                        return handleFallback(context, methodDeclaringType, e);
                     }
                 }
                 else {
@@ -319,27 +326,42 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         return blockingHttpClient.retrieve(
                                 request, returnType.asArgument()
                         );
-                    } catch (HttpClientResponseException e) {
-                        if( e.getStatus() == HttpStatus.NOT_FOUND) {
+                    } catch (HttpClientException t) {
+                        if( t instanceof HttpClientResponseException && ((HttpClientResponseException)t).getStatus() == HttpStatus.NOT_FOUND) {
                             if(javaReturnType == Optional.class) {
                                 return Optional.empty();
                             }
                             return null;
                         }
-                        Class<Object> declaringType = context.getDeclaringType();
-                        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(declaringType, context);
-                        if(fallback.isPresent())  {
-                            return fallback.get().invoke(context.getParameterValues());
-                        }
-                        else {
-                            throw e;
-                        }
+                        return handleFallback(context, methodDeclaringType, t);
                     }
                 }
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    protected Object handleFallback(MethodInvocationContext<Object, Object> context, Class<Object> methodDeclaringType, HttpClientException t) throws HttpClientException {
+        if(LOG.isErrorEnabled()) {
+            LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + t.getMessage(), t);
+        }
+
+        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(methodDeclaringType, context);
+        if(fallback.isPresent())  {
+            MethodExecutionHandle<Object> fallbackMethod = fallback.get();
+            try {
+                if(LOG.isDebugEnabled()) {
+                    LOG.debug("Client [{}] resolved fallback: {}", methodDeclaringType.getName(), fallbackMethod );
+                }
+                return fallbackMethod.invoke(context.getParameterValues());
+            } catch (Exception e) {
+                throw new HttpClientException("Error invoking fallback for type ["+ methodDeclaringType +"]: " + e.getMessage() ,e);
+            }
+        }
+        else {
+            throw t;
+        }
     }
 
     protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(Class<Object> declaringType, MethodInvocationContext<Object, Object> context) {
