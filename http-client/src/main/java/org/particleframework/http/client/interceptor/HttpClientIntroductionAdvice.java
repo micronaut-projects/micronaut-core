@@ -18,6 +18,7 @@ package org.particleframework.http.client.interceptor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.reactivex.Flowable;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.context.BeanContext;
@@ -59,7 +60,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 
 /**
  * Introduction advice that implements the {@link Client} annotation
@@ -71,19 +71,19 @@ import java.util.function.Function;
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
 
     public static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
-    final BeanContext beanContext;
+    private final BeanContext beanContext;
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
-    private final ClientPublisherResultTransformer[] transformers;
+    private final ReactiveClientResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
 
 
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
             LoadBalancerResolver loadBalancerResolver,
-            ClientPublisherResultTransformer...transformers) {
+            ReactiveClientResultTransformer...transformers) {
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
-        this.transformers = transformers != null ? transformers : new ClientPublisherResultTransformer[0];
+        this.transformers = transformers != null ? transformers : new ReactiveClientResultTransformer[0];
     }
 
     @Override
@@ -264,10 +264,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
                 else {
                     Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
-                            new HttpClientException("Unconvertible Reactive Streams Publisher Type: " + javaReturnType)
+                            new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
                     );
-                    for (ClientPublisherResultTransformer transformer : transformers) {
-                        finalPublisher = transformer.transform(finalPublisher);
+                    for (ReactiveClientResultTransformer transformer : transformers) {
+                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(context.getDeclaringType(), context), context.getParameterValues());
                     }
                     return finalPublisher;
                 }
@@ -286,8 +286,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         return null;
                     } catch (Exception e) {
                         Class<Object> declaringType = context.getDeclaringType();
-                        Optional<MethodExecutionHandle<Object>> fallback = beanContext
-                                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(declaringType, context);
                         if(fallback.isPresent())  {
                             return fallback.get().invoke(context.getParameterValues());
                         }
@@ -309,8 +308,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             return null;
                         }
                         Class<Object> declaringType = context.getDeclaringType();
-                        Optional<MethodExecutionHandle<Object>> fallback = beanContext
-                                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(declaringType, context);
                         if(fallback.isPresent())  {
                             return fallback.get().invoke(context.getParameterValues());
                         }
@@ -323,6 +321,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(Class<Object> declaringType, MethodInvocationContext<Object, Object> context) {
+        return beanContext
+                                    .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
