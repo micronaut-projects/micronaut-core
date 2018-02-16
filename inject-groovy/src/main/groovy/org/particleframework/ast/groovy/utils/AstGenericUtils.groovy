@@ -4,7 +4,9 @@ import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
+import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.tools.GenericsUtils
+import org.particleframework.core.util.ArrayUtils
 
 /**
  * @author Graeme Rocher
@@ -12,6 +14,113 @@ import org.codehaus.groovy.ast.tools.GenericsUtils
  */
 @CompileStatic
 class AstGenericUtils {
+
+    /**
+     * Variation that takes into account non primary nodes
+     *
+     * @param classNode The class node
+     * @return The generics spec
+     */
+    static Map<String,ClassNode> createGenericsSpec(ClassNode classNode) {
+        GenericsType[] existingGenericTypes = classNode.genericsTypes
+        boolean hasGenericTypes = ArrayUtils.isNotEmpty(existingGenericTypes)
+        if(!classNode.isPrimaryClassNode()) {
+            if(hasGenericTypes) {
+                GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes()
+                Map<String,ClassNode> ret = new HashMap<String,ClassNode>()
+                populateGenericsSpec(redirectTypes, existingGenericTypes, ret)
+                return ret
+            }
+            else {
+
+                classNode = classNode.redirect()
+                Map<String,ClassNode> ret = new HashMap<String,ClassNode>()
+                GenericsType[] redirectTypes = classNode.getGenericsTypes()
+                if (redirectTypes != null) {
+                    for(GenericsType gt in redirectTypes) {
+                        if(gt.isPlaceholder()) {
+                            if(gt.upperBounds) {
+                                ret.put(gt.name, gt.upperBounds[0])
+                            }
+                            else if(gt.lowerBound) {
+                                ret.put(gt.name, gt.lowerBound)
+                            }
+                            else {
+                                ret.put(gt.name, ClassHelper.OBJECT_TYPE)
+                            }
+                        }
+                        else {
+                            ret.put(gt.name, gt.type)
+                        }
+                    }
+                }
+                return ret
+            }
+        }
+        else {
+            if(!hasGenericTypes) {
+                return Collections.emptyMap()
+            }
+            else {
+                return GenericsUtils.createGenericsSpec(classNode)
+            }
+        }
+    }
+
+    /**
+     * Populates generics for a method
+     *
+     * @param methodNode The method node node
+     * @param genericsSpec The spec to populate
+     * @return The generics spec
+     */
+    static Map<String,ClassNode> createGenericsSpec(MethodNode methodNode, Map<String,ClassNode> genericsSpec) {
+        GenericsType[] redirectTypes = methodNode.genericsTypes
+        if (redirectTypes != null) {
+            for(GenericsType gt in redirectTypes) {
+                if(gt.isPlaceholder()) {
+                    if(gt.upperBounds) {
+                        genericsSpec.put(gt.name, gt.upperBounds[0])
+                    }
+                    else if(gt.lowerBound) {
+                        genericsSpec.put(gt.name, gt.lowerBound)
+                    }
+                    else {
+                        genericsSpec.put(gt.name, ClassHelper.OBJECT_TYPE)
+                    }
+                }
+                else {
+                    genericsSpec.put(gt.name, gt.type)
+                }
+            }
+        }
+        return genericsSpec
+    }
+
+    private static void populateGenericsSpec(GenericsType[] redirectTypes, GenericsType[] genericTypes, HashMap<String, ClassNode> boundTypes) {
+        if (redirectTypes && redirectTypes.length == genericTypes.length) {
+            int i = 0
+            for (GenericsType redirect in redirectTypes) {
+                GenericsType specifiedType = genericTypes[i]
+                ClassNode specifiedClassNode = specifiedType.type
+                if (redirect.isPlaceholder() && specifiedClassNode) {
+                    if (specifiedType.isPlaceholder()) {
+                        if (specifiedType.upperBounds) {
+                            boundTypes.put(redirect.name, specifiedType.upperBounds[0])
+                        } else if (specifiedType.lowerBound) {
+                            boundTypes.put(redirect.name, specifiedType.lowerBound)
+                        } else {
+                            boundTypes.put(redirect.name, specifiedClassNode.redirect().plainNodeReference)
+                        }
+                    } else {
+                        boundTypes.put(redirect.name, specifiedClassNode.redirect())
+                    }
+                }
+
+                i++
+            }
+        }
+    }
 
     /**
      * Finds the generic type for the given interface for the given class node
@@ -39,10 +148,27 @@ class AstGenericUtils {
         if (classNode == null) {
             return null
         } else {
-            if(classNode.isGenericsPlaceHolder() && classNode.genericsTypes) {
-                String typeVar = classNode.genericsTypes[0].name
-                if(boundTypes.containsKey(typeVar)) {
-                    return boundTypes.get(typeVar).name
+            if(classNode.isGenericsPlaceHolder() ) {
+                if(classNode.genericsTypes) {
+
+                    String typeVar = classNode.genericsTypes[0].name
+                    if(boundTypes.containsKey(typeVar)) {
+                        return boundTypes.get(typeVar).name
+                    }
+                }
+                else {
+                    if(classNode.isResolved() || ClassHelper.isPrimitiveType(classNode)) {
+                        return classNode.typeClass
+                    }
+                    else {
+                        String redirectName = classNode.redirect().name
+                        if(redirectName != classNode.unresolvedName) {
+                            return redirectName
+                        }
+                        else {
+                            return Object.name
+                        }
+                    }
                 }
             }
             else if(classNode.isArray() && classNode.componentType.isGenericsPlaceHolder()) {
@@ -50,10 +176,12 @@ class AstGenericUtils {
                 if(componentGenericTypes) {
                     String typeVar = componentGenericTypes[0].name
                     if(boundTypes.containsKey(typeVar)) {
-                        return boundTypes.get(typeVar).makeArray().name
+                        ClassNode arrayNode = boundTypes.get(typeVar).makeArray()
+                        return arrayNode.isPrimaryClassNode() ? arrayNode.name : arrayNode.toString()
                     }
                 }
             }
+
             return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
         }
     }

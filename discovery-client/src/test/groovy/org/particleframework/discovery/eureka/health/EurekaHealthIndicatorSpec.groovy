@@ -18,7 +18,7 @@ package org.particleframework.discovery.eureka.health
 import org.particleframework.context.ApplicationContext
 import org.particleframework.discovery.eureka.MockEurekaServer
 import org.particleframework.health.HealthStatus
-import HealthResult
+import org.particleframework.management.health.indicator.HealthResult
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 

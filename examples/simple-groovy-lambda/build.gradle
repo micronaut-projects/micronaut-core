@@ -35,16 +35,16 @@ repositories {
 }
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
-//    compile "org.particleframework:function-aws:${projectVersion}"
+    compile "org.particleframework:inject-groovy:${projectVersion}"
     compile "org.particleframework:function-groovy:${projectVersion}"
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
 
 
+    testCompile "org.particleframework:http-client:${projectVersion}"
     testRuntime "org.particleframework:http-server-netty:${projectVersion}"
     testRuntime "org.particleframework:function-web:${projectVersion}"
-    testCompile 'junit:junit:4.12'
-    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
+
 
     testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
         exclude module:'groovy-all'

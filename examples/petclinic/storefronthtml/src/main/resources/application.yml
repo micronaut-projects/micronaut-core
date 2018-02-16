@@ -1,0 +1,15 @@
+particle:
+    server:
+        port: 8080
+router:
+    static:
+        resources:
+            enabled: true
+            mapping: /assets/**
+            paths:
+                - classpath:static
+petstore:
+    html:
+        template: /index.html
+    cookie:
+        name: micronautUuid

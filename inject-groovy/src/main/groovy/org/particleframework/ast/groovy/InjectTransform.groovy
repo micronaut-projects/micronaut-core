@@ -281,7 +281,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Map<String, Object> targetMethodParamsToType = [:]
                     Map<String, Object> targetMethodQualifierTypes = [:]
                     Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                    Map<String,ClassNode> boundTypes = GenericsUtils.createGenericsSpec(classNode)
+
+                    Map<String,ClassNode> boundTypes = AstGenericUtils.createGenericsSpec(classNode)
+
+                    if(!classNode.isPrimaryClassNode()) {
+                        AstGenericUtils.createGenericsSpec(methodNode, boundTypes)
+                    }
                     Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType, boundTypes)
                     Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
                             methodNode.returnType,
@@ -305,7 +310,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     aopProxyWriter.visitAroundMethod(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                            resolveReturnType(classNode, methodNode, boundTypes),
                             resolvedReturnType,
                             resolvedGenericTypes,
                             methodNode.name,
@@ -316,8 +321,28 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     )
                 }
 
+
+
             }
             publicMethodVisitor.accept(node)
+        }
+
+        private Object resolveReturnType(ClassNode classNode, MethodNode methodNode, Map<String, ClassNode> boundTypes) {
+            boolean isPrimaryClassNode = classNode.isPrimaryClassNode()
+            ClassNode returnType = methodNode.returnType
+            if(isPrimaryClassNode || classNode.genericsTypes) {
+                if(!isPrimaryClassNode && returnType.isArray()) {
+                    Map<String,ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(classNode.redirect())
+                    return AstGenericUtils.resolveTypeReference(returnType, genericSpec)
+                }
+                else {
+
+                    return AstGenericUtils.resolveTypeReference(returnType)
+                }
+            }
+            else {
+                return AstGenericUtils.resolveTypeReference(returnType, boundTypes)
+            }
         }
 
         @Override
@@ -376,9 +401,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Map<String, Object> targetMethodParamsToType = [:]
                             Map<String, Object> targetMethodQualifierTypes = [:]
                             Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                            Map<String,ClassNode> boundTypes = GenericsUtils.createGenericsSpec(classNode)
+                            Map<String,ClassNode> boundTypes = AstGenericUtils.createGenericsSpec(classNode)
                             Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType, boundTypes)
-                            Object returnTypeReference = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType)
+                            Object returnTypeReference = resolveReturnType(classNode, targetBeanMethodNode, boundTypes)
                             Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
                                     targetBeanMethodNode.returnType,
                                     boundTypes

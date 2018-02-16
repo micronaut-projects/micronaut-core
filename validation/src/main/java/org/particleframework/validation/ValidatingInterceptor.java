@@ -59,7 +59,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
                                     .map(factory -> factory.getValidator().forExecutables())
                                     .orElse(null);
 
-        if(LOG.isWarnEnabled()) {
+        if(executableValidator == null && LOG.isWarnEnabled()) {
             LOG.warn("Beans requiring validation present, but no implementation of javax.validation configuration. Add an implementation (such as hibernate-validator) to prevent this error.");
         }
     }

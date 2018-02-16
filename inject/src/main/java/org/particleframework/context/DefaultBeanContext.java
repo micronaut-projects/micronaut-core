@@ -19,6 +19,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.context.annotation.Secondary;
 import org.particleframework.context.event.*;
 import org.particleframework.context.exceptions.*;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
@@ -219,21 +220,25 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
-        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType);
+        return findExecutionHandle(beanType,null, method, arguments);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
+        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
         if (foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
             Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
             if (foundMethod.isPresent()) {
-
-                Optional<MethodExecutionHandle<R>> executionHandle = foundMethod.map((ExecutableMethod executableMethod) ->
-                        new BeanExecutionHandle<>(this, beanType, executableMethod)
+                return foundMethod.map((ExecutableMethod executableMethod) ->
+                        new BeanExecutionHandle(this, beanType, qualifier, executableMethod)
                 );
-                return executionHandle;
             } else {
                 return beanDefinition.findPossibleMethods(method)
                         .findFirst()
                         .map((ExecutableMethod executableMethod) ->
-                                new BeanExecutionHandle<>(this, beanType, executableMethod)
+                                new BeanExecutionHandle(this, beanType, qualifier, executableMethod)
                         );
             }
         }
@@ -1300,13 +1305,19 @@ public class DefaultBeanContext implements BeanContext {
             return candidates.iterator().next();
         } else {
             BeanDefinition<T> definition = null;
-            Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
-            if (exactMatches.size() == 1) {
-                definition = exactMatches.iterator().next();
-            } else if (throwNonUnique) {
-                definition = findConcreteCandidate(beanType, qualifier, candidates);
+            candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredAnnotation(Secondary.class)).collect(Collectors.toList());
+            if(candidates.size() == 1) {
+                return candidates.iterator().next();
             }
-            return definition;
+            else {
+                Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
+                if (exactMatches.size() == 1) {
+                    definition = exactMatches.iterator().next();
+                } else if (throwNonUnique) {
+                    definition = findConcreteCandidate(beanType, qualifier, candidates);
+                }
+                return definition;
+            }
         }
     }
 
@@ -1717,11 +1728,13 @@ public class DefaultBeanContext implements BeanContext {
     private static final class BeanExecutionHandle<T, R> extends AbstractExectionHandle<T, R> {
         private final BeanContext beanContext;
         private final Class<T> beanType;
+        private final Qualifier<T> qualifier;
 
-        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, ExecutableMethod<T, R> method) {
+        public BeanExecutionHandle(BeanContext beanContext, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
             super(method);
             this.beanContext = beanContext;
             this.beanType = beanType;
+            this.qualifier = qualifier;
         }
 
         @Override
@@ -1736,7 +1749,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public R invoke(Object... arguments) {
-            return method.invoke(beanContext.getBean(beanType), arguments);
+            return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
         }
 
     }
