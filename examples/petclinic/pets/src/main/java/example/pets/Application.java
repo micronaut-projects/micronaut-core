@@ -17,11 +17,19 @@ package example.pets;
 
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
+import com.mongodb.reactivestreams.client.Success;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
 import org.particleframework.runtime.server.event.ServerStartupEvent;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
@@ -33,6 +41,7 @@ import java.util.Arrays;
 @Singleton
 public class Application implements ApplicationEventListener<ServerStartupEvent>{
 
+    private static final Logger LOG = LoggerFactory.getLogger(Application.class);
     private final MongoClient mongoClient;
     private final PetsConfiguration configuration;
 
@@ -46,10 +55,15 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
         MongoCollection<PetEntity> collection = mongoClient.getDatabase(configuration.getDatabaseName())
                                                            .getCollection(configuration.getCollectionName(), PetEntity.class);
 
-        Single.fromPublisher(collection.insertMany(Arrays.asList(
-                new PetEntity("Fred", "Dino"),
-                new PetEntity("Babe", "Arthur")
-        ))).blockingGet();
+        Flowable.fromPublisher(collection.drop())
+              .flatMap( success -> collection.insertMany(Arrays.asList(
+                      new PetEntity("Fred", "Dino"),
+                      new PetEntity("Babe", "Arthur")
+              ))).subscribe(success -> {}, throwable -> {
+                  if(LOG.isErrorEnabled()) {
+                      LOG.error("Error saving data: {}", throwable.getMessage());
+                  }
+              });
     }
 
     public static void main(String[] args) {
