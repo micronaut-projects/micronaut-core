@@ -2,6 +2,7 @@ apply plugin: 'groovy'
 
 dependencies {
   compileOnly "org.particleframework:inject-groovy:${projectVersion}"
+  compileOnly "org.particleframework:inject-java:${projectVersion}"
   compile "org.particleframework:runtime-groovy:${projectVersion}"
   compile "org.particleframework:http-server-netty:${projectVersion}"
   compile project(":api")
