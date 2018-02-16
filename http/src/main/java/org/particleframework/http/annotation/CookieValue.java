@@ -34,7 +34,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER})
 @Bindable
-public @interface Cookie {
+public @interface CookieValue {
     /**
      * @return The name of the cookie, otherwise it is inferred from the parameter name
      */

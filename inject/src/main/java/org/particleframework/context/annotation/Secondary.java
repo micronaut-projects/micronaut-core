@@ -13,21 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.context.annotation;
+
+import javax.inject.Qualifier;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization per reactive framework
+ * <p>Counter part to {@link Primary} that allows reducing the priority of a given bean for the purposes of dependency injection</p>
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @see Qualifier @Qualifier
+ * @see Primary
  */
-public interface ClientPublisherResultTransformer {
-
-    /**
-     * Transform the publisher result
-     *
-     * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isPublisher(Class)}
-     * @return The transformed result
-     */
-    Object transform(Object publisherResult);
+@Qualifier
+@Documented
+@Retention(RUNTIME)
+public @interface Secondary {
 }

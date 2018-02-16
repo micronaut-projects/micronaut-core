@@ -22,32 +22,30 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.http.HttpRequest;
-import org.particleframework.http.annotation.Cookie;
+import org.particleframework.http.annotation.CookieValue;
 import org.particleframework.core.type.Argument;
 
-import java.util.Optional;
-
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Cookie} annotation
+ * An {@link AnnotatedArgumentBinder} implementation that uses the {@link CookieValue} annotation
  * to trigger binding from an HTTP {@link org.particleframework.http.cookie.Cookie}
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Cookie, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Cookie, T> {
+public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<CookieValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<CookieValue, T> {
     public CookieAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
 
     @Override
-    public Class<Cookie> getAnnotationType() {
-        return Cookie.class;
+    public Class<CookieValue> getAnnotationType() {
+        return CookieValue.class;
     }
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleValues<org.particleframework.http.cookie.Cookie> parameters = source.getCookies();
-        Cookie annotation = argument.getAnnotation(Cookie.class);
+        CookieValue annotation = argument.getAnnotation(CookieValue.class);
         String parameterName = annotation.value();
         return doBind(argument, parameters, parameterName);
     }

@@ -15,12 +15,9 @@
  */
 package example
 
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
-import org.particleframework.http.HttpStatus
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.client.HttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -39,23 +36,14 @@ class UpperCaseTitleFunctionSpec extends Specification {
     void "run function as REST service"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-
-        OkHttpClient client = new OkHttpClient()
-        def data = '{"title":"The Stand"}'
-        def body = RequestBody.create(
-                MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON),
-                data)
-
-        def request = new Request.Builder()
-                .url(new URL(server.URL, "/upper-case-title"))
-                .post(body)
+        HttpClient client = server.getApplicationContext().createBean(HttpClient, server.getURL())
 
         when:
-        def response = client.newCall(request.build()).execute()
+        Book book = client.toBlocking()
+                          .retrieve(HttpRequest.POST("/upper-case-title", new Book(title: "The Stand")), Book)
 
         then:
-        response.code() == HttpStatus.OK.code
-        response.body().string() == '{"title":"THE STAND"}'
+        book.title == "THE STAND"
 
         cleanup:
         if(server != null)

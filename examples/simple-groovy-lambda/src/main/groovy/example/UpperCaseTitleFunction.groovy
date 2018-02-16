@@ -15,12 +15,14 @@
  */
 package example
 
+import groovy.transform.Field
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 
-BookService bookService
+@Field BookService bookService
 
 Book toUpperCase(Book book) {
     bookService.toUpperCase(book)
