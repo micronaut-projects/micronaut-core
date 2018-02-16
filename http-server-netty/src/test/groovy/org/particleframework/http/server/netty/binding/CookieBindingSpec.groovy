@@ -1,10 +1,8 @@
 package org.particleframework.http.server.netty.binding
 
-import okhttp3.Request
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpRequest
-import org.particleframework.http.MutableHttpRequest
-import org.particleframework.http.annotation.Cookie
+import org.particleframework.http.annotation.CookieValue
 import org.particleframework.http.cookie.Cookies
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import org.particleframework.http.annotation.Controller
@@ -42,13 +40,13 @@ class CookieBindingSpec extends AbstractParticleSpec {
     static class CookieController {
 
         @Get
-        String simple(@Cookie String myVar) {
+        String simple(@CookieValue String myVar) {
             "Cookie Value: $myVar"
         }
 
 
         @Get
-        String optional(@Cookie Optional<Integer> myVar) {
+        String optional(@CookieValue Optional<Integer> myVar) {
             "Cookie Value: ${myVar.orElse(-1)}"
         }
 
