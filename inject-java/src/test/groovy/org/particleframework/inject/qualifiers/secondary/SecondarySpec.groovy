@@ -16,6 +16,8 @@
 package org.particleframework.inject.qualifiers.secondary
 
 import org.particleframework.context.BeanContext
+import org.particleframework.context.annotation.Secondary
+import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 /**
@@ -37,5 +39,6 @@ class SecondarySpec extends Specification {
         b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+        context.getBean(A, Qualifiers.byStereotype(Secondary)) instanceof A1
     }
 }
