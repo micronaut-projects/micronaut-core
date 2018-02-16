@@ -2,6 +2,7 @@ package org.particleframework.discovery.cloud;
 
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.context.env.Environment;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -10,8 +11,8 @@ import java.util.Optional;
 @Requires(env="gc")
 public class GoogleComputeMetadataResolver implements MetadataResolver {
     @Override
-    public Optional<? extends ComputeInstanceMetadata> resolve(ComputePlatform computePlatform) {
-
+    public Optional<? extends ComputeInstanceMetadata> resolve(Environment environment) {
+        // not implemented yet
         return Optional.empty();
     }
 }

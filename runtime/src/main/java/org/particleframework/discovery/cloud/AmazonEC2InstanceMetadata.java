@@ -1,6 +1,9 @@
 package org.particleframework.discovery.cloud;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.core.convert.value.ConvertibleValues;
 
 import java.util.List;
 import java.util.Map;
@@ -8,7 +11,7 @@ import java.util.Map;
 public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
 
     // anything non-standard goes in here
-    private Map<String, String> metadata;
+    Map<String, String> metadata;
 
     // quick way to lookup tags
     private Map<String, String> tags;
@@ -38,6 +41,8 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     String privateIpV6;
 
 
+
+
     @Override
     public String getImageId() {
         return imageId;
@@ -49,82 +54,82 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public Map<String, String> getMetadata() {
-        return null;
+    public Map<String,String> getMetadata() {
+        return metadata;
     }
 
     @Override
     public List<NetworkInterface> getInterfaces() {
-        return null;
+        return interfaces;
     }
 
     @Override
     public ComputePlatform getComputePlatform() {
-        return null;
+        return computePlatform;
     }
 
     @Override
     public Map<String, String> getTags() {
-        return null;
+        return tags;
     }
 
     @Override
     public String getName() {
-        return null;
+        return name;
     }
 
     @Override
     public String getInstanceId() {
-        return null;
+        return instanceId;
     }
 
     @Override
     public String getMachineType() {
-        return null;
+        return machineType;
     }
 
     @Override
     public String getAvailabilityZone() {
-        return null;
+        return availabilityZone;
     }
 
     @Override
     public String getRegion() {
-        return null;
+        return region;
     }
 
     @Override
     public String getLocalHostname() {
-        return null;
+        return localHostname;
     }
 
     @Override
     public String getPrivateHosname() {
-        return null;
+        return localHostname;
     }
 
     @Override
     public String getPublicIpV4() {
-        return null;
+        return publicIpV4;
     }
 
     @Override
     public String getPublicIpV6() {
-        return null;
+        return publicIpV6;
     }
 
     @Override
     public String getPrivateIpV4() {
-        return null;
+        return privateIpV4;
     }
 
     @Override
     public String getPrivateIpV6() {
-        return null;
+        return privateIpV6;
     }
 
     @Override
     public String getDescription() {
-        return null;
+        return description;
     }
 }

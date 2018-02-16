@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.context.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Map;
 import java.util.Optional;
 
 @Singleton
@@ -21,10 +23,7 @@ public class AmazonMetadataResolver implements MetadataResolver {
     private static final Logger LOG  = LoggerFactory.getLogger(AmazonMetadataResolver.class);
 
     @Override
-    public Optional<? extends ComputeInstanceMetadata> resolve(ComputePlatform computePlatform) {
-        if (computePlatform != ComputePlatform.AMAZON_EC2) {
-            return Optional.empty();
-        }
+    public Optional<? extends ComputeInstanceMetadata> resolve(Environment environment) {
         AmazonEC2InstanceMetadata ec2InstanceMetadata = new AmazonEC2InstanceMetadata();
         String result = "";
         try {
@@ -41,9 +40,17 @@ public class AmazonMetadataResolver implements MetadataResolver {
                 ec2InstanceMetadata.imageId = metadataJson.findValue("imageId").textValue();
                 ec2InstanceMetadata.computePlatform = ComputePlatform.AMAZON_EC2;
             }
-
-            ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.localHostname.name),1000,5000);
-            ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.publicHostname.name),1000,5000);
+            try {
+                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.localHostname.name),1000,5000);
+            } catch (IOException e) {
+                LOG.error("Error getting local hostname from url:"+EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.localHostname.name,e);
+            }
+            try {
+                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.publicHostname.name),1000,5000);
+            } catch (IOException e) {
+                LOG.error("error getting public host name from:"+EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.publicHostname.name,e);
+            }
+            ec2InstanceMetadata.metadata = mapper.convertValue(ec2InstanceMetadata, Map.class);
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
             LOG.error("Error reading ec2 metadata url",e);
