@@ -19,6 +19,7 @@ import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization per reactive framework
@@ -34,7 +35,7 @@ public interface ReactiveClientResultTransformer {
      * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isPublisher(Class)}
      * @return The transformed result
      */
-    Object transform(Object publisherResult, Callable<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters);
+    Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters);
 
 
 }

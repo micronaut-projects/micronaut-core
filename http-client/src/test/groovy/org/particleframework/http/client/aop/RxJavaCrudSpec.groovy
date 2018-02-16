@@ -44,7 +44,7 @@ class RxJavaCrudSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    void "test CRUD operations on generated client that returns blocking responses"() {
+    void "test it is possible to implement CRUD operations with RxJava"() {
         given:
         BookClient client = context.getBean(BookClient)
 
