@@ -42,6 +42,8 @@ import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.uri.UriMatchTemplate;
+import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
@@ -57,6 +59,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Introduction advice that implements the {@link Client} annotation
@@ -72,6 +75,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final Map<Integer, ClientRegistration> clients = new ConcurrentHashMap<>();
     private final ClientPublisherResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
+
 
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
@@ -277,8 +281,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     );
                 }
                 else if(void.class == javaReturnType) {
-                    blockingHttpClient.exchange(request);
-                    return null;
+                    try {
+                        blockingHttpClient.exchange(request);
+                        return null;
+                    } catch (Exception e) {
+                        Class<Object> declaringType = context.getDeclaringType();
+                        Optional<MethodExecutionHandle<Object>> fallback = beanContext
+                                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                        if(fallback.isPresent())  {
+                            return fallback.get().invoke(context.getParameterValues());
+                        }
+                        else {
+                            throw e;
+                        }
+                    }
                 }
                 else {
                     try {
@@ -292,7 +308,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             }
                             return null;
                         }
-                        throw e;
+                        Class<Object> declaringType = context.getDeclaringType();
+                        Optional<MethodExecutionHandle<Object>> fallback = beanContext
+                                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                        if(fallback.isPresent())  {
+                            return fallback.get().invoke(context.getParameterValues());
+                        }
+                        else {
+                            throw e;
+                        }
                     }
                 }
             }
