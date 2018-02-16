@@ -93,7 +93,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
                             .addListener(new DefaultCloseHandler(context, request, nettyResponse));
                     return;
                 }
-            } catch (ParseException e) {
+            } catch (ParseException | NumberFormatException e) {
                 //no-op
             }
         }
