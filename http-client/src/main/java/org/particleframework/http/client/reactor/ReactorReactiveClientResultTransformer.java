@@ -16,12 +16,9 @@
 package org.particleframework.http.client.reactor;
 
 import org.particleframework.context.annotation.Requires;
-import org.particleframework.core.convert.ConversionService;
 import org.particleframework.http.HttpStatus;
-import org.particleframework.http.client.ReactiveClientResultTransformer;
-import org.particleframework.http.client.exceptions.HttpClientException;
+import org.particleframework.http.client.AbstractReactiveClientResultTransformer;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
-import org.particleframework.inject.ExecutionHandle;
 import org.particleframework.inject.MethodExecutionHandle;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,7 +36,7 @@ import java.util.function.Supplier;
  */
 @Singleton
 @Requires(classes = Mono.class)
-public class ReactorReactiveClientResultTransformer implements ReactiveClientResultTransformer {
+public class ReactorReactiveClientResultTransformer extends AbstractReactiveClientResultTransformer {
     @Override
     public Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
         if(publisherResult instanceof Mono) {
@@ -52,41 +49,15 @@ public class ReactorReactiveClientResultTransformer implements ReactiveClientRes
                         return Mono.empty();
                     }
                 }
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
-                if(fallback.isPresent()) {
-                    ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result;
-                    try {
-                        result = fallbackHandle.invoke(parameters);
-                    } catch (Exception e) {
-                        return Mono.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
-                    }
-                    return ConversionService.SHARED.convert(result, Mono.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
-                }
-                else {
-                    return Mono.error(throwable);
-                }
+                return fallbackOr(fallbackResolver, throwable, Mono.error(throwable), parameters);
             });
         }
         else if(publisherResult instanceof Flux) {
             Flux<?> flux = (Flux) publisherResult;
 
-            return flux.onErrorResume(throwable -> {
-                Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
-                if(fallback.isPresent()) {
-                    ExecutionHandle<Object> fallbackHandle = fallback.get();
-                    Object result;
-                    try {
-                        result = fallbackHandle.invoke(parameters);
-                    } catch (Exception e) {
-                        return Flux.error(new HttpClientException("Error invoking HTTP client fallback ["+fallbackHandle+"]:" + e.getMessage()));
-                    }
-                    return ConversionService.SHARED.convert(result, Flux.class).orElseThrow(()-> new HttpClientException("Fallback for method "+fallbackHandle+" returned invalid Reactive type: " +  result));
-                }
-                else {
-                    return Flux.error(throwable);
-                }
-            });
+            return flux.onErrorResume(throwable ->
+                    fallbackOr(fallbackResolver, throwable, Flux.error(throwable), parameters)
+            );
         }
         else {
             return publisherResult;
