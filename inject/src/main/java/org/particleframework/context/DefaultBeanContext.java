@@ -19,6 +19,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.context.annotation.Secondary;
 import org.particleframework.context.event.*;
 import org.particleframework.context.exceptions.*;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
@@ -1330,7 +1331,7 @@ public class DefaultBeanContext implements BeanContext {
         Stream<BeanDefinition<T>> filteredResults = candidates
                 .stream()
                 .filter((BeanDefinition<T> candidate) ->
-                        candidate.getBeanType() == beanType
+                        !candidate.hasDeclaredStereotype(Secondary.class) || candidate.getBeanType() == beanType
                 );
         return filteredResults.collect(Collectors.toList());
     }
