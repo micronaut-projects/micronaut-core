@@ -873,6 +873,12 @@ public class DefaultBeanContext implements BeanContext {
                         .filter(candidate -> candidate.isEnabled(this))
                         .collect(Collectors.toList());
 
+                if(candidates.size() > 1) {
+                    // try narrow to exact type
+                    candidates = candidates.stream().filter(candidate -> candidate.getBeanType() == instance.getClass())
+                                                                             .collect(Collectors.toList());
+                    return candidates;
+                }
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Resolved bean candidates {} for instance: {}", candidates, instance);
                 }
