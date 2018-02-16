@@ -121,30 +121,33 @@ public class DefaultFunctionRegistry implements ExecutableMethodProcessor<Functi
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         FunctionBean annotation = method.getAnnotation(FunctionBean.class);
-        String functionId = annotation.value();
-        Class<?> declaringType = method.getDeclaringType();
-        if(StringUtils.isEmpty(functionId)) {
-            String typeName = declaringType.getSimpleName();
-            if(typeName.contains("$")) {
-                // generated lambda
-                functionId = NameUtils.hyphenate(method.getMethodName());
-            }
-            else {
-                functionId = NameUtils.hyphenate(typeName);
-            }
-        }
+        if(annotation != null) {
 
-        if(java.util.function.Function.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
-            registerFunction(method, functionId);
-        }
-        else if(Consumer.class.isAssignableFrom(declaringType) && method.getMethodName().equals("accept")) {
-            registerConsumer(method, functionId);
-        }
-        else if(BiFunction.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
-            registerBiFunction(method, functionId);
-        }
-        else if(Supplier.class.isAssignableFrom(declaringType) && method.getMethodName().equals("get")) {
-            registerSupplier(method, functionId);
+            String functionId = annotation.value();
+            Class<?> declaringType = method.getDeclaringType();
+            if(StringUtils.isEmpty(functionId)) {
+                String typeName = declaringType.getSimpleName();
+                if(typeName.contains("$")) {
+                    // generated lambda
+                    functionId = NameUtils.hyphenate(method.getMethodName());
+                }
+                else {
+                    functionId = NameUtils.hyphenate(typeName);
+                }
+            }
+
+            if(java.util.function.Function.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
+                registerFunction(method, functionId);
+            }
+            else if(Consumer.class.isAssignableFrom(declaringType) && method.getMethodName().equals("accept")) {
+                registerConsumer(method, functionId);
+            }
+            else if(BiFunction.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
+                registerBiFunction(method, functionId);
+            }
+            else if(Supplier.class.isAssignableFrom(declaringType) && method.getMethodName().equals("get")) {
+                registerSupplier(method, functionId);
+            }
         }
     }
 
