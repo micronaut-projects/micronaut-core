@@ -18,6 +18,7 @@ package org.particleframework.discovery.event;
 import org.particleframework.context.env.ComputePlatform;
 import org.particleframework.context.env.DefaultEnvironment;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.cloud.AmazonMetadataResolver;
 import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
@@ -49,12 +50,6 @@ public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
 
     public ServiceStartedEvent(ServiceInstance source) {
         super(source);
-        //Environment is null, how do I get this properly??
-        //Set activeNames = environment.getActiveNames();
-        //if (activeNames.contains(Environment.AMAZON_EC2)) {
-            AmazonMetadataResolver resolver = new AmazonMetadataResolver();
-            Optional metaData = resolver.resolve(ComputePlatform.AMAZON_EC2);
-        //}
-
+        ConvertibleValues<String> values = source.getMetadata();
     }
 }

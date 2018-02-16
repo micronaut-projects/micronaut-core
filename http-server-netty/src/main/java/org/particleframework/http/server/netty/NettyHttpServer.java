@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
+import org.particleframework.context.env.ComputePlatform;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.value.ConvertibleValues;
@@ -33,6 +34,10 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
+import org.particleframework.discovery.cloud.AmazonMetadataResolver;
+import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
+import org.particleframework.discovery.cloud.DefaultMetadataResolver;
+import org.particleframework.discovery.cloud.MetadataResolver;
 import org.particleframework.discovery.event.ServiceShutdownEvent;
 import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
@@ -61,10 +66,12 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}
@@ -97,6 +104,12 @@ public class NettyHttpServer implements EmbeddedServer {
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
+    @Inject
+    Optional<DefaultMetadataResolver> defaultMetadataResolver;
+    @Inject
+    Optional<AmazonMetadataResolver> amazonMetadataResolver;
+
+
 
     @Inject
     public NettyHttpServer(
@@ -219,10 +232,20 @@ public class NettyHttpServer implements EmbeddedServer {
 
                     @Override
                     public ConvertibleValues<String> getMetadata() {
+                        Map<String,String> cloudMetadata = new HashMap<String,String>();
+                        if (defaultMetadataResolver.isPresent()) {
+                            Optional<? extends ComputeInstanceMetadata> computeInstanceMetadata = defaultMetadataResolver.get().resolve(environment);
+                            if (computeInstanceMetadata.isPresent()) {
+                                cloudMetadata = computeInstanceMetadata.get().getMetadata();
+                            }
+                        }
                         Map<CharSequence, String> metadata = serverConfiguration
                                 .getApplicationConfiguration()
                                 .getInstance()
                                 .getMetadata();
+                        if (cloudMetadata!=null) {
+                            metadata.putAll(cloudMetadata);
+                        }
                         return ConvertibleValues.of(metadata);
                     }
                 };
@@ -363,6 +386,8 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         }
     }
+
+
 
 
 }
