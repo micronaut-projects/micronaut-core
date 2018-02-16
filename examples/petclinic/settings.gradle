@@ -1,5 +1,6 @@
 include "api"
 include "storefront"
+include "storefronthtml"
 include "vendors"
 include "people"
 include "pets"
