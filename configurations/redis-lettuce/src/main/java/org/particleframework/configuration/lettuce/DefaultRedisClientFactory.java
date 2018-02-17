@@ -18,15 +18,12 @@ package org.particleframework.configuration.lettuce;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.api.sync.RedisKeyCommands;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Requires;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
@@ -35,8 +32,8 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "particle.redis")
-@Requires(missingProperty = "particle.redis.uris")
+@Requires(property = RedisSetting.PREFIX)
+@Requires(missingProperty = RedisSetting.REDIS_URIS)
 @Singleton
 @Factory
 public class DefaultRedisClientFactory {
