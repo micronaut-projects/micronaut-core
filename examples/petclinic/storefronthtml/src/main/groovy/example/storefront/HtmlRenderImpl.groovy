@@ -24,7 +24,9 @@ class HtmlRenderImpl implements HtmlRenderer {
         StringWriter writer = new StringWriter()
         MarkupBuilder html = new MarkupBuilder(writer)
         html.div(class:"col-sm") {
-            img(src: pet.image)
+            a(href: petHref(pet)) {
+                img(src: pet.image)
+            }
         }
         writer.toString()
     }
@@ -35,6 +37,10 @@ class HtmlRenderImpl implements HtmlRenderer {
         }
 
         "/${nav.name().toLowerCase()}"
+    }
+
+    String petHref(PetViewModel pet) {
+        "/pets/${pet.id}"
     }
 
     String titleByNavbar(NavBar nav) {
@@ -91,6 +97,31 @@ class HtmlRenderImpl implements HtmlRenderer {
                 .reduce('', { String s, String s2 -> s + s2 })
                 .concatWith(suffix)
                 .reduce('', { String s, String s2 -> s + s2 })
+    }
+
+    @Override
+    @CompileDynamic
+    String renderPet(PetViewModel petViewModel) {
+        StringWriter writer = new StringWriter()
+        MarkupBuilder html = new MarkupBuilder(writer)
+        html.img(src: petViewModel.image, alt: '', class: 'img-thumbnail')
+        html.div(class: "clearfix") {
+            div(class:"jumbotron") {
+                p {
+                    b('Request Info about this PET')
+                }
+                form(method: 'POST', action:"/pet/requestInfo") {
+                    div(class: "form-group") {
+                        input(type: "hidden", name: "id", value: "${petViewModel.id}")
+                        label(for: "inputEmail", 'Email address')
+                        input(type: "email", class: "form-control", id:"inputEmail", ('aria-describedby'): 'emailHelp', placeholder: "Enter email", name: 'email')
+                        small(id:"emailHelp", class: "form-text text-muted", "We'll never share your email with anyone else.")
+                    }
+                    button(type: "submit", class:"btn btn-primary", 'Send me info')
+                }
+            }
+        }
+        writer.toString()
     }
 
     @Override
