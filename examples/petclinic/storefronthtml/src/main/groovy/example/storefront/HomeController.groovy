@@ -16,21 +16,23 @@
 package example.storefront
 
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import io.reactivex.Single
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
-import org.particleframework.http.annotation.CookieValue
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Post
 import org.particleframework.http.annotation.Produces
-
+import org.particleframework.http.annotation.CookieValue
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * @author graemerocher
+ * @author sdelamo
  * @since 1.0
  */
+@Slf4j
 @Singleton
 @Controller("/")
 @CompileStatic
@@ -48,6 +50,9 @@ class HomeController {
     @Inject
     PetStoreCookieGenerator petStoreCookieGenerator
 
+    @Inject
+    PetHtmlRenderer petHtmlRenderer
+
     @Produces(MediaType.TEXT_HTML)
     @Get('/')
     HttpResponse<Single<String>> index(@CookieValue("micronautUUId") Optional<String> micronautUUIdCookie) {
@@ -62,6 +67,19 @@ class HomeController {
     Single<String> pets() {
         petGridHtmlRenderer.renderPetGrid()
     }
+
+    @Produces(MediaType.TEXT_HTML)
+    @Get("/pets/{id}")
+    Single<String> pet(Long id) {
+        petHtmlRenderer.renderPet(id)
+    }
+
+    @Produces(MediaType.TEXT_HTML)
+    @Post(uri= '/pet/requestInfo', consumes=MediaType.APPLICATION_FORM_URLENCODED)
+    HttpResponse requestInfo(String email, Long id) {
+        HttpResponse.permanentRedirect(URI.create("/pets/${id}"))
+    }
+
 
     @Produces(MediaType.TEXT_HTML)
     @Get('/vendors')
