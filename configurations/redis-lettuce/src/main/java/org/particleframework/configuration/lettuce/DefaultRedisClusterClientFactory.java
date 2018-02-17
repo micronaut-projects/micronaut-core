@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "particle.redis.uris")
+@Requires(property = RedisSetting.REDIS_URIS)
 @Singleton
 @Factory
 public class DefaultRedisClusterClientFactory {

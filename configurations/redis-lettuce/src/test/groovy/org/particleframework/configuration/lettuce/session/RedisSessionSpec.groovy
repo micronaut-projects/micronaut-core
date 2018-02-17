@@ -41,7 +41,7 @@ class RedisSessionSpec extends Specification {
     void "test redis session create"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -131,7 +131,7 @@ class RedisSessionSpec extends Specification {
     void "test redis session expiry"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -161,7 +161,7 @@ class RedisSessionSpec extends Specification {
     void "test redis session write behind"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true',
                 'particle.session.http.redis.writeMode':'background',
         )
@@ -197,7 +197,7 @@ class RedisSessionSpec extends Specification {
     void "test redis JSON sessions"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.valueSerializer':JacksonObjectSerializer.name,
                 'particle.session.http.redis.enabled':'true'
         )

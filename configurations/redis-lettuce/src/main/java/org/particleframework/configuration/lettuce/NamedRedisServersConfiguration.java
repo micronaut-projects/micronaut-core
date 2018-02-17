@@ -24,7 +24,7 @@ import org.particleframework.context.annotation.EachProperty;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "particle.redis.servers")
+@EachProperty(value = RedisSetting.REDIS_SERVERS)
 public class NamedRedisServersConfiguration extends NamedRedisURI {
 
     public NamedRedisServersConfiguration(@Argument String name) {

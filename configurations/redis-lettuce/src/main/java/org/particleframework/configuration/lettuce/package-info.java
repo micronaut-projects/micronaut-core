@@ -22,7 +22,7 @@
  */
 @Configuration
 @Requires(classes = RedisURI.class)
-@Requires(property = "particle.redis")
+@Requires(property = RedisSetting.PREFIX)
 package org.particleframework.configuration.lettuce;
 
 import io.lettuce.core.RedisURI;

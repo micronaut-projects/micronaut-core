@@ -35,7 +35,7 @@ class RedisClientFactorySpec extends Specification{
         redisServer.start()
 
         when:
-        ApplicationContext applicationContext = ApplicationContext.run('particle.redis.port':port)
+        ApplicationContext applicationContext = ApplicationContext.run('redis.port':port)
         StatefulRedisConnection connection = applicationContext.getBean(StatefulRedisConnection)
 
         def command = connection.sync()
@@ -53,7 +53,7 @@ class RedisClientFactorySpec extends Specification{
         redisServer.start()
 
         when:
-        ApplicationContext applicationContext = ApplicationContext.run('particle.redis.uri':"redis://localhost:$port")
+        ApplicationContext applicationContext = ApplicationContext.run('redis.uri':"redis://localhost:$port")
         StatefulRedisConnection client = applicationContext.getBean(StatefulRedisConnection)
         def command = client.sync()
         then:

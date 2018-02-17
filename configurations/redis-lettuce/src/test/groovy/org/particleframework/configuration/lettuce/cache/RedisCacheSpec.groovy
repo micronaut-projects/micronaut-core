@@ -31,8 +31,8 @@ import spock.lang.Specification
 class RedisCacheSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
-            'particle.redis.type':'embedded',
-            'particle.redis.caches.test.enabled':'true'
+            'redis.type':'embedded',
+            'redis.caches.test.enabled':'true'
     )
 
     void "test read/write object from redis sync cache"() {

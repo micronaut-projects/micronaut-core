@@ -31,7 +31,7 @@ import java.util.List;
  * @since 1.0
  */
 @Requires(classes = RedisServer.class)
-@Requires(property = "particle.redis.type", value = "embedded")
+@Requires(property = RedisSetting.REDIS_TYPE, value = "embedded")
 @Factory
 public class EmbeddedRedisServer {
 
@@ -55,7 +55,7 @@ public class EmbeddedRedisServer {
     }
 
 
-    @ConfigurationProperties("particle.redis.embedded")
+    @ConfigurationProperties(RedisSetting.REDIS_EMBEDDED)
     @Requires(classes = RedisServerBuilder.class )
     public static class Configuration {
         @ConfigurationBuilder(
