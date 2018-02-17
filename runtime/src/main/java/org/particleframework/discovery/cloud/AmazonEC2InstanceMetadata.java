@@ -1,10 +1,6 @@
 package org.particleframework.discovery.cloud;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.env.ComputePlatform;
-import org.particleframework.core.convert.value.ConvertibleValues;
-
 import java.util.List;
 import java.util.Map;
 
@@ -132,4 +128,6 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     public String getDescription() {
         return description;
     }
+
+
 }

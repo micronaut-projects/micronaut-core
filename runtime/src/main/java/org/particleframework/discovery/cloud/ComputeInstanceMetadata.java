@@ -43,5 +43,8 @@ public interface ComputeInstanceMetadata {
 
     public String getImageId();
 
+    public String publicHostname();
+
+
 
 }

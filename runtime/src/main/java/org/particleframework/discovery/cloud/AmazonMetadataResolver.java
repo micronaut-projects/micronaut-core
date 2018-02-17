@@ -3,10 +3,12 @@ package org.particleframework.discovery.cloud;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.context.annotation.Value;
 import org.particleframework.context.env.ComputePlatform;
 import org.particleframework.context.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.net.www.protocol.file.FileURLConnection;
 
 import javax.inject.Singleton;
 import java.io.BufferedReader;
@@ -14,6 +16,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,12 +27,18 @@ import java.util.Optional;
 public class AmazonMetadataResolver implements MetadataResolver {
     private static final Logger LOG  = LoggerFactory.getLogger(AmazonMetadataResolver.class);
 
+    @Value("particle.autodiscovery.ec2.instanceMetadata.doc.url:'http://169.254.169.254/latest/dynamic/instance-identity/document'")
+    String ec2InstanceIdentityDocURL;
+
+    @Value("particle.autodiscover.ec2.instanceMetadata.url:'http://169.254.169.254/latest/meta-data/'")
+    String ec2InstanceMetadataURL;
+
     @Override
     public Optional<? extends ComputeInstanceMetadata> resolve(Environment environment) {
         AmazonEC2InstanceMetadata ec2InstanceMetadata = new AmazonEC2InstanceMetadata();
         String result = "";
         try {
-            result = readEc2MetadataUrl(new URL("http://localhost/latest/dynamic/instance-identity/document"),5000,5000);
+            result = readEc2MetadataUrl(new URL(ec2InstanceIdentityDocURL),5000,5000);
             ObjectMapper mapper = new ObjectMapper();
             JsonNode metadataJson = mapper.readTree(result);
             if (metadataJson != null) {
@@ -41,14 +52,14 @@ public class AmazonMetadataResolver implements MetadataResolver {
                 ec2InstanceMetadata.computePlatform = ComputePlatform.AMAZON_EC2;
             }
             try {
-                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.localHostname.name),1000,5000);
+                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+EC2MetadataKeys.localHostname.name),1000,5000);
             } catch (IOException e) {
-                LOG.error("Error getting local hostname from url:"+EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.localHostname.name,e);
+                LOG.error("Error getting local hostname from url:"+ec2InstanceMetadataURL+EC2MetadataKeys.localHostname.name,e);
             }
             try {
-                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.publicHostname.name),1000,5000);
+                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+EC2MetadataKeys.publicHostname.name),1000,5000);
             } catch (IOException e) {
-                LOG.error("error getting public host name from:"+EC2MetadataKeys.AWS_METADATA_URL+EC2MetadataKeys.publicHostname.name,e);
+                LOG.error("error getting public host name from:"+ec2InstanceMetadataURL+EC2MetadataKeys.publicHostname.name,e);
             }
             ec2InstanceMetadata.metadata = mapper.convertValue(ec2InstanceMetadata, Map.class);
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
@@ -59,21 +70,39 @@ public class AmazonMetadataResolver implements MetadataResolver {
     }
 
     String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        HttpURLConnection uc = (HttpURLConnection) url.openConnection();
-        uc.setConnectTimeout(connectionTimeoutMs);
-        uc.setReadTimeout(readTimeoutMs);
-        uc.setRequestMethod("GET");
-        uc.setDoOutput(true);
-        int responseCode = uc.getResponseCode();
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(uc.getInputStream()));
-        String inputLine;
+
+        URLConnection urlConnection = url.openConnection();
+
         StringBuffer response = new StringBuffer();
 
-        while ((inputLine = in.readLine()) != null) {
-            response.append(inputLine);
+        if (urlConnection instanceof FileURLConnection) {
+
+            FileURLConnection fu = (FileURLConnection)urlConnection;
+            fu.connect();
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(fu.getInputStream()));
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+
+        } else {
+            HttpURLConnection uc = (HttpURLConnection) urlConnection;
+
+            uc.setConnectTimeout(connectionTimeoutMs);
+            uc.setReadTimeout(readTimeoutMs);
+            uc.setRequestMethod("GET");
+            uc.setDoOutput(true);
+            int responseCode = uc.getResponseCode();
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(uc.getInputStream()));
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
         }
-        in.close();
         return response.toString();
     }
 
