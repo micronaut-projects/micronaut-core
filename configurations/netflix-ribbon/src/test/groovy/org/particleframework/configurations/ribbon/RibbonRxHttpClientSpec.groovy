@@ -98,29 +98,32 @@ class RibbonRxHttpClientSpec extends Specification {
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
         EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
 
-        // the client
-        ApplicationContext context = ApplicationContext.run([
-                'consul.client.host': consulServer.host,
-                'consul.client.port': consulServer.port,
-                'ribbon.VipAddress': 'test',
-                'ribbon.clients.messageService.VipAddress': 'bar'
-        ])
-        MessageService messageClient = context.getBean(MessageService)
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
         expect: "Different servers are called for each invocation of getMessage()"
-        context.containsBean(RibbonRxHttpClient)
-        messageClient.client instanceof RibbonRxHttpClient
-        messageClient.client.loadBalancer.isPresent()
-        ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig
-        ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'bar'
-        messageClient.getMessage().startsWith("Server ")
-        messageClient.getMessage() != messageClient.getMessage()
+        conditions.eventually {
+            // the client
+            ApplicationContext context = ApplicationContext.run([
+                    'consul.client.host': consulServer.host,
+                    'consul.client.port': consulServer.port,
+                    'ribbon.VipAddress': 'test',
+                    'ribbon.clients.messageService.VipAddress': 'bar'
+            ])
+            MessageService messageClient = context.getBean(MessageService)
+
+            context.containsBean(RibbonRxHttpClient)
+            messageClient.client instanceof RibbonRxHttpClient
+            messageClient.client.loadBalancer.isPresent()
+            ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig
+            ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'bar'
+            messageClient.getMessage().startsWith("Server ")
+            messageClient.getMessage() != messageClient.getMessage()
+        }
 
 
         cleanup:
         messageServer?.stop()
         messageServer2?.stop()
-        context?.stop()
         consulServer?.stop()
     }
 

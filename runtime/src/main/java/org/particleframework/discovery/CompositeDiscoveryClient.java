@@ -53,7 +53,7 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
     @Override
     public String getDescription() {
-        return "compositeDiscoveryClient";
+        return toString();
     }
 
     @Override
@@ -87,5 +87,10 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
         for (DiscoveryClient discoveryClient : discoveryClients) {
             discoveryClient.close();
         }
+    }
+
+    @Override
+    public String toString() {
+        return "compositeDiscoveryClient("+Arrays.stream(discoveryClients).map(DiscoveryClient::getDescription).collect(Collectors.joining(",")) +")";
     }
 }
