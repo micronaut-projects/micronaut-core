@@ -26,7 +26,7 @@ import java.util.OptionalInt;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("particle.session")
+@ConfigurationProperties(SessionSettings.PREFIX)
 public class SessionConfiguration {
 
     private Duration maxInactiveInterval = Duration.ofMinutes(30);

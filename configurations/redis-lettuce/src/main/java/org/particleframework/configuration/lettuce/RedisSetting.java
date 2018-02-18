@@ -25,10 +25,24 @@ public interface RedisSetting {
      * Prefix used for all settings
      */
     String PREFIX = "redis";
+    /**
+     * The URI to the Redis server
+     */
     String REDIS_URI = PREFIX + ".uri";
+    /**
+     * The URIs to the Redis servers for cluster config
+     */
     String REDIS_URIS = PREFIX + ".uris";
-    String REDIS_TYPE = PREFIX + ".type";
+    /**
+     * The named redis servers
+     */
     String REDIS_SERVERS = PREFIX + ".servers";
+    /**
+     * Embedded Redis configuration
+     */
     String REDIS_EMBEDDED = PREFIX + ".embedded";
+    /**
+     * Configured Redis caches
+     */
     String REDIS_CACHES = PREFIX + ".caches";
 }

@@ -22,13 +22,15 @@ import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import org.particleframework.context.annotation.*;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.util.ArrayUtils;
+import org.particleframework.core.util.CollectionUtils;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Allows connecting to a Redis cluster via the the {@code "particle.redis.uris"} setting
+ * Allows connecting to a Redis cluster via the the {@code "redis.uris"} setting
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,11 +43,12 @@ public class DefaultRedisClusterClientFactory {
     @Bean(preDestroy = "shutdown")
     @Singleton
     @Primary
-    public RedisClusterClient redisClient(@Value("${particle.redis.uris}") String...uris) {
-        if(ArrayUtils.isEmpty(uris)) {
+    public RedisClusterClient redisClient(@Primary AbstractRedisConfiguration config) {
+        List<RedisURI> uris = config.getUris();
+        if(CollectionUtils.isEmpty(uris)) {
             throw new ConfigurationException("Redis URIs must be specified");
         }
-        return RedisClusterClient.create(Arrays.stream(uris).map(RedisURI::create).collect(Collectors.toList()));
+        return RedisClusterClient.create(uris);
     }
 
     @Bean(preDestroy = "close")
