@@ -16,6 +16,7 @@
 package org.particleframework.configuration.lettuce.session;
 
 import io.lettuce.core.RedisURI;
+import org.particleframework.configuration.lettuce.RedisSetting;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
@@ -34,7 +35,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@ConfigurationProperties("redis")
+@ConfigurationProperties(RedisSetting.PREFIX)
 public class RedisHttpSessionConfiguration extends HttpSessionConfiguration implements Toggleable{
 
     private WriteMode writeMode = WriteMode.BATCH;
