@@ -13,32 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.pets;
+package example.offers.client.v1;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import example.api.v1.PetType;
-import org.bson.codecs.pojo.annotations.BsonCreator;
-import org.bson.codecs.pojo.annotations.BsonProperty;
-import example.api.v1.Pet;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-public class PetEntity extends Pet {
-    @BsonCreator
+public class Pet extends example.api.v1.Pet {
     @JsonCreator
-    public PetEntity(
-            @JsonProperty("vendor")
-            @BsonProperty("vendor") String vendor,
-            @JsonProperty("name")
-            @BsonProperty("name") String name) {
+    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name)  {
         super(vendor, name);
     }
 
-    @Override
-    public PetEntity type(PetType type) {
-        return (PetEntity) super.type(type);
+    public String key() {
+        return getVendor() + ":" + getName();
     }
 }

@@ -61,7 +61,7 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
 
                 // if we have arrived to this point something has gone wrong streaming the response the client
                 // so we just queue an internal server error response to return to the client
-                context.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
+                context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
                        .addListener(ChannelFutureListener.CLOSE);
             }
         } else if (!HttpUtil.isKeepAlive(request) || response.status().code() >= 300) {

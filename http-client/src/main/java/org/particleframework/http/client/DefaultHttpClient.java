@@ -73,6 +73,7 @@ import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.codec.JsonStreamMediaTypeCodec;
 import org.particleframework.jackson.parser.JacksonProcessor;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -850,8 +851,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
         ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(objectMapper), new JsonStreamMediaTypeCodec(objectMapper)
+                new JsonMediaTypeCodec(objectMapper, applicationConfiguration), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration)
         );
     }
 

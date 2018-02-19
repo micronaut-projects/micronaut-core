@@ -48,6 +48,7 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -421,7 +422,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         objectMapper.configure(feature, false);
                     }
 
-                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper)));
+                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper, beanContext.getBean(ApplicationConfiguration.class))));
                 }
             }
             return new ClientRegistration(client, contextPath);

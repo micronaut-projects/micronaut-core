@@ -18,6 +18,7 @@ package example.pets;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.mongodb.reactivestreams.client.Success;
+import example.api.v1.PetType;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Consumer;
@@ -57,8 +58,8 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
         Flowable.fromPublisher(collection.drop())
               .flatMap( success -> collection.insertMany(Arrays.asList(
-                      new PetEntity("Fred", "Dino"),
-                      new PetEntity("Babe", "Arthur")
+                      new PetEntity("Fred", "Dino").type(PetType.DINOSAUR),
+                      new PetEntity("Arthur", "Babe").type(PetType.PIG)
               ))).subscribe(success -> {}, throwable -> {
                   if(LOG.isErrorEnabled()) {
                       LOG.error("Error saving data: {}", throwable.getMessage());

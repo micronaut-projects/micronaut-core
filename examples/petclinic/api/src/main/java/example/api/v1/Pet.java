@@ -23,13 +23,16 @@ import javax.validation.constraints.NotBlank;
  */
 public class Pet {
 
-    private final String name;
+    private String name;
     protected PetType type = PetType.DOG;
-    private final String vendor;
+    private String vendor;
 
     public Pet(String vendor, String name) {
         this.vendor = vendor;
         this.name = name;
+    }
+
+    Pet() {
     }
 
     @NotBlank
@@ -46,10 +49,19 @@ public class Pet {
         return type;
     }
 
-    public void setType(PetType type) {
+    public Pet type(PetType type) {
         if(type != null) {
             this.type = type;
         }
+        return this;
+    }
+
+    void setName(String name) {
+        this.name = name;
+    }
+
+    void setVendor(String vendor) {
+        this.vendor = vendor;
     }
 
     @Override

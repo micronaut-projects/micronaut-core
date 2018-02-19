@@ -15,6 +15,7 @@
  */
 package example.api.v1;
 
+import io.reactivex.Maybe;
 import io.reactivex.Single;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
@@ -36,6 +37,9 @@ public interface PetOperations<T extends Pet> {
 
     @Get("/vendor/{name}")
     Single<List<T>> byVendor(String name);
+
+    @Get("/vendor/{vendor}/{name}")
+    Maybe<T> find(String vendor, String name);
 
     @Post("/")
     Single<T> save(@Valid @Body T pet);
