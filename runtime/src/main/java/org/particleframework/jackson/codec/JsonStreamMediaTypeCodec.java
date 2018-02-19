@@ -17,6 +17,7 @@ package org.particleframework.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.http.MediaType;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import javax.inject.Singleton;
 
@@ -28,8 +29,8 @@ import javax.inject.Singleton;
  */
 @Singleton
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
-    public JsonStreamMediaTypeCodec(ObjectMapper objectMapper) {
-        super(objectMapper);
+    public JsonStreamMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
+        super(objectMapper, applicationConfiguration);
     }
 
     @Override

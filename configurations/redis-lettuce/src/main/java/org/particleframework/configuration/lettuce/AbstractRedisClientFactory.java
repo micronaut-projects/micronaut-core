@@ -29,16 +29,32 @@ import java.util.Optional;
  * Abstract version of the a factory class for creating Redis clients
  */
 public abstract class AbstractRedisClientFactory {
+    /**
+     * Creates the {@link RedisClient} from the configuration
+     *
+     * @param config The configuration
+     * @return The {@link RedisClient}
+     */
     public RedisClient redisClient(AbstractRedisConfiguration config) {
         Optional<RedisURI> uri = config.getUri();
         return uri.map(RedisClient::create)
                   .orElseGet(() -> RedisClient.create(config));
     }
 
+    /**
+     * Creates the {@link StatefulRedisConnection} from the {@link RedisClient}
+     * @param redisClient The {@link RedisClient}
+     * @return The {@link StatefulRedisConnection}
+     */
     public StatefulRedisConnection<String, String> redisConnection(RedisClient redisClient) {
         return redisClient.connect();
     }
 
+    /**
+     * Creates the {@link StatefulRedisPubSubConnection} from the {@link RedisClient}
+     * @param redisClient The {@link RedisClient}
+     * @return The {@link StatefulRedisPubSubConnection}
+     */
     public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(RedisClient redisClient) {
         return redisClient.connectPubSub();
     }

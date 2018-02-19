@@ -18,6 +18,7 @@ package example.storefront.client.v1.fallback
 import example.api.v1.PetOperations
 import example.storefront.client.v1.Pet
 import groovy.transform.CompileStatic
+import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.client.Fallback
@@ -39,6 +40,11 @@ class PetClientFallback implements PetOperations<Pet> {
     @Override
     Single<List<Pet>> byVendor(String name) {
         return list()
+    }
+
+    @Override
+    Maybe<Pet> find(String vendor, String name) {
+        return Maybe.empty()
     }
 
     @Override

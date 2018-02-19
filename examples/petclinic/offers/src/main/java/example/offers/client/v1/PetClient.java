@@ -13,23 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.condition;
+package example.offers.client.v1;
 
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.discovery.consul.ConsulConfiguration;
-
-import java.lang.annotation.*;
+import io.reactivex.Maybe;
+import org.particleframework.http.annotation.Get;
+import org.particleframework.http.client.Client;
 
 /**
- * Meta annotation for Consul requirements
- *
  * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = ConsulConfiguration.PREFIX)
-@Requires(property = ConsulConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
-public @interface RequiresConsul {
+@Client(id = "pets", path = "/v1/pets")
+public interface PetClient  {
+
+    @Get("/vendor/{vendor}/{name}")
+    Maybe<Pet> find(String vendor, String name);
 }

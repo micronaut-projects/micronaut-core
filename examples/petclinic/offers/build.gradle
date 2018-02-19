@@ -3,7 +3,7 @@ mainClassName = "example.offers.Application"
 apply plugin: 'groovy'
 
 dependencies {
-    compileOnly "org.particleframework:inject-groovy:${projectVersion}"
+    compileOnly "org.particleframework:inject-java:${projectVersion}"
 
     compile project(":api")
     compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
@@ -15,9 +15,18 @@ dependencies {
 
     compile "org.particleframework:runtime:${projectVersion}"
 
+    runtime "org.yaml:snakeyaml:$yamlVersion"
+
     testCompile "junit:junit:4.12"
-    testCompile "org.particleframework:inject-java:${projectVersion}"
+    testCompile "org.particleframework:inject-groovy:${projectVersion}"
     testCompile "org.particleframework:http-client:${projectVersion}"
+
+    testCompile "org.codehaus.groovy:groovy:$groovyVersion"
+    testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
+        exclude module:'groovy-all'
+    }
+    
+    testRuntime "com.github.kstyrc:embedded-redis:0.6"
 }
 shadowJar {
     mergeServiceFiles()
