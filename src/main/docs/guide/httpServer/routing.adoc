@@ -1,7 +1,6 @@
 The link:{api}/org/particleframework/http/annotation/Controller.html[@Controller] annotation used in the previous section is one of link:{api}/org/particleframework/web/router/annotation/package-summary.html[several annotations] that allow you to control the construction of HTTP routes.
 
-
-=== URI Paths and Variables
+=== URI Paths
 
 In the previous example a value of `/hello` was specified as the path to the controller. If no value is specified to the `@Controller` action then the URI is formulated from the class name.
 
@@ -32,37 +31,47 @@ The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc65
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 
+=== URI Variables
+
 URI variables can be referenced via method arguments. For example:
 
 .URI Variables Example
 [source,java]
 ----
-include::{testsuite}/server/routes/MessageController.java[tags=imports, indent=0]
+include::{testsuite}/server/routes/IssuesController.java[tags=imports, indent=0]
 
-include::{testsuite}/server/routes/MessageController.java[tags=class, indent=0]
+include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
 ----
 
 <1> The `@Controller` annotation is specified without an argument resulting in a base URI of `/message`
 <2> The link:{api}/org/particleframework/web/router/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/org/particleframework/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `name`
 <3> The value of the URI variable is referenced in the implementation
 
-Particle will map the URI `/message/hello/{name}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
+Particle will map the URI `/issues/issue/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
 
 .Testing URI Variables
 [source,java]
 ----
-include::{testsuite}/server/routes/MessageControllerTest.java[tags=imports, indent=0]
+include::{testsuite}/server/routes/IssuesControllerTest.java[tags=imports, indent=0]
 
 public class MessageControllerTest {
-include::{testsuite}/server/routes/MessageControllerTest.java[tags=setup, indent=4]
+include::{testsuite}/server/routes/IssuesControllerTest.java[tags=setup, indent=4]
 
-include::{testsuite}/server/routes/MessageControllerTest.java[tags=test, indent=4]
+include::{testsuite}/server/routes/IssuesControllerTest.java[tags=test, indent=4]
 }
 ----
 
 <1> For JUnit you can write methods to start and stop the server for the scope of the test
 <2> The tests sends a request to the URI `/message/hello/John`
 <3> And then asserts the response is "Hello John!"
+
+If you invoke the previous endpoint without the required URI variable or with an invalid type, Particle responds with the appropriate HTTP failure codes as illustrated in the next Spock test.
+
+.Testing Missing URI Variables
+[source,java]
+----
+include::{testsuite}/server/routes/IssuesControllerSpec.groovy[indent=0]
+----
 
 === Routing Annotations
 
