@@ -1,5 +1,7 @@
 mainClassName = "example.mail.Application"
 
+apply plugin: 'groovy'
+
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
 
@@ -11,9 +13,8 @@ dependencies {
 
     compile "org.particleframework.configuration:mongo-reactive:${projectVersion}"
 
-    compile "org.particleframework:runtime:${projectVersion}"
-
     testCompile "junit:junit:4.12"
+
     testCompile "org.particleframework:inject-java:${projectVersion}"
     testCompile "org.particleframework:http-client:${projectVersion}"
     testRuntime "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
