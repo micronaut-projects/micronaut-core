@@ -9,6 +9,7 @@ import groovy.xml.MarkupBuilder
 import io.reactivex.Single
 import org.particleframework.context.annotation.Value
 
+import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
@@ -105,19 +106,28 @@ class HtmlRenderImpl implements HtmlRenderer {
         StringWriter writer = new StringWriter()
         MarkupBuilder html = new MarkupBuilder(writer)
         html.img(src: petViewModel.image, alt: '', class: 'img-thumbnail')
+        writer.toString()
+    }
+
+
+    @Override
+    @CompileDynamic
+    String renderRequestInfoForm(Long id) {
+        StringWriter writer = new StringWriter()
+        MarkupBuilder html = new MarkupBuilder(writer)
         html.div(class: "clearfix") {
-            div(class:"jumbotron") {
+            div(class: "jumbotron") {
                 p {
                     b('Request Info about this PET')
                 }
-                form(method: 'POST', action:"/pet/requestInfo") {
+                form(method: 'POST', action: "/pet/requestInfo") {
                     div(class: "form-group") {
-                        input(type: "hidden", name: "id", value: "${petViewModel.id}")
+                        input(type: "hidden", name: "id", value: "${id}")
                         label(for: "inputEmail", 'Email address')
-                        input(type: "email", class: "form-control", id:"inputEmail", ('aria-describedby'): 'emailHelp', placeholder: "Enter email", name: 'email')
-                        small(id:"emailHelp", class: "form-text text-muted", "We'll never share your email with anyone else.")
+                        input(type: "email", class: "form-control", id: "inputEmail", ('aria-describedby'): 'emailHelp', placeholder: "Enter email", name: 'email')
+                        small(id: "emailHelp", class: "form-text text-muted", "We'll never share your email with anyone else.")
                     }
-                    button(type: "submit", class:"btn btn-primary", 'Send me info')
+                    button(type: "submit", class: "btn btn-primary", 'Send me info')
                 }
             }
         }
