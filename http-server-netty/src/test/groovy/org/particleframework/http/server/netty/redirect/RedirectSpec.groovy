@@ -47,6 +47,16 @@ class RedirectSpec extends Specification {
         !response.header(HttpHeaders.CONTENT_TYPE)
     }
 
+    void 'test redirect'() {
+        when:
+        HttpResponse response = httpClient.toBlocking().exchange('/redirect/regular')
+
+        then:
+        response.status == HttpStatus.MOVED_PERMANENTLY
+        response.header(HttpHeaders.LOCATION)
+        !response.header(HttpHeaders.CONTENT_TYPE)
+    }
+
     @Controller("/redirect")
     static class RedirectController {
 
@@ -55,6 +65,10 @@ class RedirectSpec extends Specification {
             HttpResponse.permanentRedirect(URI.create('/redirected'))
         }
 
+        @Get("/regular")
+        HttpResponse regular() {
+            HttpResponse.redirect(URI.create('/redirected'))
+        }
         @Get("/temporary")
         HttpResponse temporary() {
             HttpResponse.temporaryRedirect(URI.create('/redirected'))
