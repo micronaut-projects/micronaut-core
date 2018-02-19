@@ -6,27 +6,7 @@ The following features are a TODO list of things to do on Particle before launch
 
 ### Core Features
 
-#### Support for @Nullable as an alternative to Optional
 
-Right now we have to do this every time a dependency is optional for a constructor
-
-```
-class Foo {
-    Foo(Optional<Bar> bar) {
-        ...
-    }
-}
-```
-
-Would be nice to also allow @Nullable:
-
-```
-class Foo {
-    Foo(@Nullable Bar bar) {
-        ...
-    }
-}
-```
 #### @DefaultScope annotation
 
 We need a meta annotation to allow specifying the default scope to fallback to if no scope is defined
