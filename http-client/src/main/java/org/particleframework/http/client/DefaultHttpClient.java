@@ -744,6 +744,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
                 HttpResponseStatus status = fullResponse.status();
+                if(LOG.isTraceEnabled()) {
+                    LOG.trace("HTTP Client Response Received: {}", status );
+                    traceHeaders(fullResponse.headers());
+                    traceBody(fullResponse.content());
+                }
                 int statusCode = status.code();
                 if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
@@ -815,6 +820,22 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private void traceRequest(HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
+        traceHeaders(headers);
+        if (HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
+            FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+            ByteBuf content = fullHttpRequest.content();
+            traceBody(content);
+        }
+    }
+
+    private void traceBody(ByteBuf content) {
+        LOG.trace("Body");
+        LOG.trace("----");
+        LOG.trace(content.toString(defaultCharset));
+        LOG.trace("----");
+    }
+
+    private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
@@ -823,13 +844,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 }
             } else if (!all.isEmpty()) {
                 LOG.trace("{}: {}", name, all.get(0));
-            }
-            if (HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
-                FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
-                LOG.trace("Body");
-                LOG.trace("----");
-                LOG.trace(fullHttpRequest.content().toString(defaultCharset));
-                LOG.trace("----");
             }
         }
     }
