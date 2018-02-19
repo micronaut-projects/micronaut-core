@@ -37,7 +37,7 @@ class TestPetClientFallback implements PetClient{
     }
 
     @Override
-    Maybe<Pet> find(String name, String vendor) {
+    Maybe<Pet> find(String vendor, String name) {
         Pet pet = pets.get("$vendor:$name".toString())
         if(pet != null) {
             return Maybe.just(pet)

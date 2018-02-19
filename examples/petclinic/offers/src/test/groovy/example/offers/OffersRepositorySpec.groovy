@@ -66,8 +66,8 @@ class OffersRepositorySpec extends Specification {
 
         when:"A valid offer is saved"
         Offer offer = offersRepository.save(
-                pet.name,
                 pet.vendor,
+                pet.name,
                 100.0,
                 Duration.of(1, ChronoUnit.HOURS),
                 "my offer"
