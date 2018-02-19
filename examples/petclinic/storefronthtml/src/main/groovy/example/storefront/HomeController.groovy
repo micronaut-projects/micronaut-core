@@ -53,6 +53,9 @@ class HomeController {
     @Inject
     PetHtmlRenderer petHtmlRenderer
 
+    @Inject
+    MailClient mailClient
+
     @Produces(MediaType.TEXT_HTML)
     @Get('/')
     HttpResponse<Single<String>> index(@CookieValue("micronautUUId") Optional<String> micronautUUIdCookie) {
@@ -77,6 +80,7 @@ class HomeController {
     @Produces(MediaType.TEXT_HTML)
     @Post(uri= '/pet/requestInfo', consumes=MediaType.APPLICATION_FORM_URLENCODED)
     HttpResponse requestInfo(String email, Long id) {
+        mailClient.send(email)
         HttpResponse.permanentRedirect(URI.create("/pets/${id}"))
     }
 

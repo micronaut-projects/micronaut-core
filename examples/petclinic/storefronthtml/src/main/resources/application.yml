@@ -1,4 +1,6 @@
 particle:
+    application:
+        name: storefronthtml
     server:
         port: 8080
 router:
@@ -13,3 +15,9 @@ petstore:
         template: /index.html
     cookie:
         name: micronautUuid
+
+consul:
+    client:
+        registration:
+            enabled: true
+        defaultZone: '${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}'
