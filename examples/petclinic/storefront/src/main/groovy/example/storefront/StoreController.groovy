@@ -15,19 +15,38 @@
  */
 package example.storefront
 
+import example.api.v1.Offer
 import groovy.transform.CompileStatic
+import io.reactivex.Flowable
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.client.Client
+import org.particleframework.http.client.RxStreamingHttpClient
+import org.particleframework.http.sse.Event
 
 import javax.inject.Singleton
 
 /**
  * @author graemerocher
  * @since 1.0
- */
+*/
 @Singleton
 @Controller("/")
-@CompileStatic
 class StoreController {
-    
-    
+
+    private final RxStreamingHttpClient httpClient
+
+    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient) {
+        this.httpClient = httpClient
+    }
+
+    @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
+    Flowable<Event<Offer>> offers() {
+        httpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
+            Event.of(offer)
+        })
+    }
+
 }

@@ -84,19 +84,26 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         }
         String[] value = annotation.value();
         if(ArrayUtils.isEmpty(value) || StringUtils.isEmpty(value[0])) {
-            throw new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client");
+            String serviceId = annotation.id();
+            if(StringUtils.isEmpty(serviceId)) {
+                throw new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client");
+            }
+            else {
+                value = new String[] { serviceId };
+            }
         }
 
+        String[] finalValue = value;
         LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
                                                                         .orElseThrow(()->
-                                                                            new DependencyInjectionException(resolutionContext, argument, "Invalid service reference ["+ArrayUtils.toString((Object[]) value)+"] specified to @Client")
+                                                                            new DependencyInjectionException(resolutionContext, argument, "Invalid service reference ["+ArrayUtils.toString((Object[]) finalValue)+"] specified to @Client")
                                                                         );
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
             HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
             HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration);
             if(httpClient instanceof DefaultHttpClient) {
-                ((DefaultHttpClient)httpClient).setClientIdentifiers(value);
+                ((DefaultHttpClient)httpClient).setClientIdentifiers(finalValue);
             }
             return httpClient;
         });
