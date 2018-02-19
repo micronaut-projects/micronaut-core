@@ -55,7 +55,7 @@ public class OffersController implements OffersOperations {
         return offersRepository
                     .random()
                     .repeat()
-                    .delayElements(Duration.ofSeconds(10));
+                    .delayElements(Duration.ofSeconds(5));
     }
 
     /**
