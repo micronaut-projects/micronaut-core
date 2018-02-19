@@ -2,7 +2,7 @@ particle:
   application:
     name: offers
 redis:
-  uri: redis://localhost
+  uri: "redis://localhost:${REDIS_PORT:6379}"
 consul:
   client:
     defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
