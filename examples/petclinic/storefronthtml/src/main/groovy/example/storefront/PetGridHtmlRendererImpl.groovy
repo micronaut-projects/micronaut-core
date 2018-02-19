@@ -4,10 +4,6 @@ import example.storefront.ui.NavBar
 import example.storefront.ui.PetListViewModel
 import groovy.transform.CompileStatic
 import io.reactivex.Single
-import io.reactivex.annotations.NonNull
-import io.reactivex.functions.BiFunction
-import org.particleframework.context.annotation.Value
-
 import javax.inject.Inject
 import javax.inject.Singleton
 

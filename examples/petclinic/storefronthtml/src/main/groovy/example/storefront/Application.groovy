@@ -17,5 +17,4 @@ package example.storefront
 
 import org.particleframework.runtime.ParticleApplication
 
-
 ParticleApplication.run(getClass())

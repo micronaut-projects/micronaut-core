@@ -13,4 +13,5 @@ interface HtmlRenderer {
     Single<String> renderContainer(NavBar current, Single<String> container)
     Single<String> container(String placeHolder, String text, Single<String> container)
     String renderPet(PetViewModel petViewModel)
+    String renderRequestInfoForm(Long id)
 }
