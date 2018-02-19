@@ -98,7 +98,7 @@ public class OffersRepository implements OffersOperations {
             String description) {
 
         return Mono.from(petClient.find(
-                pet, vendor
+                vendor, pet
         ).toFlowable())
          .flatMap(petInstance -> {
              ZonedDateTime expiryDate = ZonedDateTime.now().plus(duration);
