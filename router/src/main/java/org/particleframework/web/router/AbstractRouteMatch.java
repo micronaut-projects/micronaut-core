@@ -33,6 +33,7 @@ import org.particleframework.inject.MethodExecutionHandle;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -225,7 +226,7 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
 
 
-                    if(bindingResult.isPresentAndSatisfied()) {
+                    if (bindingResult.isPresentAndSatisfied()) {
                         Object resolved = bindingResult.get();
                         if(resolved instanceof ConversionError) {
                             ConversionError conversionError = (ConversionError) resolved;
@@ -236,6 +237,9 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
                             Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
+                    }
+                    else if (bindingResult.isSatisfied() && argument.getDeclaredAnnotation(Nullable.class) != null) {
+                        argumentList.add(null);
                     }
                     else {
                         List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
@@ -306,7 +310,6 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
                 .stream()
                 .filter(arg -> !argumentNames.contains(arg.getName()))
                 .collect(Collectors.toList());
-
 
         return newFulfilled(newVariables, requiredArguments);
     }

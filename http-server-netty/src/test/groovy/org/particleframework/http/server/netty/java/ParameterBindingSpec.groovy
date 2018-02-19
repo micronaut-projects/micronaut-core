@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.server.netty.java
 
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.server.netty.AbstractParticleSpec
 import spock.lang.Unroll
@@ -43,7 +44,7 @@ class ParameterBindingSpec extends AbstractParticleSpec {
 
 
         where:
-        uri                                             | result                      | httpStatus
+        uri                                                  | result                      | httpStatus
         '/java/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         '/java/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
         '/java/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
@@ -51,9 +52,15 @@ class ParameterBindingSpec extends AbstractParticleSpec {
         '/java/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         '/java/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
         '/java/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+        '/java/parameter/nullable'                           | "Parameter Value: null"     | HttpStatus.OK
+        '/java/parameter/nullable?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+        HttpRequest.POST('/java/parameter/nullableBody', '{}')          | "Body Value: null"   | HttpStatus.OK
+        HttpRequest.POST('/java/parameter/nullableBody', '{"max": 20}') | "Body Value: 20"     | HttpStatus.OK
+        HttpRequest.POST('/java/parameter/requiresBody', '{}')          | null                 | HttpStatus.BAD_REQUEST
+        HttpRequest.POST('/java/parameter/requiresBody', '{"max": 20}') | "Body Value: 20"     | HttpStatus.OK
         '/java/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         '/java/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
-        '/java/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 2030"    | HttpStatus.OK
+        '/java/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 2030"     | HttpStatus.OK
         '/java/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         '/java/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
         '/java/parameter/optionalList?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
