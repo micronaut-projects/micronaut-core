@@ -7,6 +7,9 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
+
+import java.util.Collections;
+
 import static org.junit.Assert.*;
 
 public class MailControllerTest {
@@ -16,7 +19,9 @@ public class MailControllerTest {
 
     @BeforeClass
     public static void setupServer() {
-        server = ApplicationContext.run(EmbeddedServer.class);
+        server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap(
+                "consul.client.enabled", false
+        ));
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());
