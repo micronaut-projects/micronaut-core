@@ -299,6 +299,22 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return an {@link HttpStatus#MOVED_PERMANENTLY} response with the location of the new resource
+     *
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> redirect(URI location) {
+        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
+                new IllegalStateException("No Server implementation found on classpath")
+        );
+
+        return factory.<T>status(HttpStatus.MOVED_PERMANENTLY)
+                .headers((headers) ->
+                        headers.location(location)
+                );
+    }
+
+    /**
      * Return a response for the given status
      *
      * @param status The status
