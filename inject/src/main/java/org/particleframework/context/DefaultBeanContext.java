@@ -1311,7 +1311,7 @@ public class DefaultBeanContext implements BeanContext {
             return candidates.iterator().next();
         } else {
             BeanDefinition<T> definition = null;
-            candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredAnnotation(Secondary.class)).collect(Collectors.toList());
+            candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).collect(Collectors.toList());
             if(candidates.size() == 1) {
                 return candidates.iterator().next();
             }

@@ -26,6 +26,7 @@ import org.particleframework.core.type.Argument;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
+import org.particleframework.runtime.ApplicationConfiguration;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -44,9 +45,11 @@ import java.util.Map;
 @Singleton
 public class JsonMediaTypeCodec implements MediaTypeCodec {
     private final ObjectMapper objectMapper;
+    private final ApplicationConfiguration applicationConfiguration;
 
-    public JsonMediaTypeCodec(ObjectMapper objectMapper) {
+    public JsonMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
         this.objectMapper = objectMapper;
+        this.applicationConfiguration = applicationConfiguration;
     }
 
     /**
@@ -93,7 +96,10 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
         try {
-            if(type.hasTypeVariables()) {
+            if(CharSequence.class.isAssignableFrom(type.getType())) {
+                return (T) buffer.toString(applicationConfiguration.getDefaultCharset());
+            }
+            else if(type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
                 return objectMapper.readValue(buffer.toByteArray(), javaType);
             }
