@@ -41,6 +41,7 @@ import org.particleframework.inject.*;
 import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.qualifiers.Qualifiers;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
@@ -719,6 +720,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
+                if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                    path.pop();
+                    return null;
+                }
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, argument, e);
             }
         }
@@ -827,6 +832,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException | BeanInstantiationException e) {
+                if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                    path.pop();
+                    return null;
+                }
                 throw new DependencyInjectionException(resolutionContext, argument, e);
             }
         }
