@@ -16,10 +16,13 @@
 package org.particleframework.http.server.netty.java;
 
 import org.particleframework.http.HttpParameters;
+import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.http.annotation.Get;
+import org.particleframework.http.annotation.Post;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,6 +53,20 @@ public class ParameterController {
         return "Parameter Value: " + max.orElse(10);
     }
 
+    @Get
+    String nullable(@Nullable Integer max) {
+        return "Parameter Value: " + (max != null ? max : "null");
+    }
+
+    @Post(consumes = MediaType.APPLICATION_JSON)
+    String nullableBody(@Nullable Integer max) {
+        return "Body Value: " + (max != null ? max : "null");
+    }
+
+    @Post(consumes = MediaType.APPLICATION_JSON)
+    String requiresBody(Integer max) {
+        return "Body Value: " + (max != null ? max : "null");
+    }
 
     @Get
     String all(HttpParameters parameters) {
