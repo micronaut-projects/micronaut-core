@@ -13,23 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.consul.condition;
+package example.offers
 
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.discovery.consul.ConsulConfiguration;
+import example.offers.client.v1.Pet
+import example.offers.client.v1.PetClient
+import io.reactivex.Maybe
+import org.particleframework.http.client.Fallback
 
-import java.lang.annotation.*;
+import javax.inject.Singleton
 
 /**
- * Meta annotation for Consul requirements
- *
  * @author graemerocher
  * @since 1.0
  */
-@Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = ConsulConfiguration.PREFIX)
-@Requires(property = ConsulConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
-public @interface RequiresConsul {
+@Fallback
+@Singleton
+class TestPetClientFallback implements PetClient{
+
+    private Map<String, Pet> pets = [:]
+
+    void addPet(Pet pet) {
+        pets.put(pet.key(), pet)
+    }
+
+    @Override
+    Maybe<Pet> find(String vendor, String name) {
+        Pet pet = pets.get("$vendor:$name".toString())
+        if(pet != null) {
+            return Maybe.just(pet)
+        }
+        return Maybe.empty()
+    }
 }

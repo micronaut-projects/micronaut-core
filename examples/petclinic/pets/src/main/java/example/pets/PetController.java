@@ -15,14 +15,14 @@
  */
 package example.pets;
 
-import com.mongodb.client.model.Filters;
+import static com.mongodb.client.model.Filters.*;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import example.api.v1.Pet;
 import example.api.v1.PetOperations;
 import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import io.reactivex.Single;
-import org.particleframework.context.annotation.Value;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.validation.Validated;
 
@@ -61,8 +61,18 @@ public class PetController implements PetOperations<PetEntity> {
     public Single<List<PetEntity>> byVendor(String name) {
         return Flowable.fromPublisher(
                 getCollection()
-                    .find(Filters.eq("vendor", name))
+                    .find(eq("vendor", name))
         ).toList();
+    }
+
+    @Override
+    public Maybe<PetEntity> find(String vendor, String name) {
+        return Flowable.fromPublisher(
+                getCollection()
+                .find(and(
+                        eq("vendor", vendor),
+                        eq("name", name
+                )))).firstElement();
     }
 
     @Override

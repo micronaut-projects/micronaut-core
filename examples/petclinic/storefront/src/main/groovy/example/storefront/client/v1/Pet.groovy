@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
  * @author graemerocher
  * @since 1.0
  */
-class Pet extends example.api.v1.Pet{
+class Pet extends example.api.v1.Pet {
     @JsonCreator
     Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name) {
         super(vendor, name)
