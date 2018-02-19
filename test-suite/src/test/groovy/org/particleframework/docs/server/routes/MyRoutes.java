@@ -35,8 +35,8 @@ public class MyRoutes extends DefaultRouteBuilder { // <1>
     }
 
     @Inject
-    void messageRoutes(MessageController messageController) { // <2>
-        GET("/hello/{name}", messageController, "hello", String.class); // <3>
+    void issuesRoutes(IssuesController issuesController) { // <2>
+        GET("/show/{name}", issuesController, "issue", String.class); // <3>
     }
 }
 // end::class[]
