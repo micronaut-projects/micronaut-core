@@ -15,6 +15,7 @@
  */
 package example.storefront
 
+import example.api.v1.Email
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import io.reactivex.Single
@@ -80,10 +81,11 @@ class HomeController {
     @Produces(MediaType.TEXT_HTML)
     @Post(uri= '/pet/requestInfo', consumes=MediaType.APPLICATION_FORM_URLENCODED)
     HttpResponse requestInfo(String email, Long id) {
-        mailClient.send(email)
-        HttpResponse.permanentRedirect(URI.create("/pets/${id}"))
+        Email emailDTO = new Email()
+        emailDTO.setRecipient(email)
+        mailClient.send(emailDTO)
+        HttpResponse.redirect(URI.create("/pets/${id}"))
     }
-
 
     @Produces(MediaType.TEXT_HTML)
     @Get('/vendors')
