@@ -1,8 +1,4 @@
 particle:
-  server:
-    port: 8092
-    cors:
-      enabled: true
   application:
     name: offers
 redis:

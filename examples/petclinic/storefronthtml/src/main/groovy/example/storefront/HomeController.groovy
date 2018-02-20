@@ -16,9 +16,13 @@
 package example.storefront
 
 import example.api.v1.Email
+import example.api.v1.Offer
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import io.reactivex.Flowable
 import io.reactivex.Single
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
@@ -26,6 +30,10 @@ import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Post
 import org.particleframework.http.annotation.Produces
 import org.particleframework.http.annotation.CookieValue
+import org.particleframework.http.client.Client
+import org.particleframework.http.client.RxStreamingHttpClient
+import org.particleframework.http.sse.Event
+
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,6 +46,12 @@ import javax.inject.Singleton
 @Controller("/")
 @CompileStatic
 class HomeController {
+
+    private final RxStreamingHttpClient offersHttpClient
+
+    HomeController(@Client(id = 'offers') RxStreamingHttpClient offersHttpClient) {
+        this.offersHttpClient = offersHttpClient
+    }
 
     @Inject
     PetGridHtmlRenderer petGridHtmlRenderer
@@ -64,6 +78,14 @@ class HomeController {
             return HttpResponse.ok(homeHtmlRenderer.render())
         }
         HttpResponse.ok(homeHtmlRenderer.render()).cookie(petStoreCookieGenerator.generate())
+    }
+
+    @CompileDynamic
+    @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
+    Flowable<Event<Offer>> offers() {
+        offersHttpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
+            Event.of(offer)
+        })
     }
 
     @Produces(MediaType.TEXT_HTML)
