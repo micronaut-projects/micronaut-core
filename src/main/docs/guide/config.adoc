@@ -1,6 +1,6 @@
 Configuration in Particle takes inspiration from both Spring Boot and Grails and integrates them directly into the core IoC container.
 
-Configuration can by default be provided in either Java properties, YAML or Groovy files. The convention is to search for a file called `application.yml`, `application.properties` or `application.groovy`.
+Configuration can by default be provided in either Java properties, YAML, JSON or Groovy files. The convention is to search for a file called `application.yml`, `application.properties`, `application.json` or `application.groovy`.
 
 In addition, Particle will search for the system properties and environment variables for configuration allow the ability to conveniently override settings at the system property or environment variable level.
 
