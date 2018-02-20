@@ -13,21 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.configuration.neo4j.bolt;
+package org.particleframework.configuration.neo4j.bolt
+
+import org.neo4j.driver.v1.Driver
+import org.particleframework.context.ApplicationContext
+import spock.lang.Specification
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-public interface Neo4jBoltSettings {
-    String PREFIX = "neo4j";
-    /**
-     * Default Neo4j URI
-     */
-    String DEFAULT_URI = "bolt://localhost:7687";
-    /**
-     * The default embedded data location
-     */
-    String DEFAULT_LOCATION = "data/neo4j";
+class Neo4jEmbeddedServerSpec extends Specification{
 
+    void "test neo4j embedded"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run('neo4j.uri':Neo4jBoltSettings.DEFAULT_URI)
+
+        when:
+        Driver driver = applicationContext.getBean(Driver)
+
+        then:
+        driver.session().run('MATCH (n) RETURN n').size() == 0
+
+        cleanup:
+        applicationContext.stop()
+    }
 }
