@@ -23,21 +23,11 @@ class MailClient {
     RxHttpClient client
 
     Single<HealthStatus> health() {
-        client.exchange(
+        def downStatus = new HealthStatus("DOWN")
+        client.retrieve(
                 HttpRequest.GET("/health"),
-                String
-        ).singleOrError().map { HttpResponse<String> rsp ->
-
-            if ( rsp.status.code == 200 ) {
-                String status = parseStatus(rsp.body())
-                if ( !status ) {
-                    return new HealthStatus('DOWN')
-                }
-                return new HealthStatus(status)
-            } else {
-                return new HealthStatus('DOWN')
-            }
-        }
+                HealthStatus
+        ).first(downStatus).onErrorReturn({ downStatus })
 
     }
 
