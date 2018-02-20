@@ -50,6 +50,7 @@ import java.util.stream.Stream;
  * <p>The default implementation of the {@link Environment} interface. Configures a named environment.</p>
  *
  * @author Graeme Rocher
+ * @author rvanderwerf
  * @since 1.0
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {

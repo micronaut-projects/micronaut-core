@@ -5,6 +5,10 @@ import org.particleframework.context.env.ComputePlatform;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 public interface ComputeInstanceMetadata {
 
     public Map<String,String> getMetadata();

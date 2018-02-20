@@ -7,6 +7,11 @@ import spock.lang.Specification
 import java.nio.file.Path
 import java.nio.file.Paths
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
+
 class GoogleComputeInstanceResolverSpec extends Specification {
 
 
