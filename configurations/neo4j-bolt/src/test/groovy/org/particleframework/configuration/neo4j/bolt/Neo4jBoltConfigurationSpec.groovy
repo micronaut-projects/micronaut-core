@@ -25,12 +25,18 @@ import spock.lang.Specification
 class Neo4jBoltConfigurationSpec extends Specification {
 
     void "test neo4j configuration"() {
-        given:
-        ApplicationContext applicationContext = ApplicationContext.run('neo4j.uri':'bolt://someserver:7687')
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'neo4j.uri':'bolt://someserver:7687',
+                'neo4j.embedded.enabled':false
+        )
 
-        expect:
+        then:
         applicationContext.containsBean(Neo4jBoltConfiguration)
         applicationContext.getBean(Neo4jBoltConfiguration).uris.size() == 1
         applicationContext.getBean(Neo4jBoltConfiguration).uris[0] == URI.create('bolt://someserver:7687')
+
+        cleanup:
+        applicationContext?.stop()
     }
 }

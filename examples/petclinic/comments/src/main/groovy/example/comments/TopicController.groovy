@@ -15,25 +15,24 @@
  */
 package example.comments
 
-import grails.gorm.services.Service
-import grails.neo4j.services.Cypher
+import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Get
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Service(Topic)
-interface TopicRepistory {
+@Controller('/${comments.api.version}/comments')
+class TopicController {
 
-    /**
-     * Finds all of the comments for the given topic name
-     * 
-     * @param title The topic title
-     * @return The comments
-     */
-    @Cypher("""MATCH ${Topic t}-[:COMMENTS]->${Comment c} 
-               WHERE ${t.title} = $title 
-               RETURN $c 
-               ORDER BY $c.dateCreated""")
-    List<Comment> findComments(String title)
+    final TopicRepistory topicRepistory
+
+    TopicController(TopicRepistory topicRepistory) {
+        this.topicRepistory = topicRepistory
+    }
+
+    @Get('/${vendor}')
+    List<Comment> listComments(String vendor) {
+        topicRepistory.findComments(vendor)
+    }
 }

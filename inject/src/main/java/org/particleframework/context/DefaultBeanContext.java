@@ -1582,20 +1582,19 @@ public class DefaultBeanContext implements BeanContext {
                     }
                     beans = Collections.unmodifiableCollection(beansOfTypeList);
                 } else {
-                    if (LOG.isDebugEnabled()) {
+
+                    if (LOG.isDebugEnabled() && beansOfTypeList.isEmpty()) {
                         LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                     }
-                    beans = Collections.emptyList();
+                    allCandidatesAreSingleton = true;
+                    beans = Collections.unmodifiableCollection(beansOfTypeList);
                 }
             } else if (!candidates.isEmpty()) {
                 boolean hasNonSingletonCandidate = false;
                 int candidateCount = candidates.size();
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream)
-                        .filter(c -> {
-
-                            return !processedDefinitions.contains(c);
-                        });
+                        .filter(c -> !processedDefinitions.contains(c));
 
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
                 for (BeanDefinition<T> candidate : candidateList) {

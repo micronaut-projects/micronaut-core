@@ -16,8 +16,11 @@
 package org.particleframework.configuration.neo4j.gorm
 
 import grails.gorm.annotation.Entity
+import grails.gorm.transactions.Rollback
 import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -25,17 +28,24 @@ import spock.lang.Specification
  * @since 1.0
  */
 class Neo4jDatastoreFactorySpec extends Specification {
-    
+
+    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run('neo4j.uri': Neo4jBoltSettings.DEFAULT_URI)
+
+    @Rollback
     void "test configure GORM for Neo4j"() {
-        given:
-        ApplicationContext applicationContext = ApplicationContext.run('neo4j.uri': Neo4jBoltSettings.DEFAULT_URI)
-        
-        expect:
-        Team.count() == 0
+        when:
+        new Team(name: "United").save(flush:true)
+
+        then:
+        Team.count() == 1
+        Team.first().name == "United"
+        Team.first().dateCreated != null
+
     }
 }
 
 @Entity
 class Team {
     String name
+    Date dateCreated
 }
