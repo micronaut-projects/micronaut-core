@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.FullHttpResponse;
+import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
@@ -33,6 +34,8 @@ import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.netty.NettyHttpHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -42,10 +45,16 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
+ *
+ * Wraps a Netty {@link FullHttpResponse} for consumption by the {@link HttpClient}
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
@@ -123,7 +132,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
             return Optional.of((T) (fullResponse.content()));
         }
 
-        return (Optional<T>) convertedBodies.computeIfAbsent(type, argument -> {
+        Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
                     Optional<B> existing = getBody();
                     if (existing.isPresent()) {
                         return getBody().flatMap(b -> {
@@ -133,22 +142,31 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                             }
                             return ConversionService.SHARED.convert(b, ConversionContext.of(type));
                         });
+                    } else {
+                        ByteBuf content = fullResponse.content();
+                        return convertByteBuf(content, type);
                     }
-                    ByteBuf content = fullResponse.content();
-                    return convertByteBuf(content, type);
                 }
 
         );
+        if(LOG.isTraceEnabled() && !result.isPresent()) {
+            LOG.trace("Unable to convert response body to target type {}", type.getType());
+        }
+        return result;
     }
 
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
+            if(LOG.isTraceEnabled()) {
+                LOG.trace("Full HTTP response received an empty body");
+            }
             return Optional.empty();
         }
-        if (mediaTypeCodecRegistry != null && contentType.isPresent()) {
+        boolean hasContentType = contentType.isPresent();
+        if (mediaTypeCodecRegistry != null && hasContentType) {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
-                Charset charset = getContentType().flatMap(ct -> ct.getCharset()).orElse(StandardCharsets.UTF_8);
+                Charset charset = getContentType().flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
                 return Optional.of(content.toString(charset));
             } else {
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
@@ -157,6 +175,9 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
                     return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
                 }
             }
+        }
+        else if(!hasContentType && LOG.isTraceEnabled()) {
+            LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
