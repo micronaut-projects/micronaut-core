@@ -27,7 +27,7 @@ import grails.neo4j.mapping.MappingBuilder
 class Topic implements Neo4jEntity<Topic>{
     
     String title
-    Set<Comment> comments
+    List<Comment> comments
     static hasMany = [comments:Comment]
 
     static mapping = MappingBuilder.node {

@@ -27,7 +27,10 @@ class Neo4jEmbeddedServerSpec extends Specification{
 
     void "test neo4j embedded"() {
         given:
-        ApplicationContext applicationContext = ApplicationContext.run('neo4j.uri':Neo4jBoltSettings.DEFAULT_URI)
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'neo4j.uri':Neo4jBoltSettings.DEFAULT_URI,
+                'neo4j.embedded.ephemeral':true
+        )
 
         when:
         Driver driver = applicationContext.getBean(Driver)
@@ -36,6 +39,6 @@ class Neo4jEmbeddedServerSpec extends Specification{
         driver.session().run('MATCH (n) RETURN n').size() == 0
 
         cleanup:
-        applicationContext.stop()
+        applicationContext?.stop()
     }
 }

@@ -16,7 +16,6 @@
 package example.storefront
 
 import example.api.v1.Offer
-import groovy.transform.CompileStatic
 import io.reactivex.Flowable
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType

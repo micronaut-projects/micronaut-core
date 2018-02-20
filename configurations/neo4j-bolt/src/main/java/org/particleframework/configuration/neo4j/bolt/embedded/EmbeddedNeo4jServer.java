@@ -61,8 +61,8 @@ public class EmbeddedNeo4jServer implements BeanCreatedEventListener<Neo4jBoltCo
         if(uris.size() == 1) {
             URI uri = uris.get(0);
             int port = uri.getPort();
-            if(port > -1 && SocketUtils.isTcpPortAvailable(port)) {
-                Neo4jBoltConfiguration.Neo4jEmbeddedSettings embeddedSettings = configuration.getEmbeddedSettings();
+            Neo4jBoltConfiguration.Neo4jEmbeddedSettings embeddedSettings = configuration.getEmbeddedSettings();
+            if(port > -1 && SocketUtils.isTcpPortAvailable(port) && embeddedSettings.isEnabled()) {
                 // run embedded server, since it isn't up
                 final String location = embeddedSettings.getDirectory().orElse(null);
                 final Map<String,Object> options = embeddedSettings.getOptions();

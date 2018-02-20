@@ -43,6 +43,8 @@ class TopicRepositorySpec extends Specification{
 
         then:
         topicRepistory.findComments("Some topic").size() == 2
+        topicRepistory.findComments("Some topic").first().dateCreated
+        topicRepistory.findComments("Some topic").first().poster == "Fred"
     }
 
 }
