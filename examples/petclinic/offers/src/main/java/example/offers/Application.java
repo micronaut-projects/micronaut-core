@@ -74,5 +74,30 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                             });
                         }
                 );
+
+        petClient.find("Arthur", "Babe")
+                .doOnError(throwable -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
+                    }
+                })
+                .onErrorComplete()
+                .subscribe(pet -> {
+                            Mono<Offer> savedOffer = offersRepository.save(
+                                    pet.getVendor(),
+                                    pet.getName(),
+                                    new BigDecimal("29.99"),
+                                    Duration.of(2, ChronoUnit.HOURS),
+                                    "Ping in the city!");
+                            savedOffer.subscribe((offer) -> {
+                            }, throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
+                                }
+                            });
+                        }
+                );
+
+
     }
 }
