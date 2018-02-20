@@ -22,19 +22,18 @@ class HomeHtmlRendererImpl implements HomeHtmlRenderer {
 
     @Override
     Single<String> render() {
-        // TODO replace http://localhost:8092/v1/offers with ${url}/offers
-        String homePage = '''
+        String homePage = """
 <h1>Offers</h1>
 <div id="offers">Loading ...</div>
 <script type="text/javascript">
-var source = new EventSource("http://localhost:8092/v1/offers"); 
+var source = new EventSource('${url}/offers'); 
 source.onmessage = function(event) {
     console.log(event.data);
     var data = JSON.parse(event.data);
     var html = "<table class='table'><thead><tr><th>Vendor</th><th>Name</th><th>Type</th><th>description</th><th>Price</th></tr></thead><tbody><tr><td>" +  data.pet.vendor + "</td><td>" +  data.pet.name + "</td><td>" +  data.pet.type + "</td><td>" +  data.description + "</td><td>" +  data.price +  data.currency + "</td></tr></tbody></table>";
     document.getElementById("offers").innerHTML = html;                        
 };
-</script>'''
+</script>"""
         htmlRenderer.renderContainer(NavBar.HOME, Single.just(homePage))
     }
 }

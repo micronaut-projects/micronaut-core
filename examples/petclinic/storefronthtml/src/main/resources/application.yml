@@ -3,6 +3,8 @@ particle:
         name: storefronthtml
     server:
         port: 8080
+        cors:
+            enabled: true
 router:
     static:
         resources:
