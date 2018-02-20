@@ -22,6 +22,7 @@ import org.neo4j.driver.v1.GraphDatabase;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.exceptions.ConfigurationException;
+import org.particleframework.core.util.StringUtils;
 
 import javax.inject.Singleton;
 import java.net.URI;
@@ -42,18 +43,27 @@ public class Neo4jDriverFactory {
     @Bean(preDestroy = "close")
     public Driver boltDriver(Neo4jBoltConfiguration configuration) {
         List<URI> uris = configuration.getUris();
-        Optional<AuthToken> authToken = configuration.getAuthToken();
+        Optional<AuthToken> configuredAuthToken = configuration.getAuthToken();
+        AuthToken authToken = configuredAuthToken.orElse(null);
         if(uris.size() == 1) {
+            URI uri = uris.get(0);
+            String userInfo = uri.getUserInfo();
+            if(authToken == null && StringUtils.hasText(userInfo)) {
+                String[] info = userInfo.split(":");
+                if(info.length == 2) {
+                    authToken = AuthTokens.basic(info[0], info[1]);
+                }
+            }
             return GraphDatabase.driver(
-                    uris.get(0),
-                    authToken.orElse(AuthTokens.none()),
+                    uri,
+                    authToken,
                     configuration.getConfig()
             );
         }
         else if(!uris.isEmpty()) {
             return GraphDatabase.routingDriver(
                     uris,
-                    authToken.orElse(AuthTokens.none()),
+                    authToken,
                     configuration.getConfig()
             );
         }
