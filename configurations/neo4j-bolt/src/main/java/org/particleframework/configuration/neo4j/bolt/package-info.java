@@ -13,21 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.configuration.neo4j.bolt;
-
 /**
  * @author graemerocher
  * @since 1.0
  */
-public interface Neo4jBoltSettings {
-    String PREFIX = "neo4j";
-    /**
-     * Default Neo4j URI
-     */
-    String DEFAULT_URI = "bolt://localhost:7687";
-    /**
-     * The default embedded data location
-     */
-    String DEFAULT_LOCATION = "data/neo4j";
+@Configuration
+@RequiresNeo4j
+package org.particleframework.configuration.neo4j.bolt;
 
-}
+import org.particleframework.configuration.neo4j.bolt.condition.RequiresNeo4j;
+import org.particleframework.context.annotation.Configuration;

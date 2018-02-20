@@ -23,6 +23,7 @@ import org.particleframework.configuration.neo4j.bolt.condition.RequiresNeo4j;
 import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.core.util.Toggleable;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
@@ -30,6 +31,7 @@ import javax.inject.Inject;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -39,7 +41,6 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties(Neo4jBoltSettings.PREFIX)
-@RequiresNeo4j
 public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
 
     private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
@@ -50,6 +51,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     private AuthToken authToken;
     private String username;
     private String password;
+    private Neo4jEmbeddedSettings embeddedSettings = new Neo4jEmbeddedSettings();
 
     public Neo4jBoltConfiguration() {
         config.withLogging(name -> new Logger() {
@@ -161,5 +163,80 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     @Inject
     public void setAuthToken(@Nullable AuthToken authToken) {
         this.authToken = authToken;
+    }
+
+    @Inject
+    public void setEmbeddedSettings(Neo4jEmbeddedSettings embeddedSettings) {
+        this.embeddedSettings = embeddedSettings;
+    }
+
+    public Neo4jEmbeddedSettings getEmbeddedSettings() {
+        return embeddedSettings;
+    }
+
+    @ConfigurationProperties("embedded")
+    public static class Neo4jEmbeddedSettings implements Toggleable {
+        /**
+         * Options to pass to the embedded server
+         */
+        private Map<String,Object> options = Collections.emptyMap();
+        /**
+         * The directory to store embedded data
+         */
+        private String directory;
+        /**
+         * Whether to drop existing data
+         */
+        private boolean dropData = false;
+
+        /**
+         * Whether to
+         */
+        private boolean ephemeral = false;
+
+        private boolean enabled = true;
+
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Map<String, Object> getOptions() {
+            return options;
+        }
+
+        public void setOptions(Map<String, Object> options) {
+            if(options != null) {
+                this.options = options;
+            }
+        }
+
+        public Optional<String> getDirectory() {
+            return Optional.ofNullable(directory);
+        }
+
+        public void setDirectory(String directory) {
+            this.directory = directory;
+        }
+
+        public boolean isDropData() {
+            return dropData;
+        }
+
+        public void setDropData(boolean dropData) {
+            this.dropData = dropData;
+        }
+
+        public boolean isEphemeral() {
+            return ephemeral;
+        }
+
+        public void setEphemeral(boolean ephemeral) {
+            this.ephemeral = ephemeral;
+        }
     }
 }
