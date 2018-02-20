@@ -49,6 +49,8 @@ public interface ComputeInstanceMetadata {
 
     public String publicHostname();
 
+    public boolean isCached();
+
 
 
 }

@@ -19,6 +19,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,6 +31,7 @@ import java.util.Optional;
 @Requires(env="ec2")
 public class AmazonMetadataResolver implements MetadataResolver {
     private static final Logger LOG  = LoggerFactory.getLogger(AmazonMetadataResolver.class);
+    private AmazonEC2InstanceMetadata cachedMetadata;
 
     @Value("particle.autodiscovery.ec2.instanceMetadata.doc.url:'http://169.254.169.254/latest/dynamic/instance-identity/document'")
     String ec2InstanceIdentityDocURL;
@@ -39,6 +41,10 @@ public class AmazonMetadataResolver implements MetadataResolver {
 
     @Override
     public Optional<? extends ComputeInstanceMetadata> resolve(Environment environment) {
+        if (cachedMetadata != null) {
+            cachedMetadata.cached = true;
+            return Optional.of(cachedMetadata);
+        }
         AmazonEC2InstanceMetadata ec2InstanceMetadata = new AmazonEC2InstanceMetadata();
         String result = "";
         try {
@@ -65,11 +71,33 @@ public class AmazonMetadataResolver implements MetadataResolver {
             } catch (IOException e) {
                 LOG.error("error getting public host name from:"+ec2InstanceMetadataURL+EC2MetadataKeys.publicHostname.name,e);
             }
+            // build up network info
+            try {
+                String macAddress = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+EC2MetadataKeys.mac),1000,5000);
+                NetworkInterface networkInterface = new NetworkInterface();
+                networkInterface.mac = macAddress;
+                String vpcId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+"/network/interfaces/macs/"+macAddress+"/vpc-id/"),1000,5000);
+                String subnetId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+"/network/interfaces/macs/"+macAddress+"/subnet-id/"),1000,5000);
+                networkInterface.network = subnetId;
+
+                ec2InstanceMetadata.publicIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+"/network/interfaces/macs/"+macAddress+"/public-ipv4s/"),1000,5000);
+                ec2InstanceMetadata.privateIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+"/network/interfaces/macs/"+macAddress+"/local-ipv4s/"),1000,5000);
+                networkInterface.ipv4 = ec2InstanceMetadata.privateIpV4;
+                networkInterface.id = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL+"/network/interfaces/macs/"+macAddress+"/interface-id/"),1000,5000);
+                networkInterface.gateway = vpcId;
+                ec2InstanceMetadata.interfaces = new ArrayList<NetworkInterface>();
+                ec2InstanceMetadata.interfaces.add(networkInterface);
+            } catch (IOException e) {
+                LOG.error("error getting public host name from:"+ec2InstanceMetadataURL+EC2MetadataKeys.publicHostname.name,e);
+            }
+
+
             ec2InstanceMetadata.metadata = mapper.convertValue(ec2InstanceMetadata, Map.class);
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
             LOG.error("Error reading ec2 metadata url",e);
         }
+        cachedMetadata = ec2InstanceMetadata;
         return Optional.of(ec2InstanceMetadata);
     }
 

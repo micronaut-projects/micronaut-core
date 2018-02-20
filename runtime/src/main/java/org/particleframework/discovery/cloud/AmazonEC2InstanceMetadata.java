@@ -17,7 +17,7 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     private Map<String, String> tags;
 
     //network interfaces to get ip addresses
-    private List<NetworkInterface> interfaces;
+   List<NetworkInterface> interfaces;
 
 
 
@@ -39,6 +39,8 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     String publicIpV6;
     String privateIpV4;
     String privateIpV6;
+
+    boolean cached = false;
 
 
 
@@ -136,5 +138,10 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     @Override
     public String publicHostname() {
         return publicHostname;
+    }
+
+    @Override
+    public boolean isCached() {
+        return cached;
     }
 }
