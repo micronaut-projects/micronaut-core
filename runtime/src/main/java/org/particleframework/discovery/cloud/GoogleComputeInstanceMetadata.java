@@ -42,8 +42,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String privateIpV4;
     String privateIpV6;
 
-
-
+    boolean cached = false;
 
     @Override
     public String getImageId() {
@@ -141,5 +140,10 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     @Override
     public String publicHostname() {
         return publicHostname;
+    }
+
+    @Override
+    public boolean isCached() {
+        return cached;
     }
 }

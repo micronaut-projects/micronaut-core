@@ -38,11 +38,18 @@ public class GoogleComputeMetadataResolver implements MetadataResolver {
     @Value("org.particleframework.cloud.googleComputeMetadataURL:'http://metadata.google.internal/project/v1/project/'")
     String gcProjectMetadataURL;
 
+    GoogleComputeInstanceMetadata cachedMetadata;
+
     private static final Logger LOG  = LoggerFactory.getLogger(GoogleComputeMetadataResolver.class);
 
     @Override
     public Optional<? extends ComputeInstanceMetadata> resolve(Environment environment) {
-        // not implemented yet
+
+        if (cachedMetadata != null) {
+            cachedMetadata.cached = true;
+            return Optional.of(cachedMetadata);
+        }
+
         try {
             String projectResult = readGcMetadataUrl(new URL(gcProjectMetadataURL+"?recursive=true"),5000,5000);
             String instanceResult = readGcMetadataUrl(new URL(gcMetadataURL+"?recursive=true"),5000,5000);
@@ -97,6 +104,7 @@ public class GoogleComputeMetadataResolver implements MetadataResolver {
                  });
                 instanceMetadata.interfaces = interfaces;
                 instanceMetadata.metadata = mapper.convertValue(instanceMetadata, Map.class);
+                cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);
 

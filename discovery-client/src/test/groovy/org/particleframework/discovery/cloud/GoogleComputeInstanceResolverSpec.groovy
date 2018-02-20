@@ -48,4 +48,29 @@ class GoogleComputeInstanceResolverSpec extends Specification {
     }
 
 
+    void "test metadata caching"() {
+        given:
+        Environment environment = Mock(Environment)
+
+        GoogleComputeMetadataResolver resolver = new GoogleComputeMetadataResolver()
+        Path currentRelativePath = Paths.get("");
+        String s = currentRelativePath.toAbsolutePath().toString();
+        System.out.println("Current relative path is: " + s);
+
+        resolver.gcMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/gcInstanceMetadata.json"
+        resolver.gcProjectMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/projectMetadata.json"
+        Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
+
+
+        expect:
+        computeInstanceMetadata.isPresent()
+        !computeInstanceMetadata.get().isCached()
+
+        Optional<ComputeInstanceMetadata> computeInstanceMetadata1 = resolver.resolve(environment)
+        computeInstanceMetadata1.isPresent()
+        computeInstanceMetadata1.get().isCached()
+
+    }
+
+
 }
