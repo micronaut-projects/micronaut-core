@@ -220,7 +220,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
-        return findExecutionHandle(beanType,null, method, arguments);
+        return findExecutionHandle(beanType, null, method, arguments);
     }
 
     @SuppressWarnings("unchecked")
@@ -411,12 +411,11 @@ public class DefaultBeanContext implements BeanContext {
         Objects.requireNonNull(instance, "Instance cannot be null");
 
         Collection<BeanDefinition> candidates = findBeanCandidatesForInstance(instance);
-        if(candidates.size() == 1) {
+        if (candidates.size() == 1) {
             BeanDefinition<T> beanDefinition = candidates.stream().findFirst().get();
             beanDefinition.inject(new DefaultBeanResolutionContext(this, beanDefinition), this, instance);
 
-        }
-        else if(!candidates.isEmpty()) {
+        } else if (!candidates.isEmpty()) {
             throw new BeanContextException("Multiple possible bean candidates found for injection: " + candidates);
         }
         return instance;
@@ -452,8 +451,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     protected <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, Object... args) {
-        Map<String,Object> argumentValues;
-        if(definition instanceof ParametrizedBeanFactory) {
+        Map<String, Object> argumentValues;
+        if (definition instanceof ParametrizedBeanFactory) {
             Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
             argumentValues = new LinkedHashMap<>(requiredArguments.length);
             BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -463,25 +462,23 @@ public class DefaultBeanContext implements BeanContext {
                     path.pushConstructorResolve(
                             definition, requiredArgument
                     );
-                    if(args.length > i) {
+                    if (args.length > i) {
                         Object val = args[i];
-                        argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
-                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
+                        argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                         ));
-                    }
-                    else {
+                    } else {
                         // attempt resolve from context
                         Optional<?> existingBean = findBean(resolutionContext, requiredArgument.getType(), null);
-                        argumentValues.put(requiredArgument.getName(), existingBean.orElseThrow(()->
-                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument ["+requiredArgument+"]. No bean found for type: " + requiredArgument.getType())
+                        argumentValues.put(requiredArgument.getName(), existingBean.orElseThrow(() ->
+                                new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + requiredArgument.getType())
                         ));
                     }
                 } finally {
                     path.pop();
                 }
             }
-        }
-        else {
+        } else {
             argumentValues = Collections.emptyMap();
         }
         T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
@@ -611,7 +608,7 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                     reduced.parallel()
-                            .map(ref-> ref.load(this))
+                            .map(ref -> ref.load(this))
                             .filter(candidate -> candidate.isEnabled(this))
             );
             candidates = candidateStream.collect(Collectors.toList());
@@ -666,21 +663,24 @@ public class DefaultBeanContext implements BeanContext {
     }
 
 
+    @SuppressWarnings("unchecked")
     @Override
     public void publishEvent(Object event) {
         if (event != null) {
             streamOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()))
                     .forEach(listener -> {
-                                try {
-                                    listener.onApplicationEvent(event);
-                                } catch (ClassCastException ex) {
-                                    String msg = ex.getMessage();
-                                    if (msg == null || msg.startsWith(event.getClass().getName())) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Incompatible listener for event: " + listener, ex);
+                                if (listener.supports(event)) {
+                                    try {
+                                        listener.onApplicationEvent(event);
+                                    } catch (ClassCastException ex) {
+                                        String msg = ex.getMessage();
+                                        if (msg == null || msg.startsWith(event.getClass().getName())) {
+                                            if (LOG.isDebugEnabled()) {
+                                                LOG.debug("Incompatible listener for event: " + listener, ex);
+                                            }
+                                        } else {
+                                            throw ex;
                                         }
-                                    } else {
-                                        throw ex;
                                     }
                                 }
                             }
@@ -734,7 +734,7 @@ public class DefaultBeanContext implements BeanContext {
      * Initialize the context with the given {@link org.particleframework.context.annotation.Context} scope beans
      *
      * @param contextScopeBeans The context scope beans
-     * @param processedBeans The beans that require {@link org.particleframework.context.processor.ExecutableMethodProcessor} handling
+     * @param processedBeans    The beans that require {@link org.particleframework.context.processor.ExecutableMethodProcessor} handling
      */
     protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
 
@@ -750,7 +750,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        if(!processedBeans.isEmpty()) {
+        if (!processedBeans.isEmpty()) {
 
             @SuppressWarnings("unchecked") Stream<BeanDefinitionMethodReference<?, ?>> methodStream = processedBeans
                     .parallelStream()
@@ -769,10 +769,10 @@ public class DefaultBeanContext implements BeanContext {
                     // ok continue and get all of the ExecutableMethod references
                     .flatMap(beanDefinition ->
                             beanDefinition.getExecutableMethods()
-                                          .parallelStream()
-                                          .map((Function<ExecutableMethod<?, ?>, BeanDefinitionMethodReference<?, ?>>) executableMethod ->
-                                                  BeanDefinitionMethodReference.of((BeanDefinition)beanDefinition, executableMethod)
-                                          )
+                                    .parallelStream()
+                                    .map((Function<ExecutableMethod<?, ?>, BeanDefinitionMethodReference<?, ?>>) executableMethod ->
+                                            BeanDefinitionMethodReference.of((BeanDefinition) beanDefinition, executableMethod)
+                                    )
                     );
 
             // group the method references by annotation type such that we have a map of Annotation -> MethodReference
@@ -781,20 +781,20 @@ public class DefaultBeanContext implements BeanContext {
                     .collect(
                             Collectors.groupingBy((Function<ExecutableMethod<?, ?>, Class<? extends Annotation>>) executableMethod ->
                                     executableMethod.getAnnotationTypeByStereotype(Executable.class)
-                    .orElseThrow(()->
-                new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
-            )));
+                                            .orElseThrow(() ->
+                                                    new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
+                                            )));
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
                 Class<? extends Annotation> annotationType = entry.getKey();
                 streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                         .forEach(processor -> {
-                    for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
-                        //noinspection unchecked
-                        processor.process(method.getBeanDefinition(), method);
-                    }
-                });
+                            for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
+                                //noinspection unchecked
+                                processor.process(method.getBeanDefinition(), method);
+                            }
+                        });
             }
         }
     }
@@ -803,7 +803,7 @@ public class DefaultBeanContext implements BeanContext {
      * Find bean candidates for the given type
      *
      * @param beanType The bean type
-     * @param filter A bean definition to filter out
+     * @param filter   A bean definition to filter out
      * @param <T>      The bean generic type
      * @return The candidates
      */
@@ -826,8 +826,8 @@ public class DefaultBeanContext implements BeanContext {
                     })
                     .map(ref -> (BeanDefinition<T>) ref.load(this));
 
-            if(filter != null) {
-                candidateStream= candidateStream.filter(candidate -> !candidate.equals(filter));
+            if (filter != null) {
+                candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
             }
             List<BeanDefinition<T>> candidates = candidateStream
                     .filter(candidate -> candidate.isEnabled(this))
@@ -873,10 +873,10 @@ public class DefaultBeanContext implements BeanContext {
                         .filter(candidate -> candidate.isEnabled(this))
                         .collect(Collectors.toList());
 
-                if(candidates.size() > 1) {
+                if (candidates.size() > 1) {
                     // try narrow to exact type
                     candidates = candidates.stream().filter(candidate -> candidate.getBeanType() == instance.getClass())
-                                                                             .collect(Collectors.toList());
+                            .collect(Collectors.toList());
                     return candidates;
                 }
                 if (LOG.isDebugEnabled()) {
@@ -934,18 +934,18 @@ public class DefaultBeanContext implements BeanContext {
                 if (beanFactory instanceof ParametrizedBeanFactory) {
                     ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
                     Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                    if(argumentValues == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Missing bean arguments for type: " + beanDefinition.getBeanType().getName() );
+                    if (argumentValues == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Missing bean arguments for type: " + beanDefinition.getBeanType().getName());
                     }
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
                         Object val = argumentValues.get(requiredArgument.getName());
-                        if(val == null) {
-                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument ["+requiredArgument+"].");
+                        if (val == null) {
+                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;
-                        convertedValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(()->
-                                new BeanInstantiationException(finalResolutionContext, "Invalid bean argument ["+requiredArgument+"]. Cannot convert object ["+ val +"] to required type: " + requiredArgument.getType())
+                        convertedValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                         ));
                     }
 
@@ -1063,7 +1063,7 @@ public class DefaultBeanContext implements BeanContext {
             }
 
 
-            if(resolutionContext == null) {
+            if (resolutionContext == null) {
                 resolutionContext = new DefaultBeanResolutionContext(this, definition);
             }
 
@@ -1104,10 +1104,10 @@ public class DefaultBeanContext implements BeanContext {
         boolean isProxy = definition instanceof ProxyBeanDefinition;
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
-        if(currentSegment.isPresent()) {
+        if (currentSegment.isPresent()) {
             scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, currentSegment.get().getArgument().getAnnotations()).map(Annotation::annotationType);
         }
-        if(!scope.isPresent()) {
+        if (!scope.isPresent()) {
             scope = isProxy ? Optional.empty() : definition.getScope();
         }
 
@@ -1159,8 +1159,8 @@ public class DefaultBeanContext implements BeanContext {
             if (qualifier == null || qualifier.equals(key.qualifier)) {
                 BeanRegistration reg = entry.getValue();
                 if (beanType.isInstance(reg.bean)) {
-                    if(qualifier == null && definition != null) {
-                        if(!reg.beanDefinition.equals(definition)) {
+                    if (qualifier == null && definition != null) {
+                        if (!reg.beanDefinition.equals(definition)) {
                             // different definition, so ignore
                             return null;
                         }
@@ -1312,10 +1312,9 @@ public class DefaultBeanContext implements BeanContext {
         } else {
             BeanDefinition<T> definition = null;
             candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).collect(Collectors.toList());
-            if(candidates.size() == 1) {
+            if (candidates.size() == 1) {
                 return candidates.iterator().next();
-            }
-            else {
+            } else {
                 Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType, candidates);
                 if (exactMatches.size() == 1) {
                     definition = exactMatches.iterator().next();
@@ -1441,7 +1440,7 @@ public class DefaultBeanContext implements BeanContext {
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
-            if(beanDefinitionReference.requiresMethodProcessing()) {
+            if (beanDefinitionReference.requiresMethodProcessing()) {
                 processedBeans.add(beanDefinitionReference);
             }
         }
@@ -1482,7 +1481,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
-        return (Collection) beanCandidateCache.get(beanType, aClass -> (Collection)findBeanCandidates(beanType, null));
+        return (Collection) beanCandidateCache.get(beanType, aClass -> (Collection) findBeanCandidates(beanType, null));
     }
 
     @SuppressWarnings("unchecked")
@@ -1593,10 +1592,10 @@ public class DefaultBeanContext implements BeanContext {
                 int candidateCount = candidates.size();
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream();
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream)
-                                      .filter(c -> {
+                        .filter(c -> {
 
-                                          return !processedDefinitions.contains(c);
-                                      });
+                            return !processedDefinitions.contains(c);
+                        });
 
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
                 for (BeanDefinition<T> candidate : candidateList) {
@@ -1632,16 +1631,15 @@ public class DefaultBeanContext implements BeanContext {
         candidateStream = candidateStream.filter(c -> !c.isAbstract());
 
         BeanResolutionContext.Segment segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
-        if(segment instanceof DefaultBeanResolutionContext.ConstructorSegment) {
+        if (segment instanceof DefaultBeanResolutionContext.ConstructorSegment) {
             BeanDefinition declaringBean = segment.getDeclaringType();
             // if the currently injected segment is a constructor argument and the type to be constructed is the
             // same as the candidate, then filter out the candidate to avoid a circular injection problem
             candidateStream = candidateStream.filter(c -> {
-                if(c.equals(declaringBean)) {
+                if (c.equals(declaringBean)) {
                     return false;
-                }
-                else if(declaringBean instanceof ProxyBeanDefinition) {
-                    return !((ProxyBeanDefinition)declaringBean).getTargetDefinitionType().equals(c.getClass());
+                } else if (declaringBean instanceof ProxyBeanDefinition) {
+                    return !((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(c.getClass());
                 }
                 return true;
             });

@@ -1,0 +1,14 @@
+dependencies {
+    compile project(":configurations:neo4j-bolt")
+    compile project(":configurations:hibernate-validator")
+
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
+    compileOnly project(":inject-groovy")
+    compile project(":runtime-groovy")
+    compile project(":inject")
+    compile project(":spring")
+    testCompile project(":inject-groovy")
+    compile "org.grails:grails-datastore-gorm-neo4j:6.1.5.RELEASE"
+
+    testRuntime "org.neo4j.test:neo4j-harness:$neo4jVersion"
+}
