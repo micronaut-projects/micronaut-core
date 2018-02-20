@@ -1,4 +1,4 @@
-package example.mail;
+package example.api.v1;
 
 import java.util.List;
 

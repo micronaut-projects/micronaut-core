@@ -9,7 +9,9 @@ import groovy.json.JsonSlurper
 import groovy.transform.CompileStatic
 import io.reactivex.Single
 import io.reactivex.annotations.NonNull
+import io.reactivex.functions.Consumer
 import io.reactivex.functions.Function
+import org.particleframework.discovery.exceptions.DiscoveryException
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.client.exceptions.HttpClientException
 
@@ -39,10 +41,10 @@ class PetHtmlRendererImpl implements PetHtmlRenderer {
     }
 
     Single<String> requestInfoForm(Long petId) {
-        mailClient.health().map { HealthStatus x ->
+        mailClient.health().onErrorReturn({
+            new HealthStatus("DOWN")
+        }).map { HealthStatus x ->
                 HealthStatusUtils.isUp(x) ? htmlRenderer.renderRequestInfoForm(petId) : ''
-        }.onErrorReturn { throwable ->
-            ''
-        }
+            }
     }
 }
