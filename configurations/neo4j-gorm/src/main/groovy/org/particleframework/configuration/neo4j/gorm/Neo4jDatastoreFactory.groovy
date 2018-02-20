@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import org.grails.datastore.gorm.neo4j.Neo4jDatastore
 import org.grails.datastore.gorm.neo4j.Neo4jDatastoreTransactionManager
 import org.neo4j.driver.v1.Driver
+import org.particleframework.configuration.neo4j.bolt.condition.RequiresNeo4j
 import org.particleframework.configuration.neo4j.gorm.event.ConfigurableEventPublisherAdapter
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Bean
@@ -41,6 +42,7 @@ import java.util.stream.Stream
  */
 @CompileStatic
 @Factory
+@RequiresNeo4j
 @Requires(beans = Driver)
 class Neo4jDatastoreFactory {
 

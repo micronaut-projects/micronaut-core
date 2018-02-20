@@ -68,20 +68,21 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.containsProperty(key)
 
         where:
-        property      | value                                       | key           | type    | expected
-        'my.property' | '/${foo.bar}/stuff'                         | 'my.property' | String  | '/10/stuff'
-        'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
-        'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
-        'my.property' | '${not.there:also.not.there:50}'            | 'my.property' | String  | '50'
-        'my.property' | '${not.there:also.not.there:}'              | 'my.property' | String  | ''
-        'my.property' | '${not.there:USER:50}'                      | 'my.property' | String  | System.getenv('USER')
-        'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}' | 'my.property' | String  | '10 + 50 + 10'
-        'my.property' | '${foo.bar}'                                | 'my.property' | String  | '10'
-        'my.property' | '${not.there:50}'                           | 'my.property' | String  | '50'
-        'my.property' | '${foo.bar} + ${foo.bar}'                   | 'my.property' | String  | '10 + 10'
-        'my.property' | '${foo.bar[0]}'                             | 'my.property' | List    | ['10']
-        'my.property' | '${foo.bar[0]}'                             | 'my.property' | Integer | 10
-        'my.property' | '${USER}'                                   | 'my.property' | String  | System.getenv('USER')
+        property      | value                                                | key           | type    | expected
+        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
+        'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '${not.there:also.not.there:50}'                     | 'my.property' | String  | '50'
+        'my.property' | '${not.there:also.not.there:}'                       | 'my.property' | String  | ''
+        'my.property' | '${not.there:USER:50}'                               | 'my.property' | String  | System.getenv('USER')
+        'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}'          | 'my.property' | String  | '10 + 50 + 10'
+        'my.property' | '${foo.bar}'                                         | 'my.property' | String  | '10'
+        'my.property' | '${not.there:50}'                                    | 'my.property' | String  | '50'
+        'my.property' | '${foo.bar} + ${foo.bar}'                            | 'my.property' | String  | '10 + 10'
+        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | List    | ['10']
+        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
+        'my.property' | '${USER}'                                            | 'my.property' | String  | System.getenv('USER')
+        'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
     }
 
 
