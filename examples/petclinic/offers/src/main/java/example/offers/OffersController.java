@@ -50,7 +50,7 @@ public class OffersController implements OffersOperations {
      * A non-blocking infinite JSON stream of offers that change every 10 seconds
      * @return A {@link Flux} stream of JSON objects
      */
-    @Get(uri = "/", produces = MediaType.TEXT_EVENT_STREAM)
+    @Get(uri = "/", produces = MediaType.APPLICATION_JSON_STREAM)
     public Flux<Offer> current() {
         return offersRepository
                     .random()
