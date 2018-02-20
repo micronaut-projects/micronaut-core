@@ -15,7 +15,7 @@ petstore:
         template: /index.html
     cookie:
         name: micronautUuid
-
+    url: http://localhost:8080
 consul:
     client:
         registration:
