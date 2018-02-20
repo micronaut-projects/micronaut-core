@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.env;
 
+import org.particleframework.context.annotation.Value;
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
 import org.particleframework.core.convert.ConversionContext;
@@ -29,6 +30,8 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.*;
@@ -62,6 +65,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
+    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
+
+    @Value("org.particleframework.cloud.computePlatform")
+    private String computePlatform;
 
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
         this(classLoader, ConversionService.SHARED, names);
@@ -421,7 +428,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> enviroments = new HashSet<>(1);
     }
 
+
     public ComputePlatform determineCloudProvider() {
+
+        if (computePlatform!=null) {
+
+            ComputePlatform platform =  ComputePlatform.valueOf(computePlatform);
+            if (platform == null) {
+                LOG.error("Error invalid compute environment specified:"+computePlatform);
+            }
+
+        }
         boolean isWindows = System.getProperty("os.name")
                 .toLowerCase().startsWith("windows");
 

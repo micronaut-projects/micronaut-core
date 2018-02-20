@@ -1,10 +1,11 @@
 package org.particleframework.discovery.cloud;
 
 import org.particleframework.context.env.ComputePlatform;
+
 import java.util.List;
 import java.util.Map;
 
-public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
+public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
 
     // anything non-standard goes in here
     Map<String, String> metadata;
@@ -13,11 +14,12 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     private Map<String, String> tags;
 
     //network interfaces to get ip addresses
-    private List<NetworkInterface> interfaces;
+    List<NetworkInterface> interfaces;
 
 
 
-    private String name;
+
+    String name;
     String availabilityZone;
     String localHostname;
     String publicHostname;
@@ -91,6 +93,9 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
 
     @Override
     public String getRegion() {
+        if (availabilityZone !=null) {
+            return availabilityZone.substring(0,availabilityZone.length()-2);
+        }
         return region;
     }
 

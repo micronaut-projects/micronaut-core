@@ -26,32 +26,7 @@ public enum EC2MetadataKeys {
             return new URL(AWS_METADATA_URL + this.path + mac + "/" + this.name);
         }
     },
-    accountId("accountId") {
-        private Pattern pattern = Pattern.compile("\"accountId\"\\s?:\\s?\\\"([A-Za-z0-9]*)\\\"");
-
-        @Override
-        public URL getURL(String prepend, String append) throws MalformedURLException {
-            return new URL("http://169.254.169.254/" + AWS_API_VERSION + "/dynamic/instance-identity/document");
-        }
-
-        // no need to use a json deserializer, do a custom regex parse
-        @Override
-        public String read(InputStream inputStream) throws IOException {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
-                String toReturn = null;
-                String inputLine;
-                while ((inputLine = br.readLine()) != null) {
-                    Matcher matcher = pattern.matcher(inputLine);
-                    if (toReturn == null && matcher.find()) {
-                        toReturn = matcher.group(1);
-                        // don't break here as we want to read the full buffer for a clean connection close
-                    }
-                }
-
-                return toReturn;
-            }
-        }
-    };
+    accountId("accountId");
 
     protected String name;
     protected String path;
@@ -72,20 +47,6 @@ public enum EC2MetadataKeys {
     // override to apply prepend and append
     public URL getURL(String prepend, String append) throws MalformedURLException {
         return new URL(AWS_METADATA_URL + path + name);
-    }
-
-    public String read(InputStream inputStream) throws IOException {
-        String toReturn;
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
-            String line = br.readLine();
-            toReturn = line;
-
-            while (line != null) {  // need to read all the buffer for a clean connection close
-                line = br.readLine();
-            }
-
-            return toReturn;
-        }
     }
 
     public String toString() {

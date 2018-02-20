@@ -38,7 +38,7 @@ class AmazonEC2InstanceResolverSpec extends Specification {
         computeInstanceMetadata.get().imageId == "ami-80861296"
         computeInstanceMetadata.get().privateIpV4 == "172.30.3.54"
         computeInstanceMetadata.get().localHostname == "localhost"
-        computeInstanceMetadata.get().h == "172.30.3.54"
+
     }
 
 
