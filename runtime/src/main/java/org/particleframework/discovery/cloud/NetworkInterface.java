@@ -2,6 +2,10 @@ package org.particleframework.discovery.cloud;
 
 import java.io.Serializable;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 public class NetworkInterface implements Serializable
 {
     String ipv4;

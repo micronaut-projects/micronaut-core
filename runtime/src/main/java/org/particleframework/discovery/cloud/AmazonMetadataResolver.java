@@ -22,6 +22,10 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 @Singleton
 @Requires(env="ec2")
 public class AmazonMetadataResolver implements MetadataResolver {

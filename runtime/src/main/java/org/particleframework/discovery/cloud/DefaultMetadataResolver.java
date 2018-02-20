@@ -6,6 +6,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Optional;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 @Singleton
 public class DefaultMetadataResolver implements MetadataResolver {
 

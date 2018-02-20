@@ -9,6 +9,10 @@ import java.net.URL;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 public enum EC2MetadataKeys {
 
     instanceId("instance-id"),  // always have this first as we use it as a fail fast mechanism

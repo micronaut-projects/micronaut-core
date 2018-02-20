@@ -24,6 +24,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 @Singleton
 @Requires(env="gc")
 public class GoogleComputeMetadataResolver implements MetadataResolver {

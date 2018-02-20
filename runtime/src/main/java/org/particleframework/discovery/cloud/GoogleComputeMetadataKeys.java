@@ -1,5 +1,9 @@
 package org.particleframework.discovery.cloud;
 
+/**
+ * @author rvanderwerf
+ * @since 1.0
+ */
 public enum GoogleComputeMetadataKeys {
 
     DESCRIPTION("description"),
