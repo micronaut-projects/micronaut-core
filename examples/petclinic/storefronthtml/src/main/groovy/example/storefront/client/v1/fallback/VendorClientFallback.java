@@ -35,6 +35,11 @@ public class VendorClientFallback implements VendorOperations {
     }
 
     @Override
+    public Single<List<String>> names() {
+        return Single.just(Collections.emptyList());
+    }
+
+    @Override
     public Single<Vendor> save(String name) {
         return Single.just(new Vendor(name));
     }

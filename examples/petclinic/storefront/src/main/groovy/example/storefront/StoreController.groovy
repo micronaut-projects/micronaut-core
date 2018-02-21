@@ -57,13 +57,9 @@ class StoreController {
         })
     }
 
-//    @Get('/vendors')
-//    Single<Map<String, Pet>> vendors() {
-//        vendorClient.list().flatMap({ List<Vendor> vendors ->
-//            Flowable.fromIterable(vendors)
-//                    .flatMap({ Vendor v ->
-//                petClient.byVendor(v.name).map( List<Pet> p )
-//            })
-//        })
-//    }
+    @Get('/vendors')
+    Single<List<Vendor>> vendors() {
+        vendorClient.list()
+                    .onErrorReturnItem(Collections.emptyList())
+    }
 }

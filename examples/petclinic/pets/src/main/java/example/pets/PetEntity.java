@@ -34,15 +34,33 @@ public class PetEntity extends Pet {
             @BsonProperty("vendor") String vendor,
             @JsonProperty("name")
             @BsonProperty("name") String name,
-            @JsonProperty("slug")
-            @BsonProperty("slug") String slug,
             @JsonProperty("image")
             @BsonProperty("image") String image) {
-        super(vendor, name, slug, image);
+        super(vendor, name, image);
     }
 
     @Override
     public PetEntity type(PetType type) {
         return (PetEntity) super.type(type);
+    }
+
+    @Override
+    public PetEntity slug(String slug) {
+        return (PetEntity) super.slug(slug);
+    }
+
+    @Override
+    public void setSlug(String image) {
+        super.setSlug(image);
+    }
+
+    @Override
+    public void setImage(String image) {
+        super.setImage(image);
+    }
+
+    @Override
+    public void setType(PetType type) {
+        super.setType(type);
     }
 }

@@ -15,6 +15,7 @@
  */
 package example.offers.client.v1;
 
+import example.api.v1.Pet;
 import io.reactivex.Maybe;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;

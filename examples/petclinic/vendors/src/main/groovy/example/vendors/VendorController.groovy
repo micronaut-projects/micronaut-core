@@ -62,6 +62,11 @@ class VendorController {
 
     }
 
+    @Get('/names')
+    List<String> names() {
+        vendorService.listVendorName()
+    }
+
     @Post('/')
     Vendor save(@NotBlank String name) {
         vendorService.save(name)

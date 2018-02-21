@@ -75,6 +75,7 @@ public class PetController implements PetOperations<PetEntity> {
 
     @Override
     public Single<PetEntity> save(@Valid PetEntity pet) {
+        pet.slug(FriendlyUrl.sanitizeWithDashes(pet.getName()));
         return Single.fromPublisher(getCollection().insertOne(pet))
                      .map(success -> pet);
     }

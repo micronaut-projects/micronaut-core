@@ -16,10 +16,9 @@
 package example.offers
 
 import example.api.v1.Offer
-import example.offers.client.v1.Pet
+import example.api.v1.Pet
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
-import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -57,7 +56,7 @@ class OffersRepositorySpec extends Specification {
     void "test save a new offer for a pet that exists"() {
         given:
         TestPetClientFallback fallback = applicationContext.getBean(TestPetClientFallback)
-        def pet = new Pet("Fred", "Harry", "harry", "photo-1457914109735-ce8aba3b7a79.jpeg")
+        def pet = new Pet("Fred", "Harry","photo-1457914109735-ce8aba3b7a79.jpeg")
         fallback.addPet(pet)
         OffersRepository offersRepository = applicationContext.getBean(OffersRepository)
 

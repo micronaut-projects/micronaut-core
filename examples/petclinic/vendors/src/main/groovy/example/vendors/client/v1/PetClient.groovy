@@ -25,7 +25,7 @@ import org.particleframework.http.client.Client
  * @author graemerocher
  * @since 1.0
  */
-@Client('pets')
+@Client(id = 'pets', path = "/v1/pets")
 interface PetClient extends PetOperations<Pet> {
 
     @Override
