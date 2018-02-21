@@ -15,6 +15,11 @@
  */
 package example.vendors
 
+import example.api.v1.Pet
+import example.vendors.client.v1.PetClient
+import io.reactivex.Flowable
+import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Post
@@ -33,14 +38,28 @@ import javax.validation.constraints.NotBlank
 class VendorController {
 
     final VendorService vendorService
+    final PetClient petClient
 
-    VendorController(VendorService vendorService) {
+    VendorController(VendorService vendorService, PetClient petClient) {
         this.vendorService = vendorService
+        this.petClient = petClient
     }
 
     @Get('/')
-    List<Vendor> list() {
-        vendorService.list()
+    Single<List<Vendor>> list() {
+        return Single.fromCallable({-> vendorService.list() })
+              .subscribeOn(Schedulers.io())
+              .toFlowable()
+              .flatMap({ List<Vendor> list ->
+            Flowable.fromIterable(list)
+        })
+        .flatMap({ Vendor v ->
+            petClient.byVendor(v.name).map({ List<Pet> pets ->
+                return v.pets(pets)
+            }).toFlowable()
+        })
+        .toList()
+
     }
 
     @Post('/')

@@ -13,20 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.storefront.client.v1
+package example.vendors.client.v1
 
 import example.api.v1.Pet
 import example.api.v1.PetOperations
+import io.reactivex.Maybe
 import io.reactivex.Single
-import org.particleframework.http.client.Client
+import org.particleframework.http.annotation.Body
+import org.particleframework.http.client.Fallback
+
+import javax.inject.Singleton
+import javax.validation.Valid
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Client(id = "pets", path = "/v1/pets")
-interface PetClient extends PetOperations<Pet> {
+@Fallback
+@Singleton
+class PetClientFallback implements PetOperations<Pet>{
+    @Override
+    Single<List<Pet>> list() {
+        return Single.just([])
+    }
 
     @Override
-    Single<List<Pet>> byVendor(String name)
+    Single<List<Pet>> byVendor(String name) {
+        return Single.just([])
+    }
+
+    @Override
+    Maybe<Pet> find(String slug) {
+        return Maybe.empty()
+    }
+
+    @Override
+    Single<Pet> save(@Valid @Body Pet pet) {
+        return Single.error(new RuntimeException("Cannot save pets at the moment. No available servers."))
+    }
 }

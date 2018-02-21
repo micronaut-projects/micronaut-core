@@ -15,15 +15,23 @@
  */
 package example.api.v1;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Collections;
+import java.util.List;
+
 /**
  * @author graemerocher
  * @since 1.0
  */
 public class Vendor {
 
-    private String name;
+    protected String name;
+    protected List<Pet> pets = Collections.emptyList();
 
-    public Vendor(String name) {
+    @JsonCreator
+    public Vendor(@JsonProperty("name") String name) {
         this.name = name;
     }
 
@@ -34,7 +42,15 @@ public class Vendor {
         return name;
     }
 
-    public void setName(String name) {
+    public List<Pet> getPets() {
+        return pets;
+    }
+
+    protected void setName(String name) {
         this.name = name;
+    }
+
+    protected void setPets(List<Pet> pets) {
+        this.pets = pets;
     }
 }

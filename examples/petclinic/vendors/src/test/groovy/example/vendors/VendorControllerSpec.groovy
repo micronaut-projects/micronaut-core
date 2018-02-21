@@ -31,7 +31,9 @@ import spock.lang.Specification
 class VendorControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, Collections.singletonMap(
+                    "consul.client.registration.enabled",false
+            ))
 
     @Shared VendorOperations vendorOperations = embeddedServer
                                                     .getApplicationContext()

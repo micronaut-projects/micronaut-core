@@ -16,7 +16,12 @@
 package example.storefront
 
 import example.api.v1.Offer
+import example.api.v1.Pet
+import example.api.v1.Vendor
+import example.storefront.client.v1.PetClient
+import example.storefront.client.v1.VendorClient
 import io.reactivex.Flowable
+import io.reactivex.Single
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
@@ -36,9 +41,13 @@ import javax.inject.Singleton
 class StoreController {
 
     private final RxStreamingHttpClient httpClient
+    private final VendorClient vendorClient
+    private final PetClient petClient
 
-    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient) {
+    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient, VendorClient vendorClient, PetClient petClient) {
         this.httpClient = httpClient
+        this.vendorClient = vendorClient
+        this.petClient = petClient
     }
 
     @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
@@ -48,4 +57,13 @@ class StoreController {
         })
     }
 
+//    @Get('/vendors')
+//    Single<Map<String, Pet>> vendors() {
+//        vendorClient.list().flatMap({ List<Vendor> vendors ->
+//            Flowable.fromIterable(vendors)
+//                    .flatMap({ Vendor v ->
+//                petClient.byVendor(v.name).map( List<Pet> p )
+//            })
+//        })
+//    }
 }
