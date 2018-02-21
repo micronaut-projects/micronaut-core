@@ -21,6 +21,7 @@ import example.offers.client.v1.PetClient;
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.reactive.RedisReactiveCommands;
+import io.reactivex.MaybeSource;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.validation.Validated;
 import reactor.core.publisher.Flux;
@@ -66,11 +67,10 @@ public class OffersRepository implements OffersOperations {
                     return all;
                 })
                 .map(ConvertibleValues::of)
-                .map(entries -> {
+                .flatMap(entries -> {
                     String description = entries.get("description", String.class).orElseThrow(() -> new IllegalStateException("No description"));
                     BigDecimal price = entries.get("price", BigDecimal.class).orElseThrow(() -> new IllegalStateException("No price"));
-                    Pet pet = petClient.find(key).blockingGet(); // TODO do this in a non blocking way
-                    return new Offer(pet, description, price);
+                    return Mono.from(petClient.find(key).toFlowable()).map(pet -> new Offer(pet, description, price));
                 });
         });
     }
