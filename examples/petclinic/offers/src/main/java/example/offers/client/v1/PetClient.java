@@ -26,6 +26,6 @@ import org.particleframework.http.client.Client;
 @Client(id = "pets", path = "/v1/pets")
 public interface PetClient  {
 
-    @Get("/vendor/{vendor}/{name}")
-    Maybe<Pet> find(String vendor, String name);
+    @Get("/{slug}")
+    Maybe<Pet> find(String slug);
 }
