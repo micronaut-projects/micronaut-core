@@ -111,10 +111,10 @@ class TopicRepositorySpec extends Specification{
                 "More stuff"
         )
 
-//        then:"The reply is created" FIXME!
-//        status == HttpStatus.CREATED
-//
-//        when:
+        then:"The reply is created" 
+        status == HttpStatus.CREATED
+
+        when:
         data = client.expand(first.id)
 
         then:
