@@ -32,16 +32,14 @@ public interface OffersOperations {
     /**
      * Save an offer for the given pet, vendor etc.
      *
-     * @param pet The pet
-     * @param vendor The vendor
+     * @param slug pet's slug
      * @param price The price
      * @param duration The duration of the offer
      * @param description The description of the offer
      * @return The offer if it was possible to save it as a {@link Mono} or a empty {@link Mono} if no pet exists to create the offer for
      */
     Mono<Offer> save(
-            @NotBlank String pet,
-            @NotBlank String vendor,
+            @NotBlank String slug,
             @Digits(integer = 6, fraction = 2) BigDecimal price,
             @NotNull Duration duration,
             @NotBlank String description);

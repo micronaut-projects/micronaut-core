@@ -32,7 +32,7 @@ import java.time.Duration
  */
 @Client('/${offers.api.version}/offers')
 @Validated
-interface TestOffersClient extends OffersOperations{
+interface TestOffersClient extends OffersOperations {
     
     @Get(uri = '/', consumes = MediaType.APPLICATION_JSON_STREAM)
     Flux<Offer> current()
@@ -40,8 +40,7 @@ interface TestOffersClient extends OffersOperations{
     @Override
     @Post("/")
     Mono<Offer> save(
-            String vendor,
-            String pet,
+            String slug,
             BigDecimal price,
             Duration duration,
             String description)

@@ -95,18 +95,18 @@ class HomeController {
     }
 
     @Produces(MediaType.TEXT_HTML)
-    @Get("/pets/{id}")
-    Single<String> pet(Long id) {
-        petHtmlRenderer.renderPet(id)
+    @Get("/pets/{slug}")
+    Single<String> pet(String slug) {
+        petHtmlRenderer.renderPet(slug)
     }
 
     @Produces(MediaType.TEXT_HTML)
     @Post(uri= '/pet/requestInfo', consumes=MediaType.APPLICATION_FORM_URLENCODED)
-    HttpResponse requestInfo(String email, Long id) {
+    HttpResponse requestInfo(String email, String slug) {
         Email emailDTO = new Email()
         emailDTO.setRecipient(email)
         mailClient.send(emailDTO)
-        HttpResponse.redirect(URI.create("/pets/${id}"))
+        HttpResponse.redirect(URI.create("/pets/${slug}"))
     }
 
     @Produces(MediaType.TEXT_HTML)
