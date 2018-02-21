@@ -111,7 +111,7 @@ class TopicRepositorySpec extends Specification{
                 "More stuff"
         )
 
-        then:"The reply is created" 
+        then:"The reply is created"
         status == HttpStatus.CREATED
 
         when:
