@@ -36,7 +36,7 @@ class BookController {
     @Inject
     BookService bookService
 
-    @Value('galecino.servo.trim:0.0')
+    @Value('${galecino.servo.trim:0.0}')
     Float trim
 
     @Get('/')
