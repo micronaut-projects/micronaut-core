@@ -17,6 +17,7 @@ package example.comments
 
 import grails.gorm.annotation.Entity
 import grails.neo4j.Neo4jEntity
+import grails.neo4j.Node
 import grails.neo4j.mapping.MappingBuilder
 
 /**
@@ -24,7 +25,7 @@ import grails.neo4j.mapping.MappingBuilder
  * @since 1.0
  */
 @Entity
-class Topic implements Neo4jEntity<Topic>{
+class Topic implements Node<Topic> {
     
     String title
     List<Comment> comments

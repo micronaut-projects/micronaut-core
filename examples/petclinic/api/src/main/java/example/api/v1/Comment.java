@@ -13,29 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.comments
+package example.api.v1;
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import grails.gorm.annotation.Entity
-import grails.neo4j.Neo4jEntity
-import grails.neo4j.Node
-
-import javax.validation.constraints.NotBlank
+import java.util.Date;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Entity
-class Comment implements Node<Comment>, example.api.v1.Comment {
-    Long id
-    @NotBlank
-    String poster
-    @NotBlank
-    String content
-    Date dateCreated
-    
-    @JsonIgnore
-    List<Comment> replies = []
-    static hasMany = [replies: Comment]
+public interface Comment {
+
+    String getPoster();
+
+    String getContent();
+
+    Date getDateCreated();
 }
