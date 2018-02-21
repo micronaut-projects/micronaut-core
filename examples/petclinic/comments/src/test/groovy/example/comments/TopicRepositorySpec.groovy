@@ -15,11 +15,14 @@
  */
 package example.comments
 
-import grails.gorm.transactions.Rollback
+import org.grails.datastore.mapping.validation.ValidationException
+import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.validation.ConstraintViolationException
 
 /**
  * @author graemerocher
@@ -27,24 +30,35 @@ import spock.lang.Specification
  */
 class TopicRepositorySpec extends Specification{
 
-    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
+            'neo4j.uri': Neo4jBoltSettings.DEFAULT_URI,
+            'neo4j.embedded.ephemeral':true
+    )
 
 
-    @Rollback
     void "test save and retrieve topic comments"() {
         given:
         TopicRepistory topicRepistory = applicationContext.getBean(TopicRepistory)
 
-        when:"A new topic with comments is saved"
-        new Topic(title: "Some topic")
-                .addToComments(new Comment(poster: "Fred", content: "Some comment"))
-                .addToComments(new Comment(poster: "Joe", content: "Some comment"))
-                .save(flush:true)
+        when:"An invalid title is used"
+        topicRepistory.saveTopic("")
 
         then:
-        topicRepistory.findComments("Some topic").size() == 2
-        topicRepistory.findComments("Some topic").first().dateCreated
-        topicRepistory.findComments("Some topic").first().poster == "Fred"
+        thrown(ValidationException)
+
+        when:"A new topic with comments is saved"
+        topicRepistory.saveTopic("Some Topic")
+        topicRepistory.saveComment(
+                "Some Topic", "Fred", "Some content"
+        )
+        topicRepistory.saveComment(
+                "Some Topic", "Joe", "Some content"
+        )
+
+        then:
+        topicRepistory.findComments("Some Topic").size() == 2
+        topicRepistory.findComments("Some Topic").first().dateCreated
+        topicRepistory.findComments("Some Topic").first().poster == "Fred"
     }
 
 }

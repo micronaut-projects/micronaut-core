@@ -18,6 +18,8 @@ package example.comments
 import grails.gorm.annotation.Entity
 import grails.neo4j.Neo4jEntity
 
+import javax.validation.constraints.NotBlank
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -25,11 +27,11 @@ import grails.neo4j.Neo4jEntity
 @Entity
 class Comment implements Neo4jEntity<Comment> {
     
+    @NotBlank
     String poster
+    @NotBlank
     String content
     Date dateCreated
-    Topic topic
-    static belongsTo = [topic: Topic]
     
     static hasMany = [replies: Comment]
 }

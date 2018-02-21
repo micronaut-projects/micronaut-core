@@ -298,6 +298,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable.map((Function<HttpContent, HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
+                    if(LOG.isTraceEnabled()) {
+                        LOG.trace("HTTP Client Streaming Response Received Chunk");
+                        traceBody(byteBuf);
+                    }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                     nettyStreamedHttpResponse.setBody(byteBuffer);
                     return nettyStreamedHttpResponse;
@@ -321,7 +325,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 JacksonProcessor jacksonProcessor = new JacksonProcessor() {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
-                        httpContentFlowable.map(content -> ByteBufUtil.getBytes(content.content())).subscribe(this);
+                        httpContentFlowable.map(content -> {
+                            ByteBuf chunk = content.content();
+                            if(LOG.isTraceEnabled()) {
+                                LOG.trace("HTTP Client JSON Streaming Response Received Chunk");
+                                traceBody(chunk);
+                            }
+                            return ByteBufUtil.getBytes(chunk);
+                        }).subscribe(this);
                         super.subscribe(downstreamSubscriber);
                     }
                 };
@@ -378,6 +389,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                         @Override
                                         protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
                                             NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                                            if(LOG.isTraceEnabled()) {
+                                                LOG.trace("HTTP Client Streaming Response Received: {}", msg.status() );
+                                                traceHeaders(msg.headers());
+                                            }
+
                                             emitter.onNext(response);
                                             emitter.onComplete();
                                         }

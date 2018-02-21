@@ -17,11 +17,18 @@ package org.particleframework.configuration.neo4j.gorm
 
 import grails.gorm.annotation.Entity
 import grails.gorm.transactions.Rollback
+import org.grails.datastore.mapping.validation.ValidationException
 import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
+import org.particleframework.http.hateos.VndError
+import org.particleframework.validation.exceptions.ValidationExceptionHandler
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.validation.constraints.NotBlank
 
 /**
  * @author graemerocher
@@ -42,10 +49,21 @@ class Neo4jDatastoreFactorySpec extends Specification {
         Team.first().dateCreated != null
 
     }
+
+    @Rollback
+    void "test validation errors"() {
+        when:
+        new Team(name: "").save(failOnError:true)
+
+        then:
+        thrown(ValidationException)
+
+    }
 }
 
 @Entity
 class Team {
+    @NotBlank
     String name
     Date dateCreated
 }

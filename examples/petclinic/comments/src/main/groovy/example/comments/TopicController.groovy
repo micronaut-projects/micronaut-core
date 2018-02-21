@@ -15,14 +15,24 @@
  */
 package example.comments
 
+import groovy.transform.CompileStatic
+import org.grails.datastore.mapping.validation.ValidationException
+import org.particleframework.http.HttpResponse
+import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.annotation.Error
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Post
+import org.particleframework.http.hateos.VndError
+
+import javax.validation.constraints.NotBlank
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Controller('/${comments.api.version}/comments')
+@Controller('/${comments.api.version}/topics')
+@CompileStatic
 class TopicController {
 
     final TopicRepistory topicRepistory
@@ -31,8 +41,27 @@ class TopicController {
         this.topicRepistory = topicRepistory
     }
 
-    @Get('/${vendor}')
+    @Get('/{vendor}/comments')
     List<Comment> listComments(String vendor) {
-        topicRepistory.findComments(vendor)
+        return topicRepistory.findComments(vendor)
+    }
+    
+    @Post('/{vendor}/comments')
+    HttpStatus addComment(
+            @NotBlank String vendor,
+            @NotBlank String poster,
+            @NotBlank String content) {
+        Comment c = topicRepistory.saveComment(
+                vendor, poster, content
+        )
+        if(c != null) {
+            return HttpStatus.OK
+        }
+        return HttpStatus.NOT_FOUND
+    }
+
+    @Error(ValidationException.class)
+    HttpResponse<VndError> validationError(ValidationException e) {
+
     }
 }
