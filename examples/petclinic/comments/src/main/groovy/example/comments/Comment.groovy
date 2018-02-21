@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import grails.gorm.annotation.Entity
 import grails.neo4j.Neo4jEntity
 import grails.neo4j.Node
+import groovy.transform.ToString
 
 import javax.validation.constraints.NotBlank
 
@@ -27,6 +28,7 @@ import javax.validation.constraints.NotBlank
  * @since 1.0
  */
 @Entity
+@ToString(includes= ['id','poster', 'content'])
 class Comment implements Node<Comment>, example.api.v1.Comment {
     Long id
     @NotBlank

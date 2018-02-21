@@ -15,10 +15,12 @@
  */
 package example.comments
 
+import grails.neo4j.Path
+import groovy.json.JsonOutput
 import org.grails.datastore.mapping.validation.ValidationException
-import org.neo4j.driver.v1.types.Path
 import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpStatus
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -55,13 +57,14 @@ class TopicRepositorySpec extends Specification{
         def c1 = commentRepository.saveComment(
                 "Some Topic", "Fred", "Some content"
         )
+        def r1 = commentRepository.saveReply(c1, "Barney", "I Agree!")
+        def r2 = commentRepository.saveReply(c1, "Jeff", "Absolutely!")
+        def r3 = commentRepository.saveReply(r1, "John", "Yup!")
+
         def c2 = commentRepository.saveComment(
                 "Some Topic", "Joe", "Some content"
         )
-        def r1 = commentRepository.saveReply(c1, "Barney", "I Agree!")
-        def r2 = commentRepository.saveReply(c1, "Jeff", "Absolutely!")
-        commentRepository.saveReply(r1, "John", "Yup!")
-        commentRepository.saveReply(c2, "Ed", "Superb!")
+        def r4 = commentRepository.saveReply(c2, "Ed", "Superb!")
 
 
         then:
@@ -70,11 +73,13 @@ class TopicRepositorySpec extends Specification{
         commentRepository.findComments("Some Topic").first().poster == "Fred"
 
         when:
-        List<Path> paths = commentRepository.findCommentReplies(c1.id)
+        def replies = commentRepository.findCommentReplies(c1.id)
 
-        println paths
         then:
-        paths
+        replies.id == c1.id
+        replies.replies.size() == 2
+        replies.replies.first().replies.size() == 1
+        !replies.replies.last().replies
     }
 
     void "test read topic response"() {
@@ -88,5 +93,32 @@ class TopicRepositorySpec extends Specification{
         comments != null
         comments.size() == 2
         comments.first().poster == "Fred"
+
+
+        when:
+        def first = comments.first()
+        Map<String,Object> data = client.expand(first.id)
+
+        then:
+        data.id == first.id
+        data.replies.size() == 2
+
+
+        when:"A new reply is added"
+        HttpStatus status = client.addReply(
+                first.id,
+                "Edward",
+                "More stuff"
+        )
+
+//        then:"The reply is created" FIXME!
+//        status == HttpStatus.CREATED
+//
+//        when:
+        data = client.expand(first.id)
+
+        then:
+        data.replies.size() == 3
+
     }
 }

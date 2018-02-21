@@ -19,6 +19,7 @@ import org.particleframework.core.annotation.Blocking;
 import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
+import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.reactivestreams.Publisher;
 
@@ -84,14 +85,20 @@ public interface BlockingHttpClient {
      * @return A result of the given type or null the URI returns a 404
      * @throws HttpClientResponseException if an error status is returned
      */
+    @SuppressWarnings("unchecked")
     default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         HttpResponse<O> response = exchange(request, bodyType);
-        return response
-                        .getBody()
-                        .orElseThrow(() -> new HttpClientResponseException(
-                                "Empty body",
-                                response
-                        ));
+        if(HttpStatus.class.isAssignableFrom(bodyType.getType())) {
+            return (O) response.getStatus();
+        }
+        else {
+            return response
+                    .getBody()
+                    .orElseThrow(() -> new HttpClientResponseException(
+                            "Empty body",
+                            response
+                    ));
+        }
     }
 
 

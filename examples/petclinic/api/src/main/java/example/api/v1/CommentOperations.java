@@ -21,6 +21,7 @@ import org.particleframework.http.annotation.Post;
 
 import javax.validation.constraints.NotBlank;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author graemerocher
@@ -37,6 +38,14 @@ public interface CommentOperations<T extends Comment> {
     List<T> list(String topic);
 
     /**
+     * A map of comments and nested replies
+     *
+     * @param id The comment to expand
+     * @return The comments
+     */
+    @Get("/comment/{id}")
+    Map<String, Object> expand(Long id);
+    /**
      * Add a new comment under a given topic
      * @param topic The topic
      * @param poster The poster
@@ -46,6 +55,19 @@ public interface CommentOperations<T extends Comment> {
     @Post("/{topic}/comments")
     HttpStatus add(
             @NotBlank String topic,
+            @NotBlank String poster,
+            @NotBlank String content);
+
+    /**
+     * Add a new comment under a given topic
+     * @param id The id of the comment
+     * @param poster The poster
+     * @param content The content
+     * @return An {@link HttpStatus#CREATED} if the comment was created
+     */
+    @Post("/comment/{id}/reply")
+    HttpStatus addReply(
+            @NotBlank Long id,
             @NotBlank String poster,
             @NotBlank String content);
 }
