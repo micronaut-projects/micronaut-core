@@ -24,11 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class Pet extends example.api.v1.Pet {
     @JsonCreator
-    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name)  {
-        super(vendor, name);
-    }
-
-    public String key() {
-        return getVendor() + ":" + getName();
+    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name, @JsonProperty("slug") String slug, @JsonProperty("image") String image)  {
+        super(vendor, name, slug, image);
     }
 }

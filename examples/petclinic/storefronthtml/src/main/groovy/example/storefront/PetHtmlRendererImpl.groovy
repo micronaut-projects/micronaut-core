@@ -3,17 +3,9 @@ package example.storefront
 import example.api.v1.HealthStatus
 import example.api.v1.HealthStatusUtils
 import example.storefront.ui.NavBar
-import example.storefront.ui.PetListViewModel
 import example.storefront.ui.PetViewModel
-import groovy.json.JsonSlurper
 import groovy.transform.CompileStatic
 import io.reactivex.Single
-import io.reactivex.annotations.NonNull
-import io.reactivex.functions.Consumer
-import io.reactivex.functions.Function
-import org.particleframework.discovery.exceptions.DiscoveryException
-import org.particleframework.http.HttpResponse
-import org.particleframework.http.client.exceptions.HttpClientException
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,19 +24,19 @@ class PetHtmlRendererImpl implements PetHtmlRenderer {
     MailClient mailClient
 
     @Override
-    Single<String> renderPet(Long id) {
-        Single<String> container = fetcher.findById(id)
+    Single<String> renderPet(String slug) {
+        Single<String> container = fetcher.findBySlug(slug)
                 .map { PetViewModel x -> htmlRenderer.renderPet(x) }
-                .concatWith(requestInfoForm(id))
+                .concatWith(requestInfoForm(slug))
                 .reduce('', { String s, String s2 -> s + s2 })
         htmlRenderer.renderContainer(NavBar.PET, container)
     }
 
-    Single<String> requestInfoForm(Long petId) {
+    Single<String> requestInfoForm(String slug) {
         mailClient.health().onErrorReturn({
             new HealthStatus("DOWN")
         }).map { HealthStatus x ->
-                HealthStatusUtils.isUp(x) ? htmlRenderer.renderRequestInfoForm(petId) : ''
+                HealthStatusUtils.isUp(x) ? htmlRenderer.renderRequestInfoForm(slug) : ''
             }
     }
 }
