@@ -4,11 +4,14 @@ dependencies {
 
     compile "org.codehaus.groovy:groovy:$groovyVersion"
     compileOnly project(":inject-groovy")
+    compileOnly project(":http-server")
     compile project(":runtime-groovy")
     compile project(":inject")
     compile project(":spring")
     testCompile project(":inject-groovy")
     compile "org.grails:grails-datastore-gorm-neo4j:6.1.5.RELEASE"
 
+    testCompile project(":http-server")
+    testCompile project(":http-client")
     testRuntime "org.neo4j.test:neo4j-harness:$neo4jVersion"
 }

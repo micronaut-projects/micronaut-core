@@ -32,5 +32,6 @@ class Topic implements Neo4jEntity<Topic>{
 
     static mapping = MappingBuilder.node {
         id generator:'assigned', name:'title'
+        version false
     }
 }

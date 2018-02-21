@@ -22,6 +22,7 @@ import org.grails.datastore.gorm.neo4j.Neo4jDatastore
 import org.grails.datastore.gorm.neo4j.Neo4jDatastoreTransactionManager
 import org.neo4j.driver.v1.Driver
 import org.particleframework.configuration.neo4j.bolt.condition.RequiresNeo4j
+import org.particleframework.configuration.neo4j.gorm.configuration.GormPropertyResolverAdapter
 import org.particleframework.configuration.neo4j.gorm.event.ConfigurableEventPublisherAdapter
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Bean
@@ -55,7 +56,7 @@ class Neo4jDatastoreFactory {
         Class[] classes = entities.toArray() as Class[]
         Neo4jDatastore datastore = new Neo4jDatastore(
                 driver,
-                new PropertyResolverAdapter(applicationContext),
+                new GormPropertyResolverAdapter(applicationContext, applicationContext),
                 new ConfigurableEventPublisherAdapter(applicationContext),
                 classes
         )

@@ -77,7 +77,7 @@ class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
         Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
-        if(rawBodyType != null) {
+        if(rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             this.body = !errorStatus || CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType) ? getBody(bodyType).orElse(null) : null;
         }
         else {

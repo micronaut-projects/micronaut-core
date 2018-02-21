@@ -16,14 +16,20 @@
 package example.comments
 
 import grails.gorm.services.Service
+import grails.gorm.transactions.Transactional
 import grails.neo4j.services.Cypher
+import groovy.transform.CompileStatic
+
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 @Service(Topic)
-interface TopicRepistory {
+@CompileStatic
+abstract class TopicRepistory {
 
     /**
      * Finds all of the comments for the given topic name
@@ -35,5 +41,57 @@ interface TopicRepistory {
                WHERE ${t.title} = $title 
                RETURN $c 
                ORDER BY $c.dateCreated""")
-    List<Comment> findComments(String title)
+    abstract List<Comment> findComments(String title)
+
+    /**
+     * Finds a topic for the given title
+     * @param title The title
+     * @return The topic
+     */
+    abstract Topic findTopic(@NotBlank String title)
+
+    /**
+     * Finds a topic for the given title
+     * @param title The title
+     * @return The topic
+     */
+    abstract Topic saveTopic(@NotBlank String title)
+
+    /**
+     * Saves a comment
+     * @param topic The topic
+     * @param poster The poster
+     * @param content The content
+     * @return The comment
+     */
+    @Transactional
+    Comment saveComment(@NotNull String topic, @NotBlank String poster, @NotBlank String content) {
+        Topic t = findTopic(topic)
+        if(t == null) {
+            t = new Topic(title: topic)
+            t.save()
+        }
+
+
+        def comment = new Comment(poster: poster, content: content).save(failOnError:true)
+        t.addToComments(comment)
+        t.save(failOnError:true)
+
+        return comment
+    }
+
+    /**
+     * Saves a comment
+     * @param topic The topic
+     * @param poster The poster
+     * @param content The content
+     * @return The comment
+     */
+    @Transactional
+    Comment saveComment(@NotNull Comment replyTo, @NotBlank String poster, @NotBlank String content) {
+        def comment = new Comment(poster: poster, content: content).save(failOnError:true)
+        replyTo.addToReplies(comment)
+        replyTo.save(failOnError:true)
+        return comment
+    }
 }
