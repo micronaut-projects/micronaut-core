@@ -15,6 +15,9 @@
  */
 package example.api.v1;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import javax.validation.constraints.NotBlank;
 
 /**
@@ -29,15 +32,14 @@ public class Pet {
     protected PetType type = PetType.DOG;
     private String vendor;
 
-    public Pet(String vendor, String name, String slug, String image) {
+    @JsonCreator
+    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name, @JsonProperty("slug") String slug, @JsonProperty("image") String image) {
         this.vendor = vendor;
         this.name = name;
         this.slug = slug;
         this.image = image;
     }
 
-    Pet() {
-    }
 
     @NotBlank
     public String getVendor() {
@@ -68,22 +70,6 @@ public class Pet {
             this.type = type;
         }
         return this;
-    }
-
-    void setName(String name) {
-        this.name = name;
-    }
-
-    void setImage(String image) {
-        this.image = image;
-    }
-
-    void setSlug(String image) {
-        this.image = image;
-    }
-
-    void setVendor(String vendor) {
-        this.vendor = vendor;
     }
 
     @Override

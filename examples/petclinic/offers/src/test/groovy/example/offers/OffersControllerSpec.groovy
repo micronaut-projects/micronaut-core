@@ -19,6 +19,7 @@ import example.api.v1.Offer
 import example.api.v1.PetType
 import example.offers.client.v1.Pet
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -40,7 +41,8 @@ class OffersControllerSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ["consul.client.enabled": false]
+            ["consul.client.enabled": false,
+             "redis.uri":"redis://localhost:${SocketUtils.findAvailableTcpPort()}"]
     )
 
     @Unroll

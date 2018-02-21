@@ -6,7 +6,7 @@ plugins {
 
 
 
-subprojects {
+subprojects { project ->
     apply plugin:"java"
     apply plugin:"application"
     apply plugin: 'com.github.johnrengelman.shadow'
@@ -17,10 +17,13 @@ subprojects {
     }
 
     dependencies {
-        compile "org.particleframework:discovery-client:${projectVersion}"
-        compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
-        runtime "org.particleframework:management:${projectVersion}"
-        runtime "ch.qos.logback:logback-classic:1.2.3"
+        if(project.name != 'api') {
+
+            compile "org.particleframework:discovery-client:${projectVersion}"
+            compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+            runtime "org.particleframework:management:${projectVersion}"
+            runtime "ch.qos.logback:logback-classic:1.2.3"
+        }
     }
 
 

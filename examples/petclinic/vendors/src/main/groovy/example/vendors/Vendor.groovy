@@ -15,6 +15,7 @@
  */
 package example.vendors
 
+import example.api.v1.Pet
 import grails.gorm.annotation.Entity
 
 /**
@@ -23,4 +24,14 @@ import grails.gorm.annotation.Entity
  */
 @Entity
 class Vendor extends example.api.v1.Vendor {
+
+    @Override
+    void setName(String name) {
+        super.setName(name)
+    }
+
+    Vendor pets(List<Pet> pets) {
+        setPets(pets)
+        return this
+    }
 }

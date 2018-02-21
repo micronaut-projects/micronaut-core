@@ -27,6 +27,7 @@ import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
@@ -366,8 +367,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(Class<Object> declaringType, MethodInvocationContext<Object, Object> context) {
-        return beanContext
-                    .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        Optional<MethodExecutionHandle<Object>> result = beanContext
+                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        if(!result.isPresent()) {
+            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
+            for (Class i : allInterfaces) {
+                result = beanContext
+                            .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                if(result.isPresent()) {
+                    return result;
+                }
+            }
+        }
+        return result;
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {

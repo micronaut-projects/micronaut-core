@@ -15,8 +15,8 @@
  */
 package example.storefront.client.v1.fallback
 
+import example.api.v1.Pet
 import example.api.v1.PetOperations
-import example.storefront.client.v1.Pet
 import groovy.transform.CompileStatic
 import io.reactivex.Maybe
 import io.reactivex.Single
