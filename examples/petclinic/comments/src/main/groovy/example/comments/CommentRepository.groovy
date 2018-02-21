@@ -16,12 +16,82 @@
 package example.comments
 
 import grails.gorm.services.Service
+import grails.gorm.transactions.Transactional
+import grails.neo4j.services.Cypher
+import org.neo4j.driver.v1.types.Path
+
+import javax.inject.Inject
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 
 /**
  * @author graemerocher
  * @since 1.0
  */
 @Service(Comment)
-interface CommentRepository {
-    
+abstract class CommentRepository {
+
+    @Inject TopicRepository topicRepository
+
+    /**
+     * Finds all of the comments for the given topic name
+     *
+     * @param title The topic title
+     * @return The comments
+     */
+    @Cypher("""MATCH ${Topic t}-[:COMMENTS]->${Comment c} 
+               WHERE ${t.title} = $title 
+               RETURN $c 
+               ORDER BY $c.dateCreated""")
+    abstract List<Comment> findComments(String title)
+
+    /**
+     * Finds all of the paths for the given comment
+     * @param commentId The comment id
+     * @return The paths
+     */
+    @Cypher("""MATCH p=${Comment from}-[:REPLIES*..]->${Comment leaf}
+               WHERE ID($from) = $commentId 
+               RETURN DISTINCT p""")
+    abstract List<Path> findCommentPaths(Long commentId)
+
+
+
+    /**
+     * Saves a comment
+     * @param topic The topic
+     * @param poster The poster
+     * @param content The content
+     * @return The comment
+     */
+    @Transactional
+    Comment saveComment(@NotNull String topic, @NotBlank String poster, @NotBlank String content) {
+        Topic t = topicRepository.findTopic(topic)
+        if(t == null) {
+            t = new Topic(title: topic)
+            t.save(failOnError:true)
+        }
+
+
+        def comment = new Comment(poster: poster, content: content).save(failOnError:true)
+        t.addToComments(comment)
+        t.save(failOnError:true)
+
+        return comment
+    }
+
+    /**
+     * Saves a comment
+     * @param topic The topic
+     * @param poster The poster
+     * @param content The content
+     * @return The comment
+     */
+    @Transactional
+    Comment saveReply(@NotNull Comment replyTo, @NotBlank String poster, @NotBlank String content) {
+        def comment = new Comment(poster: poster, content: content).save(failOnError:true)
+        replyTo.addToReplies(comment)
+        replyTo.save(failOnError:true)
+        return comment
+    }
 }

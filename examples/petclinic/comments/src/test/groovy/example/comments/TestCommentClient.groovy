@@ -15,10 +15,9 @@
  */
 package example.comments
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import grails.gorm.annotation.Entity
-import grails.neo4j.Neo4jEntity
-import grails.neo4j.Node
+import example.api.v1.CommentOperations
+import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.Client
 
 import javax.validation.constraints.NotBlank
 
@@ -26,16 +25,11 @@ import javax.validation.constraints.NotBlank
  * @author graemerocher
  * @since 1.0
  */
-@Entity
-class Comment implements Node<Comment>, example.api.v1.Comment {
-    Long id
-    @NotBlank
-    String poster
-    @NotBlank
-    String content
-    Date dateCreated
-    
-    @JsonIgnore
-    List<Comment> replies = []
-    static hasMany = [replies: Comment]
+@Client('/${comments.api.version}/topics')
+interface TestCommentClient extends CommentOperations<Comment>{
+    @Override
+    List<Comment> list(String topic)
+
+    @Override
+    HttpStatus add(@NotBlank String topic, @NotBlank String poster, @NotBlank String content)
 }

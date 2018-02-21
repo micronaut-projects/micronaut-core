@@ -16,29 +16,33 @@
 package example.comments
 
 import org.grails.datastore.mapping.validation.ValidationException
+import org.neo4j.driver.v1.types.Path
 import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
+import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.validation.ConstraintViolationException
+import spock.lang.Stepwise
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Stepwise
 class TopicRepositorySpec extends Specification{
 
-    @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
-            'neo4j.uri': Neo4jBoltSettings.DEFAULT_URI,
-            'neo4j.embedded.ephemeral':true
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+            ['neo4j.uri': Neo4jBoltSettings.DEFAULT_URI,
+            'neo4j.embedded.ephemeral':true]
     )
+
 
 
     void "test save and retrieve topic comments"() {
         given:
-        TopicRepistory topicRepistory = applicationContext.getBean(TopicRepistory)
+        TopicRepository topicRepistory = embeddedServer.applicationContext.getBean(TopicRepository)
+        CommentRepository commentRepository = embeddedServer.applicationContext.getBean(CommentRepository)
 
         when:"An invalid title is used"
         topicRepistory.saveTopic("")
@@ -48,17 +52,41 @@ class TopicRepositorySpec extends Specification{
 
         when:"A new topic with comments is saved"
         topicRepistory.saveTopic("Some Topic")
-        topicRepistory.saveComment(
+        def c1 = commentRepository.saveComment(
                 "Some Topic", "Fred", "Some content"
         )
-        topicRepistory.saveComment(
+        def c2 = commentRepository.saveComment(
                 "Some Topic", "Joe", "Some content"
         )
+        def r1 = commentRepository.saveReply(c1, "Barney", "I Agree!")
+        def r2 = commentRepository.saveReply(c1, "Jeff", "Absolutely!")
+        commentRepository.saveReply(r1, "John", "Yup!")
+        commentRepository.saveReply(c2, "Ed", "Superb!")
+
 
         then:
-        topicRepistory.findComments("Some Topic").size() == 2
-        topicRepistory.findComments("Some Topic").first().dateCreated
-        topicRepistory.findComments("Some Topic").first().poster == "Fred"
+        commentRepository.findComments("Some Topic").size() == 2
+        commentRepository.findComments("Some Topic").first().dateCreated
+        commentRepository.findComments("Some Topic").first().poster == "Fred"
+
+        when:
+        List<Path> paths = commentRepository.findCommentReplies(c1.id)
+
+        println paths
+        then:
+        paths
     }
 
+    void "test read topic response"() {
+        given:
+        TestCommentClient client = embeddedServer.applicationContext.getBean(TestCommentClient)
+
+        when:
+        List<Comment> comments = client.list("Some Topic")
+
+        then:
+        comments != null
+        comments.size() == 2
+        comments.first().poster == "Fred"
+    }
 }

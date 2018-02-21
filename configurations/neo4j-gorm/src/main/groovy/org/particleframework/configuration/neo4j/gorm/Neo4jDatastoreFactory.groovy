@@ -61,8 +61,10 @@ class Neo4jDatastoreFactory {
                 classes
         )
         for(o in datastore.getServices()) {
-            applicationContext.inject(o)
             applicationContext.registerSingleton(o)
+        }
+        for(o in datastore.getServices()) {
+            applicationContext.inject(o)
         }
         return datastore
     }
