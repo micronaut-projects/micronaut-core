@@ -28,17 +28,17 @@ import javax.inject.Singleton
  */
 @Fallback
 @Singleton
-class TestPetClientFallback implements PetClient{
+class TestPetClientFallback implements PetClient {
 
     private Map<String, Pet> pets = [:]
 
     void addPet(Pet pet) {
-        pets.put(pet.key(), pet)
+        pets.put(pet.getSlug(), pet)
     }
 
     @Override
-    Maybe<Pet> find(String vendor, String name) {
-        Pet pet = pets.get("$vendor:$name".toString())
+    Maybe<Pet> find(String slug) {
+        Pet pet = pets.get(slug)
         if(pet != null) {
             return Maybe.just(pet)
         }

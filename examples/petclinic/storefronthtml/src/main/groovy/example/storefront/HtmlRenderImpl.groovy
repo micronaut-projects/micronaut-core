@@ -26,7 +26,7 @@ class HtmlRenderImpl implements HtmlRenderer {
         MarkupBuilder html = new MarkupBuilder(writer)
         html.div(class:"col-sm") {
             a(href: petHref(pet)) {
-                img(src: pet.image)
+                img(src: "/assets/images/${pet.image}")
             }
         }
         writer.toString()
@@ -41,7 +41,7 @@ class HtmlRenderImpl implements HtmlRenderer {
     }
 
     String petHref(PetViewModel pet) {
-        "/pets/${pet.id}"
+        "/pets/${pet.slug}"
     }
 
     String titleByNavbar(NavBar nav) {
@@ -105,14 +105,14 @@ class HtmlRenderImpl implements HtmlRenderer {
     String renderPet(PetViewModel petViewModel) {
         StringWriter writer = new StringWriter()
         MarkupBuilder html = new MarkupBuilder(writer)
-        html.img(src: petViewModel.image, alt: '', class: 'img-thumbnail')
+        html.img(src: "/assets/images/${petViewModel.image}".toString(), alt: '', class: 'img-thumbnail')
         writer.toString()
     }
 
 
     @Override
     @CompileDynamic
-    String renderRequestInfoForm(Long id) {
+    String renderRequestInfoForm(String slug) {
         StringWriter writer = new StringWriter()
         MarkupBuilder html = new MarkupBuilder(writer)
         html.div(class: "clearfix") {
@@ -122,7 +122,7 @@ class HtmlRenderImpl implements HtmlRenderer {
                 }
                 form(method: 'POST', action: "/pet/requestInfo") {
                     div(class: "form-group") {
-                        input(type: "hidden", name: "id", value: "${id}")
+                        input(type: "hidden", name: "slug", value: "${slug}")
                         label(for: "inputEmail", 'Email address')
                         input(type: "email", class: "form-control", id: "inputEmail", ('aria-describedby'): 'emailHelp', placeholder: "Enter email", name: 'email')
                         small(id: "emailHelp", class: "form-text text-muted", "We'll never share your email with anyone else.")

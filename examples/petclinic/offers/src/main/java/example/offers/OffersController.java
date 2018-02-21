@@ -61,8 +61,7 @@ public class OffersController implements OffersOperations {
     /**
      * Consumes JSON and saves a new offer
      *
-     * @param pet The pet the offer applies to
-     * @param vendor The vendor the offer applies to
+     * @param slug Pet's slug
      * @param price The price of the offer
      * @param duration The duration of the offer
      * @param description The description of the offer
@@ -71,13 +70,12 @@ public class OffersController implements OffersOperations {
     @Post("/")
     @Override
     public Mono<Offer> save(
-            String vendor,
-            String pet,
+            String slug,
             BigDecimal price,
             Duration duration,
             String description) {
         return offersRepository.save(
-                vendor, pet, price, duration, description
+                slug, price, duration, description
         );
     }
 }

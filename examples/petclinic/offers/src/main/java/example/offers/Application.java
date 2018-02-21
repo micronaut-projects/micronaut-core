@@ -16,7 +16,9 @@
 package example.offers;
 
 import example.api.v1.Offer;
+import example.offers.client.v1.Pet;
 import example.offers.client.v1.PetClient;
+import io.reactivex.Maybe;
 import io.reactivex.functions.Consumer;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
@@ -52,7 +54,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
-        petClient.find("Fred", "Dino")
+       petClient.find("harry")
                 .doOnError(throwable -> {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("No pet found: " + throwable.getMessage(), throwable);
@@ -61,11 +63,10 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                 .onErrorComplete()
                 .subscribe(pet -> {
                             Mono<Offer> savedOffer = offersRepository.save(
-                                    pet.getVendor(),
-                                    pet.getName(),
+                                    pet.getSlug(),
                                     new BigDecimal("49.99"),
                                     Duration.of(2, ChronoUnit.HOURS),
-                                    "Friendly and cute Dinosaur wants home!");
+                                    "Cut dog!");
                             savedOffer.subscribe((offer) -> {
                             }, throwable -> {
                                 if (LOG.isErrorEnabled()) {
@@ -75,7 +76,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                         }
                 );
 
-        petClient.find("Arthur", "Babe")
+        petClient.find("malfoy")
                 .doOnError(throwable -> {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("No pet found: " + throwable.getMessage(), throwable);
@@ -84,11 +85,10 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                 .onErrorComplete()
                 .subscribe(pet -> {
                             Mono<Offer> savedOffer = offersRepository.save(
-                                    pet.getVendor(),
-                                    pet.getName(),
+                                    pet.getSlug(),
                                     new BigDecimal("29.99"),
                                     Duration.of(2, ChronoUnit.HOURS),
-                                    "Ping in the city!");
+                                    "Cut Cat");
                             savedOffer.subscribe((offer) -> {
                             }, throwable -> {
                                 if (LOG.isErrorEnabled()) {

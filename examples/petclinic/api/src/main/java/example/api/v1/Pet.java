@@ -23,13 +23,17 @@ import javax.validation.constraints.NotBlank;
  */
 public class Pet {
 
+    private String slug;
+    private String image;
     private String name;
     protected PetType type = PetType.DOG;
     private String vendor;
 
-    public Pet(String vendor, String name) {
+    public Pet(String vendor, String name, String slug, String image) {
         this.vendor = vendor;
         this.name = name;
+        this.slug = slug;
+        this.image = image;
     }
 
     Pet() {
@@ -43,6 +47,16 @@ public class Pet {
     @NotBlank
     public String getName() {
         return name;
+    }
+
+    @NotBlank
+    public String getSlug() {
+        return slug;
+    }
+
+    @NotBlank
+    public String getImage() {
+        return image;
     }
 
     public PetType getType() {
@@ -60,6 +74,14 @@ public class Pet {
         this.name = name;
     }
 
+    void setImage(String image) {
+        this.image = image;
+    }
+
+    void setSlug(String image) {
+        this.image = image;
+    }
+
     void setVendor(String vendor) {
         this.vendor = vendor;
     }
@@ -70,6 +92,8 @@ public class Pet {
                 "name='" + name + '\'' +
                 ", type=" + type +
                 ", vendor='" + vendor + '\'' +
+                ", slug='" + vendor + '\'' +
+                ", image='" + image + '\'' +
                 '}';
     }
 }

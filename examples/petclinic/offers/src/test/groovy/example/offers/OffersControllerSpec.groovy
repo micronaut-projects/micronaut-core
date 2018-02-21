@@ -16,6 +16,7 @@
 package example.offers
 
 import example.api.v1.Offer
+import example.api.v1.PetType
 import example.offers.client.v1.Pet
 import org.particleframework.context.ApplicationContext
 import org.particleframework.runtime.server.EmbeddedServer
@@ -47,22 +48,21 @@ class OffersControllerSpec extends Specification {
         given:
         TestOffersClient offersClient = embeddedServer.applicationContext.getBean(TestOffersClient)
 
-
         when:
-        offersClient.save(vendor, pet, price, duration, description).block()
+        offersClient.save(slug, price, duration, description).block()
 
         then:
         thrown(ConstraintViolationException)
 
         where:
-        vendor | pet     | price  | duration                            | description
-        null   | null    | null   | null                                | null
-        "Fred" | null    | null   | null                                | null
-        "Fred" | "Dino " | null   | null                                | null
-        "Fred" | "Dino " | 10.0   | null                                | null
-        "Fred" | "Dino " | 10.0   | Duration.of(10, ChronoUnit.SECONDS) | null
-        "Fred" | "Dino " | 10.400 | Duration.of(10, ChronoUnit.SECONDS) | "desc"
-        "Fred" | "Dino " | 10.0   | null                                | "desc"
+        slug   | price  | duration                            | description
+        null   | null   | null                                | null
+        null   | null   | null                                | null
+        "dino" | null   | null                                | null
+        "dino" | 10.0   | null                                | null
+        "dino" | 10.0   | Duration.of(10, ChronoUnit.SECONDS) | null
+        "dino" | 10.400 | Duration.of(10, ChronoUnit.SECONDS) | "desc"
+        "dino" | 10.0   | null                                | "desc"
     }
 
     void "test save offer for pet that doesn't exist"() {
@@ -71,7 +71,6 @@ class OffersControllerSpec extends Specification {
 
         when:
         Offer offer = offersClient.save(
-                "not there",
                 "not there",
                 10.0,
                 Duration.of(10, ChronoUnit.SECONDS),
@@ -88,25 +87,24 @@ class OffersControllerSpec extends Specification {
         given:
         TestOffersClient offersClient = embeddedServer.applicationContext.getBean(TestOffersClient)
         TestPetClientFallback petClientFallback = embeddedServer.applicationContext.getBean(TestPetClientFallback)
-        def pet = new Pet("Fred", "Dino")
+        def pet = new Pet("Fred", "Harry", "harry", "photo-1457914109735-ce8aba3b7a79.jpeg")
         petClientFallback.addPet(pet)
 
         when: "An offer is saved"
         Offer offer = offersClient.save(
-                pet.vendor,
-                pet.name,
+                pet.slug,
                 10.0,
                 Duration.of(10, ChronoUnit.SECONDS),
-                "Friendly Dinosaur"
+                "Friendly Dog"
 
         ).block()
 
         then: "The offer was created correctly"
         offer != null
-        offer.pet.name == "Dino"
+        offer.pet.name == "Harry"
         offer.pet.vendor == "Fred"
         offer.price == 10.0
-        offer.description == "Friendly Dinosaur"
+        offer.description == "Friendly Dog"
     }
 
 }
