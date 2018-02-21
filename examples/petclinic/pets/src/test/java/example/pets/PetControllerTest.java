@@ -17,6 +17,7 @@ package example.pets;
 
 import com.mongodb.reactivestreams.client.MongoClient;
 import example.api.v1.Pet;
+import example.api.v1.PetType;
 import io.reactivex.Flowable;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -36,6 +37,8 @@ import static org.junit.Assert.*;
  * @since 1.0
  */
 public class PetControllerTest {
+
+    FriendlyUrl friendlyUrl = new FriendlyUrl();
 
     static EmbeddedServer embeddedServer;
 
@@ -73,24 +76,26 @@ public class PetControllerTest {
         List<PetEntity> pets = client
                             .list()
                             .blockingGet();
-        assertEquals(pets.size(), 0);
+        assertEquals(0, pets.size());
 
         try {
-            client.save(new PetEntity("", "")).blockingGet();
+            client.save(new PetEntity("", "", "", "")).blockingGet();
             fail("Should have thrown a constraint violation");
         } catch (HttpClientResponseException e) {
             assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
         }
 
-        Pet dino = client.save(new PetEntity("Fred", "Dino")).blockingGet();
+        PetEntity entity = new PetEntity("Fred", "Harry",friendlyUrl.sanitizeWithDashes("Harry"), "photo-1457914109735-ce8aba3b7a79.jpeg")
+                .type(PetType.DOG);
+        Pet harry = client.save(entity).blockingGet();
 
-        assertNotNull(dino);
+        assertNotNull(harry);
 
         pets = client
                 .list()
                 .blockingGet();
         assertEquals(pets.size(), 1);
-        assertEquals(pets.iterator().next().getName(), dino.getName());
+        assertEquals(pets.iterator().next().getName(), harry.getName());
 
     }
 
@@ -98,10 +103,13 @@ public class PetControllerTest {
     public void testFindByVendor() {
         PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
 
-        Pet dino = client.save(new PetEntity("Fred", "Dino")).blockingGet();
+        PetEntity entity = new PetEntity("Fred", "Ron", friendlyUrl.sanitizeWithDashes("Ron"), "photo-1442605527737-ed62b867591f.jpeg")
+                .type(PetType.DOG);
 
-        assertNotNull(dino);
+        Pet ron = client.save(entity).blockingGet();
 
-        assertEquals(2, client.byVendor("Fred").blockingGet().size());
+        assertNotNull(ron);
+
+        assertEquals(4, client.byVendor("Fred").blockingGet().size());
     }
 }

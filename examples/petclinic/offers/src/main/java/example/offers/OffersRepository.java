@@ -33,9 +33,7 @@ import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -61,29 +59,26 @@ public class OffersRepository implements OffersOperations {
     public Mono<Offer> random() {
         RedisReactiveCommands<String, String> reactiveRedis = redisConnection.reactive();
         return reactiveRedis.randomkey().flatMap(key -> {
-            Flux<KeyValue<String, String>> values = reactiveRedis.hmget(key, "price", "description");
-
-            Map<String, String> map = new HashMap<>(3);
-            return values.reduce(map, (all, keyValue) -> {
-                all.put(keyValue.getKey(), keyValue.getValue());
-                return all;
-            })
-            .map(ConvertibleValues::of)
-            .map(entries -> {
-                String[] vendorAndName = key.split(":");
-                String description = entries.get("description", String.class).orElseThrow(() -> new IllegalStateException("No description"));
-                BigDecimal price = entries.get("price", BigDecimal.class).orElseThrow(() -> new IllegalStateException("No description"));
-
-                return new Offer(new Pet(vendorAndName[0], vendorAndName[1]), description, price);
-            });
+                Flux<KeyValue<String, String>> values = reactiveRedis.hmget(key, "price", "description");
+                Map<String, String> map = new HashMap<>(3);
+                return values.reduce(map, (all, keyValue) -> {
+                    all.put(keyValue.getKey(), keyValue.getValue());
+                    return all;
+                })
+                .map(ConvertibleValues::of)
+                .map(entries -> {
+                    String description = entries.get("description", String.class).orElseThrow(() -> new IllegalStateException("No description"));
+                    BigDecimal price = entries.get("price", BigDecimal.class).orElseThrow(() -> new IllegalStateException("No price"));
+                    Pet pet = petClient.find(key).blockingGet(); // TODO do this in a non blocking way
+                    return new Offer(pet, description, price);
+                });
         });
     }
 
     /**
      * Save an offer for the given pet, vendor etc.
      *
-     * @param vendor The vendor
-     * @param pet The pet
+     * @param slug pet's slug
      * @param price The price
      * @param duration The duration of the offer
      * @param description The description of the offer
@@ -91,14 +86,13 @@ public class OffersRepository implements OffersOperations {
      */
     @Override
     public Mono<Offer> save(
-            String vendor,
-            String pet,
+            String slug,
             BigDecimal price,
             Duration duration,
             String description) {
 
         return Mono.from(petClient.find(
-                vendor, pet
+                slug
         ).toFlowable())
          .flatMap(petInstance -> {
              ZonedDateTime expiryDate = ZonedDateTime.now().plus(duration);
@@ -107,17 +101,22 @@ public class OffersRepository implements OffersOperations {
                      description,
                      price
              );
+             Map<String, String> data = dataOf(price, description, offer.getCurrency());
 
-             Map<String, String> data = new LinkedHashMap<>(4);
-             data.put("currency", offer.getCurrency().getCurrencyCode());
-             data.put("price", offer.getPrice().toString());
-             data.put("description" ,offer.getDescription());
-             String key = petInstance.key();
+             String key = petInstance.getSlug();
              RedisReactiveCommands<String, String> redisApi = redisConnection.reactive();
              return redisApi.hmset(key,data)
                             .flatMap(success-> redisApi.expireat(key, expiryDate.toEpochSecond() ))
                             .map(ok -> offer) ;
          });
-
     }
+
+    Map<String, String> dataOf(BigDecimal price, String description, Currency currency) {
+        Map<String, String> data = new LinkedHashMap<>(4);
+        data.put("currency", currency.getCurrencyCode());
+        data.put("price", price.toString());
+        data.put("description" ,description);
+        return data;
+    }
+
 }

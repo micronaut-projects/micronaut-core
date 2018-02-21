@@ -7,7 +7,7 @@ import groovy.transform.ToString
 @ToString
 @CompileStatic
 class PetViewModel {
-    Long id
+    String slug
     String image
     PetType type
 }

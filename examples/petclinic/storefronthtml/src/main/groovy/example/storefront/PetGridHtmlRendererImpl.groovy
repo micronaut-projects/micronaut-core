@@ -20,9 +20,9 @@ class PetGridHtmlRendererImpl implements PetGridHtmlRenderer {
     @Override
     Single<String> renderPetGrid() {
         Single<String> container = fetcher.fetchPets()
-                .map { PetListViewModel x -> htmlRenderer.renderPetGrid(x) }
-                .reduce('<h2>Pets</h2>', { String s, String s2 -> s + s2 })
-
+                .map { List<PetListViewModel> l ->
+            l.collect { x -> htmlRenderer.renderPetGrid(x) }.join('')
+        }
         htmlRenderer.renderContainer(NavBar.PETS, container)
     }
 }
