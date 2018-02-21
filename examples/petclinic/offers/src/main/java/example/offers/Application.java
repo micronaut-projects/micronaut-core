@@ -16,10 +16,7 @@
 package example.offers;
 
 import example.api.v1.Offer;
-import example.offers.client.v1.Pet;
 import example.offers.client.v1.PetClient;
-import io.reactivex.Maybe;
-import io.reactivex.functions.Consumer;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
 import org.particleframework.runtime.server.event.ServerStartupEvent;

@@ -30,6 +30,9 @@ public interface VendorOperations {
     @Get("/")
     Single<List<Vendor>> list();
 
+    @Get("/names")
+    Single<List<String>> names();
+
     @Post("/")
     Single<Vendor> save(String name);
 }

@@ -33,13 +33,14 @@ public class Pet {
     private String vendor;
 
     @JsonCreator
-    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name, @JsonProperty("slug") String slug, @JsonProperty("image") String image) {
+    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name,  @JsonProperty("image") String image) {
         this.vendor = vendor;
         this.name = name;
-        this.slug = slug;
         this.image = image;
     }
 
+    Pet() {
+    }
 
     @NotBlank
     public String getVendor() {
@@ -53,7 +54,10 @@ public class Pet {
 
     @NotBlank
     public String getSlug() {
-        return slug;
+        if(slug != null) {
+            return slug;
+        }
+        return vendor + "-" + name;
     }
 
     @NotBlank
@@ -70,6 +74,30 @@ public class Pet {
             this.type = type;
         }
         return this;
+    }
+
+    public Pet slug(String slug) {
+        if(slug != null) {
+            this.slug = slug;
+        }
+        return this;
+    }
+
+
+    protected void setImage(String image) {
+        this.image = image;
+    }
+
+    protected void setSlug(String slug) {
+        this.slug = slug;
+    }
+
+    protected void setType(PetType type) {
+        this.type = type;
+    }
+
+    void setVendor(String vendor) {
+        this.vendor = vendor;
     }
 
     @Override

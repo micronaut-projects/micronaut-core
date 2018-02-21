@@ -20,6 +20,7 @@ import groovy.json.JsonOutput
 import org.grails.datastore.mapping.validation.ValidationException
 import org.particleframework.configuration.neo4j.bolt.Neo4jBoltSettings
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.http.HttpStatus
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -35,7 +36,7 @@ import spock.lang.Stepwise
 class TopicRepositorySpec extends Specification{
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['neo4j.uri': Neo4jBoltSettings.DEFAULT_URI,
+            ['neo4j.uri': "bolt://localhost:${SocketUtils.findAvailableTcpPort()}",
             'neo4j.embedded.ephemeral':true]
     )
 

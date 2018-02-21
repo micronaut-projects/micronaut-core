@@ -1,9 +1,7 @@
 package example.pets;
 
-import javax.inject.Singleton;
 import java.text.Normalizer;
 
-@Singleton
 public class FriendlyUrl {
 
     /**
@@ -13,7 +11,7 @@ public class FriendlyUrl {
      * Borrowed from Wordpress: file wp-includes/formatting.php, function sanitize_title_with_dashes
      * http://core.svn.wordpress.org/trunk/wp-includes/formatting.php
      */
-    public String sanitizeWithDashes(String text) {
+    public static String sanitizeWithDashes(String text) {
 
         if ( text == null ) {
             return "";
@@ -62,7 +60,7 @@ public class FriendlyUrl {
      * If there are no accent characters, then the string given is just returned.
      *
      */
-    private String removeAccents(String  text) {
+    private static String removeAccents(String  text) {
         return Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     }

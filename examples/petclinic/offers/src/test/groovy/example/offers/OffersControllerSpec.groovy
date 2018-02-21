@@ -16,8 +16,7 @@
 package example.offers
 
 import example.api.v1.Offer
-import example.api.v1.PetType
-import example.offers.client.v1.Pet
+import example.api.v1.Pet
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.runtime.server.EmbeddedServer
@@ -89,7 +88,7 @@ class OffersControllerSpec extends Specification {
         given:
         TestOffersClient offersClient = embeddedServer.applicationContext.getBean(TestOffersClient)
         TestPetClientFallback petClientFallback = embeddedServer.applicationContext.getBean(TestPetClientFallback)
-        def pet = new Pet("Fred", "Harry", "harry", "photo-1457914109735-ce8aba3b7a79.jpeg")
+        def pet = new Pet("Fred", "Harry",  "photo-1457914109735-ce8aba3b7a79.jpeg")
         petClientFallback.addPet(pet)
 
         when: "An offer is saved"

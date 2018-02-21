@@ -15,7 +15,7 @@
  */
 package example.offers
 
-import example.offers.client.v1.Pet
+import example.api.v1.Pet
 import example.offers.client.v1.PetClient
 import io.reactivex.Maybe
 import org.particleframework.http.client.Fallback

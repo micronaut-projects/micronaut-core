@@ -23,7 +23,10 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.particleframework.configuration.mongo.reactive.MongoSettings;
 import org.particleframework.context.ApplicationContext;
+import org.particleframework.core.io.socket.SocketUtils;
+import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -38,7 +41,6 @@ import static org.junit.Assert.*;
  */
 public class PetControllerTest {
 
-    FriendlyUrl friendlyUrl = new FriendlyUrl();
 
     static EmbeddedServer embeddedServer;
 
@@ -46,7 +48,8 @@ public class PetControllerTest {
     public static void setup() {
         embeddedServer = ApplicationContext.run(
                 EmbeddedServer.class,
-                Collections.singletonMap(
+                CollectionUtils.mapOf(
+                        MongoSettings.MONGODB_URI, "mongodb://localhost:" + SocketUtils.findAvailableTcpPort(),
                         "consul.client.registration.enabled",false
                 )
         );
@@ -79,17 +82,21 @@ public class PetControllerTest {
         assertEquals(0, pets.size());
 
         try {
-            client.save(new PetEntity("", "", "", "")).blockingGet();
+            client.save(new PetEntity("", "", "")).blockingGet();
             fail("Should have thrown a constraint violation");
         } catch (HttpClientResponseException e) {
             assertEquals(e.getStatus(), HttpStatus.BAD_REQUEST);
         }
 
-        PetEntity entity = new PetEntity("Fred", "Harry",friendlyUrl.sanitizeWithDashes("Harry"), "photo-1457914109735-ce8aba3b7a79.jpeg")
-                .type(PetType.DOG);
+        PetEntity entity = new PetEntity("Fred", "Harry","photo-1457914109735-ce8aba3b7a79.jpeg")
+                .type(PetType.CAT);
         Pet harry = client.save(entity).blockingGet();
 
         assertNotNull(harry);
+
+        assertEquals(harry.getImage(), entity.getImage());
+        assertEquals(harry.getName(), entity.getName());
+        assertEquals(harry.getType(), entity.getType());
 
         pets = client
                 .list()
@@ -103,13 +110,13 @@ public class PetControllerTest {
     public void testFindByVendor() {
         PetControllerTestClient client = embeddedServer.getApplicationContext().getBean(PetControllerTestClient.class);
 
-        PetEntity entity = new PetEntity("Fred", "Ron", friendlyUrl.sanitizeWithDashes("Ron"), "photo-1442605527737-ed62b867591f.jpeg")
+        PetEntity entity = new PetEntity("Fred", "Ron", "photo-1442605527737-ed62b867591f.jpeg")
                 .type(PetType.DOG);
 
         Pet ron = client.save(entity).blockingGet();
 
         assertNotNull(ron);
 
-        assertEquals(4, client.byVendor("Fred").blockingGet().size());
+        assertEquals(1, client.byVendor("Fred").blockingGet().size());
     }
 }

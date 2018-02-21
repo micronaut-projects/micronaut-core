@@ -33,6 +33,11 @@ interface VendorService {
     List<Vendor> list()
 
     /**
+     * @return list the vendor names
+     */
+    List<String> listVendorName()
+
+    /**
      * Save a new vendor
      * @param name The name of the vendor
      * @return The vendor instance
