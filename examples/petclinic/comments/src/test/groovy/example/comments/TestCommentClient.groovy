@@ -27,6 +27,13 @@ import javax.validation.constraints.NotBlank
  */
 @Client('/${comments.api.version}/topics')
 interface TestCommentClient extends CommentOperations<Comment>{
+
+    @Override
+    HttpStatus addReply(@NotBlank Long id, @NotBlank String poster, @NotBlank String content) 
+
+    @Override
+    Map<String, Object> expand(Long id) 
+
     @Override
     List<Comment> list(String topic)
 

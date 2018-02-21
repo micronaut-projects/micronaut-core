@@ -15,6 +15,6 @@ dependencies {
     testCompile("org.spockframework:spock-core:1.1-groovy-2.4") {
         exclude module:'groovy-all'
     }
-
+    compile "org.codehaus.groovy:groovy-json:$groovyVersion"
     testRuntime "org.neo4j.test:neo4j-harness:3.3.3"
 }
