@@ -24,7 +24,7 @@ import org.particleframework.http.client.Client
  * @author graemerocher
  * @since 1.0
  */
-@Client(id = "vendor", path = "/v1/vendors")
+@Client(id = "vendors", path = "/v1/vendors")
 interface VendorClient extends VendorOperations{
     @Override
     Single<Vendor> save(String name)
