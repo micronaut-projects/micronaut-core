@@ -8,6 +8,6 @@ import io.reactivex.Single
 
 @CompileStatic
 interface PetFetcher {
-    Flowable<PetListViewModel> fetchPets()
-    Single<PetViewModel> findById(Long id)
+    Single<List<PetListViewModel>> fetchPets()
+    Single<PetViewModel> findBySlug(String slug)
 }

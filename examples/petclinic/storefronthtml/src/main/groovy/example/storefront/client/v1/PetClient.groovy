@@ -15,16 +15,23 @@
  */
 package example.storefront.client.v1
 
-import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.annotation.JsonProperty
+import example.api.v1.PetOperations
+import io.reactivex.Maybe
+import io.reactivex.Single
+import org.particleframework.http.annotation.Get
+import org.particleframework.http.client.Client
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-class Pet extends example.api.v1.Pet {
-    @JsonCreator
-    Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name, @JsonProperty("slug") String slug, @JsonProperty("image") String image) {
-        super(vendor, name, slug, image)
-    }
+@Client(id = "pets", path = "/v1/pets")
+interface PetClient extends PetOperations<Pet> {
+
+    @Override
+    Single<List<Pet>> byVendor(String name)
+
+    @Override
+    Maybe<Pet> find(String slug)
+
 }

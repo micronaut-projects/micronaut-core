@@ -1,10 +1,12 @@
 package example.mail;
 
+import io.reactivex.Flowable;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.http.HttpRequest;
+import org.particleframework.http.HttpResponse;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.runtime.server.EmbeddedServer;
 
@@ -41,8 +43,7 @@ public class MailControllerTest {
     public void testMailSend() throws Exception {
         //String requestBody = "{\"cc\": [\"sergio.delamo@softamo.com\"],\"recipient\": \"sergio.delamo@softamo.com\", \"subject\": \"Interested in Pet\", \"replyTo\": \"sergio.delamo@softamo.com\", \"htmlBody\": \"Body html\", \"bcc\": [\"sergio.delamo@softamo.com\"]}";
         String requestBody = "{\"recipient\": \"sergio.delamo@softamo.com\"}";
-        String body = client.toBlocking().retrieve(HttpRequest.POST("/mail/send",requestBody));
-        assertNotNull(body);
-        assertEquals(body, "Hello sergio.delamo@softamo.com");
+        HttpResponse rsp = client.toBlocking().exchange(HttpRequest.POST("/mail/send",requestBody));
+        assertEquals(200, rsp.getStatus().getCode());
     }
 }

@@ -13,18 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.storefront.client.v1
+package example.storefront.client.v1.fallback;
 
-import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.annotation.JsonProperty
+import example.api.v1.Vendor;
+import example.api.v1.VendorOperations;
+import io.reactivex.Single;
+import org.particleframework.http.client.Fallback;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-class Pet extends example.api.v1.Pet {
-    @JsonCreator
-    Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name, @JsonProperty("slug") String slug, @JsonProperty("image") String image) {
-        super(vendor, name, slug, image)
+@Fallback
+public class VendorClientFallback implements VendorOperations {
+    @Override
+    public Single<List<Vendor>> list() {
+        return Single.just(Collections.emptyList());
+    }
+
+    @Override
+    public Single<Vendor> save(String name) {
+        return Single.just(new Vendor(name));
     }
 }

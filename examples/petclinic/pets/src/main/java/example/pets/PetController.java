@@ -66,13 +66,11 @@ public class PetController implements PetOperations<PetEntity> {
     }
 
     @Override
-    public Maybe<PetEntity> find(String vendor, String name) {
+    public Maybe<PetEntity> find(String slug) {
         return Flowable.fromPublisher(
                 getCollection()
-                .find(and(
-                        eq("vendor", vendor),
-                        eq("name", name
-                )))).firstElement();
+                        .find(eq("slug", slug))
+        ).firstElement();
     }
 
     @Override

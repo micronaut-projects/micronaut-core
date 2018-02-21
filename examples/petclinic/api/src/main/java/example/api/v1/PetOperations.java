@@ -38,8 +38,8 @@ public interface PetOperations<T extends Pet> {
     @Get("/vendor/{name}")
     Single<List<T>> byVendor(String name);
 
-    @Get("/vendor/{vendor}/{name}")
-    Maybe<T> find(String vendor, String name);
+    @Get("/{slug}")
+    Maybe<T> find(String slug);
 
     @Post("/")
     Single<T> save(@Valid @Body T pet);

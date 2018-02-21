@@ -33,8 +33,12 @@ public class PetEntity extends Pet {
             @JsonProperty("vendor")
             @BsonProperty("vendor") String vendor,
             @JsonProperty("name")
-            @BsonProperty("name") String name) {
-        super(vendor, name);
+            @BsonProperty("name") String name,
+            @JsonProperty("slug")
+            @BsonProperty("slug") String slug,
+            @JsonProperty("image")
+            @BsonProperty("image") String image) {
+        super(vendor, name, slug, image);
     }
 
     @Override
