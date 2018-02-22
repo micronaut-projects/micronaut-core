@@ -15,19 +15,11 @@
  */
 package example.function.tweet
 
-import groovy.transform.CompileStatic
-import groovy.transform.Field
-import twitter4j.Status
-import twitter4j.Twitter
 
-import javax.inject.Inject
-
-
-@Field @Inject Twitter twitter
-
-@CompileStatic
-UpdateResult updateStatus(Message status) {
-    Status s = twitter.updateStatus(status.text)
-    URL url= new URL("https://twitter.com/$s.user.screenName/status/${s.id}")
-    return new UpdateResult(url, s.createdAt.time)
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+class Message {
+    String text
 }
