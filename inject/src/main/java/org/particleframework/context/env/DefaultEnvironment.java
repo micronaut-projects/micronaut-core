@@ -23,7 +23,6 @@ import org.particleframework.core.convert.TypeConverter;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.io.scan.CachingClassPathAnnotationScanner;
 import org.particleframework.core.io.scan.ClassPathAnnotationScanner;
-import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.io.service.ServiceDefinition;
 import org.particleframework.core.io.service.SoftServiceLoader;
 import org.particleframework.core.naming.NameUtils;
@@ -117,7 +116,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.put(propertySource.getName(),propertySource);
         if(isRunning()) {
-            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
+            processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
     }

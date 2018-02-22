@@ -2,7 +2,6 @@ package org.particleframework.context.env;
 
 import org.particleframework.core.order.Ordered;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -29,7 +28,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @return Whether the property source has upper case under score separated keys
      */
     default PropertyConvention getConvention() {
-        return PropertyConvention.LOWER_CASE_DOT_SEPARATED;
+        return PropertyConvention.JAVA_PROPERTIES;
     }
 
     /**
@@ -41,6 +40,22 @@ public interface PropertySource extends Iterable<String>, Ordered {
      */
     static PropertySource of(String name, Map<String, Object> map) {
         return new MapPropertySource(name, map);
+    }
+
+    /**
+     * Create a {@link PropertySource} from the given map
+     *
+     * @param name The name of the property source
+     * @param map The map
+     * @return The {@link PropertySource}
+     */
+    static PropertySource of(String name, Map<String, Object> map, PropertyConvention convention) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public PropertyConvention getConvention() {
+                return convention;
+            }
+        };
     }
     /**
      * Create a {@link PropertySource} named {@link Environment#DEFAULT_NAME} from the given map
@@ -57,10 +72,10 @@ public interface PropertySource extends Iterable<String>, Ordered {
         /**
          * Upper case separated by under scores (environment variable style)
          */
-        UPPER_CASE_UNDER_SCORE_SEPARATED,
+        ENVIRONMENT_VARIABLE,
         /**
          * Lower case separated by dots (java properties file style)
          */
-        LOWER_CASE_DOT_SEPARATED
+        JAVA_PROPERTIES
     }
 }
