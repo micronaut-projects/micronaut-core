@@ -24,11 +24,17 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+
+    @Unroll
+    void "test resolve environment properties"() {
+
+    }
+
     @Unroll
     void "test resolve property #property value for #key"() {
         given:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-                PropertySource.of("test", [(property): value])
+                PropertySource.of("test", [(property): value], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
         )
 
         expect:
@@ -37,16 +43,14 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty(key, type).get() == expected
 
         where:
-        property       | value       | key            | type    | expected
-        'foo.bar'      | 'test'      | 'foo.bar'      | String  | 'test'
-        'foo.bar'      | '10'        | 'foo.bar'      | Integer | 10
-        'foo.bar'      | ['10']      | 'foo.bar[0]'   | Integer | 10
-        'foo.bar'      | [foo: '10'] | 'foo.bar[foo]' | Integer | 10
-//        'foo.bar.baz'  | '10'        | 'foo.bar[baz]' | Integer | 10
-        'foo.bar[0]'   | '10'        | 'foo.bar[0]'   | Integer | 10
-        'foo.bar[0]'   | '10'        | 'foo.bar'      | List    | ['10']
-        'foo.bar[baz]' | '10'        | 'foo.bar[baz]' | Integer | 10
-        'foo.bar[baz]' | '10'        | 'foo.bar'      | Map     | [baz: '10']
+        property                      | value | key                           | type   | expected
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.accesstoken'  | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.OAuth2AccessToken'   | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2accesstoken'   | String | 'xxx'
+
     }
 
     @Unroll
@@ -68,21 +72,21 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.containsProperty(key)
 
         where:
-        property      | value                                       | key           | type    | expected
-        'my.property' | '/${foo.bar}/stuff'                         | 'my.property' | String  | '/10/stuff'
-        'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
-        'my.property' | '${not.there:foo.bar:50}'                   | 'my.property' | String  | '10'
-        'my.property' | '${not.there:also.not.there:50}'            | 'my.property' | String  | '50'
-        'my.property' | '${not.there:also.not.there:}'              | 'my.property' | String  | ''
-        'my.property' | '${not.there:USER:50}'                      | 'my.property' | String  | System.getenv('USER')
-        'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}' | 'my.property' | String  | '10 + 50 + 10'
-        'my.property' | '${foo.bar}'                                | 'my.property' | String  | '10'
-        'my.property' | '${not.there:50}'                           | 'my.property' | String  | '50'
-        'my.property' | '${foo.bar} + ${foo.bar}'                   | 'my.property' | String  | '10 + 10'
-        'my.property' | '${foo.bar[0]}'                             | 'my.property' | List    | ['10']
-        'my.property' | '${foo.bar[0]}'                             | 'my.property' | Integer | 10
-        'my.property' | '${USER}'                                   | 'my.property' | String  | System.getenv('USER')
-        'my.property' | '${JAVA_HOME}'                              | 'my.property' | String  | System.getenv('JAVA_HOME')
+        property      | value                                                | key           | type    | expected
+        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
+        'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '${not.there:also.not.there:50}'                     | 'my.property' | String  | '50'
+        'my.property' | '${not.there:also.not.there:}'                       | 'my.property' | String  | ''
+        'my.property' | '${not.there:USER:50}'                               | 'my.property' | String  | System.getenv('USER')
+        'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}'          | 'my.property' | String  | '10 + 50 + 10'
+        'my.property' | '${foo.bar}'                                         | 'my.property' | String  | '10'
+        'my.property' | '${not.there:50}'                                    | 'my.property' | String  | '50'
+        'my.property' | '${foo.bar} + ${foo.bar}'                            | 'my.property' | String  | '10 + 10'
+        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | List    | ['10']
+        'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
+        'my.property' | '${USER}'                                            | 'my.property' | String  | System.getenv('USER')
+        'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
     }
 
 

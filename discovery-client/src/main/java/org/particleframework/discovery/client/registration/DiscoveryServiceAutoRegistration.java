@@ -19,12 +19,14 @@ import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
+import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.consul.ConsulConfiguration;
 import org.particleframework.discovery.registration.AutoRegistration;
 import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.discovery.registration.RegistrationException;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.runtime.server.EmbeddedServerInstance;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -45,23 +47,8 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
     protected void performRegistration(
             String discoveryService,
             RegistrationConfiguration registration,
-            String applicationName,
+            ServiceInstance instance,
             Observable<HttpStatus> registrationObservable) {
-        if (registration.isFailFast()) {
-            // will throw an exception if a failure response code is called
-            try {
-                registrationObservable.blockingSingle();
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Registered service [{}] with {}", applicationName, discoveryService);
-                }
-            } catch (NoSuchElementException e) {
-                // timeouts throw NoSuchElementException from RxJava for some inexplicable reason
-                throw new RegistrationException("Retry timeout error occurred during service registration with Consul");
-            } catch (Throwable e) {
-                String message = getErrorMessage(discoveryService, e);
-                throw new RegistrationException(message, e);
-            }
-        } else {
             registrationObservable.subscribe(new Observer<HttpStatus>() {
                 @Override
                 public void onSubscribe(Disposable d) {
@@ -71,7 +58,7 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                 @Override
                 public void onNext(HttpStatus httpStatus) {
                     if (LOG.isInfoEnabled()) {
-                        LOG.info("Registered service [{}] with {}", applicationName, discoveryService);
+                        LOG.info("Registered service [{}] with {}", instance.getId(), discoveryService);
                     }
                 }
 
@@ -81,6 +68,9 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                         String message = getErrorMessage(discoveryService, t);
                         LOG.error(message, t);
                     }
+                    if(registration.isFailFast() && instance instanceof EmbeddedServerInstance) {
+                        ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
+                    }
                 }
 
                 @Override
@@ -88,7 +78,6 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
 
                 }
             });
-        }
     }
 
     private String getErrorMessage(String discoveryService, Throwable e) {

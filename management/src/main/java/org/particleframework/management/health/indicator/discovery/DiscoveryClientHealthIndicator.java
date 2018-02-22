@@ -20,6 +20,7 @@ import io.reactivex.functions.Function;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.health.HealthStatus;
 import org.particleframework.management.health.indicator.HealthIndicator;
 import org.particleframework.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
@@ -64,7 +65,7 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                         allServiceMap.putAll(service);
                         return allServiceMap;
                     }).map(details -> {
-                        HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription());
+                        HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.UP);
                         Stream<Map.Entry<String, List<ServiceInstance>>> entryStream = details.entrySet().stream();
                         Map<String, Object> value = entryStream.collect(
                                 Collectors.toMap(Map.Entry::getKey, entry ->
@@ -81,6 +82,10 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                         ));
                         return builder.build();
                     }).toFlowable();
+                }).onErrorReturn(throwable -> {
+                    HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.DOWN);
+                    builder.exception(throwable);
+                    return builder.build();
                 });
     }
 }

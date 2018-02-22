@@ -37,6 +37,8 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
 
     protected final ApplicationContext applicationContext;
     protected final boolean closeContext;
+    private FunctionExitHandler functionExitHandler = new DefaultFunctionExitHandler();
+
     @SuppressWarnings("unchecked")
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
@@ -66,6 +68,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
         }
     }
 
+
     @Override
     @Internal
     public void close() throws IOException {
@@ -84,6 +87,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
      */
     protected void run(String[] args, Function<ParseContext, ?> supplier) throws IOException {
         ApplicationContext applicationContext = this.applicationContext;
+        this.functionExitHandler = applicationContext.findBean(FunctionExitHandler.class).orElse(this.functionExitHandler);
         ParseContext context = new ParseContext(args);
         try {
             Object result = supplier.apply(context);
@@ -91,9 +95,10 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
 
                 FunctionRegistry bean = applicationContext.getBean(FunctionRegistry.class);
                 StreamFunctionExecutor.encode(applicationContext.getEnvironment(), bean, result.getClass(), result, System.out);
+                functionExitHandler.exitWithSuccess();
             }
         } catch (Exception e) {
-            FunctionApplication.exitWithError(context.debug, e);
+            functionExitHandler.exitWithError(e, context.debug);
         }
     }
 
@@ -133,7 +138,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
 
         public <T> T get(Class<T> type) {
             if (data == null) {
-                FunctionApplication.exitWithNoData();
+                functionExitHandler.exitWithNoData();
                 return null;
             } else {
                 if (ClassUtils.isJavaLangType(type)) {

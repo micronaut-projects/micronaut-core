@@ -31,7 +31,9 @@ import spock.lang.Specification
 class VendorControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, Collections.singletonMap(
+                    "consul.client.registration.enabled",false
+            ))
 
     @Shared VendorOperations vendorOperations = embeddedServer
                                                     .getApplicationContext()
@@ -42,17 +44,18 @@ class VendorControllerSpec extends Specification {
         List<example.api.v1.Vendor> vendors = vendorOperations.list().blockingGet()
 
         then:
-        vendors.size() == 0
+        vendors.size() == 3
     }
 
     void 'test save vendor'() {
         when:
-        example.api.v1.Vendor v = vendorOperations.save("Fred").blockingGet()
+        example.api.v1.Vendor v = vendorOperations.save("Bob").blockingGet()
 
         then:
         v != null
-        v.name == "Fred"
-        vendorOperations.list().blockingGet().size() == 1
+        v.name == "Bob"
+        vendorOperations.list().blockingGet().size() == 4
+        vendorOperations.names().blockingGet().contains("Bob")
 
     }
 

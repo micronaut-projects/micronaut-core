@@ -15,6 +15,9 @@
  */
 package example.api.v1;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import javax.validation.constraints.NotBlank;
 
 /**
@@ -23,13 +26,20 @@ import javax.validation.constraints.NotBlank;
  */
 public class Pet {
 
-    private final String name;
+    private String slug;
+    private String image;
+    private String name;
     protected PetType type = PetType.DOG;
-    private final String vendor;
+    private String vendor;
 
-    public Pet(String vendor, String name) {
+    @JsonCreator
+    public Pet(@JsonProperty("vendor") String vendor, @JsonProperty("name") String name,  @JsonProperty("image") String image) {
         this.vendor = vendor;
         this.name = name;
+        this.image = image;
+    }
+
+    Pet() {
     }
 
     @NotBlank
@@ -42,14 +52,52 @@ public class Pet {
         return name;
     }
 
+    @NotBlank
+    public String getSlug() {
+        if(slug != null) {
+            return slug;
+        }
+        return vendor + "-" + name;
+    }
+
+    @NotBlank
+    public String getImage() {
+        return image;
+    }
+
     public PetType getType() {
         return type;
     }
 
-    public void setType(PetType type) {
+    public Pet type(PetType type) {
         if(type != null) {
             this.type = type;
         }
+        return this;
+    }
+
+    public Pet slug(String slug) {
+        if(slug != null) {
+            this.slug = slug;
+        }
+        return this;
+    }
+
+
+    protected void setImage(String image) {
+        this.image = image;
+    }
+
+    protected void setSlug(String slug) {
+        this.slug = slug;
+    }
+
+    protected void setType(PetType type) {
+        this.type = type;
+    }
+
+    void setVendor(String vendor) {
+        this.vendor = vendor;
     }
 
     @Override
@@ -58,6 +106,8 @@ public class Pet {
                 "name='" + name + '\'' +
                 ", type=" + type +
                 ", vendor='" + vendor + '\'' +
+                ", slug='" + vendor + '\'' +
+                ", image='" + image + '\'' +
                 '}';
     }
 }

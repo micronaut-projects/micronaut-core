@@ -15,6 +15,7 @@
  */
 package org.particleframework.spring.core.env;
 
+import org.particleframework.context.env.PropertyPlaceholderResolver;
 import org.particleframework.core.reflect.ClassUtils;
 import org.springframework.core.env.PropertyResolver;
 
@@ -28,40 +29,46 @@ import java.util.Optional;
  */
 public class PropertyResolverAdapter implements PropertyResolver {
 
-    final org.particleframework.core.value.PropertyResolver target;
+    private final org.particleframework.core.value.PropertyResolver propertyResolver;
+    private final PropertyPlaceholderResolver placeholderResolver;
 
-    public PropertyResolverAdapter(org.particleframework.core.value.PropertyResolver target) {
-        this.target = target;
+    public PropertyResolverAdapter(
+            org.particleframework.core.value.PropertyResolver propertyResolver,
+            PropertyPlaceholderResolver placeholderResolver
+    )
+    {
+        this.propertyResolver = propertyResolver;
+        this.placeholderResolver = placeholderResolver;
     }
 
     @Override
     public boolean containsProperty(String key) {
-        return target.getProperty(key, String.class).isPresent();
+        return propertyResolver.getProperty(key, String.class).isPresent();
     }
 
     @Override
     public String getProperty(String key) {
-        return target.getProperty(key, String.class).orElse(null);
+        return propertyResolver.getProperty(key, String.class).orElse(null);
     }
 
     @Override
     public String getProperty(String key, String defaultValue) {
-        return target.getProperty(key, String.class, defaultValue);
+        return getProperty(key ,String.class, null);
     }
 
     @Override
     public <T> T getProperty(String key, Class<T> targetType) {
-        return target.getProperty(key, targetType).orElse(null);
+        return getProperty(key, targetType, null);
     }
 
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
-        return target.getProperty(key, targetType, defaultValue);
+        return propertyResolver.getProperty(key, targetType, defaultValue);
     }
 
     @Override
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
-        Optional<String> property = target.getProperty(key, String.class);
+        Optional<String> property = propertyResolver.getProperty(key, String.class);
         if(property.isPresent()) {
             Optional<Class> aClass = ClassUtils.forName(key, Thread.currentThread().getContextClassLoader());
             if(aClass.isPresent()) {
@@ -73,21 +80,25 @@ public class PropertyResolverAdapter implements PropertyResolver {
 
     @Override
     public String getRequiredProperty(String key) throws IllegalStateException {
-        return target.getProperty(key, String.class).orElseThrow(()-> new IllegalStateException("Property ["+key+"] not found"));
+        return getRequiredProperty(key, String.class);
     }
 
     @Override
     public <T> T getRequiredProperty(String key, Class<T> targetType) throws IllegalStateException {
-        return target.getProperty(key, targetType).orElseThrow(()-> new IllegalStateException("Property ["+key+"] not found"));
+        T v = getProperty(key, targetType, null);
+        if(v == null) {
+            throw new IllegalStateException("Property ["+key+"] not found");
+        }
+        return v;
     }
 
     @Override
     public String resolvePlaceholders(String text) {
-        throw new UnsupportedOperationException("Method resolvePlaceholders(..) not supported");
+        return placeholderResolver.resolvePlaceholders(text).orElse(null);
     }
 
     @Override
     public String resolveRequiredPlaceholders(String text) throws IllegalArgumentException {
-        throw new UnsupportedOperationException("Method resolvePlaceholders(..) not supported");
+        return placeholderResolver.resolvePlaceholders(text).orElseThrow(()-> new IllegalArgumentException("Unable to resolve placeholders for property: " + text));
     }
 }

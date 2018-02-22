@@ -17,6 +17,7 @@ package org.particleframework.configuration.lettuce.cache;
 
 import org.particleframework.cache.CacheConfiguration;
 import org.particleframework.cache.serialize.DefaultStringKeySerializer;
+import org.particleframework.configuration.lettuce.RedisSetting;
 import org.particleframework.context.annotation.Argument;
 import org.particleframework.context.annotation.EachProperty;
 import org.particleframework.core.serialize.ObjectSerializer;
@@ -30,10 +31,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(RedisCacheConfiguration.PREFIX)
+@EachProperty(RedisSetting.REDIS_CACHES)
 public class RedisCacheConfiguration extends CacheConfiguration {
-
-    public static final String PREFIX = "particle.redis.caches";
 
     protected String server;
 

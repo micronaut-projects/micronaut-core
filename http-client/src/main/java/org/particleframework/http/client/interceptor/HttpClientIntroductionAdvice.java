@@ -27,6 +27,7 @@ import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
@@ -48,6 +49,7 @@ import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -365,8 +367,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(Class<Object> declaringType, MethodInvocationContext<Object, Object> context) {
-        return beanContext
-                    .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        Optional<MethodExecutionHandle<Object>> result = beanContext
+                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        if(!result.isPresent()) {
+            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
+            for (Class i : allInterfaces) {
+                result = beanContext
+                            .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                if(result.isPresent()) {
+                    return result;
+                }
+            }
+        }
+        return result;
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
@@ -421,7 +434,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         objectMapper.configure(feature, false);
                     }
 
-                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper)));
+                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper, beanContext.getBean(ApplicationConfiguration.class))));
                 }
             }
             return new ClientRegistration(client, contextPath);

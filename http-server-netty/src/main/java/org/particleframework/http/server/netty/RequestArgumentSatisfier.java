@@ -29,6 +29,7 @@ import org.particleframework.http.server.binding.binders.NonBlockingBodyArgument
 import org.particleframework.web.router.RouteMatch;
 import org.particleframework.web.router.UnresolvedArgument;
 
+import javax.annotation.Nullable;
 import java.util.*;
 
 /**
@@ -114,6 +115,8 @@ class RequestArgumentSatisfier {
                                 }
                                 return result;
                             });
+                        } else if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                            argumentValues.put(argumentName, (UnresolvedArgument) () -> ArgumentBinder.BindingResult.EMPTY);
                         }
                     }
                 }

@@ -5,6 +5,7 @@ dependencies {
     compile "javax.validation:validation-api:$validationVersion"
     compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
     runtime "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+    runtime "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
 
     compile "io.reactivex.rxjava2:rxjava:$rxJava2Version"
 

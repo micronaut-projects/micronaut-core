@@ -19,6 +19,8 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.MapPropertySource
 import org.particleframework.http.HttpStatus
@@ -30,7 +32,34 @@ import spock.lang.Specification
  * @since 1.0
  */
 class FunctionTransformSpec extends Specification{
+    def cleanup() {
+        TestFunctionExitHandler.lastError = null
+    }
 
+    void 'test parse function'() {
+        given:
+        CompilerConfiguration configuration = new CompilerConfiguration()
+        configuration.optimizationOptions['particle.function.compile'] = true
+        GroovyClassLoader gcl = new GroovyClassLoader(FunctionTransformSpec.classLoader, configuration)
+
+        Class functionClass = gcl.parseClass('''
+int round(float value) {
+    Math.round(value) 
+}
+''')
+
+        expect:
+        functionClass.main(['-d','1.6f'] as String[])
+        TestFunctionExitHandler.lastError == null
+    }
+
+    void "run function main method"() {
+
+        expect:
+        RoundFunction.main(['-d','1.6f'] as String[])
+        TestFunctionExitHandler.lastError == null
+
+    }
     void "run function"() {
         expect:
         new RoundFunction().round(1.6f) == 4

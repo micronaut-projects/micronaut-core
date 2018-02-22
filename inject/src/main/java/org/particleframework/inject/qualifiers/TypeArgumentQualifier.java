@@ -52,7 +52,11 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     }
 
     protected boolean areTypesCompatible(Class[] classes) {
-        if(classes.length != typeArguments.length) {
+        if(classes.length == 0) {
+            // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
+            return true;
+        }
+        else if(classes.length != typeArguments.length) {
             return false;
         }
         else {
