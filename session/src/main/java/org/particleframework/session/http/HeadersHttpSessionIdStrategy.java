@@ -22,6 +22,7 @@ import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MutableHttpHeaders;
 import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.session.Session;
+import org.particleframework.session.SessionSettings;
 
 import javax.inject.Singleton;
 import java.util.Collections;
@@ -34,7 +35,7 @@ import java.util.List;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "particle.session.http.header", notEquals = "false")
+@Requires(property = SessionSettings.HTTP_HEADER_STRATEGY, notEquals = "false")
 public class HeadersHttpSessionIdStrategy implements HttpSessionIdStrategy {
 
     private final String[] headerNames;

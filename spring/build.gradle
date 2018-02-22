@@ -1,4 +1,5 @@
 dependencies {
-    compile "org.springframework:spring-core:4.3.9.RELEASE"
+    compile "org.springframework:spring-core:$springVersion"
+    compile "org.springframework:spring-context:$springVersion"
     compile project(":inject")
 }

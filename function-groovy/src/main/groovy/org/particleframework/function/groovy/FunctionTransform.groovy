@@ -20,10 +20,12 @@ import groovy.transform.Field
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
+import org.codehaus.groovy.ast.expr.ClosureExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
 import org.codehaus.groovy.ast.expr.DeclarationExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.MethodCallExpression
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.tools.GenericsUtils
@@ -65,7 +67,8 @@ class FunctionTransform implements ASTTransformation{
     void visit(ASTNode[] nodes, SourceUnit source) {
 
         def uri = source.getSource().getURI()
-        if(uri != null) {
+        Boolean useTransform = source.configuration?.optimizationOptions?.get('particle.function.compile')
+        if(useTransform == null && uri != null) {
             def file = uri.toString()
             if( !file.endsWith("Function.groovy") && !file.toLowerCase(Locale.ENGLISH).endsWith("-function.groovy")) {
                 return
@@ -85,7 +88,7 @@ class FunctionTransform implements ASTTransformation{
                     node.removeMethod(runMethod)
                     MethodNode mainMethod = node.getMethod("main", new Parameter(ClassHelper.make(([] as String[]).class), "args"))
                     Parameter argParam = mainMethod.getParameters()[0]
-                    def thisInstance = varX('$this')
+                    VariableExpression thisInstance = varX('$this')
                     def parameters = functionMethod.parameters
                     int argLength = parameters.length
                     boolean isVoidReturn = functionMethod.returnType == ClassHelper.VOID_TYPE
@@ -108,9 +111,13 @@ class FunctionTransform implements ASTTransformation{
                         functionCall = callX(thisInstance, functionMethod.getName())
                     }
 
-                    def closureExpression = closureX(stmt(functionCall))
-                    mainMethod.variableScope.putDeclaredVariable(thisInstance)
-                    closureExpression.setVariableScope(mainMethod.variableScope)
+                    ClosureExpression closureExpression = closureX(stmt(functionCall))
+                    VariableScope variableScope = mainMethod.variableScope
+                    mainMethod.setVariableScope(variableScope)
+                    thisInstance.setClosureSharedVariable(true)
+                    variableScope.putReferencedLocalVariable(thisInstance)
+
+                    closureExpression.setVariableScope(variableScope)
                     mainMethod.setCode(
                             block(
                                 declS(thisInstance, ctorX(node)),
@@ -119,9 +126,7 @@ class FunctionTransform implements ASTTransformation{
                     )
                     def code = runMethod.getCode()
                     def appCtx = varX("applicationContext")
-                    def constructorBody = block(
-
-                    )
+                    def constructorBody = block()
                     if(code instanceof BlockStatement) {
                         BlockStatement bs = (BlockStatement)code
                         for(st in bs.statements) {
@@ -132,7 +137,9 @@ class FunctionTransform implements ASTTransformation{
                                     DeclarationExpression de = (DeclarationExpression)exp
                                     def initial = de.getVariableExpression().getInitialExpression()
                                     if ( initial == null) {
-                                        de.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                                        if(!de.getAnnotations(AstUtils.INJECT_ANNOTATION)) {
+                                            de.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                                        }
                                         new FieldASTTransformation().visit([new AnnotationNode(FIELD_TYPE), de] as ASTNode[], source)
                                     }
                                 }
@@ -170,7 +177,9 @@ class FunctionTransform implements ASTTransformation{
 
                     )
                     for(field in node.getFields()) {
-                        field.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                        if(!field.getAnnotations(AstUtils.INJECT_ANNOTATION)) {
+                            field.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                        }
                         def setterName = getSetterName(field.getName())
                         def setterMethod = node.getMethod(setterName, params(param(field.getType(), "arg")))
                         if(setterMethod != null) {

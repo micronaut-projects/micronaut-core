@@ -21,6 +21,7 @@ import org.particleframework.http.MutableHttpResponse;
 import org.particleframework.http.cookie.Cookie;
 import org.particleframework.http.cookie.Cookies;
 import org.particleframework.session.Session;
+import org.particleframework.session.SessionSettings;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "particle.session.http.cookie", notEquals = "false")
+@Requires(property = SessionSettings.HTTP_COOKIE_STRATEGY, notEquals = "false")
 public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
     private final boolean base64Decode;
     private final String prefix;

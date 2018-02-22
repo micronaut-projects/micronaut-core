@@ -84,11 +84,12 @@ import static org.particleframework.configuration.lettuce.session.RedisSessionSt
  */
 @Singleton
 @Primary
-@Requires(property = "particle.session.http.redis.enabled", value = "true")
+@Requires(property = RedisSessionStore.REDIS_SESSION_ENABLED, value = "true")
 @Replaces(InMemorySessionStore.class)
 public class RedisSessionStore extends RedisPubSubAdapter<String, String> implements SessionStore<RedisSessionStore.RedisSession> {
 
     private static final Logger LOG  = LoggerFactory.getLogger(RedisSessionStore.class);
+    public static final String REDIS_SESSION_ENABLED = SessionSettings.HTTP + ".redis.enabled";
     private final RedisSessionCommands sessionCommands;
     private final RedisHttpSessionConfiguration sessionConfiguration;
     private final SessionIdGenerator sessionIdGenerator;

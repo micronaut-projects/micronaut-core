@@ -73,6 +73,7 @@ import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.codec.JsonStreamMediaTypeCodec;
 import org.particleframework.jackson.parser.JacksonProcessor;
+import org.particleframework.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -297,6 +298,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable.map((Function<HttpContent, HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
+                    if(LOG.isTraceEnabled()) {
+                        LOG.trace("HTTP Client Streaming Response Received Chunk");
+                        traceBody(byteBuf);
+                    }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
                     nettyStreamedHttpResponse.setBody(byteBuffer);
                     return nettyStreamedHttpResponse;
@@ -320,7 +325,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 JacksonProcessor jacksonProcessor = new JacksonProcessor() {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
-                        httpContentFlowable.map(content -> ByteBufUtil.getBytes(content.content())).subscribe(this);
+                        httpContentFlowable.map(content -> {
+                            ByteBuf chunk = content.content();
+                            if(LOG.isTraceEnabled()) {
+                                LOG.trace("HTTP Client JSON Streaming Response Received Chunk");
+                                traceBody(chunk);
+                            }
+                            return ByteBufUtil.getBytes(chunk);
+                        }).subscribe(this);
                         super.subscribe(downstreamSubscriber);
                     }
                 };
@@ -377,6 +389,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                         @Override
                                         protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
                                             NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                                            if(LOG.isTraceEnabled()) {
+                                                LOG.trace("HTTP Client Streaming Response Received: {}", msg.status() );
+                                                traceHeaders(msg.headers());
+                                            }
+
                                             emitter.onNext(response);
                                             emitter.onComplete();
                                         }
@@ -744,6 +761,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
                 HttpResponseStatus status = fullResponse.status();
+                if(LOG.isTraceEnabled()) {
+                    LOG.trace("HTTP Client Response Received: {}", status );
+                    traceHeaders(fullResponse.headers());
+                    traceBody(fullResponse.content());
+                }
                 int statusCode = status.code();
                 if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
@@ -815,6 +837,22 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private void traceRequest(HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
+        traceHeaders(headers);
+        if (HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
+            FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+            ByteBuf content = fullHttpRequest.content();
+            traceBody(content);
+        }
+    }
+
+    private void traceBody(ByteBuf content) {
+        LOG.trace("Body");
+        LOG.trace("----");
+        LOG.trace(content.toString(defaultCharset));
+        LOG.trace("----");
+    }
+
+    private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
@@ -824,20 +862,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             } else if (!all.isEmpty()) {
                 LOG.trace("{}: {}", name, all.get(0));
             }
-            if (HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
-                FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
-                LOG.trace("Body");
-                LOG.trace("----");
-                LOG.trace(fullHttpRequest.content().toString(defaultCharset));
-                LOG.trace("----");
-            }
         }
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
         ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(objectMapper), new JsonStreamMediaTypeCodec(objectMapper)
+                new JsonMediaTypeCodec(objectMapper, applicationConfiguration), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration)
         );
     }
 

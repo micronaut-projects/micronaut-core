@@ -18,16 +18,14 @@ package org.particleframework.configuration.lettuce;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.api.sync.RedisKeyCommands;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Requires;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * Factory for the default {@link RedisClient}. Creates the injectable {@link Primary} bean
@@ -35,30 +33,30 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "particle.redis")
-@Requires(missingProperty = "particle.redis.uris")
+@Requires(beans = DefaultRedisConfiguration.class)
 @Singleton
 @Factory
-public class DefaultRedisClientFactory {
+public class DefaultRedisClientFactory extends AbstractRedisClientFactory {
 
     @Bean(preDestroy = "shutdown")
     @Singleton
     @Primary
-    public RedisClient redisClient(@Primary RedisURI redisURI) {
-        return RedisClient.create(redisURI);
+    @Override
+    public RedisClient redisClient(@Primary AbstractRedisConfiguration config) {
+        return super.redisClient(config);
     }
 
     @Bean(preDestroy = "close")
     @Singleton
     @Primary
     public StatefulRedisConnection<String, String> redisConnection(@Primary RedisClient redisClient) {
-        return redisClient.connect();
+        return super.redisConnection(redisClient);
     }
 
     @Bean(preDestroy = "close")
     @Singleton
     public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(@Primary RedisClient redisClient) {
-        return redisClient.connectPubSub();
+        return super.redisPubSubConnection(redisClient);
     }
 
 }

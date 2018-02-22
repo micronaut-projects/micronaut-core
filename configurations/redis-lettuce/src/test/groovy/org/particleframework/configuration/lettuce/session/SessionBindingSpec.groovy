@@ -36,7 +36,7 @@ class SessionBindingSpec extends Specification {
     void "test bind simple session argument using HTTP header processing"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         ])
         OkHttpClient httpClient = new OkHttpClient()
@@ -71,7 +71,7 @@ class SessionBindingSpec extends Specification {
     void "test bind simple session argument using Cookie processing"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         ])
         OkHttpClient httpClient = new OkHttpClient()
@@ -105,7 +105,7 @@ class SessionBindingSpec extends Specification {
     void "test bind optional session"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'particle.redis.type':'embedded',
+                'redis.type':'embedded',
                 'particle.session.http.redis.enabled':'true'
         ])
         OkHttpClient httpClient = new OkHttpClient()

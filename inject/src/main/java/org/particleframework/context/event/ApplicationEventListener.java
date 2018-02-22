@@ -31,4 +31,14 @@ public interface ApplicationEventListener<E> extends EventListener {
      * @param event the event to respond to
      */
     void onApplicationEvent(E event);
+
+    /**
+     * Whether the given event is supported
+     *
+     * @param event The event
+     * @return True if it is
+     */
+    default boolean supports(E event) {
+        return true;
+    }
 }

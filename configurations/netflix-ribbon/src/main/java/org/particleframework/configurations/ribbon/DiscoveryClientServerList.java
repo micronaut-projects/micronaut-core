@@ -22,6 +22,8 @@ import com.netflix.loadbalancer.ServerList;
 import io.reactivex.Flowable;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,7 @@ import java.util.List;
  * @since 1.0
  */
 public class DiscoveryClientServerList extends AbstractServerList<Server> {
+    private static final Logger LOG = LoggerFactory.getLogger(DiscoveryClientServerList.class);
     private final DiscoveryClient discoveryClient;
     private final String serviceID;
 
@@ -43,6 +46,14 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
 
     @Override
     public List<Server> getInitialListOfServers() {
+        List<Server> serverList = resolveServerList();
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("Resolved initial list of servers from DiscoveryClient [{}]: {}",discoveryClient.getDescription(), serverList );
+        }
+        return serverList;
+    }
+
+    protected List<Server> resolveServerList() {
         List<ServiceInstance> serviceInstances = Flowable.fromPublisher(discoveryClient.getInstances(serviceID)).blockingFirst();
         List<Server> servers = new ArrayList<>(serviceInstances.size());
         for (ServiceInstance serviceInstance : serviceInstances) {
@@ -54,7 +65,11 @@ public class DiscoveryClientServerList extends AbstractServerList<Server> {
 
     @Override
     public List<Server> getUpdatedListOfServers() {
-        return getInitialListOfServers();
+        List<Server> serverList = resolveServerList();
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("Resolved updated list of servers from DiscoveryClient [{}]: {}",discoveryClient.getDescription(), serverList );
+        }
+        return serverList;
     }
 
     @Override

@@ -17,9 +17,9 @@ The following table summarizes the annotations, their purpose and provides an ex
 |Allows to specify the parameter the body of the request should bind to
 |`@Body String body`
 
-|link:{api}/org/particleframework/http/annotation/Cookie.html[@Cookie]
+|link:{api}/org/particleframework/http/annotation/CookieValue.html[@CookieValue]
 |Binds a parameter from a Cookie
-|`@Cookie String myCookie`
+|`@CookieValue String myCookie`
 
 |link:{api}/org/particleframework/http/annotation/Header.html[@Header]
 |Binds a parameter from an HTTP header
@@ -34,11 +34,11 @@ When a value is not specified to any binding annotation then the parameter name 
 
 [source,groovy]
 ----
-String hello(@Cookie("myCookie") String myCookie) {
+String hello(@CookieValue("myCookie") String myCookie) {
     ...
 }
 
-String hello(@Cookie String myCookie) {
+String hello(@CookieValue String myCookie) {
     ...
 }
 ----

@@ -30,5 +30,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 @Requires(property = ConsulConfiguration.PREFIX)
+@Requires(property = ConsulConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
 public @interface RequiresConsul {
 }

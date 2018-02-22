@@ -558,7 +558,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                             }
                         } else if (result instanceof HttpResponse) {
                             HttpStatus status = ((HttpResponse) result).getStatus();
-                            if (status.getCode() >= 300) {
+                            if (status.getCode() >= 400) {
                                 // handle re-mapping of errors
                                 result = router.route(status)
                                         .map((match) -> requestArgumentSatisfier.fulfillArgumentRequirements(match, httpRequest, true))
@@ -573,7 +573,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 response = HttpResponse.status(status)
                                         .body(result);
                             }
-                        } else {
+                        }
+                        else if(result instanceof HttpStatus) {
+                            response = HttpResponse.status((HttpStatus) result);
+                        }
+                        else {
                             response = HttpResponse.ok(result);
                         }
 
@@ -895,7 +899,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         }
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
-        streamedResponse.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        HttpHeaders headers = streamedResponse.headers();
+        headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
         writeNettyResponse(
                 context,
                 request,

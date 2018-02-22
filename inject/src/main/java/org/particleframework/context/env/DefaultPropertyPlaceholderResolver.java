@@ -118,5 +118,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
             }
         }
+        else if(defaultValue != null) {
+            builder.append(defaultValue);
+        }
+        else {
+            throw new ConfigurationException("Could not resolve placeholder ${"+ expr +"} in value: " + str);
+        }
     }
 }

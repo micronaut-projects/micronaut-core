@@ -25,6 +25,7 @@ import org.particleframework.core.value.PropertyResolver;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances</p>
@@ -80,7 +81,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     public PropertySourcePropertyResolver addPropertySource(@Nullable PropertySource propertySource) {
         if(propertySource != null) {
             propertySources.put(propertySource.getName(), propertySource);
-            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
+            processPropertySource(propertySource, propertySource.getConvention());
         }
         return this;
     }
@@ -103,13 +104,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return false;
         }
         else {
+
             Map<String, Object> entries = resolveEntriesForKey(name, false);
             if(entries == null) {
                 return false;
             }
             else {
                 name = trimIndex(name);
-                return entries.containsKey(name);
+                return entries.containsKey(name) || entries.containsKey(normalizeName(name));
             }
         }
     }
@@ -126,7 +128,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
             else {
                 name = trimIndex(name);
-                if(entries.containsKey(name)) {
+                if(entries.containsKey(name) || entries.containsKey(normalizeName(name))) {
                     return true;
                 }
                 else {
@@ -143,9 +145,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return Optional.empty();
         }
         else {
+
             Map<String,Object> entries = resolveEntriesForKey(name, false);
             if(entries != null) {
                 Object value = entries.get(name);
+                if(value == null) {
+                    value = entries.get(normalizeName(name));
+                }
                 if(value == null) {
                     int i = name.indexOf('[');
                     if(i > -1 && name.endsWith("]")) {
@@ -203,6 +209,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return Optional.empty();
     }
 
+    private String normalizeName(String name) {
+        return name.toLowerCase(Locale.ENGLISH).replace('-', '.');
+    }
+
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if(value instanceof CharSequence) {
             return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
@@ -258,52 +268,83 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         synchronized (catalog) {
             for (String property : properties) {
                 Object value = properties.get(property);
-                if(convention == PropertySource.PropertyConvention.UPPER_CASE_UNDER_SCORE_SEPARATED) {
-                    property = property.toLowerCase(Locale.ENGLISH).replace('_', '.');
-                }
-                int i = property.indexOf('[');
-                if(i > -1 && property.endsWith("]")) {
-                    String index = property.substring(i + 1, property.length() -1);
-                    if(StringUtils.isNotEmpty(index)) {
-                        property = property.substring(0, i);
-                        Map entries = resolveEntriesForKey(property, true);
-                        Object v = entries.get(property);
-                        if(StringUtils.isDigits(index)) {
-                            Integer number = Integer.valueOf(index);
-                            List list;
-                            if(v instanceof List) {
-                                list = (List) v;
-                            }
-                            else {
-                                list = new ArrayList(number);
-                                entries.put(property, list);
-                            }
-                            list.add(number, value);
-                        }
-                        else {
-                            Map map;
-                            if(v instanceof Map) {
-                                map = (Map) v;
-                            }
-                            else {
-                                map = new LinkedHashMap(3);
-                                entries.put(property, map);
-                            }
-                            map.put(index, value);
-                        }
-                    }
-                }
-                else {
 
-                    Map entries = resolveEntriesForKey(property, true);
-                    if(entries != null) {
-                        entries.put(property, value);
+                List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
+                for (String resolvedProperty : resolvedProperties) {
+                    int i = resolvedProperty.indexOf('[');
+                    if(i > -1 && resolvedProperty.endsWith("]")) {
+                        String index = resolvedProperty.substring(i + 1, resolvedProperty.length() -1);
+                        if(StringUtils.isNotEmpty(index)) {
+                            resolvedProperty = resolvedProperty.substring(0, i);
+                            Map entries = resolveEntriesForKey(resolvedProperty, true);
+                            Object v = entries.get(resolvedProperty);
+                            if(StringUtils.isDigits(index)) {
+                                Integer number = Integer.valueOf(index);
+                                List list;
+                                if(v instanceof List) {
+                                    list = (List) v;
+                                }
+                                else {
+                                    list = new ArrayList(number);
+                                    entries.put(resolvedProperty, list);
+                                }
+                                list.add(number, value);
+                            }
+                            else {
+                                Map map;
+                                if(v instanceof Map) {
+                                    map = (Map) v;
+                                }
+                                else {
+                                    map = new LinkedHashMap(3);
+                                    entries.put(resolvedProperty, map);
+                                }
+                                map.put(index, value);
+                            }
+                        }
+                    }
+                    else {
+
+                        Map entries = resolveEntriesForKey(resolvedProperty, true);
+                        if(entries != null) {
+                            entries.put(resolvedProperty, value);
+                        }
                     }
                 }
+
 
             }
         }
     }
+
+    private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
+        switch (convention) {
+            case ENVIRONMENT_VARIABLE:
+                List<String> properties = new ArrayList<>();
+                String[] tokens = property.split("_");
+
+                StringBuilder path = new StringBuilder();
+                int len = tokens.length;
+                if(len > 1) {
+
+                    for (int i = 0; i < len; i++) {
+                        String token = tokens[i];
+                        if(i < (len -1)) {
+                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
+                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
+                            properties.add( path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
+                        }
+                    }
+                }
+                else {
+                    return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
+                }
+                return properties;
+            default:
+                return Arrays.asList(property, property.toLowerCase(Locale.ENGLISH));
+        }
+    }
+
 
     protected Map<String,Object> resolveEntriesForKey(String name, boolean allowCreate) {
         Map<String,Object> entries = null;

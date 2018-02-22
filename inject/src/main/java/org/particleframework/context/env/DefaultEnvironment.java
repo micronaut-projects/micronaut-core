@@ -70,6 +70,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Value("org.particleframework.cloud.computePlatform")
     private String computePlatform;
+    private final AtomicBoolean reading = new AtomicBoolean(false);
 
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
         this(classLoader, ConversionService.SHARED, names);
@@ -129,8 +130,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.put(propertySource.getName(),propertySource);
-        if(isRunning()) {
-            processPropertySource(propertySource, PropertySource.PropertyConvention.LOWER_CASE_DOT_SEPARATED);
+        if(isRunning() && !reading.get()) {
+            processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
     }
@@ -182,7 +183,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if(running.compareAndSet(false, true)) {
-            readPropertySources(getPropertySourceRootName());
+            if(reading.compareAndSet(false, true)) {
+                readPropertySources(getPropertySourceRootName());
+                reading.set(false);
+            }
         }
         return this;
     }
@@ -270,8 +274,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if(!hasLoaders) {
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
         }
-        propertySources.add(new SystemPropertiesPropertySource());
-        propertySources.add(new EnvironmentPropertySource());
+        if(!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
+            propertySources.add(new SystemPropertiesPropertySource());
+        }
+        if(!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
+            propertySources.add(new EnvironmentPropertySource());
+        }
         return propertySources;
     }
 

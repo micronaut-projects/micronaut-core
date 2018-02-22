@@ -17,13 +17,30 @@ package example.vendors
 
 import grails.gorm.services.Service
 
+import javax.validation.constraints.NotBlank
+
 /**
  * @author graemerocher
  * @since 1.0
  */
 @Service(Vendor)
 interface VendorService {
+    /**
+     * List all of the vendors
+     *
+     * @return The vendors
+     */
     List<Vendor> list()
 
-    Vendor save(String name)
+    /**
+     * @return list the vendor names
+     */
+    List<String> listVendorName()
+
+    /**
+     * Save a new vendor
+     * @param name The name of the vendor
+     * @return The vendor instance
+     */
+    Vendor save(@NotBlank String name)
 }

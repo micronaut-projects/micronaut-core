@@ -20,5 +20,5 @@ package example.api.v1;
  * @since 1.0
  */
 public enum PetType {
-    DOG, CAT, RODENT, DINOSAUR
+    DOG, CAT, RODENT, PIG, DINOSAUR
 }

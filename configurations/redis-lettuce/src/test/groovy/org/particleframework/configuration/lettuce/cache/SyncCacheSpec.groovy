@@ -31,9 +31,9 @@ import spock.lang.Specification
 class SyncCacheSpec extends Specification{
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
-            'particle.redis.type':'embedded',
-            'particle.redis.caches.counter.enabled':'true',
-            'particle.redis.caches.counter2.enabled':'true'
+            'redis.uri':"redis://localhost:${SocketUtils.findAvailableTcpPort()}",
+            'redis.caches.counter.enabled':'true',
+            'redis.caches.counter2.enabled':'true'
     )
 
     void "test cacheable annotations"() {

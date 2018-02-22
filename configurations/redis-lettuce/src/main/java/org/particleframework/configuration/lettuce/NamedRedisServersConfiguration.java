@@ -24,10 +24,19 @@ import org.particleframework.context.annotation.EachProperty;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "particle.redis.servers")
-public class NamedRedisServersConfiguration extends NamedRedisURI {
+@EachProperty(value = RedisSetting.REDIS_SERVERS)
+public class NamedRedisServersConfiguration extends AbstractRedisConfiguration {
+
+    private final String serverName;
 
     public NamedRedisServersConfiguration(@Argument String name) {
-        super(name);
+        this.serverName = name;
+    }
+
+    /**
+     * @return The name of the server
+     */
+    public String getServerName() {
+        return serverName;
     }
 }
