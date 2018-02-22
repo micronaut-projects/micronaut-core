@@ -7,9 +7,12 @@ plugins {
 
 
 subprojects { project ->
-    apply plugin:"java"
-    apply plugin:"application"
-    apply plugin: 'com.github.johnrengelman.shadow'
+
+    if(!project.path.contains(':frontend')) {
+        apply plugin:"java"
+        apply plugin:"application"
+        apply plugin: 'com.github.johnrengelman.shadow'
+    }
 
     repositories {
         mavenLocal()
@@ -17,7 +20,7 @@ subprojects { project ->
     }
 
     dependencies {
-        if(project.name != 'api' && !project.path.contains(':functions')) {
+        if(project.name != 'api' && !project.path.contains(':functions') && !project.path.contains(':frontend')) {
 
             compile "org.particleframework:discovery-client:${projectVersion}"
             compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
