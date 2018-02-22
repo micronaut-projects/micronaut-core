@@ -19,6 +19,10 @@ subprojects { project ->
         jcenter()
     }
 
+    shadowJar {
+        mergeServiceFiles()
+    }
+
     dependencies {
         if(project.name != 'api' && !project.path.contains(':functions') && !project.path.contains(':frontend')) {
 
