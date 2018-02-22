@@ -17,6 +17,7 @@ package org.particleframework.configuration.neo4j.bolt
 
 import org.neo4j.driver.v1.Driver
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import spock.lang.Specification
 
 /**
@@ -28,7 +29,7 @@ class Neo4jEmbeddedServerSpec extends Specification{
     void "test neo4j embedded"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'neo4j.uri':Neo4jBoltSettings.DEFAULT_URI,
+                'neo4j.uri':"bolt://localhost:${SocketUtils.findAvailableTcpPort()}",
                 'neo4j.embedded.ephemeral':true
         )
 

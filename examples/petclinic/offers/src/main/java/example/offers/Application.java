@@ -63,7 +63,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                                     pet.getSlug(),
                                     new BigDecimal("49.99"),
                                     Duration.of(2, ChronoUnit.HOURS),
-                                    "Cut dog!");
+                                    "Cute dog!");
                             savedOffer.subscribe((offer) -> {
                             }, throwable -> {
                                 if (LOG.isErrorEnabled()) {
@@ -85,7 +85,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                                     pet.getSlug(),
                                     new BigDecimal("29.99"),
                                     Duration.of(2, ChronoUnit.HOURS),
-                                    "Cut Cat");
+                                    "Special Cat! Offer ends soon!");
                             savedOffer.subscribe((offer) -> {
                             }, throwable -> {
                                 if (LOG.isErrorEnabled()) {

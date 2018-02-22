@@ -13,27 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.storefront.client.v1
+package example.function.tweet
 
-import example.api.v1.Pet
-import example.api.v1.PetOperations
-import io.reactivex.Maybe
-import io.reactivex.Single
-import org.particleframework.http.client.Client
+import groovy.transform.CompileStatic
+import groovy.transform.Field
+import twitter4j.Status
+import twitter4j.Twitter
 
-/**
- * @author graemerocher
- * @since 1.0
- */
-@Client(id = "pets", path = "/v1/pets")
-interface PetClient extends PetOperations<Pet> {
+import javax.inject.Inject
 
-    @Override
-    Single<List<Pet>> byVendor(String name)
 
-    @Override
-    Maybe<Pet> find(String slug)
+@Field @Inject Twitter twitter
 
-    @Override
-    Single<List<Pet>> list()
+@CompileStatic
+UpdateResult updateStatus(String status) {
+    Status s = twitter.updateStatus(status)
+    URL url= new URL("https://twitter.com/$s.user.screenName/status/${s.id}")
+    return new UpdateResult(url, s.createdAt.time)
 }

@@ -13,27 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package example.storefront.client.v1
+package example.function.tweet
 
-import example.api.v1.Pet
-import example.api.v1.PetOperations
-import io.reactivex.Maybe
-import io.reactivex.Single
-import org.particleframework.http.client.Client
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Client(id = "pets", path = "/v1/pets")
-interface PetClient extends PetOperations<Pet> {
+class UpdateResult {
 
-    @Override
-    Single<List<Pet>> byVendor(String name)
+    final URL url
+    final long createdAt
 
-    @Override
-    Maybe<Pet> find(String slug)
+    @JsonCreator
+    UpdateResult(@JsonProperty("url") URL url, @JsonProperty("createdAt") long createdAt) {
+        this.url = url
+        this.createdAt = createdAt
+    }
 
-    @Override
-    Single<List<Pet>> list()
 }

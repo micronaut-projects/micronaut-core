@@ -21,11 +21,14 @@ import example.api.v1.Vendor
 import example.storefront.client.v1.PetClient
 import example.storefront.client.v1.VendorClient
 import io.reactivex.Flowable
+import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Produces
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.RxStreamingHttpClient
 import org.particleframework.http.sse.Event
@@ -50,6 +53,12 @@ class StoreController {
         this.petClient = petClient
     }
 
+    @Produces(MediaType.TEXT_HTML)
+    @Get(uri = '/')
+    HttpResponse index() {
+        HttpResponse.redirect(URI.create('/index.html'))
+    }
+
     @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
     Flowable<Event<Offer>> offers() {
         httpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
@@ -61,6 +70,11 @@ class StoreController {
     Single<List<Pet>> pets() {
         petClient.list()
                 .onErrorReturnItem(Collections.emptyList())
+    }
+
+    @Get('/pets/{slug}')
+    Maybe<Pet> showPet(String slug) {
+        petClient.find(slug)
     }
 
     @Get('/vendors')

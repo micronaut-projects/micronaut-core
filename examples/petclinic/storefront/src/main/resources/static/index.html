@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>Micronaut - Pet Store</title>
+
+    <style type="text/css">
+        .col-sm img {
+            width: 100%;
+        }
+    </style>
+    <script type="text/javascript">	    
+	    function navBar(currentPage) {
+			var html = "<ul class='navbar-nav'>";
+			html += ( currentPage == 'home' ) ? activeNavBarItem('home') : navBarItem('home');
+			html += ( currentPage == 'pets' ) ? activeNavBarItem('pets') : navBarItem('pets');
+			html += ( currentPage == 'vendors' ) ? activeNavBarItem('vendors') : navBarItem('vendors');
+			html += "</ul>";
+			return html;		    
+	    }
+	    function activeNavBarItem(item) {
+			var html = "<li class='nav-item'>";
+			html += "<a class='nav-link' href='"+ hrefByNavBar(item) + "'>";
+			html += titleByNavbar(item);
+			html += "<span class='sr-only'>(current)</span>";			
+			html += "</a>";
+			html += "</li>";
+			return html;
+		}
+		function navBarItem(item) {
+			var html = "<li class='nav-item active'>";
+			html += "<a class='nav-link' href='"+ hrefByNavBar(item) + "'>"+titleByNavbar(item)+"</a>";
+			html += "</li>";
+			return html;
+		}
+		function hrefByNavBar(item) {
+			return 'javascript:refreshPage("'+item+'","")';
+		}
+		function titleByNavbar(item) {
+			if ( item === 'home' ) {
+				return 'Home';								
+			} else if ( item === 'pets' || item == 'pet' ) {
+				return 'Pets';				
+			} else if ( item === 'vendors' ) {
+				return 'Vendors';
+			}			
+		}
+		function refreshPage(menu,item) {
+			refreshNavbarNav(menu)
+			refreshContainer(menu,item)
+		}		
+		function findAllByPetType(pets, petType) {
+			var result = []
+			for ( var i = 0; i < pets.length; i++ ) {
+				var pet = pets[i];
+				if ( pet.type == petType) {
+					result.push(pet);
+				}
+			}
+			return result;						
+		}
+		function findDistinctPetTypes(pets) {
+			var petTypes = []
+			for ( var i = 0; i < pets.length; i++ ) {
+				var pet = pets[i];
+				if ( petTypes.indexOf(pet.type) == -1) {
+					petTypes.push(pet.type);
+				}
+			}
+			return petTypes;			
+		}
+		function loadPets() {
+			var petsAPI = url + '/pets';
+			$.getJSON( petsAPI, {
+				format: "json"
+			}).done(function( data ) {
+				console.log(data);
+				var petTypes = findDistinctPetTypes(data);
+				console.log('petTypes' + petTypes);				
+				var html = "";
+				for ( var i = 0; i < petTypes.length; i++ ) {
+					var petType = petTypes[i];
+					var pets = findAllByPetType(data, petType);
+					html += "<h2>" + petType + "</h2>"; 
+					html += petsRow(pets);
+				}
+				setContainerHtml(html);
+			}).fail(function( jqxhr, textStatus, error ) {
+				setContainerHtml(alertMessage('Could not fetch pets'));
+			});
+		}
+		function loadVendors() {
+			var vendorsAPI = url + '/vendors';
+			$.getJSON( vendorsAPI, {
+				format: "json"
+			}).done(function( data ) {
+				console.log(data);
+				var html = "";
+				for ( var i = 0; i < data.length; i++ ) {
+					var vendor = data[i];
+					html += vendorHtml(vendor);
+				}
+				setContainerHtml(html);
+			}).fail(function( jqxhr, textStatus, error ) {
+				setContainerHtml(alertMessage('Could not fetch vendors'));
+			});
+		}
+		function alertMessage(msg) {
+			var html = "<div class='alert alert-warning alert-dismissible fade show' role='alert'>";
+            html += msg;
+            html += "<button type='button' class='close' data-dismiss='alert' aria-label='Close'>";
+            html += "<span aria-hidden='true'>&times;</span>";
+            html += "</button>";
+            html += "</div>";
+            return html;
+		}
+
+        function successMessage(msg) {
+            var html = "<div class='alert alert-success alert-dismissible fade show' role='alert'>";
+            html += msg;
+            html += "<button type='button' class='close' data-dismiss='alert' aria-label='Close'>";
+            html += "<span aria-hidden='true'>&times;</span>";
+            html += "</button>";
+            html += "</div>";
+            return html;
+        }
+		function vendorHtml(vendor) {
+			var html = "<h2>" + vendor.name + "</h2>";
+			if ( vendor.pets.length == 0 ) {
+				html += 'No pets available';	
+			} else {
+				html += petsRow(vendor.pets);
+
+			}
+			return html;
+		}
+		function petsRow(pets) {
+			var html = "<div class='row'>";
+			for ( var x = 0; x < pets.length; x++ ) {
+				var pet = pets[x];
+				html += petCelHtml(pet);
+			}
+			html += "</div>";							
+			return html;
+		}
+		function petHref(pet) {
+			var menu = 'pet';
+			return 'javascript:refreshPage("'+menu+'","'+pet.slug+'")';
+		}
+		function petCelHtml(pet) {
+			var html = "<div class='col-sm'>";
+			html += "<a href='"+petHref(pet)+"'>";
+			html += "<img src='"+url+"/images/"+pet.image+"'>";
+			html += "</a>";			
+			html += "</div>";
+			return html;
+		}
+		function renderPet(pet) {
+			var html = "<h1>" + pet.name + "</h1>";
+			html += "<h2>" + pet.vendor + "</h2>";			
+			html += "<img src='"+url+"/images/" + pet.image + "' alt='" + pet.name + "' class='img-thumbnail'/>";
+			return html;
+		}
+		function loadMailForm(slug) {
+			var mailHealthAPI = url + '/mail/health';
+			$.getJSON( mailHealthAPI, {
+				format: "json"
+			}).done(function( data ) {
+				console.log(data);
+				if ( data.status === 'UP' ) {
+					var html = renderMailForm(slug);
+					$( "#container" ).append(html);
+				} else {
+					console.log('mail is down');
+				}			
+			}).fail(function( jqxhr, textStatus, error ) {
+				console.log('mail is down');
+			});			
+		}
+		function renderMailForm(slug) {
+			var html = "<div class='clearfix'>";
+            html += "<div class='jumbotron' id='mailBox'>";
+            html += "<p>";
+            html += "<b>Request Info about this PET</b>";            
+            html += "</p>"                        
+            html += "<div class='form-group'>";
+            html += "<input type='hidden' name='slug' id='inputSlug' value='"+slug+"'/>";
+            html += "<label for='inputEmail'>Email address</label>";     
+            html += "<input type='email' class='form-control' name='email' id='inputEmail' aria-describedby='emailHelp' placeholder='Enter email'/>";
+            html += "<small id='emailHelp' class='form-text text-muted'>We'll never share your email with anyone else.</b></small>";                        
+            html += "</div>";
+			html += "<button onclick='javascript:submitMailForm();' class='btn btn-primary'>Send me info</button>";            
+            html += "</div>";
+            html += "</div>";
+            return html;
+		}
+		function submitMailForm() {
+			var slug = $('#inputSlug').val();
+			var email = $('#inputEmail').val();	
+			if ( email != '' ) {
+				console.log('submitting form' + slug + " email: " + email);
+				var mailSendAPI = url + "/mail/send?email=" + email + "&amp;slug=" + slug;
+                $.post(mailSendAPI, function(data) {
+                    $( "#mailBox" ).append(successMessage('Email sent'));
+                }).fail(function( jqxhr, textStatus, error ) {
+                      console.log( "error" );
+                      $( "#mailBox" ).append(alertMessage('Could not send email'));
+                });
+			}
+		}
+		function loadPet(slug) {
+			var vendorsAPI = url + '/pets/' +slug;
+			$.getJSON(vendorsAPI).done(function( data ) {
+				console.log(data);			
+				setContainerHtml(renderPet(data));
+				loadMailForm(slug);
+			}).fail(function( jqxhr, textStatus, error ) {
+				setContainerHtml(alertMessage('Could not load pet'));
+			});
+		}
+	    function refreshContainer(currentPage,item) {
+	    	if ( currentPage == 'home' ) {
+		    	loadOffers();
+	    	} else if ( currentPage == 'vendors' ) {
+		    	loadVendors();
+	    	} else if ( currentPage == 'pets' ) {		    			    	
+		    	loadPets();		    	
+	    	} else if ( currentPage == 'pet' ) {		    	
+		    	loadPet(item)
+	    	} else {
+				setContainerHtml('');
+	    	}    
+        }             		
+        function offerTable(data) {
+	        var html = "<table class='table'>";
+	        html += "<thead>";
+	        html += "<tr>";
+	        html += "<th>Vendor</th>";
+			html += "<th>Name</th>";
+			html += "<th>Type</th>";
+			html += "<th>description</th>";
+			html += "<th>Price</th>";
+			html += "</tr>";
+			html += "</thead>";
+			html += "<tbody>";
+			html += "<tr>";
+			html += "<td>" +  data.pet.vendor + "</td>";
+			html += "<td>" + data.pet.name + "</td>";
+			html += "<td>" +  data.pet.type + "</td>";
+			html += "<td>" +  data.description + "</td>";
+			html += "<td>" +  data.price +  data.currency + "</td>";
+			html += "</tr>";
+			html += "<tr>";
+			html += "<td colspan='5'><img src='"+url+"/images/" + data.pet.image + "' alt='" + data.pet.name + "' class='img-thumbnail'/></td>";
+			html += "</tr>";
+			html += "</tbody>";
+			html += "</table>";
+			return html;
+        }	
+        function setContainerHtml(html) {
+	        document.getElementById('container').innerHTML = html;
+        }
+		function loadOffers() {
+			if ( typeof(EventSource) !== "undefined" ) {
+				var html = '<h1>Offers</h1>';
+				html += '<div id="offers">Loading ...</div>'
+				setContainerHtml(html);
+				var source = new EventSource(url + '/offers'); 
+				source.onmessage = function(event) {
+                    console.log(event.data);
+                    var data = JSON.parse(event.data);
+                    var element = document.getElementById('offers');
+                    if (typeof(element) != 'undefined' && element != null) {
+                        element.innerHTML = offerTable(data);
+                    }
+				};
+				source.onerror = function(event) {
+                    var element = document.getElementById('offers');
+                    if (typeof(element) != 'undefined' && element != null) {
+                        element.innerHTML = alertMessage('Could not load offers');
+                    }
+				}
+    		} else {
+			    console.log('EventSource undefined');
+            }
+		}
+		function refreshNavbarNav(currentPage) {
+			document.getElementById("navbarNav").innerHTML = navBar(currentPage);           
+		}
+    </script>
+  </head>
+  <body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="#">Micronaut PetStore</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+  </div>
+</nav>
+<div class="container" id="container">
+</div>
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script   src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+	    var url = 'http://localhost:8080';
+	    $( document ).ready(function() {
+		    refreshPage('home','');
+		});
+    </script>
+  </body>
+</html>

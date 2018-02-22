@@ -15,9 +15,7 @@
  */
 package org.particleframework.context;
 
-import org.particleframework.context.env.Environment;
-import org.particleframework.context.env.PropertyPlaceholderResolver;
-import org.particleframework.context.env.PropertySource;
+import org.particleframework.context.env.*;
 import org.particleframework.core.io.ResourceLoader;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.PropertyResolver;
@@ -111,7 +109,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The running {@link ApplicationContext}
      */
     static ApplicationContext run(Map<String, Object> properties, String... environments) {
-        PropertySource propertySource = PropertySource.of(Environment.DEFAULT_NAME, properties);
+        PropertySource propertySource = PropertySource.of(PropertySource.CONTEXT, properties, SystemPropertiesPropertySource.POSITION + 100);
         return run(propertySource, environments);
     }
 
@@ -151,7 +149,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The running bean
      */
     static <T> T run(Class<T> type, Map<String, Object> properties, String... environments) {
-        PropertySource propertySource = PropertySource.of(Environment.DEFAULT_NAME, properties);
+        PropertySource propertySource = PropertySource.of(PropertySource.CONTEXT, properties, SystemPropertiesPropertySource.POSITION + 100);
         return run(type, propertySource, environments);
     }
 

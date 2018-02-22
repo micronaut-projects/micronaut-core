@@ -137,7 +137,9 @@ class FunctionTransform implements ASTTransformation{
                                     DeclarationExpression de = (DeclarationExpression)exp
                                     def initial = de.getVariableExpression().getInitialExpression()
                                     if ( initial == null) {
-                                        de.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                                        if(!de.getAnnotations(AstUtils.INJECT_ANNOTATION)) {
+                                            de.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                                        }
                                         new FieldASTTransformation().visit([new AnnotationNode(FIELD_TYPE), de] as ASTNode[], source)
                                     }
                                 }
@@ -175,7 +177,9 @@ class FunctionTransform implements ASTTransformation{
 
                     )
                     for(field in node.getFields()) {
-                        field.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                        if(!field.getAnnotations(AstUtils.INJECT_ANNOTATION)) {
+                            field.addAnnotation(new AnnotationNode(AstUtils.INJECT_ANNOTATION))
+                        }
                         def setterName = getSetterName(field.getName())
                         def setterMethod = node.getMethod(setterName, params(param(field.getType(), "arg")))
                         if(setterMethod != null) {

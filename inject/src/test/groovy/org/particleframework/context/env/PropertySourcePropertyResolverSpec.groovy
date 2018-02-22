@@ -24,11 +24,17 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+
+    @Unroll
+    void "test resolve environment properties"() {
+
+    }
+
     @Unroll
     void "test resolve property #property value for #key"() {
         given:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-                PropertySource.of("test", [(property): value])
+                PropertySource.of("test", [(property): value], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
         )
 
         expect:
@@ -37,16 +43,14 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty(key, type).get() == expected
 
         where:
-        property       | value       | key            | type    | expected
-        'foo.bar'      | 'test'      | 'foo.bar'      | String  | 'test'
-        'foo.bar'      | '10'        | 'foo.bar'      | Integer | 10
-        'foo.bar'      | ['10']      | 'foo.bar[0]'   | Integer | 10
-        'foo.bar'      | [foo: '10'] | 'foo.bar[foo]' | Integer | 10
-//        'foo.bar.baz'  | '10'        | 'foo.bar[baz]' | Integer | 10
-        'foo.bar[0]'   | '10'        | 'foo.bar[0]'   | Integer | 10
-        'foo.bar[0]'   | '10'        | 'foo.bar'      | List    | ['10']
-        'foo.bar[baz]' | '10'        | 'foo.bar[baz]' | Integer | 10
-        'foo.bar[baz]' | '10'        | 'foo.bar'      | Map     | [baz: '10']
+        property                      | value | key                           | type   | expected
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.accesstoken'  | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.OAuth2AccessToken'   | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2accesstoken'   | String | 'xxx'
+
     }
 
     @Unroll

@@ -397,13 +397,18 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private static class BootstrapPropertySource implements PropertySource {
         private final PropertySource delegate;
 
-        public BootstrapPropertySource(PropertySource bootstrapPropertySource) {
+        BootstrapPropertySource(PropertySource bootstrapPropertySource) {
             this.delegate = bootstrapPropertySource;
         }
 
         @Override
         public String toString() {
             return getName();
+        }
+
+        @Override
+        public PropertyConvention getConvention() {
+            return delegate.getConvention();
         }
 
         @Override
