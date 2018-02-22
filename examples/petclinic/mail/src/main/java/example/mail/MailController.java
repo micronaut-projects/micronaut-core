@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 
-@Controller
+@Controller("/${mail.api.version}/mail")
 @Singleton
 public class MailController {
 

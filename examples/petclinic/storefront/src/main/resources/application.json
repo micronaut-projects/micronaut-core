@@ -1,5 +1,11 @@
 {
   "particle": {
+    "server": {
+      "port":"8080",
+      "cors": {
+        "enabled": true
+      }
+    },
     "application": {
       "name":"storefront"
     }
@@ -11,5 +17,16 @@
       },
       "defaultZone":"${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
     }
+  },
+  "router": {
+    "static": {
+      "resources": {
+        "enabled": true,
+        "mapping": "/assets/**",
+        "paths": ["classpath:static"]
+      }
+    }
   }
 }
+
+
