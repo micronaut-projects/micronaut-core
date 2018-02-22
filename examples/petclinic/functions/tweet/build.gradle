@@ -1,4 +1,22 @@
+import jp.classmethod.aws.gradle.lambda.*
+import com.amazonaws.services.lambda.model.*
+
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+        mavenLocal()
+
+    }
+    dependencies {
+        classpath "jp.classmethod.aws:gradle-aws-plugin:0.22"
+
+    }
+}
+
 apply plugin:"groovy"
+apply plugin: 'jp.classmethod.aws.lambda'
+mainClassName = "example.function.tweet.UpdateStatusFunction"
 
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
@@ -18,4 +36,24 @@ dependencies {
         exclude module:'groovy-all'
     }
 
+}
+
+// NOTE: the AWS gradle plugin
+task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
+    functionName = "twitter-update-status"
+    handler = "example.function.tweet.UpdateStatusFunction::updateStatus"
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
+    runtime = Runtime.Java8
+    zipFile = shadowJar.archivePath
+    memorySize = 256
+    timeout = 60
+}
+
+task invokeFunction(type: AWSLambdaInvokeTask) {
+    functionName = "twitter-update-status"
+    invocationType = InvocationType.RequestResponse
+    payload = '{"text:"Time is '+System.currentTimeMillis()+'"}'
+    doLast {
+        println "Lambda function result: " + new String(invokeResult.payload.array(), "UTF-8")
+    }
 }
