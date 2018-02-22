@@ -40,6 +40,6 @@ public class EnvironmentPropertySource extends MapPropertySource {
 
     @Override
     public PropertyConvention getConvention() {
-        return PropertyConvention.UPPER_CASE_UNDER_SCORE_SEPARATED;
+        return PropertyConvention.ENVIRONMENT_VARIABLE;
     }
 }

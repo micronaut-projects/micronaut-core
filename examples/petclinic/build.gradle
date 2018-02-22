@@ -17,7 +17,7 @@ subprojects { project ->
     }
 
     dependencies {
-        if(project.name != 'api') {
+        if(project.name != 'api' && !project.path.contains(':functions')) {
 
             compile "org.particleframework:discovery-client:${projectVersion}"
             compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"

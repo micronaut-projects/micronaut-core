@@ -9,15 +9,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import javax.validation.Valid;
 
-@Controller
+@Controller("/${mail.api.version}/mail")
 @Singleton
 public class MailController {
 
     private static final Logger log = LoggerFactory.getLogger(MailController.class);
 
     @Post("/send")
-    public HttpResponse index(@Body Email email) {
+    public HttpResponse send(@Valid @Body Email email) {
         log.info(email.toString());
         return HttpResponse.ok();
     }
