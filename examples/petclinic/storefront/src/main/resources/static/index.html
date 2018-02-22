@@ -112,8 +112,24 @@
 			});
 		}
 		function alertMessage(msg) {
-			return "<div class='alert alert-danger' role='alert'>"+msg+"</div>";
+			var html = "<div class='alert alert-warning alert-dismissible fade show' role='alert'>";
+            html += msg;
+            html += "<button type='button' class='close' data-dismiss='alert' aria-label='Close'>";
+            html += "<span aria-hidden='true'>&times;</span>";
+            html += "</button>";
+            html += "</div>";
+            return html;
 		}
+
+        function successMessage(msg) {
+            var html = "<div class='alert alert-success alert-dismissible fade show' role='alert'>";
+            html += msg;
+            html += "<button type='button' class='close' data-dismiss='alert' aria-label='Close'>";
+            html += "<span aria-hidden='true'>&times;</span>";
+            html += "</button>";
+            html += "</div>";
+            return html;
+        }
 		function vendorHtml(vendor) {
 			var html = "<h2>" + vendor.name + "</h2>";
 			if ( vendor.pets.length == 0 ) {
@@ -169,7 +185,7 @@
 		}
 		function renderMailForm(slug) {
 			var html = "<div class='clearfix'>";
-            html += "<div class='jumbotron'>";
+            html += "<div class='jumbotron' id='mailBox'>";
             html += "<p>";
             html += "<b>Request Info about this PET</b>";            
             html += "</p>"                        
@@ -178,32 +194,29 @@
             html += "<label for='inputEmail'>Email address</label>";     
             html += "<input type='email' class='form-control' name='email' id='inputEmail' aria-describedby='emailHelp' placeholder='Enter email'/>";
             html += "<small id='emailHelp' class='form-text text-muted'>We'll never share your email with anyone else.</b></small>";                        
-            html += "</div>"
+            html += "</div>";
 			html += "<button onclick='javascript:submitMailForm();' class='btn btn-primary'>Send me info</button>";            
-            html += "</div>"
-            html += "</div>"            
+            html += "</div>";
+            html += "</div>";
             return html;
 		}
 		function submitMailForm() {
 			var slug = $('#inputSlug').val();
 			var email = $('#inputEmail').val();	
 			if ( email != '' ) {
-				console.log('submitting form');
-				var mailSendAPI = url + "/mail/send";
-				$.ajax({
-					url: mailSendAPI,
-					type: "POST",
-					data: JSON.stringify({ slug: slug, email: email }),
-                    contentType: "application/json; charset=utf-8",
-                    dataType: "json"
+				console.log('submitting form' + slug + " email: " + email);
+				var mailSendAPI = url + "/mail/send?email=" + email + "&amp;slug=" + slug;
+                $.post(mailSendAPI, function(data) {
+                    $( "#mailBox" ).append(successMessage('Email sent'));
+                }).fail(function( jqxhr, textStatus, error ) {
+                      console.log( "error" );
+                      $( "#mailBox" ).append(alertMessage('Could not send email'));
                 });
 			}
 		}
 		function loadPet(slug) {
 			var vendorsAPI = url + '/pets/' +slug;
-			$.getJSON( vendorsAPI, {
-				format: "json"
-			}).done(function( data ) {
+			$.getJSON(vendorsAPI).done(function( data ) {
 				console.log(data);			
 				setContainerHtml(renderPet(data));
 				loadMailForm(slug);
