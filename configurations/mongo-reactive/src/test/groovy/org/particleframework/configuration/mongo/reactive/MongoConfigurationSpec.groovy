@@ -5,6 +5,7 @@ import com.mongodb.reactivestreams.client.MongoClient
 import groovy.transform.NotYetImplemented
 import io.reactivex.Flowable
 import org.particleframework.context.ApplicationContext
+import org.particleframework.core.io.socket.SocketUtils
 import org.particleframework.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -13,11 +14,11 @@ class MongoConfigurationSpec extends Specification {
 
     void "test a basic connection"() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:27017")
+        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}")
         MongoClient mongoClient = applicationContext.getBean(MongoClient)
 
         then:
-        Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList() == ["admin", "local"]
+        !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
 
         cleanup:
         applicationContext.stop()
@@ -27,7 +28,7 @@ class MongoConfigurationSpec extends Specification {
     void "test configure #property pool setting"() {
         given:
         ApplicationContext context = ApplicationContext.run(
-                (MongoSettings.MONGODB_URI): "mongodb://localhost:27017",
+                (MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}",
                 ("${MongoSettings.PREFIX}.connectionPool.${property}".toString()): value
         )
 

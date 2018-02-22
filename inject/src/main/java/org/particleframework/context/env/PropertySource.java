@@ -12,6 +12,11 @@ import java.util.Map;
  */
 public interface PropertySource extends Iterable<String>, Ordered {
     /**
+     * the name of the property source with values supplied directly from the context
+     */
+    String CONTEXT = "context";
+
+    /**
      * @return The name of the property source
      */
     String getName();
@@ -47,6 +52,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      *
      * @param name The name of the property source
      * @param map The map
+     * @param convention The convention type of the property source
      * @return The {@link PropertySource}
      */
     static PropertySource of(String name, Map<String, Object> map, PropertyConvention convention) {
@@ -54,6 +60,23 @@ public interface PropertySource extends Iterable<String>, Ordered {
             @Override
             public PropertyConvention getConvention() {
                 return convention;
+            }
+        };
+    }
+
+    /**
+     * Create a {@link PropertySource} from the given map
+     *
+     * @param name The name of the property source
+     * @param map The map
+     * @param priority The priority to order by
+     * @return The {@link PropertySource}
+     */
+    static PropertySource of(String name, Map<String, Object> map, int priority) {
+        return new MapPropertySource(name, map) {
+            @Override
+            public int getOrder() {
+                return priority;
             }
         };
     }

@@ -104,14 +104,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return false;
         }
         else {
-            name = normalizeName(name);
+
             Map<String, Object> entries = resolveEntriesForKey(name, false);
             if(entries == null) {
                 return false;
             }
             else {
                 name = trimIndex(name);
-                return entries.containsKey(name);
+                return entries.containsKey(name) || entries.containsKey(normalizeName(name));
             }
         }
     }
@@ -122,14 +122,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return false;
         }
         else {
-            name = normalizeName(name);
             Map<String, Object> entries = resolveEntriesForKey(name, false);
             if(entries == null) {
                 return false;
             }
             else {
                 name = trimIndex(name);
-                if(entries.containsKey(name)) {
+                if(entries.containsKey(name) || entries.containsKey(normalizeName(name))) {
                     return true;
                 }
                 else {
@@ -146,10 +145,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return Optional.empty();
         }
         else {
-            name = normalizeName(name);
+
             Map<String,Object> entries = resolveEntriesForKey(name, false);
             if(entries != null) {
                 Object value = entries.get(name);
+                if(value == null) {
+                    value = entries.get(normalizeName(name));
+                }
                 if(value == null) {
                     int i = name.indexOf('[');
                     if(i > -1 && name.endsWith("]")) {
@@ -208,7 +210,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     private String normalizeName(String name) {
-        return name.toLowerCase(Locale.ENGLISH).replace('-','.');
+        return name.toLowerCase(Locale.ENGLISH).replace('-', '.');
     }
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
@@ -323,17 +325,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 StringBuilder path = new StringBuilder();
                 int len = tokens.length;
-                for (int i = 0; i < len; i++) {
-                    String token = tokens[i];
-                    if(i < (len -1)) {
-                        path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
-                        String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
-                        properties.add( path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
+                if(len > 1) {
+
+                    for (int i = 0; i < len; i++) {
+                        String token = tokens[i];
+                        if(i < (len -1)) {
+                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
+                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
+                            properties.add( path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
+                        }
                     }
+                }
+                else {
+                    return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
                 }
                 return properties;
             default:
-                return Collections.singletonList(property);
+                return Arrays.asList(property, property.toLowerCase(Locale.ENGLISH));
         }
     }
 

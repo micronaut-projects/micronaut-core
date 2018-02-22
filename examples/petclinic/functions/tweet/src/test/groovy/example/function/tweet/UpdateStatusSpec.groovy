@@ -34,10 +34,10 @@ import java.time.LocalDateTime
  */
 
 @IgnoreIf({
-    !System.getenv('TWITTER_OAUTH2_ACCESS_TOKEN') ||
-    !System.getenv('TWITTER_OAUTH2_ACCESS_TOKEN_SECRET') ||
-    !System.getenv('TWITTER_OAUTH2_CONSUMER_KEY') ||
-    !System.getenv('TWITTER_OAUTH2_CONSUMER_SECRET')
+    !System.getenv('TWITTER_OAUTH_ACCESS_TOKEN') ||
+    !System.getenv('TWITTER_OAUTH_ACCESS_TOKEN_SECRET') ||
+    !System.getenv('TWITTER_OAUTH_CONSUMER_KEY') ||
+    !System.getenv('TWITTER_OAUTH_CONSUMER_SECRET')
 })
 class UpdateStatusSpec extends Specification {
 
@@ -46,11 +46,11 @@ class UpdateStatusSpec extends Specification {
 
     void "test post tweet"() {
         when:
-        LocalDateTime time = httpClient.toBlocking()
+        UpdateResult result = httpClient.toBlocking()
                                         .retrieve(HttpRequest.POST('/update-status', "My Tweet")
-                                                             .contentType(MediaType.TEXT_PLAIN_TYPE), LocalDateTime)
+                                                             .contentType(MediaType.TEXT_PLAIN_TYPE), UpdateResult)
 
         then:
-        time != null
+        result.url != null
     }
 }
