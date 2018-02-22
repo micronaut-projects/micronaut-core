@@ -8,6 +8,7 @@ import groovy.transform.CompileStatic
 import io.reactivex.Single
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
+import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Post
@@ -31,10 +32,10 @@ class MailController {
         mailHealthClient.health().onErrorReturn( { new HealthStatus('DOWN') })
     }
 
-    @Post(uri = '/send')
-    HttpResponse send(String email, String slug) {
+    @Post('/send')
+    HttpResponse send(@Body MailFormSubmission form) {
         Email emailDTO = new Email()
-        emailDTO.setRecipient(email)
+        emailDTO.setRecipient(form.email)
         mailClient.send(emailDTO)
         HttpResponse.ok()
     }

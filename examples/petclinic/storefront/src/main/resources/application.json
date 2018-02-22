@@ -3,7 +3,13 @@
     "server": {
       "port":"8080",
       "cors": {
-        "enabled": true
+        "enabled": true,
+        "configurations": {
+          "web": {
+            "allowedMethods": ["POST", "GET"]
+          }
+        }
+
       }
     },
     "application": {
@@ -22,7 +28,7 @@
     "static": {
       "resources": {
         "enabled": true,
-        "mapping": "/assets/**",
+        "mapping": "/**",
         "paths": ["classpath:static"]
       }
     }

@@ -8,6 +8,6 @@ import javax.validation.Valid;
 
 @Validated
 public interface MailOperation {
-    @Post("/mail/send")
+    @Post("/send")
     HttpResponse send(@Valid @Body Email email);
 }

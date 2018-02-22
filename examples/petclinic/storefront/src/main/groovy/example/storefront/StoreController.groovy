@@ -24,9 +24,11 @@ import io.reactivex.Flowable
 import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Produces
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.RxStreamingHttpClient
 import org.particleframework.http.sse.Event
@@ -49,6 +51,12 @@ class StoreController {
         this.httpClient = httpClient
         this.vendorClient = vendorClient
         this.petClient = petClient
+    }
+
+    @Produces(MediaType.TEXT_HTML)
+    @Get(uri = '/')
+    HttpResponse index() {
+        HttpResponse.redirect(URI.create('/index.html'))
     }
 
     @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)

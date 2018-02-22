@@ -5,6 +5,6 @@ import groovy.transform.CompileStatic
 import org.particleframework.http.client.Client
 
 @CompileStatic
-@Client(value = 'mail', path = "/v1/pets")
+@Client(id = 'mail', path = "/v1/mail")
 interface MailClient extends MailOperation {
 }
