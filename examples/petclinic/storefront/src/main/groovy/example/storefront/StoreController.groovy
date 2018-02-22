@@ -66,6 +66,12 @@ class StoreController {
         })
     }
 
+    @Get('/pets')
+    Single<List<Pet>> pets() {
+        petClient.list()
+                .onErrorReturnItem(Collections.emptyList())
+    }
+
     @Get('/pets/{slug}')
     Maybe<Pet> showPet(String slug) {
         petClient.find(slug)
@@ -75,10 +81,5 @@ class StoreController {
     Single<List<Vendor>> vendors() {
         vendorClient.list()
                     .onErrorReturnItem(Collections.emptyList())
-    }
-
-    @Get('/pets')
-    Single<List<Pet>> pets() {
-        petClient.list().onErrorReturnItem(Collections.emptyList())
     }
 }
