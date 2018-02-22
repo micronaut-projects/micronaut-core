@@ -5,6 +5,6 @@ import groovy.transform.CompileStatic
 import org.particleframework.http.client.Client
 
 @CompileStatic
-@Client(value = 'mail')
+@Client(id = 'mail')
 interface MailHealthClient extends HealthStatusOperation {
 }

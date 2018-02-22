@@ -40,7 +40,7 @@
 			return html;
 		}
 		function hrefByNavBar(item) {
-			return 'javascript:refreshPage("'+item+'")';
+			return 'javascript:refreshPage("'+item+'","")';
 		}
 		function titleByNavbar(item) {
 			if ( item === 'home' ) {
@@ -140,7 +140,7 @@
 		function petCelHtml(pet) {
 			var html = "<div class='col-sm'>";
 			html += "<a href='"+petHref(pet)+"'>";
-			html += "<img src='"+url+"/assets/images/"+pet.image+"'>";			
+			html += "<img src='"+url+"/images/"+pet.image+"'>";
 			html += "</a>";			
 			html += "</div>";
 			return html;
@@ -148,7 +148,7 @@
 		function renderPet(pet) {
 			var html = "<h1>" + pet.name + "</h1>";
 			html += "<h2>" + pet.vendor + "</h2>";			
-			html += "<img src='"+url+"/assets/images/" + pet.image + "' alt='" + pet.name + "' class='img-thumbnail'/>";
+			html += "<img src='"+url+"/images/" + pet.image + "' alt='" + pet.name + "' class='img-thumbnail'/>";
 			return html;
 		}
 		function loadMailForm(slug) {
@@ -195,7 +195,7 @@
 				$.ajax({
 					url: mailSendAPI,
 					type: "POST",
-					data: { slug: slug, email: email },
+					data: JSON.stringify({ slug: slug, email: email }),
                     contentType: "application/json; charset=utf-8",
                     dataType: "json"
                 });
@@ -246,7 +246,7 @@
 			html += "<td>" +  data.price +  data.currency + "</td>";
 			html += "</tr>";
 			html += "<tr>";
-			html += "<td colspan='5'><img src='"+url+"/assets/images/" + data.pet.image + "' alt='" + data.pet.name + "' class='img-thumbnail'/></td>";
+			html += "<td colspan='5'><img src='"+url+"/images/" + data.pet.image + "' alt='" + data.pet.name + "' class='img-thumbnail'/></td>";
 			html += "</tr>";
 			html += "</tbody>";
 			html += "</table>";
@@ -262,14 +262,22 @@
 				setContainerHtml(html);
 				var source = new EventSource(url + '/offers'); 
 				source.onmessage = function(event) {
-	    			console.log(event.data);
-					var data = JSON.parse(event.data);
-					document.getElementById("offers").innerHTML = offerTable(data);                        
+                    console.log(event.data);
+                    var data = JSON.parse(event.data);
+                    var element = document.getElementById('offers');
+                    if (typeof(element) != 'undefined' && element != null) {
+                        element.innerHTML = offerTable(data);
+                    }
 				};
 				source.onerror = function(event) {
-					document.getElementById("offers").innerHTML = alertMessage('Could not load offers');                        
+                    var element = document.getElementById('offers');
+                    if (typeof(element) != 'undefined' && element != null) {
+                        element.innerHTML = alertMessage('Could not load offers');
+                    }
 				}
-    		}
+    		} else {
+			    console.log('EventSource undefined');
+            }
 		}
 		function refreshNavbarNav(currentPage) {
 			document.getElementById("navbarNav").innerHTML = navBar(currentPage);           
@@ -289,13 +297,13 @@
 </div>
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script   src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
     <script type="text/javascript">
 	    var url = 'http://localhost:8080';
 	    $( document ).ready(function() {
-		    refreshPage('pets');
+		    refreshPage('home','');
 		});
     </script>
   </body>
