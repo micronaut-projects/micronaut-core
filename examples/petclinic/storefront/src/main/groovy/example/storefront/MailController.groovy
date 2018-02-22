@@ -24,12 +24,9 @@ class MailController {
     @Inject
     MailClient mailClient
 
-    @Inject
-    MailHealthClient mailHealthClient
-
     @Get('/health')
     Single<HealthStatus> health() {
-        mailHealthClient.health().onErrorReturn( { new HealthStatus('DOWN') })
+        mailClient.health().onErrorReturn( { new HealthStatus('DOWN') })
     }
 
     @Post('/send')
