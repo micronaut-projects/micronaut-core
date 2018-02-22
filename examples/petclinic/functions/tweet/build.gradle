@@ -38,7 +38,12 @@ dependencies {
 
 }
 
-// NOTE: the AWS gradle plugin
+// NOTE: the AWS gradle plugin does not support altering environment variables so after
+// deployment you have to go the console and set:
+// - TWITTER_OAUTH_CONSUMER_KEY
+// - TWITTER_OAUTH_CONSUMER_SECRET
+// - TWITTER_OAUTH_ACCESS_TOKEN
+// - TWITTER_OAUTH_ACCESS_TOKEN_SECRET
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "twitter-update-status"
     handler = "example.function.tweet.UpdateStatusFunction::updateStatus"
