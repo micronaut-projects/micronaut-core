@@ -90,6 +90,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if(isRoot && (len == 0 || (len == 1 &&uri.charAt(0) == '/'))) {
             return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap()));
         }
+        //Remove any url parameters before matching
+        int parameterIndex = uri.indexOf('?');
+        if (parameterIndex > -1) {
+            uri = uri.substring(0, parameterIndex);
+        }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.length == 0) {
@@ -98,7 +103,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 Map<String, Object> variableMap = new LinkedHashMap<>();
                 int count = matcher.groupCount();
                 for (int j = 0; j < variables.length; j++) {
-                    int index = j + 1;
+                    int index = (j * 2) + 2;
                     if (index > count) break;
                     String variable = variables[j];
                     String value = matcher.group(index);
@@ -235,8 +240,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             if (hasModifier) {
                 char firstChar = modifierStr.charAt(0);
                 if (firstChar == '?') {
-                    operatorQuantifier = modifierStr;
-                    variableQuantifier = variableQuantifier + modifierStr;
+                    operatorQuantifier = "";
                 }
                 else if(modifierStr.chars().allMatch(Character::isDigit)) {
                     variableQuantifier = "{1," + modifierStr + "})";
@@ -247,28 +251,41 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                             (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen-2) == '+'))) {
                         operatorQuantifier = "?";
                     }
-                    if(operator != '.') {
-
-                        operatorPrefix = "(";
-                        variablePattern =  modifierStr + ")";
+                    if (operator == '/' || operator == '.') {
+                        variablePattern =  "(" + modifierStr + ")";
                     }
                     else {
-                        variablePattern =  "(" + modifierStr + ")";
+                        operatorPrefix = "(";
+                        variablePattern =  modifierStr + ")";
                     }
                     variableQuantifier = "";
                 }
             }
-            pattern.append(operatorPrefix);
+
+            boolean operatorAppended = false;
+
             switch (operator) {
                 case '.':
                 case '/':
-                    pattern.append("\\").append(String.valueOf(operator))
+                    pattern.append("(")
+                            .append(operatorPrefix)
+                            .append("\\")
+                            .append(String.valueOf(operator))
                             .append(operatorQuantifier);
+                    operatorAppended = true;
                 case '+':
                 case '0': // no active operator
+                    if (!operatorAppended) {
+                        pattern.append("(").append(operatorPrefix);
+                    }
                     pattern.append(variablePattern)
-                            .append(variableQuantifier);
+                            .append(variableQuantifier)
+                            .append(")");
                     break;
+            }
+
+            if (operator == '/' || modifierStr.equals("?")) {
+                pattern.append("?");
             }
             super.addVariableSegment(segments, variable, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previousDelimiter, isQuerySegment);
         }
