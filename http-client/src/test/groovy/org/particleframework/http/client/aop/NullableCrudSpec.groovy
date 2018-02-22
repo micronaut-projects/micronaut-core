@@ -1,18 +1,3 @@
-/*
- * Copyright 2018 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.particleframework.http.client.aop
 
 import org.particleframework.context.ApplicationContext
@@ -28,27 +13,23 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.annotation.Nullable
 import javax.inject.Singleton
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * TODO: Javadoc description
- *
- * @author graemerocher
- * @since 1.0
- */
-class BlockingCrudSpec extends Specification {
+@Ignore
+class NullableCrudSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
     @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test CRUD operations on generated client that returns blocking responses"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        NullableBookClient client = context.getBean(NullableBookClient)
 
         when:
-        Book book = client.get(99)
-        List<Book> books = client.list()
+        NullableBook book = client.get(99)
+        List<NullableBook> books = client.list()
 
         then:
         book == null
@@ -85,10 +66,9 @@ class BlockingCrudSpec extends Specification {
         client.get(book.id) == null
     }
 
-    @Ignore
     void "test DELETE operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        NullableBookClient client = context.getBean(NullableBookClient)
 
         when:
         client.delete(null)
@@ -97,63 +77,61 @@ class BlockingCrudSpec extends Specification {
         noExceptionThrown() //HttpClientResponseException: Not Found, should throw httpclient exception. should never send request
     }
 
-    @Ignore
     void "test POST operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        NullableBookClient client = context.getBean(NullableBookClient)
 
         when:
-        Book book = client.save(null)
+        NullableBook book = client.save(null)
 
         then:
         book.title == null // string {}
         noExceptionThrown()
     }
 
-    @Ignore
     void "test PUT operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        NullableBookClient client = context.getBean(NullableBookClient)
 
         when:
-        Book book = client.update(null, null)
+        NullableBook saved = client.save("Temporary")
+        NullableBook book = client.update(saved.id, null)
 
         then:
-        book == null
+        book.title == null
         noExceptionThrown()
     }
 
-    @Ignore
     void "test GET operation with null values"() {
         given:
-        BookClient client = context.getBean(BookClient)
+        NullableBookClient client = context.getBean(NullableBookClient)
 
         when:
-        Book book = client.get(null)
+        NullableBook book = client.get(null)
 
         then:
         book == null
         noExceptionThrown()
     }
 
-    @Client('/blocking/books')
-    static interface BookClient extends BookApi {
+    @Client('/blocking/nullableBooks')
+    static interface NullableBookClient extends NullableBookApi {
     }
 
-    @Controller("/blocking/books")
+    @Controller("/blocking/nullableBooks")
     @Singleton
-    static class BookController implements BookApi {
+    static class NullableBookController implements NullableBookApi {
 
-        Map<Long, Book> books = new LinkedHashMap<>()
+        Map<Long, NullableBook> books = new LinkedHashMap<>()
         AtomicLong currentId = new AtomicLong(0)
 
         @Override
-        Book get(Long id) {
+        NullableBook get(Long id) {
             return books.get(id)
         }
 
         @Override
-        List<Book> list() {
+        List<NullableBook> list() {
             return books.values().toList()
         }
 
@@ -163,42 +141,42 @@ class BlockingCrudSpec extends Specification {
         }
 
         @Override
-        Book save(String title) {
-            Book book = new Book(title: title, id:currentId.incrementAndGet())
+        NullableBook save(String title) {
+            NullableBook book = new NullableBook(title: title, id: currentId.incrementAndGet())
             books[book.id] = book
             return book
         }
 
         @Override
-        Book update(Long id, String title) {
-            Book book = books[id]
-            if(book != null) {
+        NullableBook update(Long id, String title) {
+            NullableBook book = books[id]
+            if (book != null) {
                 book.title = title
             }
             return book
         }
     }
 
-    static interface BookApi {
+    static interface NullableBookApi {
 
-        @Get("/{id}")
-        Book get(Long id)
+        @Get("{/id}")
+        NullableBook get(@Nullable Long id)
 
         @Get('/')
-        List<Book> list()
+        List<NullableBook> list()
 
-        @Delete("/{id}")
-        void delete(Long id)
+        @Delete("{/id}")
+        void delete(@Nullable Long id)
 
         @Post('/')
-        Book save(String title)
+        NullableBook save(@Nullable String title)
 
         @Patch("/{id}")
-        Book update(Long id, String title)
+        NullableBook update(Long id, @Nullable String title)
     }
 
 
-    static class Book {
+    static class NullableBook {
         Long id
         String title
     }

@@ -47,8 +47,7 @@ class UpdateStatusSpec extends Specification {
     void "test post tweet"() {
         when:
         UpdateResult result = httpClient.toBlocking()
-                                        .retrieve(HttpRequest.POST('/update-status', "My Tweet")
-                                                             .contentType(MediaType.TEXT_PLAIN_TYPE), UpdateResult)
+                                        .retrieve(HttpRequest.POST('/update-status', new Message(text:"My New Tweet")), UpdateResult)
 
         then:
         result.url != null
