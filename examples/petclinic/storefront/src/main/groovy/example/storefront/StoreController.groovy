@@ -21,6 +21,7 @@ import example.api.v1.Vendor
 import example.storefront.client.v1.PetClient
 import example.storefront.client.v1.VendorClient
 import io.reactivex.Flowable
+import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.MediaType
@@ -57,9 +58,19 @@ class StoreController {
         })
     }
 
+    @Get('/pets/{slug}')
+    Maybe<Pet> showPet(String slug) {
+        petClient.find(slug)
+    }
+
     @Get('/vendors')
     Single<List<Vendor>> vendors() {
         vendorClient.list()
                     .onErrorReturnItem(Collections.emptyList())
+    }
+
+    @Get('/pets')
+    Single<List<Pet>> pets() {
+        petClient.list().onErrorReturnItem(Collections.emptyList())
     }
 }
