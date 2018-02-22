@@ -55,6 +55,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.Closeable;
@@ -100,6 +101,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
         }
 
+        for (MutableArgumentValue<?> argumentValue: context.getParameters().values()) {
+            if (argumentValue.getValue() == null && !argumentValue.isAnnotationPresent(Nullable.class)) {
+                throw new IllegalArgumentException(String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getTargetMethod().toString()));
+
+            }
+        }
 
         ClientRegistration reg = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
