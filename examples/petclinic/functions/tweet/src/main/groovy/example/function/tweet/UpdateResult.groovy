@@ -15,19 +15,22 @@
  */
 package example.function.tweet
 
-import groovy.transform.CompileStatic
-import groovy.transform.Field
-import twitter4j.Status
-import twitter4j.Twitter
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 
-import javax.inject.Inject
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+class UpdateResult {
 
+    final URL url
+    final long createdAt
 
-@Field @Inject Twitter twitter
+    @JsonCreator
+    UpdateResult(@JsonProperty("url") URL url, @JsonProperty("createdAt") long createdAt) {
+        this.url = url
+        this.createdAt = createdAt
+    }
 
-@CompileStatic
-UpdateResult updateStatus(String status) {
-    Status s = twitter.updateStatus(status)
-    URL url= new URL("https://twitter.com/$s.user.screenName/status/${s.id}")
-    return new UpdateResult(url, s.createdAt.time)
 }

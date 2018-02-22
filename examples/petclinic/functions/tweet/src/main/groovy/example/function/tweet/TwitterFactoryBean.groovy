@@ -44,8 +44,8 @@ class TwitterFactoryBean {
     @Singleton
     Twitter twitter() {
         Configuration twitterConfig = configuration.builder.build()
-        if(!twitterConfig.OAuth2AccessToken) {
-            throw new ConfigurationException("Missing Twitter OAuth2AccessToken")
+        if(!twitterConfig.OAuthAccessToken) {
+            throw new ConfigurationException("Missing Twitter OAuthAccessToken")
         }
         if(!twitterConfig.OAuthAccessTokenSecret) {
             throw new ConfigurationException("Missing Twitter OAuthAccessTokenSecret")

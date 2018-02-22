@@ -16,6 +16,7 @@
 package example.function.tweet
 
 import org.particleframework.context.ApplicationContext
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import twitter4j.conf.Configuration
 
@@ -25,10 +26,10 @@ import twitter4j.conf.Configuration
  */
 class TwitterConfigurationSpec extends Specification {
 
-    void "test twitter config"() {
+    void "test twitter config manually supplied"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'twitter.OAuth2AccessToken':'xxxxxx'
+                'twitter.OAuth2AccessToken': 'xxxxxx'
         )
         TwitterConfiguration config = applicationContext.getBean(TwitterConfiguration)
         Configuration configuration = config.builder.build()
@@ -36,5 +37,24 @@ class TwitterConfigurationSpec extends Specification {
         expect:
         configuration.OAuth2AccessToken == 'xxxxxx'
 
+    }
+
+    @IgnoreIf({
+        !System.getenv('TWITTER_OAUTH_ACCESS_TOKEN') ||
+                !System.getenv('TWITTER_OAUTH_ACCESS_TOKEN_SECRET') ||
+                !System.getenv('TWITTER_OAUTH_CONSUMER_KEY') ||
+                !System.getenv('TWITTER_OAUTH_CONSUMER_SECRET')
+    })
+    void "test twitter config supplied from environment"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run()
+        TwitterConfiguration config = applicationContext.getBean(TwitterConfiguration)
+        Configuration configuration = config.builder.build()
+
+        expect:
+        configuration.OAuthAccessToken == System.getenv('TWITTER_OAUTH_ACCESS_TOKEN')
+        configuration.OAuthAccessTokenSecret == System.getenv('TWITTER_OAUTH_ACCESS_TOKEN_SECRET')
+        configuration.OAuthConsumerKey == System.getenv('TWITTER_OAUTH_CONSUMER_KEY')
+        configuration.OAuthConsumerSecret == System.getenv('TWITTER_OAUTH_CONSUMER_SECRET')
     }
 }
