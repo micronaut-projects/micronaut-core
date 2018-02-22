@@ -57,6 +57,12 @@ class StoreController {
         })
     }
 
+    @Get('/pets')
+    Single<List<Pet>> pets() {
+        petClient.list()
+                .onErrorReturnItem(Collections.emptyList())
+    }
+
     @Get('/vendors')
     Single<List<Vendor>> vendors() {
         vendorClient.list()

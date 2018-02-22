@@ -2,6 +2,12 @@
   "particle": {
     "application": {
       "name":"storefront"
+    },
+    "server": {
+      "port": 8080,
+      "cors": {
+        "enabled": true
+      }
     }
   },
   "consul": {
