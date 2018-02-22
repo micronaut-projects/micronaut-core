@@ -85,7 +85,6 @@ class BlockingCrudSpec extends Specification {
         client.get(book.id) == null
     }
 
-    @Ignore
     void "test DELETE operation with null values"() {
         given:
         BookClient client = context.getBean(BookClient)
@@ -94,10 +93,9 @@ class BlockingCrudSpec extends Specification {
         client.delete(null)
 
         then:
-        noExceptionThrown() //HttpClientResponseException: Not Found, should throw httpclient exception. should never send request
+        thrown(IllegalArgumentException)
     }
 
-    @Ignore
     void "test POST operation with null values"() {
         given:
         BookClient client = context.getBean(BookClient)
@@ -106,24 +104,20 @@ class BlockingCrudSpec extends Specification {
         Book book = client.save(null)
 
         then:
-        book.title == null // string {}
-        noExceptionThrown()
+        thrown(IllegalArgumentException)
     }
 
-    @Ignore
     void "test PUT operation with null values"() {
         given:
         BookClient client = context.getBean(BookClient)
 
         when:
-        Book book = client.update(null, null)
+        Book book = client.update(5, null)
 
         then:
-        book == null
-        noExceptionThrown()
+        thrown(IllegalArgumentException)
     }
 
-    @Ignore
     void "test GET operation with null values"() {
         given:
         BookClient client = context.getBean(BookClient)
@@ -132,8 +126,7 @@ class BlockingCrudSpec extends Specification {
         Book book = client.get(null)
 
         then:
-        book == null
-        noExceptionThrown()
+        thrown(IllegalArgumentException)
     }
 
     @Client('/blocking/books')
