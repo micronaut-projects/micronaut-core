@@ -173,14 +173,12 @@
             html += "<p>";
             html += "<b>Request Info about this PET</b>";            
             html += "</p>"                        
-            html += "<form method='POST' action='"+url+"/mail/send' id='mailForm'>";
             html += "<div class='form-group'>";
             html += "<input type='hidden' name='slug' id='inputSlug' value='"+slug+"'/>";
             html += "<label for='inputEmail'>Email address</label>";     
             html += "<input type='email' class='form-control' name='email' id='inputEmail' aria-describedby='emailHelp' placeholder='Enter email'/>";
             html += "<small id='emailHelp' class='form-text text-muted'>We'll never share your email with anyone else.</b></small>";                        
             html += "</div>"
-            html += "</form>"                        
 			html += "<button onclick='javascript:submitMailForm();' class='btn btn-primary'>Send me info</button>";            
             html += "</div>"
             html += "</div>"            
