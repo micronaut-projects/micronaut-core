@@ -300,7 +300,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 Object result = errorRoute.execute();
                 HttpResponse response = errorResultToResponse(result);
 
-                processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, errorRoute);
+                processResponse(ctx, nettyHttpRequest, (NettyHttpResponse<?>) response, defaultResponseMediaType, errorRoute);
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
@@ -317,7 +317,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 try {
                     Object result = handler.handle(nettyHttpRequest, cause);
                     HttpResponse response = errorResultToResponse(result);
-                    processResponse(ctx, nettyHttpRequest, response, defaultResponseMediaType, null);
+                    processResponse(ctx, nettyHttpRequest, (NettyHttpResponse<?>) response, defaultResponseMediaType, null);
                 } catch (Throwable e) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Exception occurred executing error handler. Falling back to default error handling.");
@@ -600,7 +600,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
                 @Override
                 protected void doOnNext(HttpResponse<?> message) {
-                    processResponse(context, request, message, defaultResponseMediaType, finalRoute);
+                    processResponse(context, request, (NettyHttpResponse<?>) message, defaultResponseMediaType, finalRoute);
                 }
 
                 @Override
@@ -654,11 +654,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private void processResponse(
             ChannelHandlerContext context,
             NettyHttpRequest<?> request,
-            HttpResponse<?> defaultResponse,
+            NettyHttpResponse<?> defaultResponse,
             MediaType defaultResponseMediaType,
             RouteMatch<?> route) {
         Optional<?> optionalBody = defaultResponse.getBody();
-        FullHttpResponse nativeResponse = ((NettyHttpResponse) defaultResponse).getNativeResponse();
+        FullHttpResponse nativeResponse = defaultResponse.getNativeResponse();
         boolean isChunked = HttpUtil.isTransferEncodingChunked(nativeResponse);
         if (optionalBody.isPresent()) {
             // a response body is present so we need to process it
@@ -666,7 +666,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             Class<?> bodyType = body.getClass();
 
 
-            Optional<MediaType> responseType = defaultResponse.getContentType();
+            Optional<MediaType> responseMediaType = defaultResponse.getContentType();
 
             Publisher<Object> publisher;
             if (Publishers.isPublisher(bodyType)) {
@@ -689,7 +689,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                 // that will send the encoded data chunk by chunk
 
                 // adapt the publisher to produce HTTP content
-                writeHttpContentChunkByChunk(context, request, nativeResponse, responseType, defaultResponseMediaType, publisher);
+                writeHttpContentChunkByChunk(
+                        context,
+                        request,
+                        nativeResponse,
+                        responseMediaType.orElse(defaultResponseMediaType),
+                        publisher);
             } else {
                 // if the transfer encoding is not chunked then we must send a content length header so subscribe the
                 // publisher, encode the result as a io.netty.handler.codec.http.FullHttpResponse
@@ -712,15 +717,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                         body = response.getBody().orElse(null);
                                         fullHttpResponse = response.getNativeResponse();
                                     } else {
-                                        response = (NettyHttpResponse<?>) defaultResponse;
+                                        response = defaultResponse;
                                         body = message;
                                         fullHttpResponse = nativeResponse;
                                     }
 
-                                    if (responseType.isPresent()) {
-                                        Optional<MediaTypeCodec> codec = mediaTypeCodecRegistry.findCodec(responseType.get(), body.getClass());
+                                    if (responseMediaType.isPresent()) {
+                                        Optional<MediaTypeCodec> codec = mediaTypeCodecRegistry.findCodec(responseMediaType.get(), body.getClass());
                                         if (codec.isPresent()) {
-                                            writeSingleMessage(context, request, fullHttpResponse, body, codec.get(), responseType.get());
+                                            writeSingleMessage(context, request, fullHttpResponse, body, codec.get(), responseMediaType.get());
                                             return;
                                         }
                                     }
@@ -754,24 +759,38 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     });
                 } else {
                     // unbound publisher, we cannot know the content length, so we write chunk by chunk
-                    writeHttpContentChunkByChunk(context, request, nativeResponse, responseType, defaultResponseMediaType, publisher);
+                    writeHttpContentChunkByChunk(
+                            context,
+                            request,
+                            nativeResponse,
+                            responseMediaType.orElse(defaultResponseMediaType),
+                            publisher);
                 }
             }
         } else {
             // no body returned so just write the Netty response as is
-            writeNettyResponse(context, request, nativeResponse);
+            writeNettyResponseAndCloseChannel(context, request, nativeResponse);
         }
     }
 
-    private void writeHttpResponse(ChannelHandlerContext context, HttpRequest<?> request, HttpResponse<?> responseMessage, FullHttpResponse nativeResponse, MediaTypeCodec codec, MediaType responseType) {
-        Object body = responseMessage.getBody().orElse(null);
-        if (body != null && codec == null) {
-            codec = mediaTypeCodecRegistry.findCodec(
+    private void writeHttpResponse(
+            ChannelHandlerContext context,
+            NettyHttpRequest<?> request,
+            NettyHttpResponse<?> response,
+            MediaType responseType) {
+        Object body = response.getBody().orElse(null);
+        if (body != null) {
+            MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(
                     responseType,
                     body.getClass()
             ).orElse(new TextPlainCodec(serverConfiguration.getDefaultCharset()));
+            writeSingleMessage(context, request, response.getNativeResponse(), body, codec, responseType);
         }
-        writeSingleMessage(context, request, nativeResponse, body, codec, responseType);
+        else {
+            writeNettyResponseAndCloseChannel(
+                    context, request, response.getNativeResponse()
+            );
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -788,14 +807,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
         NettyHttpResponse error = (NettyHttpResponse) HttpResponse.serverError()
                 .body(new VndError("Internal Server Error: " + cause.getMessage()));
-        writeHttpResponse(
-                ctx,
-                nettyHttpRequest,
-                error,
-                error.getNativeResponse(),
-                null,
-                MediaType.APPLICATION_VND_ERROR_TYPE
-        );
+        emitDefaultErrorResponse(ctx, nettyHttpRequest, error);
     }
 
     private Class<?> resolveBodyType(RouteMatch<?> route, Class<?> bodyType) {
@@ -808,7 +820,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         return bodyType;
     }
 
-    private void emitDefaultErrorResponse(ChannelHandlerContext ctx, HttpRequest<?> request, MutableHttpResponse<Object> defaultResponse) {
+    private void emitDefaultErrorResponse(
+            ChannelHandlerContext ctx,
+            HttpRequest<?> request,
+            MutableHttpResponse<Object> defaultResponse) {
         Publisher<MutableHttpResponse<?>> notAllowedResponse = Publishers.just(defaultResponse);
         AtomicReference<HttpRequest<?>> reference = new AtomicReference<>(request);
         notAllowedResponse = (Publisher<MutableHttpResponse<?>>) filterPublisher(request, reference, notAllowedResponse);
@@ -820,11 +835,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             @Override
             protected void doOnNext(MutableHttpResponse<?> message) {
-                writeHttpResponse(ctx,
-                        reference.get(),
-                        message,
-                        ((NettyHttpResponse) message).getNativeResponse(),
-                        null,
+                writeHttpResponse(
+                        ctx,
+                        (NettyHttpRequest)reference.get(),
+                        (NettyHttpResponse)message,
                         MediaType.APPLICATION_VND_ERROR_TYPE);
             }
 
@@ -847,11 +861,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             ChannelHandlerContext context,
             NettyHttpRequest<?> request,
             FullHttpResponse nativeResponse,
-            Optional<MediaType> responseType,
-            MediaType defaultResponseType,
+            MediaType mediaType,
             Publisher<Object> publisher) {
-
-        MediaType mediaType = responseType.orElse(defaultResponseType);
 
         Publisher<HttpContent> httpContentPublisher = Publishers.map(publisher, message -> {
             if (message instanceof ByteBuf) {
@@ -902,7 +913,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         HttpHeaders headers = streamedResponse.headers();
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        writeNettyResponse(
+        writeNettyResponseAndCloseChannel(
                 context,
                 request,
                 streamedResponse
@@ -916,37 +927,43 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             Object message,
             MediaTypeCodec codec,
             MediaType mediaType) {
-        ByteBuf byteBuf;
-
-        if (message != null) {
-            if (message instanceof ByteBuf) {
-                byteBuf = (ByteBuf) message;
-            } else if (message instanceof ByteBuffer) {
-                ByteBuffer byteBuffer = (ByteBuffer) message;
-                Object nativeBuffer = byteBuffer.asNativeBuffer();
-                if (nativeBuffer instanceof ByteBuf) {
-                    byteBuf = (ByteBuf) nativeBuffer;
-                } else {
-                    byteBuf = Unpooled.copiedBuffer(byteBuffer.asNioBuffer());
-                }
-            } else if (message instanceof byte[]) {
-                byteBuf = Unpooled.copiedBuffer((byte[]) message);
-            } else {
-                byteBuf = (ByteBuf) codec.encode(message, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
-            }
-            int len = byteBuf.readableBytes();
-            FullHttpResponse newResponse = nativeResponse.replace(byteBuf);
-            HttpHeaders headers = newResponse.headers();
-            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, len);
-            writeNettyResponse(context, request, newResponse);
-        } else {
-            writeNettyResponse(context, request, nativeResponse);
+        if(message == null) {
+            throw new IllegalStateException("Response publisher emitted null result");
         }
+        else {
+            FullHttpResponse newResponse = encodeFullResponseBody(context, nativeResponse, message, codec, mediaType);
+            writeNettyResponseAndCloseChannel(context, request, newResponse);
+        }
+
 
     }
 
-    private void writeNettyResponse(
+    private FullHttpResponse encodeFullResponseBody(ChannelHandlerContext context, FullHttpResponse nativeResponse, Object message, MediaTypeCodec codec, MediaType mediaType) {
+        ByteBuf byteBuf;
+        if (message instanceof ByteBuf) {
+            byteBuf = (ByteBuf) message;
+        } else if (message instanceof ByteBuffer) {
+            ByteBuffer byteBuffer = (ByteBuffer) message;
+            Object nativeBuffer = byteBuffer.asNativeBuffer();
+            if (nativeBuffer instanceof ByteBuf) {
+                byteBuf = (ByteBuf) nativeBuffer;
+            } else {
+                byteBuf = Unpooled.copiedBuffer(byteBuffer.asNioBuffer());
+            }
+        } else if (message instanceof byte[]) {
+            byteBuf = Unpooled.copiedBuffer((byte[]) message);
+        } else {
+            byteBuf = (ByteBuf) codec.encode(message, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+        }
+        int len = byteBuf.readableBytes();
+        FullHttpResponse newResponse = nativeResponse.replace(byteBuf);
+        HttpHeaders headers = newResponse.headers();
+        headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        headers.add(HttpHeaderNames.CONTENT_LENGTH, len);
+        return newResponse;
+    }
+
+    private void writeNettyResponseAndCloseChannel(
             ChannelHandlerContext context,
             HttpRequest<?> request,
             io.netty.handler.codec.http.HttpResponse nettyResponse) {
