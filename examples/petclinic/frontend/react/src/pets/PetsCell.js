@@ -6,7 +6,7 @@ const PetsCell = ({pet}) =>
       backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`,
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
-      'background-size': 'cover',
+      backgroundSize: 'cover',
       margin: '10px',
       minHeight: '300px',
       color: 'white'}}>
@@ -19,6 +19,7 @@ const PetsCell = ({pet}) =>
         padding: '10px',
         width: '100%'}}>
         <h4>{pet.name}</h4>
+        
       </div>
     </div>
 

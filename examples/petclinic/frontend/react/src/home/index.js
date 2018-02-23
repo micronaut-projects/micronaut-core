@@ -3,9 +3,10 @@ import config from "../config";
 import Offer from "./Offer";
 import Error from "./Error";
 
-let source;
 
 class Home extends Component {
+
+  source;
 
   constructor() {
     super();
@@ -21,17 +22,17 @@ class Home extends Component {
   }
 
   componentWillUnmount() {
-    source.close();
+    this.source.close();
   }
 
 
   loadOffers() {
-    source = new EventSource(`${config.SERVER_URL}/offers`);
-    source.onmessage = (e) => {
+    this.source = new EventSource(`${config.SERVER_URL}/offers`);
+    this.source.onmessage = (e) => {
       const offer = JSON.parse(e.data);
       this.setState({offer, error: null})
     };
-    source.onerror = () => {
+    this.source.onerror = () => {
       this.setState({error: 'Could not load offers', offer: null})
     }
   }

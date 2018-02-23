@@ -1,5 +1,6 @@
 import React from 'react'
 import config from "../config";
+import Price from "../display/Price";
 
 const Offer = ({offer}) => offer ? <div id="offers">
 
@@ -12,7 +13,7 @@ const Offer = ({offer}) => offer ? <div id="offers">
     <div className="container">
       <h1 className="display-4">{offer.pet.name}</h1>
       <p className="lead">{offer.description}</p>
-      <p><strong>{offer.price}{offer.currency}</strong></p>
+      <h3><Price price={offer.price} currency={offer.currency} /></h3>
       <p>
         <small>{offer.pet.vendor} | {offer.pet.type}</small>
       </p>
