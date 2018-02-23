@@ -22,7 +22,9 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A registry of defined {@link FunctionBean} instances containing within the current running application.
+ * <p>A registry of defined {@link FunctionBean} instances containing within the current running application.</p>
+ *
+ * <p>This interface is designed to allow the location and interaction with non-remote functions</p>
  *
  * @author Graeme Rocher
  * @since 1.0
