@@ -15,6 +15,7 @@
  */
 package org.particleframework.context.env;
 
+import org.particleframework.context.annotation.Value;
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
 import org.particleframework.core.convert.ConversionContext;
@@ -29,11 +30,16 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.InputStream;
+import java.io.*;
 import java.lang.annotation.Annotation;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +50,7 @@ import java.util.stream.Stream;
  * <p>The default implementation of the {@link Environment} interface. Configures a named environment.</p>
  *
  * @author Graeme Rocher
+ * @author rvanderwerf
  * @since 1.0
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
@@ -56,6 +63,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
+    private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
+    private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
+    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
+
+    @Value("org.particleframework.cloud.computePlatform")
+    private String computePlatform;
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
@@ -310,6 +324,38 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
+        ComputePlatform computePlatform = determineCloudProvider();
+        if (computePlatform != null) {
+            switch (computePlatform) {
+                case GOOGLE_COMPUTE:
+                    //instantiate bean for GC metadata discovery
+                    environmentsAndPackage.enviroments.add(Environment.GOOGLE_COMPUTE);
+                    break;
+                case AMAZON_EC2:
+                    //instantiate bean for ec2 metadata discovery
+                    environmentsAndPackage.enviroments.add(Environment.AMAZON_EC2);
+                    break;
+                case AZURE:
+                    // not implemented
+                    environmentsAndPackage.enviroments.add(Environment.AZURE);
+                    break;
+                case IBM:
+                    // not implemented
+                    environmentsAndPackage.enviroments.add(Environment.IBM);
+                    break;
+                case OTHER:
+                    // do nothing here
+                    break;
+                default:
+                case BARE_METAL:
+                    // do nothing
+                    environmentsAndPackage.enviroments.add(Environment.BARE_METAL);
+                    break;
+
+            }
+
+        }
+
 
         return environmentsAndPackage;
     }
@@ -390,4 +436,121 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Package aPackage;
         Set<String> enviroments = new HashSet<>(1);
     }
+
+
+    public ComputePlatform determineCloudProvider() {
+
+        if (computePlatform!=null) {
+
+            ComputePlatform platform =  ComputePlatform.valueOf(computePlatform);
+            if (platform == null) {
+                LOG.error("Error invalid compute environment specified:"+computePlatform);
+            }
+
+        }
+        boolean isWindows = System.getProperty("os.name")
+                .toLowerCase().startsWith("windows");
+
+        if (isWindows) {
+            if (isEC2Windows()) {
+                return ComputePlatform.AMAZON_EC2;
+            }
+            if (isGoogleCompute()) {
+                return ComputePlatform.GOOGLE_COMPUTE;
+            }
+
+        } else {
+            // can just read from the file
+            if (isEC2Linux()) {
+                return ComputePlatform.AMAZON_EC2;
+            }
+        }
+        // let's try google
+        if (isGoogleCompute()) {
+            return ComputePlatform.GOOGLE_COMPUTE;
+        }
+        //TODO check for azure and IBM
+        //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
+        //IBM - uses cloudfoundry, will have to use that to probe
+        // if all else fails not a cloud server that we can tell
+        return ComputePlatform.BARE_METAL;
+    }
+
+
+
+    boolean isGoogleCompute() {
+        try {
+            URL url = new URL("http://metadata.google.internal");
+            HttpURLConnection con = (HttpURLConnection)url.openConnection();
+            con.setRequestMethod("GET");
+            con.setDoOutput(true);
+            int responseCode = con.getResponseCode();
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer response = new StringBuffer();
+
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+            if (con.getHeaderField("Metadata-Flavor")!=null &&
+                    con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
+                return true;
+            }
+
+        } catch (IOException e) {
+            // well not google then
+        }
+        return false;
+    }
+
+    boolean isEC2Linux() {
+
+        try {
+            String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
+            if (contents.startsWith("ec2")) {
+                return true;
+            }
+        } catch (IOException e) {
+            // well that's not it!
+        }
+        return false;
+    }
+
+    boolean isEC2Windows() {
+        try {
+            ProcessBuilder builder = new ProcessBuilder();
+            builder.command("cmd.exe", "/c", EC2_WINDOWS_HYPERVISOR_CMD);
+            builder.redirectErrorStream(true);
+            builder.directory(new File(System.getProperty("user.home")));
+            Process process = builder.start();
+
+            //Read out dir output
+            InputStream is = process.getInputStream();
+            InputStreamReader isr = new InputStreamReader(is);
+            BufferedReader br = new BufferedReader(isr);
+            String line;
+            StringBuilder stdout = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                stdout.append(line);
+            }
+
+            //Wait to get exit value
+            try {
+                int exitValue = process.waitFor();
+                if (exitValue == 0 && stdout.toString().startsWith("EC2")) {
+                    return true;
+                }
+            } catch (InterruptedException e) {
+                // test negative
+            }
+
+        } catch (IOException e) {
+
+        }
+        return false;
+    }
 }
+
+

@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.discovery.event;
+package org.particleframework.discovery.cloud;
 
-import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.context.env.Environment;
+
+import java.util.Optional;
 
 /**
- * An event fired when registering a service
+ * Interface for resoling compute instance metadata
  *
- * @author graemerocher
+ * @author rvanderwerf
+ * @author Graeme Rocher
  * @since 1.0
  */
-public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
-    /**
-     * Constructs a prototypical Event.
-     *
-     * @param source The object on which the Event initially occurred.
-     * @throws IllegalArgumentException if source is null.
-     */
+public interface ComputeInstanceMetadataResolver {
 
-    public ServiceStartedEvent(ServiceInstance source) {
-        super(source);
-    }
+    /**
+     * Resolves {@link ComputeInstanceMetadata} for the current environment if possible
+     *
+     * @param environment The environment
+     * @return The {@link ComputeInstanceMetadata}
+     */
+    Optional<ComputeInstanceMetadata> resolve(Environment environment);
 }
