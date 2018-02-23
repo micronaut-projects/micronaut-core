@@ -24,7 +24,12 @@ class Vendors extends Component {
     render() {
         const {vendors} = this.state;
 
-        return <div><h2>Vendors</h2>
+        return <div>
+          <div className="jumbotron jumbotron-fluid">
+            <div className="container">
+              <h1 className="display-4">Vendors</h1>
+            </div>
+          </div>
             <VendorsTable vendors={vendors} />
         </div>
     }
