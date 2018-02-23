@@ -63,6 +63,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The default bootstrap name
      */
     String BOOTSTRAP_NAME_PROPERTY = "particle.bootstrap.name";
+
+    /**
+     * The default bootstrap name
+     */
+    String CLOUD_PLATFORM_PROPERTY = "particle.cloud.platform";
     /**
      * The default bootstrap config name
      */
