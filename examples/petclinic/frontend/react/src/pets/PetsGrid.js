@@ -13,7 +13,7 @@ const PetsGrid = ({pets}) => <div>
             ar[index].push(it);
 
             return ar;
-        }, []).map(group => <PetsRow pets={group}/>)
+        }, []).map((group, i) => <PetsRow key={i} pets={group}/>)
     }
 
 </div>
