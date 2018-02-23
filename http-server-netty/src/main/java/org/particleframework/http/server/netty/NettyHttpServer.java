@@ -41,7 +41,7 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
-import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
+import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.ApplicationConfiguration;
 import org.particleframework.scheduling.executor.ExecutorSelector;
@@ -89,7 +89,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ExecutorSelector executorSelector;
     private final ChannelOutboundHandler[] outboundHandlers;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry;
+    private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
@@ -107,12 +107,11 @@ public class NettyHttpServer implements EmbeddedServer {
     @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
-
             ApplicationContext applicationContext,
             Router router,
             RequestBinderRegistry binderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry,
+            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
@@ -126,7 +125,7 @@ public class NettyHttpServer implements EmbeddedServer {
         this.computeInstanceMetadataResolver = computeInstanceMetadataResolver;
         this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.specialTypeHandlerRegistry = specialTypeHandlerRegistry;
+        this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
@@ -174,7 +173,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     beanLocator,
                                     router,
                                     mediaTypeCodecRegistry,
-                                    specialTypeHandlerRegistry,
+                                    customizableResponseTypeHandlerRegistry,
                                     staticResourceResolver,
                                     serverConfiguration,
                                     binderRegistry,

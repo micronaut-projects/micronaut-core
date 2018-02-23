@@ -33,8 +33,10 @@ import java.util.List;
  * @author James Kleeh
  * @since 1.0
  */
-@ConfigurationProperties("router.static.resources")
+@ConfigurationProperties(StaticResourceConfiguration.PREFIX)
 public class StaticResourceConfiguration implements Toggleable {
+
+    public static final String PREFIX = "router.static.resources";
 
     protected boolean enabled = false;
     protected List<String> paths = Collections.emptyList();

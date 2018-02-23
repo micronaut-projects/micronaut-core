@@ -15,7 +15,7 @@
  */
 package org.particleframework.http.server.types.files;
 
-import org.particleframework.http.server.types.SpecialTypeHandlerException;
+import org.particleframework.http.server.types.CustomizableResponseTypeException;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,29 +30,29 @@ import java.time.Instant;
  *
  * @author James Kleeh
  */
-public class StreamedFileSpecialType implements FileSpecialType {
+public class StreamedFileCustomizableResponseType implements FileCustomizableResponseType {
 
     private final String name;
     private final long lastModified;
     private final InputStream inputStream;
     private final long length;
 
-    public StreamedFileSpecialType(InputStream inputStream, String name) {
+    public StreamedFileCustomizableResponseType(InputStream inputStream, String name) {
         this(inputStream, name, Instant.now().toEpochMilli());
     }
 
-    public StreamedFileSpecialType(InputStream inputStream, String name, long lastModified) {
+    public StreamedFileCustomizableResponseType(InputStream inputStream, String name, long lastModified) {
         this(inputStream, name, lastModified, -1);
     }
 
-    public StreamedFileSpecialType(InputStream inputStream, String name, long lastModified, long contentLength) {
+    public StreamedFileCustomizableResponseType(InputStream inputStream, String name, long lastModified, long contentLength) {
         this.name = name;
         this.lastModified = lastModified;
         this.inputStream = inputStream;
         this.length = contentLength;
     }
 
-    public StreamedFileSpecialType(URL url) {
+    public StreamedFileCustomizableResponseType(URL url) {
         String path = url.getPath();
         int idx = path.lastIndexOf(File.separatorChar);
         if (idx > -1) {
@@ -66,7 +66,7 @@ public class StreamedFileSpecialType implements FileSpecialType {
             this.inputStream = con.getInputStream();
             this.length = con.getContentLengthLong();
         } catch (IOException e) {
-            throw new SpecialTypeHandlerException("Could not open a connection to the URL: " + path, e);
+            throw new CustomizableResponseTypeException("Could not open a connection to the URL: " + path, e);
         }
     }
 

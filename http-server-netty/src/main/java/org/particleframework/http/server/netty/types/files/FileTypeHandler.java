@@ -16,26 +16,22 @@
 package org.particleframework.http.server.netty.types.files;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import org.particleframework.http.*;
-import org.particleframework.http.HttpHeaders;
-import org.particleframework.http.HttpResponse;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
-import org.particleframework.http.server.netty.types.NettyFileSpecialType;
-import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
-import org.particleframework.http.server.types.SpecialTypeHandlerException;
-import org.particleframework.http.server.types.files.SystemFileSpecialType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.particleframework.http.server.netty.types.NettyFileCustomizableResponseType;
+import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandler;
+import org.particleframework.http.server.types.CustomizableResponseTypeException;
+import org.particleframework.http.server.types.files.SystemFileCustomizableResponseType;
 
 import javax.inject.Singleton;
-import java.io.*;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.concurrent.ExecutionException;
+import java.io.File;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 /**
  * Responsible for writing files out to the response in Netty
@@ -44,58 +40,50 @@ import java.util.concurrent.ExecutionException;
  * @since 1.0
  */
 @Singleton
-public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
+public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
 
     private final FileTypeHandlerConfiguration configuration;
-    private final SimpleDateFormat dateFormat;
 
     public FileTypeHandler(FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
-        this.dateFormat = new SimpleDateFormat(configuration.getDateFormat(), Locale.US);
-        this.dateFormat.setTimeZone(configuration.getDateTimeZone());
     }
 
     @Override
-    public void handle(Object obj, HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context) {
+    public void handle(Object obj, HttpRequest<?> request, NettyHttpResponse<?> response, ChannelHandlerContext context) {
 
-        NettyFileSpecialType type;
+        NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
-            type = new NettySystemFileSpecialType((File) obj);
-        } else if (obj instanceof NettyFileSpecialType) {
-            type = (NettyFileSpecialType) obj;
-        } else if (obj instanceof SystemFileSpecialType) {
-            type = new NettySystemFileSpecialType((SystemFileSpecialType) obj);
+            type = new NettySystemFileCustomizableResponseType((File) obj);
+        } else if (obj instanceof NettyFileCustomizableResponseType) {
+            type = (NettyFileCustomizableResponseType) obj;
+        } else if (obj instanceof SystemFileCustomizableResponseType) {
+            type = new NettySystemFileCustomizableResponseType((SystemFileCustomizableResponseType) obj);
         } else {
-            throw new SpecialTypeHandlerException("FileTypeHandler only supports File or FileSpecialType types");
+            throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
         }
 
         long lastModified = type.getLastModified();
 
         // Cache Validation
-        String ifModifiedSince = request.headers().get(HttpHeaders.IF_MODIFIED_SINCE);
-        if (ifModifiedSince != null && !ifModifiedSince.isEmpty()) {
-            try {
-                Date ifModifiedSinceDate = dateFormat.parse(ifModifiedSince);
+        ZonedDateTime ifModifiedSince = request.getHeaders().getDate(HttpHeaders.IF_MODIFIED_SINCE);
+        if (ifModifiedSince != null) {
 
-                // Only compare up to the second because the datetime format we send to the client
-                // does not have milliseconds
-                long ifModifiedSinceDateSeconds = ifModifiedSinceDate.getTime() / 1000;
-                long fileLastModifiedSeconds = lastModified / 1000;
-                if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
-                    FullHttpResponse nettyResponse = notModified();
-                    context.writeAndFlush(nettyResponse)
-                            .addListener(new DefaultCloseHandler(context, request, nettyResponse));
-                    return;
-                }
-            } catch (ParseException | NumberFormatException e) {
-                //no-op
+            // Only compare up to the second because the datetime format we send to the client
+            // does not have milliseconds
+            long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
+            long fileLastModifiedSeconds = lastModified / 1000;
+            if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
+                FullHttpResponse nettyResponse = notModified();
+                context.writeAndFlush(nettyResponse)
+                        .addListener(new DefaultCloseHandler(context, request, response.code()));
+                return;
             }
         }
 
         response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
         setDateAndCacheHeaders(response, lastModified);
-        if (HttpUtil.isKeepAlive(request)) {
+        if (request.getHeaders().isKeepAlive()) {
             response.header(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
         }
 
@@ -106,7 +94,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
 
     @Override
     public boolean supports(Class<?> type) {
-        return File.class.isAssignableFrom(type) || SystemFileSpecialType.class.isAssignableFrom(type);
+        return File.class.isAssignableFrom(type) || SystemFileCustomizableResponseType.class.isAssignableFrom(type);
     }
 
     protected MediaType getMediaType(String filename) {
@@ -118,20 +106,22 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
 
     protected void setDateAndCacheHeaders(MutableHttpResponse response, long lastModified) {
         // Date header
-        Calendar time = new GregorianCalendar();
-        response.header(HttpHeaders.DATE, dateFormat.format(time.getTime()));
+        MutableHttpHeaders headers = response.getHeaders();
+        LocalDateTime now = LocalDateTime.now();
+        headers.date(now);
 
         // Add cache headers
-        time.add(Calendar.SECOND, configuration.getCacheSeconds());
-        response.header(HttpHeaders.EXPIRES, dateFormat.format(time.getTime()));
+        LocalDateTime cacheSeconds = now.plus(configuration.getCacheSeconds(), ChronoUnit.SECONDS);
+        headers.expires(cacheSeconds);
+
         response.header(HttpHeaders.CACHE_CONTROL, "private, max-age=" + configuration.getCacheSeconds());
-        response.header(
-                HttpHeaderNames.LAST_MODIFIED, dateFormat.format(new Date(lastModified)));
+        headers.lastModified(lastModified);
     }
 
     protected void setDateHeader(MutableHttpResponse response) {
-        Calendar time = new GregorianCalendar();
-        response.header(HttpHeaders.DATE, dateFormat.format(time.getTime()));
+        MutableHttpHeaders headers = response.getHeaders();
+        LocalDateTime now = LocalDateTime.now();
+        headers.date(now);
     }
 
     private FullHttpResponse notModified() {

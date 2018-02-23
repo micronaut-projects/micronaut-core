@@ -15,12 +15,10 @@
  */
 package org.particleframework.http.server.netty.async;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,13 +38,16 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
 
 
     private final ChannelHandlerContext context;
-    private final HttpRequest request;
-    private final HttpResponse response;
+    private final org.particleframework.http.HttpRequest<?> request;
+    private final int statusCode;
 
-    public DefaultCloseHandler(ChannelHandlerContext context, HttpRequest request, HttpResponse response) {
+    public DefaultCloseHandler(
+            ChannelHandlerContext context,
+            org.particleframework.http.HttpRequest<?> request,
+            int statusCode) {
         this.context = context;
         this.request = request;
-        this.response = response;
+        this.statusCode = statusCode;
     }
 
     @Override
@@ -64,7 +65,7 @@ public class DefaultCloseHandler implements GenericFutureListener<ChannelFuture>
                 context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
                        .addListener(ChannelFutureListener.CLOSE);
             }
-        } else if (!HttpUtil.isKeepAlive(request) || response.status().code() >= 300) {
+        } else if (!request.getHeaders().isKeepAlive() || statusCode >= 300) {
             future.channel().close();
         }
     }
