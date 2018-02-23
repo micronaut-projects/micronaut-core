@@ -73,6 +73,31 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String DEFAULT_NAME = "application";
 
     /**
+     * cloud provider google compute instance
+     */
+    String GOOGLE_COMPUTE = "gcp";
+
+    /**
+     * cloud provider amazon ec2
+     */
+    String AMAZON_EC2 = "ec2";
+
+    /**
+     * cloud provider Microsoft Azure
+     */
+    String AZURE = "azure";
+
+    /**
+     * cloud or non cloud provider on bare metal (unknown)
+     */
+    String BARE_METAL = "baremetal";
+
+    /**
+     *  cloud provider IBM cloud
+     */
+    String IBM = "ibm";
+
+    /**
      * @return The active environment names
      */
     Set<String> getActiveNames();
