@@ -1,7 +1,10 @@
 package org.particleframework.discovery.cloud
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.particleframework.context.env.ComputePlatform
 import org.particleframework.context.env.Environment
+import org.particleframework.discovery.cloud.gcp.GoogleComputeInstanceMetadataResolver
+import org.particleframework.discovery.cloud.gcp.GoogleComputeMetadataConfiguration
 import spock.lang.Specification
 
 import java.nio.file.Path
@@ -19,13 +22,7 @@ class GoogleComputeInstanceResolverSpec extends Specification {
         given:
         Environment environment = Mock(Environment)
 
-        GoogleComputeMetadataResolver resolver = new GoogleComputeMetadataResolver()
-        Path currentRelativePath = Paths.get("");
-        String s = currentRelativePath.toAbsolutePath().toString();
-        System.out.println("Current relative path is: " + s);
-
-        resolver.gcMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/gcInstanceMetadata.json"
-        resolver.gcProjectMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/projectMetadata.json"
+        GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 
 
@@ -47,18 +44,28 @@ class GoogleComputeInstanceResolverSpec extends Specification {
         computeInstanceMetadata.get().publicIpV4 == "35.190.174.64"
     }
 
+    private GoogleComputeInstanceMetadataResolver buildResolver() {
+        def configuration = new GoogleComputeMetadataConfiguration()
+        Path currentRelativePath = Paths.get("");
+        String s = currentRelativePath.toAbsolutePath().toString();
+        System.out.println("Current relative path is: " + s);
+
+        configuration.metadataUrl = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/gcInstanceMetadata.json"
+        configuration.projectMetadataUrl = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/projectMetadata.json"
+        GoogleComputeInstanceMetadataResolver resolver = new GoogleComputeInstanceMetadataResolver(
+                new ObjectMapper(),
+                configuration
+
+        )
+        resolver
+    }
+
 
     void "test metadata caching"() {
         given:
         Environment environment = Mock(Environment)
 
-        GoogleComputeMetadataResolver resolver = new GoogleComputeMetadataResolver()
-        Path currentRelativePath = Paths.get("");
-        String s = currentRelativePath.toAbsolutePath().toString();
-        System.out.println("Current relative path is: " + s);
-
-        resolver.gcMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/gcInstanceMetadata.json"
-        resolver.gcProjectMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/projectMetadata.json"
+        GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 
 

@@ -1,30 +1,23 @@
 package org.particleframework.discovery.cloud
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.particleframework.context.env.ComputePlatform
 import org.particleframework.context.env.Environment
-import org.particleframework.context.env.PropertySource
-import org.particleframework.context.env.PropertySourcePropertyResolver
-import spock.lang.Ignore
+import org.particleframework.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver
+import org.particleframework.discovery.cloud.aws.AmazonMetadataConfiguration
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import java.nio.file.Path
 import java.nio.file.Paths
 
 class AmazonEC2InstanceResolverSpec extends Specification {
 
-
     void "test building ec2 metadata"() {
         given:
         Environment environment = Mock(Environment)
 
-        AmazonMetadataResolver resolver = new AmazonMetadataResolver()
-        Path currentRelativePath = Paths.get("");
-        String s = currentRelativePath.toAbsolutePath().toString();
-        System.out.println("Current relative path is: " + s);
+        AmazonComputeInstanceMetadataResolver resolver = getResolver()
 
-        resolver.ec2InstanceMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/"
-        resolver.ec2InstanceIdentityDocURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/identity-document.json"
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 
 
@@ -51,18 +44,25 @@ class AmazonEC2InstanceResolverSpec extends Specification {
 
     }
 
+    private AmazonComputeInstanceMetadataResolver getResolver() {
+        AmazonMetadataConfiguration configuration = new AmazonMetadataConfiguration()
+        Path currentRelativePath = Paths.get("");
+        String s = currentRelativePath.toAbsolutePath().toString();
+        System.out.println("Current relative path is: " + s);
+        configuration.metadataUrl = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/"
+        configuration.instanceDocumentUrl = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/identity-document.json"
+        AmazonComputeInstanceMetadataResolver resolver = new AmazonComputeInstanceMetadataResolver(
+                new ObjectMapper(),
+                configuration
+        )
+        resolver
+    }
+
 
     void "test caching ec2 metadata"() {
         given:
         Environment environment = Mock(Environment)
-
-        AmazonMetadataResolver resolver = new AmazonMetadataResolver()
-        Path currentRelativePath = Paths.get("");
-        String s = currentRelativePath.toAbsolutePath().toString();
-        System.out.println("Current relative path is: " + s);
-
-        resolver.ec2InstanceMetadataURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/"
-        resolver.ec2InstanceIdentityDocURL = "file:///${s}/src/test/groovy/org/particleframework/discovery/cloud/identity-document.json"
+        AmazonComputeInstanceMetadataResolver resolver = getResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 
 

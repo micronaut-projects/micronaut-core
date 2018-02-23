@@ -1,7 +1,25 @@
-package org.particleframework.discovery.cloud;
+/*
+ * Copyright 2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.particleframework.discovery.cloud.gcp;
 
 /**
+ * Models common Google compute instance metadata keys
+ *
  * @author rvanderwerf
+ * @author Graeme Rocher
  * @since 1.0
  */
 public enum GoogleComputeMetadataKeys {
@@ -36,19 +54,10 @@ public enum GoogleComputeMetadataKeys {
     ACCESS_CONFIGS("accessConfigs"),
     NETMASK("subnetmask");
 
-
-
-    protected String name;
-    protected String path;
-
+    private final String name;
 
     GoogleComputeMetadataKeys(String name) {
-        this(name, "");
-    }
-
-    GoogleComputeMetadataKeys(String name, String path) {
         this.name = name;
-        this.path = path;
     }
 
     public String getName() {

@@ -1,14 +1,37 @@
-package org.particleframework.discovery.cloud;
+/*
+ * Copyright 2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.particleframework.discovery.cloud.aws;
 
 import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
+import org.particleframework.discovery.cloud.NetworkInterface;
+
 import java.util.List;
 import java.util.Map;
 
 /**
+ * Represents {@link ComputeInstanceMetadata} for Amazon's EC2
+ *
  * @author rvanderwerf
+ * @author Graeme Rocher
  * @since 1.0
  */
 public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
+
+    final ComputePlatform computePlatform = ComputePlatform.AMAZON_EC2;
 
     // anything non-standard goes in here
     Map<String, String> metadata;
@@ -17,11 +40,9 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     private Map<String, String> tags;
 
     //network interfaces to get ip addresses
-   List<NetworkInterface> interfaces;
+    List<NetworkInterface> interfaces;
 
 
-
-    private String name;
     String availabilityZone;
     String localHostname;
     String publicHostname;
@@ -29,7 +50,6 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     String machineType;
     String instanceId;
     String region;
-    ComputePlatform computePlatform;
     String account;
     String imageId;
 
@@ -43,8 +63,6 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     boolean cached = false;
 
 
-
-
     @Override
     public String getImageId() {
         return imageId;
@@ -56,7 +74,7 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public Map<String,String> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
@@ -77,7 +95,7 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
 
     @Override
     public String getName() {
-        return name;
+        return getInstanceId();
     }
 
     @Override
@@ -106,7 +124,7 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public String getPrivateHosname() {
+    public String getPrivateHostname() {
         return localHostname;
     }
 
@@ -136,7 +154,7 @@ public class AmazonEC2InstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public String publicHostname() {
+    public String getPublicHostname() {
         return publicHostname;
     }
 

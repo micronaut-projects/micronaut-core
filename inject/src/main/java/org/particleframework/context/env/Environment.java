@@ -75,7 +75,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     /**
      * cloud provider google compute instance
      */
-    String GOOGLE_COMPUTE = "gc";
+    String GOOGLE_COMPUTE = "gcp";
 
     /**
      * cloud provider amazon ec2
