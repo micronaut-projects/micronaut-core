@@ -19,13 +19,13 @@ class App extends Component {
                         <div className="collapse navbar-collapse" id="navbarNav">
                             <ul className='navbar-nav'>
                                 <li className='nav-item'>
-                                    <Link to="/" className="nav-link">HOME</Link>
+                                    <Link to="/" className="nav-link">Home</Link>
                                 </li>
                                 <li className='nav-item'>
-                                    <Link to="/pets" className="nav-link">PETS</Link>
+                                    <Link to="/pets" className="nav-link">Pets</Link>
                                 </li>
                                 <li className='nav-item'>
-                                    <Link to="/vendors" className="nav-link">VENDORS</Link>
+                                    <Link to="/vendors" className="nav-link">Vendors</Link>
                                 </li>
                             </ul>
                         </div>
