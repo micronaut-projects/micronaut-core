@@ -22,12 +22,12 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A registry of defined {@link FunctionBean} instances
+ * A registry of defined {@link FunctionBean} instances containing within the current running application.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FunctionRegistry {
+public interface LocalFunctionRegistry {
 
     /**
      * The name of the default function name
