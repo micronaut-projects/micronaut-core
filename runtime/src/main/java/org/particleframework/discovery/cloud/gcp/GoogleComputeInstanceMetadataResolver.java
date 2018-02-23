@@ -18,24 +18,18 @@ package org.particleframework.discovery.cloud.gcp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.particleframework.context.annotation.Requires;
-import org.particleframework.context.annotation.Value;
-import org.particleframework.context.env.ComputePlatform;
 import org.particleframework.context.env.Environment;
-import org.particleframework.core.io.IOUtils;
 import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
 import org.particleframework.discovery.cloud.ComputeInstanceMetadataResolver;
 import org.particleframework.discovery.cloud.NetworkInterface;
 import org.particleframework.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.net.www.protocol.file.FileURLConnection;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -163,10 +157,9 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
 
         URLConnection urlConnection = url.openConnection();
 
-        if (urlConnection instanceof FileURLConnection) {
-            FileURLConnection fu = (FileURLConnection)urlConnection;
-            fu.connect();
-            try(InputStream in = fu.getInputStream()) {
+        if (url.getProtocol().equalsIgnoreCase("file")) {
+            urlConnection.connect();
+            try(InputStream in = urlConnection.getInputStream()) {
                 return objectMapper.readTree(in);
             }
         } else {

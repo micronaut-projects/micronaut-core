@@ -15,9 +15,9 @@
  */
 package org.particleframework.context.env;
 
-import org.particleframework.context.annotation.Value;
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
@@ -55,6 +55,12 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
+    private static EnvironmentsAndPackage environmentsAndPackage;
+    //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
+    private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
+    private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
+    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
+
     private final Set<String> names;
     private final ClassLoader classLoader;
     protected final ResourceLoader resourceLoader;
@@ -63,13 +69,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
-    //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
-    private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
-    private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
-    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
 
-    @Value("org.particleframework.cloud.computePlatform")
-    private String computePlatform;
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
@@ -88,7 +88,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
-        EnvironmentsAndPackage environmentsAndPackage = deduceEnvironments();
+        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
         specifiedNames.addAll(environmentsAndPackage.enviroments);
         Package aPackage = environmentsAndPackage.aPackage;
         if(aPackage != null) {
@@ -297,7 +297,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return SoftServiceLoader.load(PropertySourceLoader.class);
     }
 
-    private EnvironmentsAndPackage deduceEnvironments() {
+    private static EnvironmentsAndPackage getEnvironmentsAndPackage() {
+        EnvironmentsAndPackage environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+        if (environmentsAndPackage == null) {
+            synchronized (EnvironmentsAndPackage.class) { // double check
+                environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+                if (environmentsAndPackage == null) {
+                    DefaultEnvironment.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
+                }
+            }
+        }
+        return environmentsAndPackage;
+    }
+
+    private static EnvironmentsAndPackage deduceEnvironments() {
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         for (StackTraceElement stackTraceElement : stackTrace) {
@@ -346,19 +359,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 case OTHER:
                     // do nothing here
                     break;
-                default:
-                case BARE_METAL:
-                    // do nothing
-                    environmentsAndPackage.enviroments.add(Environment.BARE_METAL);
-                    break;
-
             }
 
         }
-
+        if(LOG.isInfoEnabled()) {
+            LOG.info("Established active environments: {}", environmentsAndPackage.enviroments);
+        }
 
         return environmentsAndPackage;
     }
+
+
 
     private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
@@ -432,19 +443,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return resourceLoader.getResources(path);
     }
 
-    private class EnvironmentsAndPackage {
-        Package aPackage;
-        Set<String> enviroments = new HashSet<>(1);
-    }
 
+    private static ComputePlatform determineCloudProvider() {
 
-    public ComputePlatform determineCloudProvider() {
-
+        String computePlatform = System.getProperty(Environment.CLOUD_PLATFORM_PROPERTY);
         if (computePlatform!=null) {
 
-            ComputePlatform platform =  ComputePlatform.valueOf(computePlatform);
-            if (platform == null) {
-                LOG.error("Error invalid compute environment specified:"+computePlatform);
+            try {
+                return ComputePlatform.valueOf(computePlatform);
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Illegal value specified for ["+Environment.CLOUD_PLATFORM_PROPERTY+"]: " + computePlatform);
             }
 
         }
@@ -478,10 +486,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
 
 
-    boolean isGoogleCompute() {
+    private static boolean isGoogleCompute() {
         try {
             URL url = new URL("http://metadata.google.internal");
             HttpURLConnection con = (HttpURLConnection)url.openConnection();
+            con.setReadTimeout(500);
+            con.setConnectTimeout(500);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
@@ -505,7 +515,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
-    boolean isEC2Linux() {
+    private static boolean isEC2Linux() {
 
         try {
             String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
@@ -518,7 +528,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
-    boolean isEC2Windows() {
+    private static boolean isEC2Windows() {
         try {
             ProcessBuilder builder = new ProcessBuilder();
             builder.command("cmd.exe", "/c", EC2_WINDOWS_HYPERVISOR_CMD);
@@ -551,6 +561,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         return false;
     }
+
+    private static class EnvironmentsAndPackage {
+        Package aPackage;
+        Set<String> enviroments = new HashSet<>(1);
+    }
+
 }
+
 
 
