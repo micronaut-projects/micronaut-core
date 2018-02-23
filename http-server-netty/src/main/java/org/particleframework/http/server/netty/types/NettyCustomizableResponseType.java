@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types;
+package org.particleframework.http.server.netty.types;
 
+import io.netty.channel.ChannelHandlerContext;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.MutableHttpResponse;
+import org.particleframework.http.server.types.CustomizableResponseType;
 
 /**
- * A type that needs special handling that may
- * include modification of the response.
+ * A special type that allows writing data in Netty
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface SpecialType {
+public interface NettyCustomizableResponseType extends CustomizableResponseType {
 
     /**
-     * Modify the response before it is written
-     * to the client.
+     * Write this instance to Netty
      *
-     * @param response The response to modify
+     * @param request The request
+     * @param response The response
+     * @param context The Netty {@link ChannelHandlerContext}
      */
-    default void process(MutableHttpResponse response) {
-        //no-op
-    }
+    void write(HttpRequest<?> request,
+               MutableHttpResponse<?> response,
+               ChannelHandlerContext context);
 }

@@ -13,15 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.netty.types;
-
-import org.particleframework.http.server.types.files.FileSpecialType;
+package org.particleframework.http.server.types;
 
 /**
- * A special type for files specific to Netty
+ * Used when a special type handler encounters an error
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface NettyFileSpecialType extends FileSpecialType, NettySpecialType {
+public class CustomizableResponseTypeException extends RuntimeException {
+
+    public CustomizableResponseTypeException(String msg) {
+        super(msg);
+    }
+
+    public CustomizableResponseTypeException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

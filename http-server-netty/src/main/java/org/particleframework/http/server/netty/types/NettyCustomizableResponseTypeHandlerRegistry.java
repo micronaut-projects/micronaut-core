@@ -18,20 +18,20 @@ package org.particleframework.http.server.netty.types;
 import java.util.Optional;
 
 /**
- * Represents a registry of {@link NettySpecialTypeHandler} and finds
+ * Represents a registry of {@link NettyCustomizableResponseTypeHandler} and finds
  * the correct handler based on the type.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface NettySpecialTypeHandlerRegistry {
+public interface NettyCustomizableResponseTypeHandlerRegistry {
 
     /**
      * Finds the first type handler that supports the given type.
      *
-     * @see NettySpecialTypeHandler#supports(Class)
+     * @see NettyCustomizableResponseTypeHandler#supports(Class)
      * @param type The type to search for
-     * @return An optional {@link NettySpecialTypeHandler}
+     * @return An optional {@link NettyCustomizableResponseTypeHandler}
      */
-    Optional<NettySpecialTypeHandler> findTypeHandler(Class<?> type);
+    Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type);
 }

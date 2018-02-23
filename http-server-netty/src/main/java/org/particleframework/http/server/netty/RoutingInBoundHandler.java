@@ -44,17 +44,17 @@ import org.particleframework.http.hateos.Link;
 import org.particleframework.http.hateos.VndError;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
-import org.particleframework.http.server.netty.types.files.NettyStreamedFileSpecialType;
-import org.particleframework.http.server.netty.types.files.NettySystemFileSpecialType;
-import org.particleframework.http.server.types.files.FileSpecialType;
+import org.particleframework.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
+import org.particleframework.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
+import org.particleframework.http.server.types.files.FileCustomizableResponseType;
 import org.particleframework.runtime.http.codec.TextPlainCodec;
 import org.particleframework.http.server.exceptions.ExceptionHandler;
 import org.particleframework.http.server.netty.async.ContextCompletionAwareSubscriber;
 import org.particleframework.http.server.netty.async.DefaultCloseHandler;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.multipart.NettyPart;
-import org.particleframework.http.server.netty.types.NettySpecialTypeHandler;
-import org.particleframework.http.server.netty.types.NettySpecialTypeHandlerRegistry;
+import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandler;
+import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.scheduling.executor.ExecutorSelector;
 import org.particleframework.web.router.*;
@@ -97,20 +97,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     private final NettyHttpServerConfiguration serverConfiguration;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry;
+    private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
 
     RoutingInBoundHandler(
             BeanLocator beanLocator,
             Router router,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            NettySpecialTypeHandlerRegistry specialTypeHandlerRegistry,
+            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver staticResourceResolver,
             NettyHttpServerConfiguration serverConfiguration,
             RequestBinderRegistry binderRegistry,
             ExecutorSelector executorSelector,
             ExecutorService ioExecutor) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.specialTypeHandlerRegistry = specialTypeHandlerRegistry;
+        this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanLocator = beanLocator;
         this.staticResourceResolver = staticResourceResolver;
         this.ioExecutor = ioExecutor;
@@ -188,15 +188,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
 
             } else {
 
-                Optional<? extends FileSpecialType> optionalFile = Optional.empty();
+                Optional<? extends FileCustomizableResponseType> optionalFile = Optional.empty();
                 Optional<URL> optionalUrl = staticResourceResolver.resolve(requestPath);
                 if (optionalUrl.isPresent()) {
                     URL url = optionalUrl.get();
                     File file = new File(url.getPath());
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        optionalFile = Optional.of(new NettySystemFileSpecialType(file));
+                        optionalFile = Optional.of(new NettySystemFileCustomizableResponseType(file));
                     } else {
-                        optionalFile = Optional.of(new NettyStreamedFileSpecialType(url));
+                        optionalFile = Optional.of(new NettyStreamedFileCustomizableResponseType(url));
                     }
                 }
 
@@ -730,9 +730,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                         }
                                     }
 
-                                    Optional<NettySpecialTypeHandler> typeHandler = specialTypeHandlerRegistry.findTypeHandler(body.getClass());
+                                    Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry.findTypeHandler(body.getClass());
                                     if (typeHandler.isPresent()) {
-                                        typeHandler.get().handle(body, request.getNativeRequest(), response, context);
+                                        typeHandler.get().handle(body, request, response, context);
                                         return;
                                     }
 
@@ -967,8 +967,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             ChannelHandlerContext context,
             HttpRequest<?> request,
             io.netty.handler.codec.http.HttpResponse nettyResponse) {
+
         context.writeAndFlush(nettyResponse)
-                .addListener(new DefaultCloseHandler(context, ((NettyHttpRequest) request).getNativeRequest(), nettyResponse));
+                .addListener(new DefaultCloseHandler(context, request, nettyResponse.status().code()));
     }
 
 

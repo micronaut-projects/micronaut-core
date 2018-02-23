@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types;
+package org.particleframework.http.server.types.files;
+
+import org.particleframework.http.server.types.CustomizableResponseType;
 
 /**
- * Used when a special type handler encounters an error
+ * A special type for file handling.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SpecialTypeHandlerException extends RuntimeException {
+public interface FileCustomizableResponseType extends CustomizableResponseType {
 
-    public SpecialTypeHandlerException(String msg) {
-        super(msg);
-    }
+    /**
+     * @return The last modified date of the file
+     */
+    long getLastModified();
 
-    public SpecialTypeHandlerException(String msg, Throwable cause) {
-        super(msg, cause);
-    }
+    /**
+     * @return The length of the file
+     */
+    long getLength();
+
+    /**
+     * @return The name of the file
+     */
+    String getName();
 }
