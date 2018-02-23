@@ -11,5 +11,5 @@
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
-    <!--<logger name="org.particleframework.http.client" level="INFO"/>-->
+    <logger name="org.particleframework.http.client" level="DEBUG"/>
 </configuration>

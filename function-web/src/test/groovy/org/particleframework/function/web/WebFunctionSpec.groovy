@@ -22,7 +22,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
 import org.particleframework.function.FunctionBean
-import org.particleframework.function.FunctionRegistry
+import org.particleframework.function.LocalFunctionRegistry
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpStatus
 import org.particleframework.runtime.server.EmbeddedServer
@@ -39,7 +39,7 @@ class WebFunctionSpec extends Specification {
 
     void "test the function registry"() {
         given:
-        FunctionRegistry registry = ApplicationContext.run(FunctionRegistry)
+        LocalFunctionRegistry registry = ApplicationContext.run(LocalFunctionRegistry)
 
         expect:
         registry.findConsumer("consumer/string").isPresent()

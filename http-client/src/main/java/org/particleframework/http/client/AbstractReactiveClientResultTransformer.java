@@ -16,6 +16,8 @@
 package org.particleframework.http.client;
 
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.discovery.exceptions.NoAvailableServiceException;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MethodExecutionHandle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,16 +35,27 @@ public abstract class AbstractReactiveClientResultTransformer implements Reactiv
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
 
-    protected <T> T fallbackOr(Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Throwable exception, T defaultValue, Object... parameters) {
-        if(LOG.isErrorEnabled()) {
-            LOG.error("HTTP Client received error response: " + exception.getMessage(), exception);
+    protected <T> T fallbackOr(Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Throwable exception, T defaultValue, ExecutableMethod<Object, Object> invocation, Object... parameters) {
+
+        if(exception instanceof NoAvailableServiceException) {
+            NoAvailableServiceException nase = (NoAvailableServiceException) exception;
+            if(LOG.isErrorEnabled()) {
+                LOG.debug(nase.getMessage(), nase);
+                LOG.error("HTTP @Client [{}] invocation [{}] attempting to resolve fallback for unavailable service [{}]", invocation.getDeclaringType().getName(), invocation, nase.getServiceID());
+            }
+
+        }
+        else {
+            if(LOG.isErrorEnabled()) {
+                LOG.error("HTTP @Client ["+invocation.getDeclaringType().getName()+"] invocation ["+invocation+"] received error response: " + exception.getMessage(), exception);
+            }
         }
 
         Optional<MethodExecutionHandle<Object>> fallback = fallbackResolver.get();
         if(fallback.isPresent()) {
             MethodExecutionHandle<Object> fallbackHandle = fallback.get();
             if(LOG.isDebugEnabled()) {
-                LOG.debug("Client [{}] resolved fallback: {}", fallbackHandle.getDeclaringType(), fallbackHandle );
+                LOG.debug("HTTP @Client [{}] invocation [{}] resolved fallback: {}", fallbackHandle.getDeclaringType(), invocation, fallbackHandle );
             }
 
             Object result;
@@ -60,7 +73,7 @@ public abstract class AbstractReactiveClientResultTransformer implements Reactiv
             }
             else {
                 if(LOG.isErrorEnabled()) {
-                    LOG.error("HTTP client fallback ["+fallbackHandle+"] returned invalid result: " + result);
+                    LOG.error("HTTP @Client fallback [{}] invocation ["+fallbackHandle+"] returned invalid result: {}", fallbackHandle.getDeclaringType().getName(), fallbackHandle, result);
                 }
                 return defaultValue;
             }

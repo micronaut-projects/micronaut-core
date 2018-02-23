@@ -29,18 +29,8 @@ import java.util.TimeZone;
 public class FileTypeHandlerConfiguration {
 
     protected int cacheSeconds = 60;
-    protected String dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz";
-    protected TimeZone dateTimeZone = TimeZone.getTimeZone("GMT");
 
     public int getCacheSeconds() {
         return cacheSeconds;
-    }
-
-    public String getDateFormat() {
-        return dateFormat;
-    }
-
-    public TimeZone getDateTimeZone() {
-        return dateTimeZone;
     }
 }

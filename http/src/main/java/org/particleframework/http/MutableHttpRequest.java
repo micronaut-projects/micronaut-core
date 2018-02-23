@@ -32,6 +32,9 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     MutableHttpRequest<B> body(B body);
 
+    @Override
+    MutableHttpHeaders getHeaders();
+
     /**
      * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header
      * @param mediaTypes The media types
