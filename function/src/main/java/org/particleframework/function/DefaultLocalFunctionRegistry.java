@@ -35,20 +35,20 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * <p>Default implementation of the {@link FunctionRegistry} interface</p>
+ * <p>Default implementation of the {@link LocalFunctionRegistry} interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class DefaultFunctionRegistry implements ExecutableMethodProcessor<FunctionBean>, FunctionRegistry, MediaTypeCodecRegistry {
+public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
     private final Map<String, ExecutableMethod<?,?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> biFunctions= new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?,?>> suppliers = new LinkedHashMap<>(1);
     private final MediaTypeCodecRegistry decoderRegistry;
 
-    public DefaultFunctionRegistry(MediaTypeCodec...decoders) {
+    public DefaultLocalFunctionRegistry(MediaTypeCodec...decoders) {
         this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
     }
 

@@ -106,7 +106,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Prototype
-public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
+public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";

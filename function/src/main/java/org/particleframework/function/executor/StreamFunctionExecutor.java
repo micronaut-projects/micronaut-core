@@ -26,8 +26,7 @@ import org.particleframework.core.io.Writable;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.reflect.exception.InvocationException;
 import org.particleframework.core.type.Argument;
-import org.particleframework.core.type.ReturnType;
-import org.particleframework.function.FunctionRegistry;
+import org.particleframework.function.LocalFunctionRegistry;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.CodecException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -75,8 +74,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Environment env = startEnvironment(applicationContext);
         String functionName = resolveFunctionName(env);
 
-        FunctionRegistry functionRegistry = applicationContext.getBean(FunctionRegistry.class);
-        ExecutableMethod<Object, Object> method = resolveFunction(functionRegistry, functionName);
+        LocalFunctionRegistry localFunctionRegistry = applicationContext.getBean(LocalFunctionRegistry.class);
+        ExecutableMethod<Object, Object> method = resolveFunction(localFunctionRegistry, functionName);
 
         Argument[] requiredArguments = method.getArguments();
         int argCount = requiredArguments.length;
@@ -90,13 +89,13 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             case 1:
 
                 Argument arg = requiredArguments[0];
-                Object value = decodeInputArgument(env, functionRegistry, arg, input);
+                Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
                 result = method.invoke(bean, value);
                 break;
             case 2:
                 Argument firstArgument = requiredArguments[0];
                 Argument secondArgument = requiredArguments[1];
-                Object first = decodeInputArgument(env, functionRegistry, firstArgument, input);
+                Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
                 Object second = decodeContext(env, secondArgument, context);
                 result = method.invoke(bean, first, second);
                 break;
@@ -104,12 +103,12 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 throw new InvocationException("Function ["+functionName+"] cannot be made executable.");
         }
         if(result != null) {
-            encode(env, functionRegistry, method.getReturnType().getType(), result, output);
+            encode(env, localFunctionRegistry, method.getReturnType().getType(), result, output);
         }
     }
 
 
-    static void encode(Environment environment, FunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
+    static void encode(Environment environment, LocalFunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
         if(ClassUtils.isJavaLangType(returnType)) {
             if(result instanceof Byte) {
                 output.write((Byte) result);
@@ -130,7 +129,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         else {
             if(result instanceof Writable) {
                 Writable writable = (Writable) result;
-                writable.writeTo(output, environment.getProperty(FunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
+                writable.writeTo(output, environment.getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
             }
             else {
                 Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
@@ -151,7 +150,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
 
     private Object decodeInputArgument(
             ConversionService<?> conversionService,
-            FunctionRegistry functionRegistry,
+            LocalFunctionRegistry localFunctionRegistry,
             Argument<?> arg,
             InputStream input) {
         Class<?> argType = arg.getType();
@@ -164,8 +163,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         }
         else {
 
-            if(functionRegistry instanceof MediaTypeCodecRegistry) {
-                Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) functionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
+            if(localFunctionRegistry instanceof MediaTypeCodecRegistry) {
+                Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
                 if(registeredDecoder.isPresent()) {
                     MediaTypeCodec decoder = registeredDecoder.get();
                     return decoder.decode(arg, input);

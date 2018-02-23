@@ -17,6 +17,7 @@ package org.particleframework.http.client.loadbalance;
 
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.exceptions.DiscoveryException;
+import org.particleframework.discovery.exceptions.NoAvailableServiceException;
 import org.particleframework.health.HealthStatus;
 import org.particleframework.http.client.LoadBalancer;
 
@@ -38,7 +39,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer{
                                                                            .collect(Collectors.toList());
         int len = availableServices.size();
         if(len == 0) {
-            throw new DiscoveryException("No available services for ID: " + getServiceID());
+            throw new NoAvailableServiceException(getServiceID());
         }
         int i = index.getAndAccumulate(len, (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
         return availableServices.get(i);
