@@ -15,8 +15,10 @@
  */
 package org.particleframework.function.executor;
 
+import org.particleframework.function.LocalFunctionRegistry;
+
 /**
- * A class that executes the configured {@link org.particleframework.function.FunctionRegistry#FUNCTION_NAME} for the given inputs and outputs
+ * A class that executes the configured {@link LocalFunctionRegistry#FUNCTION_NAME} for the given inputs and outputs
  *
  * @author Graeme Rocher
  * @since 1.0

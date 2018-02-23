@@ -1,7 +1,7 @@
 {
   "particle": {
     "server": {
-      "port":"8080",
+      "port": 8080,
       "cors": {
         "enabled": true,
         "configurations": {
@@ -14,12 +14,6 @@
     },
     "application": {
       "name":"storefront"
-    },
-    "server": {
-      "port": 8080,
-      "cors": {
-        "enabled": true
-      }
     }
   },
   "consul": {

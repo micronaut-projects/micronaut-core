@@ -17,6 +17,7 @@ package example.offers;
 
 import example.api.v1.Offer;
 import example.offers.client.v1.PetClient;
+import io.lettuce.core.api.StatefulRedisConnection;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
 import org.particleframework.runtime.server.event.ServerStartupEvent;
@@ -39,10 +40,12 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
     private final PetClient petClient;
     private final OffersRepository offersRepository;
+    private final StatefulRedisConnection<String, String> redisConnection;
 
-    public Application(PetClient petClient, OffersRepository offersRepository) {
+    public Application(PetClient petClient, OffersRepository offersRepository, StatefulRedisConnection<String, String> redisConnection) {
         this.petClient = petClient;
         this.offersRepository = offersRepository;
+        this.redisConnection = redisConnection;
     }
 
     public static void main(String... args) {
@@ -51,7 +54,12 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
-       petClient.find("harry")
+        try {
+            redisConnection.sync().flushall();
+        } catch (Exception e) {
+            LOG.error("Error flushing Redis data: " +e.getMessage(), e);
+        }
+        petClient.find("harry")
                 .doOnError(throwable -> {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("No pet found: " + throwable.getMessage(), throwable);
@@ -95,6 +103,26 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                         }
                 );
 
-
+        petClient.find("Goyle")
+                .doOnError(throwable -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
+                    }
+                })
+                .onErrorComplete()
+                .subscribe(pet -> {
+                            Mono<Offer> savedOffer = offersRepository.save(
+                                    pet.getSlug(),
+                                    new BigDecimal("39.99"),
+                                    Duration.of(1, ChronoUnit.DAYS),
+                                    "Carefree Cat! Low Maintenance! Looking for a Home!");
+                            savedOffer.subscribe((offer) -> {
+                            }, throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
+                                }
+                            });
+                        }
+                );
     }
 }

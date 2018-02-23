@@ -22,6 +22,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.AbstractReactiveClientResultTransformer;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import javax.inject.Singleton;
@@ -38,7 +39,11 @@ import java.util.function.Supplier;
 @Requires(classes = Flowable.class)
 public class RxReactiveClientResultTransformer extends AbstractReactiveClientResultTransformer {
     @Override
-    public Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
+    public Object transform(
+            Object publisherResult,
+            Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver,
+            ExecutableMethod<Object, Object> invocation,
+            Object...parameters) {
         if(publisherResult instanceof Maybe) {
             Maybe<?> maybe = (Maybe) publisherResult;
             // add 404 handling for maybe
@@ -50,19 +55,19 @@ public class RxReactiveClientResultTransformer extends AbstractReactiveClientRes
                     }
                 }
 
-                return fallbackOr(fallbackResolver, throwable, Maybe.error(throwable), parameters);
+                return fallbackOr(fallbackResolver, throwable, Maybe.error(throwable), invocation,parameters);
             });
         }
         else if(publisherResult instanceof Single) {
             Single<?> single = (Single) publisherResult;
             return single.onErrorResumeNext(throwable ->
-                    fallbackOr(fallbackResolver, throwable, Single.error(throwable), parameters)
+                    fallbackOr(fallbackResolver, throwable, Single.error(throwable), invocation,parameters)
             );
         }
         else if(publisherResult instanceof Flowable) {
             Flowable<?> single = (Flowable) publisherResult;
             return single.onErrorResumeNext(throwable -> {
-                return fallbackOr(fallbackResolver, throwable, Flowable.error(throwable), parameters);
+                return fallbackOr(fallbackResolver, throwable, Flowable.error(throwable),invocation, parameters);
             });
         }
         return publisherResult;

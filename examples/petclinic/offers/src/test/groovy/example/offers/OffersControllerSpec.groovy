@@ -19,12 +19,18 @@ import example.api.v1.Offer
 import example.api.v1.Pet
 import org.particleframework.context.ApplicationContext
 import org.particleframework.core.io.socket.SocketUtils
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.client.RxHttpClient
+import org.particleframework.http.client.RxStreamingHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.lang.Unroll
+import spock.util.concurrent.PollingConditions
 
 import javax.validation.ConstraintViolationException
 import java.time.Duration
@@ -41,6 +47,8 @@ class OffersControllerSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ["consul.client.enabled": false,
+             "http.client.readTimeout":'3m',
+             "offers.delay":"10ms", // short delay between offers for testing
              "redis.uri":"redis://localhost:${SocketUtils.findAvailableTcpPort()}"]
     )
 
@@ -108,4 +116,24 @@ class OffersControllerSpec extends Specification {
         offer.description == "Friendly Dog"
     }
 
+    void "test receive random offer"() {
+        given:
+        RxStreamingHttpClient rxHttpClient = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        Offer offer = rxHttpClient.jsonStream(HttpRequest.GET("/v1/offers"), Offer)
+                                   .blockingFirst()
+
+
+
+
+
+        then: "The offer was read correctly"
+
+        offer != null
+        offer.pet.name == "Harry"
+        offer.pet.vendor == "Fred"
+        offer.price == 10.0
+        offer.description == "Friendly Dog"
+    }
 }

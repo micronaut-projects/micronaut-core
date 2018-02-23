@@ -18,6 +18,8 @@ package org.particleframework.http;
 
 import org.particleframework.core.convert.value.ConvertibleMultiValues;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -30,7 +32,6 @@ import java.util.stream.Collectors;
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
  *
  * @author Graeme Rocher
- *
  * @since 1.0
  */
 public interface HttpHeaders extends ConvertibleMultiValues<String> {
@@ -339,7 +340,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     /**
      * {@code "X-Auth-Token"}
      */
-    String X_AUTH_TOKEN  = "X-Auth-Token";
+    String X_AUTH_TOKEN = "X-Auth-Token";
 
     /**
      * Obtain the date header
@@ -349,8 +350,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
         try {
-            return findFirst(name).map((str)->
-                    ZonedDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME)
+            return findFirst(name).map((str) -> {
+                        LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
+                        return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
+                    }
+
             );
         } catch (DateTimeParseException e) {
             return Optional.empty();
@@ -400,6 +404,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
 
     /**
      * The request or response content type
+     *
      * @return The content type
      */
     default Optional<MediaType> contentType() {
@@ -409,6 +414,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
 
     /**
      * The request or response content type
+     *
      * @return The content type
      */
     default OptionalLong contentLength() {
@@ -433,7 +439,7 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, String.class).map(val-> val.equalsIgnoreCase("keep-alive") ).orElse(false);
+        return getFirst(CONNECTION, String.class).map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
     }
 
     /**

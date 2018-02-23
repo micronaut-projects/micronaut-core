@@ -33,6 +33,7 @@ import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.discovery.exceptions.NoAvailableServiceException;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Consumes;
@@ -309,7 +310,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
                     );
                     for (ReactiveClientResultTransformer transformer : transformers) {
-                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(methodDeclaringType, context), context.getParameterValues());
+                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(methodDeclaringType, context), context, context.getParameterValues());
                     }
                     return finalPublisher;
                 }
@@ -326,7 +327,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     try {
                         blockingHttpClient.exchange(request);
                         return null;
-                    } catch (HttpClientException e) {
+                    } catch (RuntimeException e) {
                         return handleFallback(context, methodDeclaringType, e);
                     }
                 }
@@ -335,7 +336,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         return blockingHttpClient.retrieve(
                                 request, returnType.asArgument()
                         );
-                    } catch (HttpClientException t) {
+                    } catch (RuntimeException t) {
                         if( t instanceof HttpClientResponseException && ((HttpClientResponseException)t).getStatus() == HttpStatus.NOT_FOUND) {
                             if(javaReturnType == Optional.class) {
                                 return Optional.empty();
@@ -351,9 +352,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return context.proceed();
     }
 
-    protected Object handleFallback(MethodInvocationContext<Object, Object> context, Class<Object> methodDeclaringType, HttpClientException t) throws HttpClientException {
-        if(LOG.isErrorEnabled()) {
-            LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + t.getMessage(), t);
+    protected Object handleFallback(MethodInvocationContext<Object, Object> context, Class<Object> methodDeclaringType, RuntimeException exception) throws HttpClientException {
+        if(exception instanceof NoAvailableServiceException) {
+            NoAvailableServiceException nase = (NoAvailableServiceException) exception;
+            if(LOG.isErrorEnabled()) {
+                LOG.debug(nase.getMessage(), nase);
+                LOG.error("Client [{}] attempting to resolve fallback for unavailable service [{}]", methodDeclaringType.getName(), nase.getServiceID());
+            }
+
+        }
+        else {
+            if(LOG.isErrorEnabled()) {
+                LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + exception.getMessage(), exception);
+            }
         }
 
         Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(methodDeclaringType, context);
@@ -369,7 +380,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         }
         else {
-            throw t;
+            throw exception;
         }
     }
 
