@@ -9,7 +9,7 @@ const VendorsTable = ({vendors}) => <table className='table'>
     </tr>
     </thead>
     <tbody>
-    {vendors.map(v => <VendorsTableRow vendor={v}/>)}
+    {vendors.map((v, i) => <VendorsTableRow key={i} vendor={v}/>)}
     </tbody>
 </table>
 
