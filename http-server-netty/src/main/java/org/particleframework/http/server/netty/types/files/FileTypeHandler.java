@@ -32,11 +32,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -49,9 +47,6 @@ import java.util.concurrent.ExecutionException;
 public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
 
 
-    private static final Logger LOG = LoggerFactory.getLogger(FileTypeHandler.class);
-    private static final CompletableFuture<Map<String, String>> mediaTypeFileExtensions = CompletableFuture.supplyAsync(FileTypeHandler::loadMimeTypes);
-    private static final String MIME_TYPES_FILE_NAME = "particle/http/mime.types";
     private final FileTypeHandlerConfiguration configuration;
     private final SimpleDateFormat dateFormat;
 
@@ -101,7 +96,7 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
         response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
         setDateAndCacheHeaders(response, lastModified);
         if (HttpUtil.isKeepAlive(request)) {
-            response.header(HttpHeaders.CONNECTION, "keep-alive");
+            response.header(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
         }
 
         type.process(response);
@@ -115,19 +110,10 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
     }
 
     protected MediaType getMediaType(String filename) {
-        try {
-            String extension = getExtension(filename);
-            String contentType = mediaTypeFileExtensions.get().get(extension);
-            if (contentType != null) {
-                return new MediaType(contentType, extension);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-            //no-op
-        }
+        String extension = getExtension(filename);
+        Optional<MediaType> mediaType = MediaType.forExtension(extension);
+        return mediaType.orElse(MediaType.TEXT_PLAIN_TYPE);
 
-        return MediaType.TEXT_PLAIN_TYPE;
     }
 
     protected void setDateAndCacheHeaders(MutableHttpResponse response, long lastModified) {
@@ -168,42 +154,4 @@ public class FileTypeHandler implements NettySpecialTypeHandler<Object> {
         }
     }
 
-    private static Map<String, String> loadMimeTypes() {
-        InputStream is = null;
-        try {
-            is = FileTypeHandler.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
-            Map<String, String> result = new LinkedHashMap<>(100);
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isEmpty() || line.charAt(0) == '#') {
-                    continue;
-                }
-                String formattedLine = line.trim().replaceAll("\\s{2,}", " ").replaceAll("\\s", "|");
-                String[] tokens = formattedLine.split("\\|");
-                for (int i = 1; i < tokens.length; i++) {
-                    String fileExtension = tokens[i].toLowerCase(Locale.ENGLISH);
-                    result.put(fileExtension, tokens[0]);
-                }
-            }
-            return result;
-        }
-        catch (IOException ex) {
-            System.out.println(ex.getMessage());
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Failed to load mime types for file extension detection!");
-            }
-        }
-        finally {
-            if (is != null) {
-                try {
-                    is.close();
-                }
-                catch (IOException ignore) {
-                }
-            }
-        }
-
-        return Collections.emptyMap();
-    }
 }

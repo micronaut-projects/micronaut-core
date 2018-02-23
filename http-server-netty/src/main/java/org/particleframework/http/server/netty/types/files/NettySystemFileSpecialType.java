@@ -93,10 +93,10 @@ public class NettySystemFileSpecialType extends SystemFileSpecialType implements
 
         //The streams codec prevents non full responses from being written
         Optional.ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> {
-                    context.pipeline()
-                            .replace(handler, "chunked-handler", new ChunkedWriteHandler());
-                });
+                .ifPresent(handler ->
+                        context.pipeline()
+                               .replace(handler, "chunked-handler", new ChunkedWriteHandler())
+                );
 
         // Write the request data
         context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
