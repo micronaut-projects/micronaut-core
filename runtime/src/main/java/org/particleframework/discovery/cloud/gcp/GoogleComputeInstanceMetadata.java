@@ -1,12 +1,33 @@
-package org.particleframework.discovery.cloud;
+/*
+ * Copyright 2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.particleframework.discovery.cloud.gcp;
 
 import org.particleframework.context.env.ComputePlatform;
+import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
+import org.particleframework.discovery.cloud.NetworkInterface;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
+ * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform
+ *
  * @author rvanderwerf
+ * @author Graeme Rocher
  * @since 1.0
  */
 public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
@@ -15,13 +36,10 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     Map<String, String> metadata;
 
     // quick way to lookup tags
-    private Map<String, String> tags;
+    private Map<String, String> tags = Collections.emptyMap();
 
     //network interfaces to get ip addresses
-    List<NetworkInterface> interfaces;
-
-
-
+    List<NetworkInterface> interfaces = Collections.emptyList();
 
     String name;
     String availabilityZone;
@@ -31,7 +49,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     String machineType;
     String instanceId;
     String region;
-    ComputePlatform computePlatform;
+    final ComputePlatform computePlatform = ComputePlatform.GOOGLE_COMPUTE;
     String account;
     String imageId;
 
@@ -108,7 +126,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public String getPrivateHosname() {
+    public String getPrivateHostname() {
         return localHostname;
     }
 
@@ -138,7 +156,7 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
     }
 
     @Override
-    public String publicHostname() {
+    public String getPublicHostname() {
         return publicHostname;
     }
 

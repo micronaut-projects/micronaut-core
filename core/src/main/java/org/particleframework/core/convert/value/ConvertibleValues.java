@@ -17,6 +17,7 @@ package org.particleframework.core.convert.value;
 
 import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionContext;
+import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.value.ValueResolver;
@@ -90,6 +91,26 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         }
     }
 
+    /**
+     * Return this {@link ConvertibleValues} as a map for the given key type and value type
+     * @param keyType The key type
+     * @param valueType The value type
+     * @param <KT>
+     * @param <VT>
+     * @return The values
+     */
+    default <KT,VT> Map<KT, VT> asMap(Class<KT> keyType, Class<VT> valueType) {
+        Map<KT, VT> newMap = new LinkedHashMap<>();
+        for (Map.Entry<String, V> entry : this) {
+            String key = entry.getKey();
+            Optional<KT> convertedKey = ConversionService.SHARED.convert(key, keyType);
+            if (convertedKey.isPresent()) {
+                Optional<VT> convertedValue = ConversionService.SHARED.convert(entry.getValue(), valueType);
+                convertedValue.ifPresent(vt -> newMap.put(convertedKey.get(), vt));
+            }
+        }
+        return newMap;
+    }
     /**
      * Returns a submap for all the keys with the given prefix
      *

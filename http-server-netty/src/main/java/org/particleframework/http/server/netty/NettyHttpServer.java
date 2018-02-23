@@ -25,7 +25,6 @@ import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
-import org.particleframework.context.env.ComputePlatform;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.value.ConvertibleValues;
@@ -34,10 +33,8 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.discovery.cloud.AmazonMetadataResolver;
 import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
-import org.particleframework.discovery.cloud.DefaultMetadataResolver;
-import org.particleframework.discovery.cloud.MetadataResolver;
+import org.particleframework.discovery.cloud.ComputeInstanceMetadataResolver;
 import org.particleframework.discovery.event.ServiceShutdownEvent;
 import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
@@ -58,6 +55,7 @@ import org.particleframework.web.router.resource.StaticResourceResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
@@ -71,7 +69,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}
@@ -100,20 +97,17 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final int serverPort;
+    private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
     private final ApplicationContext applicationContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
-    @Inject
-    Optional<DefaultMetadataResolver> defaultMetadataResolver;
-    @Inject
-    Optional<AmazonMetadataResolver> amazonMetadataResolver;
-
 
 
     @Inject
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
+
             ApplicationContext applicationContext,
             Router router,
             RequestBinderRegistry binderRegistry,
@@ -122,12 +116,14 @@ public class NettyHttpServer implements EmbeddedServer {
             StaticResourceResolver resourceResolver,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
+            @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
+        this.computeInstanceMetadataResolver = computeInstanceMetadataResolver;
         this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.specialTypeHandlerRegistry = specialTypeHandlerRegistry;
@@ -233,10 +229,10 @@ public class NettyHttpServer implements EmbeddedServer {
                     @Override
                     public ConvertibleValues<String> getMetadata() {
                         Map<String,String> cloudMetadata = new HashMap<String,String>();
-                        if (defaultMetadataResolver.isPresent()) {
-                            Optional<? extends ComputeInstanceMetadata> computeInstanceMetadata = defaultMetadataResolver.get().resolve(environment);
-                            if (computeInstanceMetadata.isPresent()) {
-                                cloudMetadata = computeInstanceMetadata.get().getMetadata();
+                        if (computeInstanceMetadataResolver != null) {
+                            Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
+                            if(resolved.isPresent()) {
+                                cloudMetadata = resolved.get().getMetadata();
                             }
                         }
                         Map<CharSequence, String> metadata = serverConfiguration

@@ -18,6 +18,7 @@ package org.particleframework.discovery.eureka.registration;
 import io.reactivex.Observable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.ServiceInstanceIdGenerator;
 import org.particleframework.discovery.eureka.EurekaConfiguration;
@@ -166,6 +167,8 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
                 instanceInfo.setInstanceId(idGenerator.generateId(environment, instance));
             }
 
+            ConvertibleValues<String> instanceMetadata = instance.getMetadata();
+            instanceInfo.getMetadata().putAll( instanceMetadata.asMap(String.class, String.class) );
             customizeInstanceInfo(instanceInfo);
             validateApplicationName(instanceInfo.getApp());
 
