@@ -45,7 +45,7 @@ public class OffersController implements OffersOperations {
     private final Duration offerDelay;
 
 
-    public OffersController(OffersRepository offersRepository, @Value("${offers.delay:5s}") Duration offerDelay) {
+    public OffersController(OffersRepository offersRepository, @Value("${offers.delay:3s}") Duration offerDelay) {
         this.offersRepository = offersRepository;
         this.offerDelay = offerDelay;
     }
