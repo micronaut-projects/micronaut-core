@@ -16,8 +16,8 @@
 package org.particleframework.http.server.netty.types;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
 import org.particleframework.core.order.Ordered;
+import org.particleframework.http.HttpRequest;
 import org.particleframework.http.server.netty.NettyHttpResponse;
 
 /**
@@ -29,7 +29,7 @@ import org.particleframework.http.server.netty.NettyHttpResponse;
  * @author James Kleeh
  * @since 1.0
  */
-public interface NettySpecialTypeHandler<T> extends Ordered {
+public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
 
     /**
      * Responsible for fully handling the response, including any closing of the channel.
@@ -39,7 +39,7 @@ public interface NettySpecialTypeHandler<T> extends Ordered {
      * @param response The mutable Particle response
      * @param context The channel context
      */
-    void handle(T object, HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context);
+    void handle(T object, HttpRequest<?> request, NettyHttpResponse<?> response, ChannelHandlerContext context);
 
     /**
      * @param type The type to check

@@ -13,41 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.types.files;
+package org.particleframework.http.server.netty.types;
 
-import java.io.File;
+import org.particleframework.http.server.types.files.FileCustomizableResponseType;
 
 /**
- * A special type for handling a {@link File}
+ * A special type for files specific to Netty
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SystemFileSpecialType implements FileSpecialType {
-
-    protected final File file;
-
-    public SystemFileSpecialType(File file) {
-        this.file = file;
-    }
-
-    public File getFile() {
-        return file;
-    }
-
-    @Override
-    public long getLastModified() {
-        return file.lastModified();
-    }
-
-    @Override
-    public String getName() {
-        return file.getName();
-    }
-
-    @Override
-    public long getLength() {
-        return file.length();
-    }
-
+public interface NettyFileCustomizableResponseType extends FileCustomizableResponseType, NettyCustomizableResponseType {
 }

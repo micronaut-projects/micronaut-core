@@ -19,6 +19,7 @@ import org.particleframework.context.annotation.Requires;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.client.AbstractReactiveClientResultTransformer;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MethodExecutionHandle;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -38,7 +39,11 @@ import java.util.function.Supplier;
 @Requires(classes = Mono.class)
 public class ReactorReactiveClientResultTransformer extends AbstractReactiveClientResultTransformer {
     @Override
-    public Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters) {
+    public Object transform(
+            Object publisherResult,
+            Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver,
+            ExecutableMethod<Object, Object> invocation,
+            Object...parameters) {
         if(publisherResult instanceof Mono) {
             Mono<?> maybe = (Mono) publisherResult;
             // add 404 handling for maybe
@@ -49,14 +54,14 @@ public class ReactorReactiveClientResultTransformer extends AbstractReactiveClie
                         return Mono.empty();
                     }
                 }
-                return fallbackOr(fallbackResolver, throwable, Mono.error(throwable), parameters);
+                return fallbackOr(fallbackResolver, throwable, Mono.error(throwable),invocation, parameters);
             });
         }
         else if(publisherResult instanceof Flux) {
             Flux<?> flux = (Flux) publisherResult;
 
             return flux.onErrorResume(throwable ->
-                    fallbackOr(fallbackResolver, throwable, Flux.error(throwable), parameters)
+                    fallbackOr(fallbackResolver, throwable, Flux.error(throwable), invocation,parameters)
             );
         }
         else {

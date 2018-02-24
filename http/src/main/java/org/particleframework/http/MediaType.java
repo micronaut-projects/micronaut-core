@@ -16,12 +16,22 @@
 package org.particleframework.http;
 
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.core.value.OptionalValues;
 import org.particleframework.http.annotation.Produces;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -32,6 +42,11 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class MediaType implements CharSequence {
+
+    private static final CompletableFuture<Map<String, String>> mediaTypeFileExtensionsFuture = CompletableFuture.supplyAsync(MediaType::loadMimeTypes);
+    private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
+    private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
+    private static Map<String, String> mediaTypeFileExtensions;
 
     static {
         ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
@@ -421,6 +436,38 @@ public class MediaType implements CharSequence {
         return Optional.empty();
     }
 
+    /**
+     * Resolve the {@link MediaType} for the given file extension
+     *
+     * @param extension The file extension
+     * @return The {@link MediaType}
+     */
+    public static Optional<MediaType> forExtension(String extension) {
+        if(StringUtils.isNotEmpty(extension)) {
+            String type = getMediaTypeFileExtensions().get(extension);
+            if(type != null) {
+                return Optional.of(new MediaType(type, extension));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Map<String,String> getMediaTypeFileExtensions() {
+        Map<String, String> extensions = mediaTypeFileExtensions;
+        if (extensions == null) {
+            synchronized (MediaType.class) { // double check
+                extensions = mediaTypeFileExtensions;
+                if (extensions == null) {
+                    try {
+                        mediaTypeFileExtensions = extensions = mediaTypeFileExtensionsFuture.get(5, TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                        mediaTypeFileExtensions = Collections.emptyMap();
+                    }
+                }
+            }
+        }
+        return extensions;
+    }
     private BigDecimal getOrConvertQualityParameterToBigDecimal(MediaType mt) {
         BigDecimal bd;
         try {
@@ -434,6 +481,45 @@ public class MediaType implements CharSequence {
             bd = QUALITY_RATING_NUMBER;
             return bd;
         }
+    }
+
+    private static Map<String, String> loadMimeTypes() {
+        InputStream is = null;
+        try {
+            is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
+            Map<String, String> result = new LinkedHashMap<>(100);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty() || line.charAt(0) == '#') {
+                    continue;
+                }
+                String formattedLine = line.trim().replaceAll("\\s{2,}", " ").replaceAll("\\s", "|");
+                String[] tokens = formattedLine.split("\\|");
+                for (int i = 1; i < tokens.length; i++) {
+                    String fileExtension = tokens[i].toLowerCase(Locale.ENGLISH);
+                    result.put(fileExtension, tokens[0]);
+                }
+            }
+            return result;
+        }
+        catch (IOException ex) {
+            System.out.println(ex.getMessage());
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Failed to load mime types for file extension detection!");
+            }
+        }
+        finally {
+            if (is != null) {
+                try {
+                    is.close();
+                }
+                catch (IOException ignore) {
+                }
+            }
+        }
+
+        return Collections.emptyMap();
     }
 
 

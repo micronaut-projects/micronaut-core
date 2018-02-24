@@ -16,6 +16,7 @@
 package example.offers;
 
 import example.api.v1.Offer;
+import org.particleframework.context.annotation.Value;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.http.annotation.Get;
@@ -41,9 +42,12 @@ import java.time.Duration;
 public class OffersController implements OffersOperations {
 
     private final OffersRepository offersRepository;
+    private final Duration offerDelay;
 
-    public OffersController(OffersRepository offersRepository) {
+
+    public OffersController(OffersRepository offersRepository, @Value("${offers.delay:3s}") Duration offerDelay) {
         this.offersRepository = offersRepository;
+        this.offerDelay = offerDelay;
     }
 
     /**
@@ -55,7 +59,7 @@ public class OffersController implements OffersOperations {
         return offersRepository
                     .random()
                     .repeat()
-                    .delayElements(Duration.ofSeconds(5));
+                    .delayElements(offerDelay);
     }
 
     /**

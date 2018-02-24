@@ -30,6 +30,7 @@ public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
      * @param source The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
+
     public ServiceStartedEvent(ServiceInstance source) {
         super(source);
     }

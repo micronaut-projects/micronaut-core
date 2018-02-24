@@ -17,6 +17,7 @@ package org.particleframework.context.env;
 
 import org.particleframework.context.converters.StringArrayToClassArrayConverter;
 import org.particleframework.context.converters.StringToClassConverter;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.TypeConverter;
@@ -29,11 +30,16 @@ import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.BeanConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.InputStream;
+import java.io.*;
 import java.lang.annotation.Annotation;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,9 +50,16 @@ import java.util.stream.Stream;
  * <p>The default implementation of the {@link Environment} interface. Configures a named environment.</p>
  *
  * @author Graeme Rocher
+ * @author rvanderwerf
  * @since 1.0
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
+
+    private static EnvironmentsAndPackage environmentsAndPackage;
+    //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
+    private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
+    private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
+    private static final Logger LOG  = LoggerFactory.getLogger(DefaultEnvironment.class);
 
     private final Set<String> names;
     private final ClassLoader classLoader;
@@ -56,6 +69,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
@@ -74,7 +88,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         super(conversionService);
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
-        EnvironmentsAndPackage environmentsAndPackage = deduceEnvironments();
+        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
         specifiedNames.addAll(environmentsAndPackage.enviroments);
         Package aPackage = environmentsAndPackage.aPackage;
         if(aPackage != null) {
@@ -283,7 +297,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return SoftServiceLoader.load(PropertySourceLoader.class);
     }
 
-    private EnvironmentsAndPackage deduceEnvironments() {
+    private static EnvironmentsAndPackage getEnvironmentsAndPackage() {
+        EnvironmentsAndPackage environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+        if (environmentsAndPackage == null) {
+            synchronized (EnvironmentsAndPackage.class) { // double check
+                environmentsAndPackage = DefaultEnvironment.environmentsAndPackage;
+                if (environmentsAndPackage == null) {
+                    DefaultEnvironment.environmentsAndPackage = environmentsAndPackage = deduceEnvironments();
+                }
+            }
+        }
+        return environmentsAndPackage;
+    }
+
+    private static EnvironmentsAndPackage deduceEnvironments() {
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         for (StackTraceElement stackTraceElement : stackTrace) {
@@ -310,9 +337,39 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
+        ComputePlatform computePlatform = determineCloudProvider();
+        if (computePlatform != null) {
+            switch (computePlatform) {
+                case GOOGLE_COMPUTE:
+                    //instantiate bean for GC metadata discovery
+                    environmentsAndPackage.enviroments.add(Environment.GOOGLE_COMPUTE);
+                    break;
+                case AMAZON_EC2:
+                    //instantiate bean for ec2 metadata discovery
+                    environmentsAndPackage.enviroments.add(Environment.AMAZON_EC2);
+                    break;
+                case AZURE:
+                    // not implemented
+                    environmentsAndPackage.enviroments.add(Environment.AZURE);
+                    break;
+                case IBM:
+                    // not implemented
+                    environmentsAndPackage.enviroments.add(Environment.IBM);
+                    break;
+                case OTHER:
+                    // do nothing here
+                    break;
+            }
+
+        }
+        if(LOG.isInfoEnabled()) {
+            LOG.info("Established active environments: {}", environmentsAndPackage.enviroments);
+        }
 
         return environmentsAndPackage;
     }
+
+
 
     private Map<String, Object> diffCatalog(Map<String, Object>[] original, Map<String, Object>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
@@ -386,8 +443,131 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return resourceLoader.getResources(path);
     }
 
-    private class EnvironmentsAndPackage {
+
+    private static ComputePlatform determineCloudProvider() {
+
+        String computePlatform = System.getProperty(Environment.CLOUD_PLATFORM_PROPERTY);
+        if (computePlatform!=null) {
+
+            try {
+                return ComputePlatform.valueOf(computePlatform);
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Illegal value specified for ["+Environment.CLOUD_PLATFORM_PROPERTY+"]: " + computePlatform);
+            }
+
+        }
+        boolean isWindows = System.getProperty("os.name")
+                .toLowerCase().startsWith("windows");
+
+        if (isWindows) {
+            if (isEC2Windows()) {
+                return ComputePlatform.AMAZON_EC2;
+            }
+            if (isGoogleCompute()) {
+                return ComputePlatform.GOOGLE_COMPUTE;
+            }
+
+        } else {
+            // can just read from the file
+            if (isEC2Linux()) {
+                return ComputePlatform.AMAZON_EC2;
+            }
+        }
+        // let's try google
+        if (isGoogleCompute()) {
+            return ComputePlatform.GOOGLE_COMPUTE;
+        }
+        //TODO check for azure and IBM
+        //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
+        //IBM - uses cloudfoundry, will have to use that to probe
+        // if all else fails not a cloud server that we can tell
+        return ComputePlatform.BARE_METAL;
+    }
+
+
+
+    private static boolean isGoogleCompute() {
+        try {
+            URL url = new URL("http://metadata.google.internal");
+            HttpURLConnection con = (HttpURLConnection)url.openConnection();
+            con.setReadTimeout(500);
+            con.setConnectTimeout(500);
+            con.setRequestMethod("GET");
+            con.setDoOutput(true);
+            int responseCode = con.getResponseCode();
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer response = new StringBuffer();
+
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+            if (con.getHeaderField("Metadata-Flavor")!=null &&
+                    con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
+                return true;
+            }
+
+        } catch (IOException e) {
+            // well not google then
+        }
+        return false;
+    }
+
+    private static boolean isEC2Linux() {
+
+        try {
+            String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
+            if (contents.startsWith("ec2")) {
+                return true;
+            }
+        } catch (IOException e) {
+            // well that's not it!
+        }
+        return false;
+    }
+
+    private static boolean isEC2Windows() {
+        try {
+            ProcessBuilder builder = new ProcessBuilder();
+            builder.command("cmd.exe", "/c", EC2_WINDOWS_HYPERVISOR_CMD);
+            builder.redirectErrorStream(true);
+            builder.directory(new File(System.getProperty("user.home")));
+            Process process = builder.start();
+
+            //Read out dir output
+            InputStream is = process.getInputStream();
+            InputStreamReader isr = new InputStreamReader(is);
+            BufferedReader br = new BufferedReader(isr);
+            String line;
+            StringBuilder stdout = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                stdout.append(line);
+            }
+
+            //Wait to get exit value
+            try {
+                int exitValue = process.waitFor();
+                if (exitValue == 0 && stdout.toString().startsWith("EC2")) {
+                    return true;
+                }
+            } catch (InterruptedException e) {
+                // test negative
+            }
+
+        } catch (IOException e) {
+
+        }
+        return false;
+    }
+
+    private static class EnvironmentsAndPackage {
         Package aPackage;
         Set<String> enviroments = new HashSet<>(1);
     }
+
 }
+
+
+

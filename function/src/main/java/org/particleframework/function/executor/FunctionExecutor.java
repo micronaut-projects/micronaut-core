@@ -15,8 +15,10 @@
  */
 package org.particleframework.function.executor;
 
+import org.particleframework.function.LocalFunctionRegistry;
+
 /**
- * <p>Allows executing the function configured by {@link org.particleframework.function.FunctionRegistry#FUNCTION_NAME}</p>
+ * <p>Allows executing the function configured by {@link LocalFunctionRegistry#FUNCTION_NAME}</p>
  *
  * <p>Or a named function</p>
  *
@@ -26,7 +28,7 @@ package org.particleframework.function.executor;
 public interface FunctionExecutor<I,O> {
 
     /**
-     * Execute the function configured by {@link org.particleframework.function.FunctionRegistry#FUNCTION_NAME}
+     * Execute the function configured by {@link LocalFunctionRegistry#FUNCTION_NAME}
      *
      * @param input The input
      * @return The output

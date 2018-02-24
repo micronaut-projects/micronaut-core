@@ -28,7 +28,7 @@ import java.io.File;
  * @author James Kleeh
  * @since 1.0
  */
-public class AttachedFile extends SystemFileSpecialType {
+public class AttachedFile extends SystemFileCustomizableResponseType {
 
     private static final String headerValue = "attachment; filename=\"%s\"";
 
