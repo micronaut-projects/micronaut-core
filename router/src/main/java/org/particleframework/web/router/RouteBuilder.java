@@ -1018,7 +1018,7 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(Class type, PropertyConvention id) {
-            return resolveUri(type) + "{/" + id.lowerCaseName() + "}";
+            return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
     }
 

@@ -21,23 +21,23 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry of {@link NettySpecialTypeHandler} instances
+ * Registry of {@link NettyCustomizableResponseTypeHandler} instances
  *
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-public class DefaultSpecialTypeHandlerRegistry implements NettySpecialTypeHandlerRegistry {
+public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCustomizableResponseTypeHandlerRegistry {
 
-    private NettySpecialTypeHandler[] handlers;
-    private ConcurrentHashMap<Class<?>, NettySpecialTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
+    private NettyCustomizableResponseTypeHandler[] handlers;
+    private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
 
-    public DefaultSpecialTypeHandlerRegistry(NettySpecialTypeHandler...typeHandlers) {
+    public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler...typeHandlers) {
         this.handlers = typeHandlers;
     }
 
     @Override
-    public Optional<NettySpecialTypeHandler> findTypeHandler(Class<?> type) {
+    public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
         return Optional.ofNullable(handlerCache.computeIfAbsent(type,  (clazz) -> {
             return Arrays.stream(handlers)
                     .filter(handler -> handler.supports(clazz))

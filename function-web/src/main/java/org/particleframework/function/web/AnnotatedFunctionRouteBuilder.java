@@ -22,9 +22,9 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.StringUtils;
-import org.particleframework.function.DefaultFunctionRegistry;
+import org.particleframework.function.DefaultLocalFunctionRegistry;
 import org.particleframework.function.FunctionBean;
-import org.particleframework.function.FunctionRegistry;
+import org.particleframework.function.LocalFunctionRegistry;
 import org.particleframework.http.MediaType;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
@@ -46,18 +46,18 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-@Replaces(DefaultFunctionRegistry.class)
-public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<FunctionBean>, FunctionRegistry {
+@Replaces(DefaultLocalFunctionRegistry.class)
+public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry {
 
 
-    private final FunctionRegistry functionRegistry;
+    private final LocalFunctionRegistry localFunctionRegistry;
 
     public AnnotatedFunctionRouteBuilder(
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
             ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.functionRegistry = new DefaultFunctionRegistry();
+        this.localFunctionRegistry = new DefaultLocalFunctionRegistry();
     }
 
     @SuppressWarnings("unchecked")
@@ -102,7 +102,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
                                 .acceptAll();
                     }
                 }
-                ((ExecutableMethodProcessor)functionRegistry).process(beanDefinition, method);
+                ((ExecutableMethodProcessor) localFunctionRegistry).process(beanDefinition, method);
             }
         }
     }
@@ -110,31 +110,31 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
 
     @Override
     public <T, R> Optional<? extends ExecutableMethod<T, R>> findFirst() {
-        return functionRegistry.findFirst();
+        return localFunctionRegistry.findFirst();
     }
 
     @Override
     public <T, R> Optional<? extends ExecutableMethod<T, R>> find(String name) {
-        return functionRegistry.find(name);
+        return localFunctionRegistry.find(name);
     }
 
     @Override
     public <T> Optional<ExecutableMethod<Supplier<T>, T>> findSupplier(String name) {
-        return functionRegistry.findSupplier(name);
+        return localFunctionRegistry.findSupplier(name);
     }
 
     @Override
     public <T> Optional<ExecutableMethod<Consumer<T>, Void>> findConsumer(String name) {
-        return functionRegistry.findConsumer(name);
+        return localFunctionRegistry.findConsumer(name);
     }
 
     @Override
     public <T, R> Optional<ExecutableMethod<java.util.function.Function<T, R>, R>> findFunction(String name) {
-        return functionRegistry.findFunction(name);
+        return localFunctionRegistry.findFunction(name);
     }
 
     @Override
     public <T, U, R> Optional<ExecutableMethod<BiFunction<T, U, R>, R>> findBiFunction(String name) {
-        return functionRegistry.findBiFunction(name);
+        return localFunctionRegistry.findBiFunction(name);
     }
 }

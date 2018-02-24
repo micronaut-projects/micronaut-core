@@ -18,7 +18,7 @@ package org.particleframework.function.executor;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.env.PropertySource;
-import org.particleframework.function.FunctionRegistry;
+import org.particleframework.function.LocalFunctionRegistry;
 import org.particleframework.inject.ExecutableMethod;
 
 import javax.annotation.Nullable;
@@ -32,18 +32,18 @@ import java.util.Optional;
  */
 class AbstractExecutor<C> {
     /**
-     * Resolve a function from the {@link FunctionRegistry}
-     * @param functionRegistry The {@link FunctionRegistry}
+     * Resolve a function from the {@link LocalFunctionRegistry}
+     * @param localFunctionRegistry The {@link LocalFunctionRegistry}
      * @param functionName The function name
      * @return The method
      */
-    protected ExecutableMethod<Object, Object> resolveFunction(FunctionRegistry functionRegistry, String functionName) {
+    protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, String functionName) {
         Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
         if(functionName == null) {
-            registeredMethod = functionRegistry.findFirst();
+            registeredMethod = localFunctionRegistry.findFirst();
         }
         else {
-            registeredMethod = functionRegistry.find(functionName);
+            registeredMethod = localFunctionRegistry.find(functionName);
         }
         return registeredMethod
                 .orElseThrow(() -> new IllegalStateException("No function found for name: " + functionName));
@@ -55,7 +55,7 @@ class AbstractExecutor<C> {
      * @return The function name
      */
     protected String resolveFunctionName(Environment env) {
-        return env.getProperty(FunctionRegistry.FUNCTION_NAME, String.class, (String)null);
+        return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class, (String)null);
     }
 
     /**

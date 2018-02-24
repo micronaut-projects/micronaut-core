@@ -15,6 +15,7 @@
  */
 package org.particleframework.http.client;
 
+import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.MethodExecutionHandle;
 
 import java.util.Optional;
@@ -35,7 +36,11 @@ public interface ReactiveClientResultTransformer {
      * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isPublisher(Class)}
      * @return The transformed result
      */
-    Object transform(Object publisherResult, Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver, Object...parameters);
+    Object transform(
+            Object publisherResult,
+            Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver,
+            ExecutableMethod<Object, Object> invocation,
+            Object...parameters);
 
 
 }

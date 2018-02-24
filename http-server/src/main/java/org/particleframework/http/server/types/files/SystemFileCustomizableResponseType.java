@@ -13,20 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.netty.types;
+package org.particleframework.http.server.types.files;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
-import org.particleframework.http.server.netty.NettyHttpResponse;
-import org.particleframework.http.server.types.SpecialType;
+import java.io.File;
 
 /**
- * A special type that allows writing data in Netty
+ * A special type for handling a {@link File}
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface NettySpecialType extends SpecialType {
+public class SystemFileCustomizableResponseType implements FileCustomizableResponseType {
 
-    void write(HttpRequest request, NettyHttpResponse response, ChannelHandlerContext context);
+    protected final File file;
+
+    public SystemFileCustomizableResponseType(File file) {
+        this.file = file;
+    }
+
+    public File getFile() {
+        return file;
+    }
+
+    @Override
+    public long getLastModified() {
+        return file.lastModified();
+    }
+
+    @Override
+    public String getName() {
+        return file.getName();
+    }
+
+    @Override
+    public long getLength() {
+        return file.length();
+    }
+
 }

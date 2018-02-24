@@ -63,6 +63,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The default bootstrap name
      */
     String BOOTSTRAP_NAME_PROPERTY = "particle.bootstrap.name";
+
+    /**
+     * The default bootstrap name
+     */
+    String CLOUD_PLATFORM_PROPERTY = "particle.cloud.platform";
     /**
      * The default bootstrap config name
      */
@@ -71,6 +76,31 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The default application name
      */
     String DEFAULT_NAME = "application";
+
+    /**
+     * cloud provider google compute instance
+     */
+    String GOOGLE_COMPUTE = "gcp";
+
+    /**
+     * cloud provider amazon ec2
+     */
+    String AMAZON_EC2 = "ec2";
+
+    /**
+     * cloud provider Microsoft Azure
+     */
+    String AZURE = "azure";
+
+    /**
+     * cloud or non cloud provider on bare metal (unknown)
+     */
+    String BARE_METAL = "baremetal";
+
+    /**
+     *  cloud provider IBM cloud
+     */
+    String IBM = "ibm";
 
     /**
      * @return The active environment names

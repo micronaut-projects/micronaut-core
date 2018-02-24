@@ -19,7 +19,7 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.cli.CommandLine;
 import org.particleframework.core.reflect.ClassUtils;
-import org.particleframework.function.FunctionRegistry;
+import org.particleframework.function.LocalFunctionRegistry;
 import org.particleframework.http.MediaType;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 
@@ -93,7 +93,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
             Object result = supplier.apply(context);
             if (result != null) {
 
-                FunctionRegistry bean = applicationContext.getBean(FunctionRegistry.class);
+                LocalFunctionRegistry bean = applicationContext.getBean(LocalFunctionRegistry.class);
                 StreamFunctionExecutor.encode(applicationContext.getEnvironment(), bean, result.getClass(), result, System.out);
                 functionExitHandler.exitWithSuccess();
             }

@@ -58,7 +58,7 @@ class BlockingFallbackSpec extends Specification {
         then:
         book != null
         book.title == "The Stand"
-        book.id == null
+        book.id != null
 
         when:
         client.delete(book.id)
@@ -73,38 +73,45 @@ class BlockingFallbackSpec extends Specification {
 
     @Fallback
     static class BookFallback implements BookApi {
+
+        Map<Long, Book> books = new LinkedHashMap<>()
+        AtomicLong currentId = new AtomicLong(0)
+
         @Override
         Book get(Long id) {
-            return null
+            return books.get(id)
         }
 
         @Override
         List<Book> list() {
-            return []
+            return books.values().toList()
         }
 
         @Override
         void delete(Long id) {
-
+            books.remove(id)
         }
 
         @Override
         Book save(String title) {
-            return new Book(title: title)
+            Book book = new Book(title: title, id:currentId.incrementAndGet())
+            books[book.id] = book
+            return book
         }
 
         @Override
         Book update(Long id, String title) {
-            return new Book(id: id, title: title)
+            Book book = books[id]
+            if(book != null) {
+                book.title = title
+            }
+            return book
         }
     }
 
     @Controller("/blocking/fallback/books")
     @Singleton
     static class BookController implements BookApi {
-
-        Map<Long, Book> books = new LinkedHashMap<>()
-        AtomicLong currentId = new AtomicLong(0)
 
         @Override
         Book get(Long id) {

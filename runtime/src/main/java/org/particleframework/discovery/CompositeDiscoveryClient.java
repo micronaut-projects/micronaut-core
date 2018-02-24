@@ -18,22 +18,14 @@ package org.particleframework.discovery;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import org.particleframework.cache.CacheConfiguration;
-import org.particleframework.context.annotation.Primary;
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.util.ArrayUtils;
-import org.reactivestreams.Publisher;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.particleframework.discovery.CompositeDiscoveryClient.SETTING_ENABLED;
 
 /**
  * A composite implementation combining all registered {@link DiscoveryClient} instances
