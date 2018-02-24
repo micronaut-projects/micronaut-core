@@ -30,7 +30,7 @@ class Mail extends Component {
 
     fetch(`${config.SERVER_URL}/mail/send`, {
       method: 'POST',
-      body: JSON.stringify({email, slug: pet.name}),
+      body: JSON.stringify({email, slug: pet.slug}),
       headers: {'Content-Type': 'application/json'}
     }).then((r) => {
       r.status === 200 ?
