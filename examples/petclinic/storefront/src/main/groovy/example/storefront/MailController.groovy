@@ -6,6 +6,7 @@ import example.storefront.client.v1.MailClient
 import groovy.transform.CompileStatic
 import io.reactivex.Single
 import org.particleframework.http.HttpResponse
+import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
@@ -27,11 +28,16 @@ class MailController {
         mailClient.health().onErrorReturn( { new HealthStatus('DOWN') })
     }
 
-    @Post('/send')
-    HttpResponse send(String email, String slug) {
+    @Post(uri = '/send', consumes = MediaType.APPLICATION_JSON)
+    HttpResponse send(@Body EmailCommand cmd) {
         Email emailDTO = new Email()
-        emailDTO.setRecipient(email)
+        emailDTO.setRecipient(cmd.email)
         mailClient.send(emailDTO)
         HttpResponse.ok()
     }
+}
+
+class EmailCommand {
+    String email
+    String slug
 }
