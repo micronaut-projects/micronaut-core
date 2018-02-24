@@ -24,7 +24,8 @@ class Mail extends Component {
 
   changeEmail = (e) => this.setState({email: e.target.value})
 
-  submitEmail = () => {
+  submitEmail = (e) => {
+    e.preventDefault()
     const {email} = this.state
     const {pet} = this.props
 
@@ -53,16 +54,14 @@ class Mail extends Component {
     return enabled ? <div>
       <div className="jumbotron">
         <p><b>Request Info about {pet.name}</b></p>
-        <div className="form-group">
+        <form className="form-group" onSubmit={valid ? this.submitEmail : this.displayError}>
           <label htmlFor="inputEmail">Email address</label>
           <input type="email" className="form-control" name="email" id="inputEmail" placeholder="Enter email"
                  onChange={this.changeEmail} value={email}/>
-          <small id="emailHelp" className="form-text text-muted">We'll never share your email with anyone else.
-          </small>
-        </div>
-        <button onClick={valid ? this.submitEmail : this.displayError}
-                className={`btn btn-primary ${valid ? '' : 'disabled'}`}>Send me info
-        </button>
+          <small id="emailHelp" className="form-text text-muted">We'll never share your email with anyone else.</small>
+          <br/>
+          <input type='submit' className={`btn btn-primary ${valid ? '' : 'disabled'}`} value='Send me info'/>
+        </form>
 
       </div>
       <Alert message={message} level={level}/>
