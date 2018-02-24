@@ -1,6 +1,8 @@
 import React, {Component} from 'react';
 import PetsGrid from "./PetsGrid";
 import config from "../config";
+import Pet from "./Pet";
+import {Route} from "react-router-dom";
 
 class Pets extends Component {
 
@@ -44,27 +46,33 @@ class Pets extends Component {
 
   render() {
     const {tab} = this.state;
+    const {match} = this.props;
 
 
     return <div>
-      <div className="jumbotron jumbotron-fluid">
-        <div className="container">
-          <h1 className="display-4">Pets</h1>
-        </div>
-      </div>
+      <Route path="/pets/test" component={Pet} />
+      <Route exact path={match.url}
+        render={() => <div>
+          <div className="jumbotron jumbotron-fluid">
+            <div className="container">
+              <h1 className="display-4">Pets</h1>
+            </div>
+          </div>
 
 
-      <ul className="nav nav-tabs">
-        <li className="nav-item">
-          <span className={`nav-link ${tab === 1 ? 'active' : ''}`} onClick={() => this.switchTab(1)}>Cats</span>
-        </li>
-        <li className="nav-item">
-          <span className={`nav-link ${tab === 2 ? 'active' : ''}`} onClick={() => this.switchTab(2)}>Dogs</span>
-        </li>
-      </ul>
+          <ul className="nav nav-tabs">
+            <li className="nav-item">
+              <span className={`nav-link ${tab === 1 ? 'active' : ''}`} onClick={() => this.switchTab(1)}>Cats</span>
+            </li>
+            <li className="nav-item">
+              <span className={`nav-link ${tab === 2 ? 'active' : ''}`} onClick={() => this.switchTab(2)}>Dogs</span>
+            </li>
+          </ul>
 
 
-      <PetsGrid pets={this.petsForTab(tab)}/>
+          <PetsGrid pets={this.petsForTab(tab)} match={match}/>
+        </div>}
+      />
     </div>
   }
 }
