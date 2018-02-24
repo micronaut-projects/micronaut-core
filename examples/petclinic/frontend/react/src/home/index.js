@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import config from "../config";
 import Offer from "./Offer";
-import Error from "./Error";
+import Alert from "../display/Alert";
 
 
 class Home extends Component {
@@ -42,7 +42,7 @@ class Home extends Component {
 
     return <div>
       <Offer offer={offer}/>
-      <Error message={error} />
+      <Alert message={error} level='warning'/>
 
     </div>
   }

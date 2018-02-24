@@ -1,8 +1,9 @@
 import React, {Component} from 'react';
 import {BrowserRouter as Router, Route, Link} from "react-router-dom";
 import Home from './home/index'
-import PetsLayout from './pets/index'
+import Pets from './pets/index'
 import Vendors from './vendors/index'
+import Pet from "./pets/Pet";
 
 
 class App extends Component {
@@ -34,7 +35,8 @@ class App extends Component {
                     <div className="container">
 
                         <Route exact path="/" component={Home} />
-                        <Route exact path="/pets" component={PetsLayout} />
+                        <Route exact path="/pets" component={Pets} />
+                        <Route exact path="/pets/:slug" component={Pet} />
                         <Route exact path="/vendors" component={Vendors} />
                     </div>
 

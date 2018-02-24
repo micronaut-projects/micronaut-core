@@ -1,7 +1,7 @@
 import React from 'react';
 import PetsRow from './PetsRow'
 
-const PetsGrid = ({pets}) => {
+const PetsGrid = ({pets, match}) => {
 
   const groupByThree = (array, pet, i) => {
     const index = Math.floor(i / 3);
@@ -17,7 +17,7 @@ const PetsGrid = ({pets}) => {
   
 
   return <div>
-    {pets.reduce(groupByThree, []).map((group, i) => <PetsRow key={i} pets={group}/>)}
+    {pets.reduce(groupByThree, []).map((group, i) => <PetsRow key={i} pets={group} match={match}/>)}
   </div>
 }
 

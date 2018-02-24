@@ -1,0 +1,73 @@
+import React, {Component} from 'react'
+import Alert from "../display/Alert";
+import config from "../config";
+
+class Mail extends Component {
+
+  constructor() {
+    super()
+
+    this.state = {
+      enabled: false,
+      message: '',
+      level: null,
+      email: ''
+    }
+  }
+
+  componentDidMount() {
+    fetch(`${config.SERVER_URL}/mail/health`)
+      .then(r => r.json())
+      .then(json => this.setState({enabled: json.status === 'UP'}))
+      .catch(e => console.warn(e))
+  }
+
+  changeEmail = (e) => this.setState({email: e.target.value})
+
+  submitEmail = () => {
+    const {email} = this.state
+    const {pet} = this.props
+
+    fetch(`${config.SERVER_URL}/mail/send`, {
+      method: 'POST',
+      body: JSON.stringify({email, slug: pet.name}),
+      headers: {'Content-Type': 'application/json'}
+    }).then((r) => {
+      r.status === 200 ?
+        this.setState({email: '', message: 'Email has been sent', level: 'success'}) :
+        this.setState({message: 'Could not send email', level: 'warning'})
+    }).then((json) => console.log(json))
+      .catch(e => console.warn(e));
+  }
+
+  displayError = () => this.setState({message: 'Enter a valid email address', level: 'warning'})
+
+  render() {
+    const {message, level, email, enabled} = this.state
+    const {pet} = this.props;
+
+    const valid =
+      email.length > 0 &&
+      email.match(/^([\w.%+-]+)@([\w-]+\.)+([\w]{2,})$/i);
+
+    return enabled ? <div>
+      <div className="jumbotron">
+        <p><b>Request Info about {pet.name}</b></p>
+        <div className="form-group">
+          <label htmlFor="inputEmail">Email address</label>
+          <input type="email" className="form-control" name="email" id="inputEmail" placeholder="Enter email"
+                 onChange={this.changeEmail} value={email}/>
+          <small id="emailHelp" className="form-text text-muted">We'll never share your email with anyone else.
+          </small>
+        </div>
+        <button onClick={valid ? this.submitEmail : this.displayError}
+                className={`btn btn-primary ${valid ? '' : 'disabled'}`}>Send me info
+        </button>
+
+      </div>
+      <Alert message={message} level={level}/>
+    </div> : null
+  }
+}
+
+export default Mail
