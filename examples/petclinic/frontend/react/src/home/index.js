@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import config from "../config";
 import Offer from "./Offer";
 import Alert from "../display/Alert";
+import RandomPet from "./RandomPet";
 
 
 class Home extends Component {
@@ -43,6 +44,18 @@ class Home extends Component {
     return <div>
       <Offer offer={offer}/>
       <Alert message={error} level='warning'/>
+
+      <h2>Check out our Popular Pets!</h2>
+      <div className='row'>
+        <div className='col-md-6'>
+          <RandomPet />
+        </div>
+        <div className='col-md-6'>
+          <RandomPet />
+        </div>
+      </div>
+      
+      
 
     </div>
   }
