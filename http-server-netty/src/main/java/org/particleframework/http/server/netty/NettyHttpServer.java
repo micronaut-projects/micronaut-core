@@ -97,7 +97,6 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
     private final int serverPort;
-    private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
     private final ApplicationContext applicationContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
@@ -115,14 +114,12 @@ public class NettyHttpServer implements EmbeddedServer {
             StaticResourceResolver resourceResolver,
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
-            @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir ->
                 DiskFileUpload.baseDirectory = dir.getAbsolutePath()
         );
-        this.computeInstanceMetadataResolver = computeInstanceMetadataResolver;
         this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
@@ -138,6 +135,13 @@ public class NettyHttpServer implements EmbeddedServer {
         this.outboundHandlers = outboundHandlers;
         this.binderRegistry = binderRegistry;
         this.staticResourceResolver = resourceResolver;
+    }
+
+    /**
+     * @return The configuration for the server
+     */
+    public NettyHttpServerConfiguration getServerConfiguration() {
+        return serverConfiguration;
     }
 
     @Override
@@ -209,41 +213,7 @@ public class NettyHttpServer implements EmbeddedServer {
             applicationContext.publishEvent(new ServerStartupEvent(this));
             Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
             applicationName.ifPresent(id -> {
-                this.serviceInstance = new EmbeddedServerInstance() {
-                    @Override
-                    public EmbeddedServer getEmbeddedServer() {
-                        return NettyHttpServer.this;
-                    }
-
-                    @Override
-                    public String getId() {
-                        return id;
-                    }
-
-                    @Override
-                    public URI getURI() {
-                        return NettyHttpServer.this.getURI();
-                    }
-
-                    @Override
-                    public ConvertibleValues<String> getMetadata() {
-                        Map<String,String> cloudMetadata = new HashMap<String,String>();
-                        if (computeInstanceMetadataResolver != null) {
-                            Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
-                            if(resolved.isPresent()) {
-                                cloudMetadata = resolved.get().getMetadata();
-                            }
-                        }
-                        Map<CharSequence, String> metadata = serverConfiguration
-                                .getApplicationConfiguration()
-                                .getInstance()
-                                .getMetadata();
-                        if (cloudMetadata!=null) {
-                            metadata.putAll(cloudMetadata);
-                        }
-                        return ConvertibleValues.of(metadata);
-                    }
-                };
+                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
                 applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
             });
         }
@@ -381,8 +351,6 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         }
     }
-
-
 
 
 }
