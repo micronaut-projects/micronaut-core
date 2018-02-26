@@ -19,7 +19,9 @@ const Offer = ({offer}) => offer ? <div id="offers">
       </p>
     </div>
   </div>
-</div> : <div className="jumbotron jumbotron-fluid">
+</div> : <div className="jumbotron jumbotron-fluid" style={{
+  backgroundImage: `url(${config.SERVER_URL}/images/missing.png)`
+}}>
   <div className="container">
     <h1 className="display-4">Loading...</h1>
   </div>
