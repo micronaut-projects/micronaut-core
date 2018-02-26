@@ -4,6 +4,7 @@ import Home from './home/index'
 import Pets from './pets/index'
 import Vendors from './vendors/index'
 import Pet from "./pets/Pet";
+import VendorPets from "./pets/VendorPets";
 
 
 class App extends Component {
@@ -37,6 +38,7 @@ class App extends Component {
                         <Route exact path="/" component={Home} />
                         <Route exact path="/pets" component={Pets} />
                         <Route exact path="/pets/:slug" component={Pet} />
+                        <Route exact path="/pets/vendor/:vendor" component={VendorPets} />
                         <Route exact path="/vendors" component={Vendors} />
                     </div>
 
