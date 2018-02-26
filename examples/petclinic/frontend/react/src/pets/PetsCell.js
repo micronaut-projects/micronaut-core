@@ -2,7 +2,7 @@ import React from 'react';
 import config from "../config";
 import {Link} from "react-router-dom";
 
-const PetsCell = ({pet, match}) =>
+const PetsCell = ({pet}) =>
   <div className="col-sm" style={{
     backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`,
     backgroundPosition: 'center',
@@ -11,7 +11,7 @@ const PetsCell = ({pet, match}) =>
     margin: '10px',
     minHeight: '300px'
   }}>
-    <Link style={{position: 'absolute', top: 0, left: 0, height: '100%', width: '100%'}} to={`${match.url}/${pet.slug}`}>
+    <Link style={{position: 'absolute', top: 0, left: 0, height: '100%', width: '100%'}} to={`/pets/${pet.slug}`}>
       <div style={{
         position: 'absolute',
         color: 'white',

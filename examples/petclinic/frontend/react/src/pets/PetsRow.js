@@ -1,6 +1,6 @@
 import React from 'react'
 import PetsCell from "./PetsCell";
 
-const PetsRow = ({pets, match}) => <div className="row">{pets.map((pet, i) => <PetsCell key={i} pet={pet} match={match}/>)}</div>
+const PetsRow = ({pets}) => <div className="row">{pets.map((pet, i) => <PetsCell key={i} pet={pet} />)}</div>
 
 export default PetsRow

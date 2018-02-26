@@ -1,6 +1,7 @@
 import React, {Component} from 'react'
 import config from "../config";
 import Mail from "../mail";
+import {Link} from "react-router-dom";
 
 class Pet extends Component {
 
@@ -28,6 +29,7 @@ class Pet extends Component {
       <div className='col-md-6'>
         <h1>{pet.name}</h1>
         <h4>Vendor: {pet.vendor}</h4>
+        <p><Link to={`/pets/vendor/${pet.vendor}`} className="btn btn-primary">More Pets from {pet.vendor}</Link></p>
 
         <Mail pet={pet}/>
 
