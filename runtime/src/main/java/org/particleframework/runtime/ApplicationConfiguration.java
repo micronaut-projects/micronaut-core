@@ -89,7 +89,7 @@ public class ApplicationConfiguration {
         private String group;
         private String zone;
         @SuppressWarnings("unchecked")
-        private Map<CharSequence, String> metadata = Collections.EMPTY_MAP;
+        private Map<String, String> metadata = Collections.EMPTY_MAP;
 
         /**
          * @return An optional instance identifier
@@ -101,7 +101,7 @@ public class ApplicationConfiguration {
         /**
          * @return Any metadata to associate with the instance
          */
-        public Map<CharSequence, String> getMetadata() {
+        public Map<String, String> getMetadata() {
             return metadata;
         }
 
@@ -131,7 +131,7 @@ public class ApplicationConfiguration {
             this.id = id;
         }
 
-        public void setMetadata(Map<CharSequence, String> metadata) {
+        public void setMetadata(Map<String, String> metadata) {
             this.metadata = metadata;
         }
     }

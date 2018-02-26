@@ -17,11 +17,14 @@ package org.particleframework.function.web;
 
 import org.particleframework.context.ExecutionHandleLocator;
 import org.particleframework.context.annotation.Replaces;
+import org.particleframework.context.annotation.Value;
 import org.particleframework.context.processor.ExecutableMethodProcessor;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.metadata.ServiceInstanceMetadataContributor;
 import org.particleframework.function.DefaultLocalFunctionRegistry;
 import org.particleframework.function.FunctionBean;
 import org.particleframework.function.LocalFunctionRegistry;
@@ -32,7 +35,9 @@ import org.particleframework.web.router.DefaultRouteBuilder;
 import org.particleframework.web.router.UriRoute;
 
 import javax.inject.Singleton;
+import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -47,17 +52,23 @@ import java.util.stream.Stream;
  */
 @Singleton
 @Replaces(DefaultLocalFunctionRegistry.class)
-public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry {
+public class AnnotatedFunctionRouteBuilder
+        extends DefaultRouteBuilder
+        implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, ServiceInstanceMetadataContributor {
 
 
     private final LocalFunctionRegistry localFunctionRegistry;
+    private final String contextPath;
+    private final Map<String, URI> availableFunctions = new ConcurrentHashMap<>();
 
     public AnnotatedFunctionRouteBuilder(
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
-            ConversionService<?> conversionService) {
+            ConversionService<?> conversionService,
+            @Value("${function.contextPath:/}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.localFunctionRegistry = new DefaultLocalFunctionRegistry();
+        this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';
     }
 
     @SuppressWarnings("unchecked")
@@ -65,32 +76,33 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         FunctionBean annotation = method.getAnnotation(FunctionBean.class);
         if(annotation != null) {
-            String functionPath = annotation.value();
+            String functionName = annotation.value();
+            String functionPath = functionName;
             Class<?> declaringType = method.getDeclaringType();
             if(StringUtils.isEmpty(functionPath)) {
                 String typeName = declaringType.getSimpleName();
                 if(typeName.contains("$")) {
                     // generated lambda
-                    functionPath = "/" + NameUtils.hyphenate(method.getMethodName());
+                    functionPath = contextPath + NameUtils.hyphenate(method.getMethodName());
                 }
                 else {
-                    functionPath = "/" + NameUtils.hyphenate(typeName);
+                    functionPath = contextPath + NameUtils.hyphenate(typeName);
                 }
             }
             else {
-                functionPath = "/" + functionPath;
+                functionPath = contextPath + functionPath;
             }
 
             UriRoute route = null;
             if(Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
                 route = POST(functionPath, method);
-
             }
             else if(Supplier.class.isAssignableFrom(declaringType)) {
                 route = GET(functionPath, method);
             }
 
             if(route != null) {
+                availableFunctions.put(functionName, URI.create(functionPath));
                 Class[] argumentTypes = method.getArgumentTypes();
                 int argCount = argumentTypes.length;
                 if(argCount > 0) {
@@ -107,6 +119,14 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
         }
     }
 
+    /**
+     * A map of available functions with the key being the function name and the value being the function URI
+     *
+     * @return A map of functions
+     */
+    public Map<String, URI> getAvailableFunctions() {
+        return availableFunctions;
+    }
 
     @Override
     public <T, R> Optional<? extends ExecutableMethod<T, R>> findFirst() {
@@ -136,5 +156,13 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder implement
     @Override
     public <T, U, R> Optional<ExecutableMethod<BiFunction<T, U, R>, R>> findBiFunction(String name) {
         return localFunctionRegistry.findBiFunction(name);
+    }
+
+    @Override
+    public void contribute(ServiceInstance instance, Map<String, String> metadata) {
+        for (Map.Entry<String, URI> entry : availableFunctions.entrySet()) {
+            String functionName = entry.getKey();
+            metadata.put(FUNCTION_PREFIX + functionName, entry.getValue().toString());
+        }
     }
 }
