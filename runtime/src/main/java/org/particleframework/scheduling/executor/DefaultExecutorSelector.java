@@ -15,17 +15,18 @@
  */
 package org.particleframework.scheduling.executor;
 
-import org.particleframework.context.BeanLocator;
-import org.particleframework.core.annotation.Blocking;
+import org.particleframework.core.annotation.NonBlocking;
+import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.inject.MethodReference;
-import org.particleframework.inject.qualifiers.Qualifiers;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Default implementation of the {@link ExecutorSelector} interface
+ * Default implementation of the {@link ExecutorSelector} interface that regards methods that return reactive types as non-blocking
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -33,33 +34,24 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 public class DefaultExecutorSelector implements ExecutorSelector {
 
-    protected static final String[] DEFAULT_BLOCKING_ANNOTATIONS = {
-            Blocking.class.getName(),
-            "grails.gorm.transactions.Transactional",
-            "grails.gorm.transactions.ReadOnly",
-            "org.springframework.transaction.annotation.Transactional",
-    };
-    private final BeanLocator beanLocator;
-    private final String[] blockingAnnotations;
 
+    private final ExecutorService ioExecutor;
 
-    public DefaultExecutorSelector(BeanLocator beanLocator) {
-        this(beanLocator, DEFAULT_BLOCKING_ANNOTATIONS);
-    }
-
-    protected DefaultExecutorSelector(BeanLocator beanLocator, String... blockingAnnotations) {
-        this.beanLocator = beanLocator;
-        this.blockingAnnotations = blockingAnnotations;
+    protected DefaultExecutorSelector(@Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor) {
+        this.ioExecutor = ioExecutor;
     }
 
     @Override
     public Optional<ExecutorService> select(MethodReference method) {
-        if( method.hasStereotype(blockingAnnotations) ) {
-            return beanLocator.findBean(
-                    ExecutorService.class,
-                    Qualifiers.byName(IOExecutorServiceConfig.NAME)
-            );
+        if( method.hasStereotype(NonBlocking.class) ) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        else {
+            Class returnType = method.getReturnType().getType();
+            if(Publishers.isPublisher(returnType) || CompletableFuture.class.isAssignableFrom(returnType)) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(ioExecutor);
     }
 }
