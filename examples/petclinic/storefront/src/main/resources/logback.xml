@@ -8,9 +8,8 @@
         </encoder>
     </appender>
 
-    <root level="debug">
+    <root level="TRACE">
         <appender-ref ref="STDOUT" />
-
     </root>
     <logger name="org.particleframework.http.client" level="TRACE"/>
 </configuration>
