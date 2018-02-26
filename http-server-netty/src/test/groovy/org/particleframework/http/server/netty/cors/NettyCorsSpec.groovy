@@ -1,7 +1,5 @@
 package org.particleframework.http.server.netty.cors
 
-import okhttp3.FormBody
-import okhttp3.Request
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse

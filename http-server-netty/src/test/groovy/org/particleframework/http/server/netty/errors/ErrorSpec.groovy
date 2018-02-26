@@ -16,8 +16,6 @@
 package org.particleframework.http.server.netty.errors
 
 import groovy.json.JsonSlurper
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
