@@ -28,6 +28,7 @@ import org.particleframework.http.HttpResponse
 import org.particleframework.http.MediaType
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.annotation.Parameter
 import org.particleframework.http.annotation.Produces
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.RxStreamingHttpClient
@@ -73,7 +74,7 @@ class StoreController {
     }
 
     @Get('/pets/{slug}')
-    Maybe<Pet> showPet(String slug) {
+    Maybe<Pet> showPet(@Parameter('slug') String slug) {
         petClient.find(slug)
     }
 
