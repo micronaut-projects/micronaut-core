@@ -43,6 +43,11 @@ class PetClientFallback implements PetOperations<Pet> {
     }
 
     @Override
+    Maybe<Pet> random() {
+        return Maybe.empty()
+    }
+
+    @Override
     Maybe<Pet> find(String slug) {
         return Maybe.empty()
     }
