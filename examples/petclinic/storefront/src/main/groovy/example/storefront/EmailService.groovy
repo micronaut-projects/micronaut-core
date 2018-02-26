@@ -6,6 +6,9 @@ import example.storefront.client.v1.MailClient
 import example.storefront.client.v1.PetClient
 import groovy.transform.CompileStatic
 
+import javax.inject.Singleton
+
+@Singleton
 @CompileStatic
 class EmailService {
 
