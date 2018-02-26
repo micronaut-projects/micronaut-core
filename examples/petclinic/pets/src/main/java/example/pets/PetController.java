@@ -32,6 +32,7 @@ import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
 import javax.validation.Valid;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -63,10 +64,10 @@ public class PetController implements PetOperations<PetEntity> {
     }
 
     @Override
-    public Maybe<PetEntity> random() { //TODO: Implement actual random query
+    public Maybe<PetEntity> random() {
         return Flowable.fromPublisher(
                 getCollection()
-                        .find()
+                        .aggregate(Collections.singletonList(Aggregates.sample(1)), PetEntity.class)
         ).firstElement();
     }
 
