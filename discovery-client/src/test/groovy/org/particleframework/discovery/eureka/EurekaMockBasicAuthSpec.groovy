@@ -59,7 +59,7 @@ class EurekaMockBasicAuthSpec extends Specification {
             Flowable.fromPublisher(eurekaClient.getServiceIds()).blockingFirst().contains(serviceName)
         }
 
-        when:"The unauthorized clean is used"
+        when:"The unauthorized client is used"
         unauthorizedClient.toBlocking().retrieve('/eureka/apps')
 
         then:

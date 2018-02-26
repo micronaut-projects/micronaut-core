@@ -92,6 +92,19 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
+     * Return this {@link ConvertibleValues} as a map for the given key type and value type. The map represents a copy of the data held by this instance
+     *
+     * @return The values
+     */
+    default Map<String, V> asMap() {
+        Map<String, V> newMap = new LinkedHashMap<>();
+        for (Map.Entry<String, V> entry : this) {
+            String key = entry.getKey();
+            newMap.put(key, entry.getValue());
+        }
+        return newMap;
+    }
+    /**
      * Return this {@link ConvertibleValues} as a map for the given key type and value type
      * @param keyType The key type
      * @param valueType The value type

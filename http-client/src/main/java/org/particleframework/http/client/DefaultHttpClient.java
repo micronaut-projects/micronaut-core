@@ -384,13 +384,6 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
                                     pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
                                         AtomicBoolean received = new AtomicBoolean(false);
-                                        @Override
-                                        public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-                                                if(!received.get()) {
-                                                    emitter.onError(new EmptyResponseException());
-                                                }
-                                                super.channelReadComplete(ctx);
-                                        }
 
                                         @Override
                                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
@@ -775,14 +768,6 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
 
     private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
-
-            @Override
-            public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-                if(!completableFuture.isDone()) {
-                    completableFuture.completeExceptionally(new EmptyResponseException());
-                }
-                super.channelReadComplete(ctx);
-            }
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
