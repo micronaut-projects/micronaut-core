@@ -35,6 +35,9 @@ public interface PetOperations<T extends Pet> {
     @Get("/")
     Single<List<T>> list();
 
+    @Get("/random")
+    Maybe<T> random();
+
     @Get("/vendor/{name}")
     Single<List<T>> byVendor(String name);
 

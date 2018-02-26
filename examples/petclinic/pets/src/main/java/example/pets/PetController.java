@@ -16,6 +16,8 @@
 package example.pets;
 
 import static com.mongodb.client.model.Filters.*;
+
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import example.api.v1.Pet;
@@ -25,10 +27,13 @@ import io.reactivex.Maybe;
 import io.reactivex.Single;
 import org.particleframework.http.annotation.Controller;
 import org.particleframework.validation.Validated;
+import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import javax.validation.Valid;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 /**
  * @author graemerocher
@@ -55,6 +60,14 @@ public class PetController implements PetOperations<PetEntity> {
                 getCollection()
                     .find()
         ).toList();
+    }
+
+    @Override
+    public Maybe<PetEntity> random() { //TODO: Implement actual random query
+        return Flowable.fromPublisher(
+                getCollection()
+                        .find()
+        ).firstElement();
     }
 
     @Override

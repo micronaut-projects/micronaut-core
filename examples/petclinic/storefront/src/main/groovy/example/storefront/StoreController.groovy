@@ -77,6 +77,18 @@ class StoreController {
         petClient.find(slug)
     }
 
+    @Get('/pets/random')
+    Maybe<Pet> randomPet() {
+        petClient.random()
+    }
+
+
+    @Get('/pets/vendor/{vendor}')
+    Single<List<Pet>> petsForVendor(String vendor) {
+        petClient.byVendor(vendor)
+                .onErrorReturnItem(Collections.emptyList())
+    }
+
     @Get('/vendors')
     Single<List<Vendor>> vendors() {
         vendorClient.list()

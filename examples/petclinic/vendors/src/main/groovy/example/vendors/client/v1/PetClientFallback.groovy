@@ -20,6 +20,7 @@ import example.api.v1.PetOperations
 import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.annotation.Body
+import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.Fallback
 
 import javax.inject.Singleton
@@ -40,6 +41,11 @@ class PetClientFallback implements PetOperations<Pet>{
     @Override
     Single<List<Pet>> byVendor(String name) {
         return Single.just([])
+    }
+
+    @Override
+    Maybe<Pet> random() {
+        return Maybe.empty()
     }
 
     @Override
