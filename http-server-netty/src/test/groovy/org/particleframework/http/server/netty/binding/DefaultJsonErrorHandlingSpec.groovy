@@ -16,9 +16,6 @@
 package org.particleframework.http.server.netty.binding
 
 import groovy.json.JsonSlurper
-import okhttp3.MediaType
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body

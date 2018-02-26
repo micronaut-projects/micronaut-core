@@ -1,16 +1,12 @@
 package org.particleframework.http.server.netty.resources
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.particleframework.http.HttpRequest
 import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.client.RxHttpClient
 import org.particleframework.http.server.netty.AbstractParticleSpec
-import org.particleframework.http.server.netty.types.files.FileTypeHandlerConfiguration
 import org.particleframework.runtime.server.EmbeddedServer
 
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
