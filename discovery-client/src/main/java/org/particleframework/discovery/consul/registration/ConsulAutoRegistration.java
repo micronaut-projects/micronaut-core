@@ -19,6 +19,7 @@ import io.reactivex.Observable;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.context.env.Environment;
 import org.particleframework.core.convert.value.ConvertibleMultiValues;
+import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.discovery.ServiceInstance;
 import org.particleframework.discovery.ServiceInstanceIdGenerator;
@@ -41,6 +42,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Auto registration implementation for consul
@@ -183,6 +185,12 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                                 tags.add(ServiceInstance.ZONE + "=" + z);
                             }
                     );
+
+                    // include metadata as tags
+                    ConvertibleValues<String> metadata = embeddedServerInstance.getMetadata();
+                    for (Map.Entry<String, String> entry : metadata) {
+                        tags.add(entry.getKey() + "=" + entry.getValue());
+                    }
 
                     ConsulConfiguration.ConsulRegistrationConfiguration.CheckConfiguration checkConfig = registration.getCheck();
                     if (checkConfig.isEnabled()) {

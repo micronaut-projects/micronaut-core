@@ -45,6 +45,8 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
     private final ServiceInstanceMetadataContributor[] metadataContributors;
 
+    private ConvertibleValues<String> instanceMetadata;
+
     NettyEmbeddedServerInstance(
             @Argument String id,
             @Argument NettyHttpServer nettyHttpServer,
@@ -75,23 +77,26 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
 
     @Override
     public ConvertibleValues<String> getMetadata() {
-        Map<String,String> cloudMetadata = new HashMap<>();
-        if (computeInstanceMetadataResolver != null) {
-            Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
-            if(resolved.isPresent()) {
-                cloudMetadata = resolved.get().getMetadata();
+        if(instanceMetadata == null) {
+            Map<String,String> cloudMetadata = new HashMap<>();
+            if (computeInstanceMetadataResolver != null) {
+                Optional<? extends ComputeInstanceMetadata> resolved = computeInstanceMetadataResolver.resolve(environment);
+                if(resolved.isPresent()) {
+                    cloudMetadata = resolved.get().getMetadata();
+                }
             }
+            for (ServiceInstanceMetadataContributor metadataContributor : metadataContributors) {
+                metadataContributor.contribute(this, cloudMetadata);
+            }
+            Map<String, String> metadata = nettyHttpServer.getServerConfiguration()
+                    .getApplicationConfiguration()
+                    .getInstance()
+                    .getMetadata();
+            if (cloudMetadata!=null) {
+                cloudMetadata.putAll(metadata);
+            }
+            instanceMetadata = ConvertibleValues.of(cloudMetadata);
         }
-        for (ServiceInstanceMetadataContributor metadataContributor : metadataContributors) {
-            metadataContributor.contribute(this, cloudMetadata);
-        }
-        Map<CharSequence, String> metadata = nettyHttpServer.getServerConfiguration()
-                .getApplicationConfiguration()
-                .getInstance()
-                .getMetadata();
-        if (cloudMetadata!=null) {
-            metadata.putAll(cloudMetadata);
-        }
-        return ConvertibleValues.of(metadata);
+        return instanceMetadata;
     }
 }
