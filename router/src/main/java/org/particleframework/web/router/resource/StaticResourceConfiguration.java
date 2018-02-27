@@ -18,14 +18,12 @@ package org.particleframework.web.router.resource;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.io.ResourceLoader;
-import org.particleframework.core.io.file.FileSystemResourceLoader;
-import org.particleframework.core.io.scan.ClassPathResourceLoader;
 import org.particleframework.core.util.Toggleable;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores configuration for the loading of static resources
@@ -51,10 +49,9 @@ public class StaticResourceConfiguration implements Toggleable {
         List<ResourceLoader> loaders = new ArrayList<>(paths.size());
         if (enabled) {
             for(String path: paths) {
-                if (path.startsWith("classpath:")) {
-                    loaders.add(new ClassPathResourceLoader(this.getClass().getClassLoader(), path.substring(10)));
-                } else if (path.startsWith("file:")) {
-                    loaders.add(new FileSystemResourceLoader(new File(path.substring(5))));
+                Optional<ResourceLoader> loader = ResourceLoader.forPath(path, this.getClass().getClassLoader());
+                if (loader.isPresent()) {
+                    loaders.add(loader.get());
                 } else {
                     throw new ConfigurationException("Unrecognizable resource path: " + path);
                 }

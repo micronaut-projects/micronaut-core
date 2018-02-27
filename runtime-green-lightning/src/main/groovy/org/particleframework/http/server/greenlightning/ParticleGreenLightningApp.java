@@ -31,6 +31,7 @@ import java.util.Optional;
 public class ParticleGreenLightningApp implements GreenApp {
     protected final int port;
     protected final String host;
+    protected final String scheme;
     protected GreenRuntime runtime;
     protected final Optional<Router> router;
 
@@ -42,6 +43,7 @@ public class ParticleGreenLightningApp implements GreenApp {
         this.port = serverPort == -1 ? SocketUtils.findAvailableTcpPort() : serverPort;
 
         this.host = serverConfiguration.getHost().orElse("localhost");
+        this.scheme = serverConfiguration.getSsl().isEnabled() ? "https" : "http";
     }
 
     @Override
@@ -66,4 +68,6 @@ public class ParticleGreenLightningApp implements GreenApp {
     public String getHost() {
         return host;
     }
+
+    public String getScheme() { return scheme; }
 }

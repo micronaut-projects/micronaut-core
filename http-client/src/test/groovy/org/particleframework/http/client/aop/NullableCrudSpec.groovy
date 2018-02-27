@@ -84,7 +84,7 @@ class NullableCrudSpec extends Specification {
         NullableBook book = client.save(null)
 
         then:
-        book.title == null // string {}
+        book.title == null
         noExceptionThrown()
     }
 
@@ -158,7 +158,7 @@ class NullableCrudSpec extends Specification {
 
     static interface NullableBookApi {
 
-        @Get("/show/{/id}") // /show to avoid a duplicate route exception
+        @Get("/show/{/id}") // /show to avoid calling list instead
         NullableBook get(@Nullable Long id)
 
         @Get('/')
