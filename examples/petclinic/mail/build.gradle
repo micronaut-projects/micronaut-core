@@ -10,6 +10,7 @@ dependencies {
     compile "org.particleframework:discovery-client:${projectVersion}"
 
     compile 'com.amazonaws:aws-java-sdk-ses:1.11.285'
+    compile 'com.sendgrid:sendgrid-java:4.1.2'
 
     testCompile "junit:junit:4.12"
 
