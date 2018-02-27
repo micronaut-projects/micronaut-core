@@ -8,7 +8,21 @@ public class Email {
     private List<String> bcc;
     private String subject;
     private String htmlBody;
+    private String textBody;
     private String replyTo;
+
+    public String getTextBody() {
+        return textBody;
+    }
+
+    public void setTextBody(String textBody) {
+        this.textBody = textBody;
+    }
+
+    Email textBody(String textBody) {
+        setTextBody(textBody);
+        return this;
+    }
 
     public String getRecipient() {
         return recipient;
@@ -16,6 +30,11 @@ public class Email {
 
     public void setRecipient(String recipient) {
         this.recipient = recipient;
+    }
+
+    public Email recipient(String recipient) {
+        setRecipient(recipient);
+        return this;
     }
 
     public List<String> getCc() {
@@ -26,12 +45,22 @@ public class Email {
         this.cc = cc;
     }
 
+    public Email cc(List<String> cc) {
+        setCc(cc);
+        return this;
+    }
+
     public List<String> getBcc() {
         return bcc;
     }
 
     public void setBcc(List<String> bcc) {
         this.bcc = bcc;
+    }
+
+    public Email bcc(List<String> bcc) {
+        setBcc(bcc);
+        return this;
     }
 
     public String getSubject() {
@@ -42,6 +71,11 @@ public class Email {
         this.subject = subject;
     }
 
+    public Email subject(String subject) {
+        setSubject(subject);
+        return this;
+    }
+
     public String getHtmlBody() {
         return htmlBody;
     }
@@ -50,12 +84,22 @@ public class Email {
         this.htmlBody = htmlBody;
     }
 
+    public Email htmlBody(String htmlBody) {
+        setHtmlBody(htmlBody);
+        return this;
+    }
+
     public String getReplyTo() {
         return replyTo;
     }
 
     public void setReplyTo(String replyTo) {
         this.replyTo = replyTo;
+    }
+
+    public Email replyTo(String replyTo) {
+        setReplyTo(replyTo);
+        return this;
     }
 
     public String toString() {
@@ -90,8 +134,12 @@ public class Email {
         }
 
         if ( getHtmlBody() != null ) {
-            sb.append("Body: ");
+            sb.append("HTML Body: ");
             sb.append(getHtmlBody());
+        }
+        if ( getTextBody() != null ) {
+            sb.append("Text Body: ");
+            sb.append(getTextBody());
         }
         return sb.toString();
     }
