@@ -24,6 +24,7 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValuesMap;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpParameters;
 import org.particleframework.http.MutableHttpHeaders;
@@ -35,6 +36,7 @@ import org.reactivestreams.Publisher;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Optional;
 
@@ -175,9 +177,24 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>{
     }
 
     HttpRequest getNettyRequest(ByteBuf content) {
-        DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString(), content) :
-                                                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name()), getUri().toString());
+        String uriStr = resolveUriPath();
+        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
+        DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
+                                                        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().setAll(headers.getNettyHeaders());
         return req;
+    }
+
+    private String resolveUriPath() {
+        URI uri = getUri();
+        if(StringUtils.isNotEmpty(uri.getScheme())) {
+            try {
+                // obtain just the path
+                uri = new URI(null, null, null, -1, uri.getPath(), uri.getQuery(), uri.getFragment());
+            } catch (URISyntaxException e) {
+                // ignore
+            }
+        }
+        return uri.toString();
     }
 }

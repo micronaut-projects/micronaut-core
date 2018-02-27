@@ -16,6 +16,7 @@
 package org.particleframework.function.client.aop;
 
 import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import io.reactivex.functions.Function;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
@@ -54,21 +55,15 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class FunctionClientAdvice extends DefaultHttpClient implements MethodInterceptor<Object,Object> {
+public class FunctionClientAdvice  implements MethodInterceptor<Object,Object> {
 
 
     private final FunctionDiscoveryClient discoveryClient;
     private final FunctionInvokerChooser functionInvokerChooser;
 
-    public FunctionClientAdvice(
-            HttpClientConfiguration configuration,
-            MediaTypeCodecRegistry codecRegistry,
-            FunctionDiscoveryClient discoveryClient,
-            FunctionInvokerChooser functionInvokerChooser,
-            HttpClientFilter... filters) {
-        super(LoadBalancer.empty(), configuration, codecRegistry, filters);
-        this.functionInvokerChooser = functionInvokerChooser;
+    public FunctionClientAdvice(FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
         this.discoveryClient = discoveryClient;
+        this.functionInvokerChooser = functionInvokerChooser;
     }
 
     @SuppressWarnings("unchecked")
@@ -98,11 +93,12 @@ public class FunctionClientAdvice extends DefaultHttpClient implements MethodInt
         Class<Object> javaReturnType = returnType.getType();
         if(Publishers.isPublisher(javaReturnType)) {
 
-            Flowable flowable = functionDefinition.flatMap(def -> {
+            Maybe flowable = functionDefinition.firstElement().flatMap(def -> {
                 FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-                return (Publisher) functionInvoker.invoke(def, body, Argument.of(Publisher.class, returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)));
+                return (Maybe) functionInvoker.invoke(def, body, Argument.of(Maybe.class, returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)));
             });
-            return ConversionService.SHARED.convert(flowable, returnType.asArgument()).orElseThrow(()-> new FunctionExecutionException("Unsupported reactive type: " + returnType));
+            flowable = flowable.switchIfEmpty(Maybe.error(new FunctionNotFoundException(functionName)));
+            return ConversionService.SHARED.convert(flowable, returnType.asArgument()).orElseThrow(()-> new FunctionExecutionException("Unsupported reactive type: " + returnType.getType()));
         }
         else {
             // blocking operation

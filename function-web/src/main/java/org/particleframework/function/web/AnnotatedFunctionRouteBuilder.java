@@ -102,6 +102,10 @@ public class AnnotatedFunctionRouteBuilder
             }
 
             if(route != null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route to Function: {}", route);
+                }
+
                 availableFunctions.put(functionName, URI.create(functionPath));
                 Class[] argumentTypes = method.getArgumentTypes();
                 int argCount = argumentTypes.length;

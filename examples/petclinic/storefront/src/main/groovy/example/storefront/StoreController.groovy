@@ -21,6 +21,7 @@ import example.api.v1.Vendor
 import example.storefront.client.v1.Comment
 import example.storefront.client.v1.CommentClient
 import example.storefront.client.v1.PetClient
+import example.storefront.client.v1.TweetClient
 import example.storefront.client.v1.VendorClient
 import io.reactivex.Flowable
 import io.reactivex.Maybe
@@ -50,12 +51,19 @@ class StoreController {
     private final VendorClient vendorClient
     private final PetClient petClient
     private final CommentClient commentClient
+    private final TweetClient tweetClient
 
-    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient, VendorClient vendorClient, PetClient petClient, CommentClient commentClient) {
+    StoreController(
+            @Client(id = 'offers') RxStreamingHttpClient httpClient,
+            VendorClient vendorClient,
+            PetClient petClient,
+            CommentClient commentClient,
+            TweetClient tweetClient) {
         this.httpClient = httpClient
         this.vendorClient = vendorClient
         this.petClient = petClient
         this.commentClient = commentClient
+        this.tweetClient = tweetClient
     }
 
     @Produces(MediaType.TEXT_HTML)
@@ -69,6 +77,11 @@ class StoreController {
         httpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
             Event.of(offer)
         })
+    }
+
+    @Get(uri = "/tweet/{message}")
+    Single<TweetClient.Result> tweet(String message) {
+        tweetClient.updateStatus(message)
     }
 
     @Get('/pets')
