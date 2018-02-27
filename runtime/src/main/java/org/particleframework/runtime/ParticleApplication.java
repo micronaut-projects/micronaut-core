@@ -105,6 +105,10 @@ public class ParticleApplication {
                     handleStartupException(applicationContext.getEnvironment(), e);
                 }
             }));
+
+            if(LOG.isInfoEnabled() && !embeddedContainerBean.isPresent()) {
+                LOG.info("No embedded container found. Running as CLI application");
+            }
             return applicationContext;
         } catch (Throwable e) {
             handleStartupException(applicationContext.getEnvironment(), e);

@@ -43,7 +43,7 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
     }
 
     @Override
-    public Set<String> getNames() {
+    public Set<String> names() {
         Iterator<String> fieldNames = objectNode.fieldNames();
         return CollectionUtils.iteratorToSet(fieldNames);
     }

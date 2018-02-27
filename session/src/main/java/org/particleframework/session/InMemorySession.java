@@ -104,8 +104,8 @@ public class InMemorySession implements Session {
     }
 
     @Override
-    public Set<String> getNames() {
-        return attributes.getNames();
+    public Set<String> names() {
+        return attributes.names();
     }
 
     @Override

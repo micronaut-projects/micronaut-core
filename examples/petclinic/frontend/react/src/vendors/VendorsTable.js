@@ -1,16 +1,8 @@
 import React from 'react';
-import VendorsTableRow from './VendorsTableRow'
+import VendorCard from "./VendorCard";
 
-const VendorsTable = ({vendors}) => <table className='table'>
-    <thead>
-    <tr>
-        <th scope='col'>Name</th>
-        <th scope='col'>Pets</th>
-    </tr>
-    </thead>
-    <tbody>
-    {vendors.map((v, i) => <VendorsTableRow key={i} vendor={v}/>)}
-    </tbody>
-</table>
+const VendorsTable = ({vendors}) => <div>
+  {vendors.map((v, i) => <VendorCard key={i} vendor={v}/>)}
+</div>
 
 export default VendorsTable;

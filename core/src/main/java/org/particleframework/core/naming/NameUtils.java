@@ -1,17 +1,17 @@
 /*
  * Copyright 2017 original authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License. 
+ * limitations under the License.
  */
 package org.particleframework.core.naming;
 
@@ -42,7 +42,7 @@ public class NameUtils {
     /**
      * Converts class name to property name using JavaBean decapitalization
      *
-     * @param name The class name
+     * @param name     The class name
      * @param suffixes The suffix to remove
      * @return The decapitalized name
      */
@@ -54,14 +54,14 @@ public class NameUtils {
     /**
      * Trims the given suffixes
      *
-     * @param string The string to trim
+     * @param string   The string to trim
      * @param suffixes The suffixes
      * @return The trimmed string
      */
     public static String trimSuffix(String string, String... suffixes) {
-        if(suffixes != null) {
+        if (suffixes != null) {
             for (String suffix : suffixes) {
-                if(string.endsWith(suffix)) {
+                if (string.endsWith(suffix)) {
                     return string.substring(0, string.length() - suffix.length());
                 }
             }
@@ -92,7 +92,6 @@ public class NameUtils {
      *
      * @param name The name
      * @return The hyphenated string
-     *
      */
     public static String hyphenate(String name) {
         return hyphenate(name, true);
@@ -101,10 +100,9 @@ public class NameUtils {
     /**
      * Converts camel case to hyphenated, lowercase form
      *
-     * @param name The name
+     * @param name      The name
      * @param lowerCase Whether the result should be converted to lower case
      * @return The hyphenated string
-     *
      */
     public static String hyphenate(String name, boolean lowerCase) {
         char separatorChar = '-';
@@ -116,22 +114,21 @@ public class NameUtils {
      *
      * @param name The hyphenated string
      * @return The camel case form
-     *
      */
     public static String dehyphenate(String name) {
         return Arrays.stream(name.split("-"))
-              .map((str)->{
-                    if(str.length() > 0 && Character.isLetter(str.charAt(0))) {
+                .map((str) -> {
+                    if (str.length() > 0 && Character.isLetter(str.charAt(0))) {
                         return Character.toUpperCase(str.charAt(0)) + str.substring(1);
                     }
                     return str;
-              })
-              .collect(Collectors.joining(""));
+                })
+                .collect(Collectors.joining(""));
     }
 
     public static String getPackageName(String className) {
         int i = className.lastIndexOf('.');
-        if(i >-1) {
+        if (i > -1) {
             return className.substring(0, i);
         }
         return "";
@@ -148,29 +145,26 @@ public class NameUtils {
     }
 
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
-        if(!lowerCase) {
+        if (!lowerCase) {
             StringBuilder newName = new StringBuilder();
             boolean first = true;
             char last = '0';
             for (char c : name.toCharArray()) {
-                if(first) {
+                if (first) {
                     newName.append(c);
                     first = false;
-                }
-                else {
-                    if( Character.isUpperCase(c) && !Character.isUpperCase(last)) {
+                } else {
+                    if (Character.isUpperCase(c) && !Character.isUpperCase(last)) {
                         newName.append(separatorChar).append(c);
-                    }
-                    else {
-                        if(c == '.') first = true;
+                    } else {
+                        if (c == '.') first = true;
                         newName.append(c);
                     }
                 }
                 last = c;
             }
             return newName.toString();
-        }
-        else {
+        } else {
 
             StringBuilder newName = new StringBuilder();
             char[] chars = name.toCharArray();
@@ -178,22 +172,17 @@ public class NameUtils {
             char last = '0';
             for (char c : chars) {
 
-                if(Character.isLowerCase(c) || !Character.isLetter(c)) {
-                    if(c == '.') {
-                        first =false;
-                    }
+                if (Character.isLowerCase(c) || !Character.isLetter(c)) {
+                    first = false;
                     newName.append(c);
-                }
-                else {
+                } else {
                     char lowerCaseChar = Character.toLowerCase(c);
-                    if(first) {
+                    if (first) {
                         first = false;
                         newName.append(lowerCaseChar);
-                    }
-                    else if(Character.isUpperCase(last) || last == '.') {
+                    } else if (Character.isUpperCase(last) || last == '.') {
                         newName.append(lowerCaseChar);
-                    }
-                    else {
+                    } else {
                         newName.append(separatorChar).append(lowerCaseChar);
                     }
                 }
@@ -206,7 +195,7 @@ public class NameUtils {
 
     public static String getSimpleName(String className) {
         int i = className.lastIndexOf('.');
-        if(i > -1) {
+        if (i > -1) {
             return className.substring(i + 1);
         }
         return className;
@@ -214,6 +203,7 @@ public class NameUtils {
 
     /**
      * Is the given method name a valid setter name
+     *
      * @param methodName The method name
      * @return True if it is a valid setter name
      */
@@ -227,12 +217,13 @@ public class NameUtils {
 
     /**
      * Get the equivalent property name for the given setter
+     *
      * @param setterName The setter
      * @return The property name
      */
     public static String getPropertyNameForSetter(String setterName) {
-        if(isSetterName(setterName)) {
-            return decapitalize( setterName.substring(3) );
+        if (isSetterName(setterName)) {
+            return decapitalize(setterName.substring(3));
         }
         return setterName;
     }

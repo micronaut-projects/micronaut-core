@@ -1,7 +1,5 @@
 package org.particleframework.http.server.netty.cors
 
-import okhttp3.FormBody
-import okhttp3.Request
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
@@ -17,7 +15,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
     void "test non cors request"() {
         when:
         def response = rxClient.exchange('/test').blockingFirst()
-        Set<String> headerNames = response.getHeaders().getNames()
+        Set<String> headerNames = response.getHeaders().names()
 
         then:
         response.status == HttpStatus.NO_CONTENT
@@ -34,7 +32,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ).blockingFirst()
 
         when:
-        Set<String> headerNames = response.headers.names
+        Set<String> headerNames = response.headers.names()
 
         then:
         response.status == HttpStatus.NO_CONTENT
@@ -49,7 +47,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ).blockingFirst()
 
         when:
-        Set<String> headerNames = response.headers.names
+        Set<String> headerNames = response.headers.names()
 
         then:
         response.status == HttpStatus.OK
@@ -71,7 +69,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ).blockingFirst()
 
         when:
-        Set<String> headerNames = response.headers.names
+        Set<String> headerNames = response.headers.names()
 
         then:
         response.status == HttpStatus.NO_CONTENT
@@ -94,7 +92,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ).blockingFirst()
 
         when:
-        Set<String> headerNames = response.headers.names
+        Set<String> headerNames = response.headers.names()
 
         then:
         response.code() == HttpStatus.NO_CONTENT.code
@@ -116,7 +114,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
         ).onErrorReturn({ t -> t.response} ).blockingFirst()
 
         when:
-        Set<String> headerNames = response.headers.names
+        Set<String> headerNames = response.headers.names()
 
         then:
         response.code() == HttpStatus.FORBIDDEN.code
@@ -176,7 +174,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
 
         ).blockingFirst()
 
-        def headerNames = response.headers.names
+        def headerNames = response.headers.names()
 
         expect:
         response.code() == HttpStatus.OK.code
@@ -199,7 +197,7 @@ class NettyCorsSpec extends AbstractParticleSpec {
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
         ).blockingFirst()
 
-        def headerNames = response.headers.names
+        def headerNames = response.headers.names()
 
         expect:
         response.code() == HttpStatus.OK.code

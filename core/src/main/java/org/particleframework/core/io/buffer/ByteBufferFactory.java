@@ -56,6 +56,14 @@ public interface ByteBufferFactory<T, B> {
     ByteBuffer<B> copiedBuffer(byte[] bytes);
 
     /**
+     * Creates a new big-endian buffer whose content is a copy of the
+     * specified NIO buffer.  The new buffer's
+     * {@code readerIndex} and {@code writerIndex} are {@code 0} and
+     * the specified {@code length} respectively.
+     */
+    ByteBuffer<B> copiedBuffer(java.nio.ByteBuffer nioBuffer);
+
+    /**
      * Wrap an existing buffer
      * @param existing The buffer to wrap
      * @return The wrapped {@link ByteBuffer}

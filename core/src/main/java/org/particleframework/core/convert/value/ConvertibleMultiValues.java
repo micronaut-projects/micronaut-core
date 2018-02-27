@@ -53,7 +53,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      */
     @Override
     default boolean isEmpty() {
-        return this == ConvertibleMultiValuesMap.EMPTY || getNames().isEmpty();
+        return this == ConvertibleMultiValuesMap.EMPTY || names().isEmpty();
     }
     /**
      * Performs the given action for each header. Note that in the case
@@ -67,7 +67,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     default void forEachValue(BiConsumer<String, V> action) {
         Objects.requireNonNull(action, "Consumer cannot be null");
 
-        Collection<String> names = getNames();
+        Collection<String> names = names();
         for (String headerName : names) {
             Collection<V> values = getAll(headerName);
             for (V value : values) {
@@ -78,7 +78,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
 
     @Override
     default Iterator<Map.Entry<String, List<V>>> iterator() {
-        Iterator<String> headerNames = getNames().iterator();
+        Iterator<String> headerNames = names().iterator();
         return new Iterator<Map.Entry<String, List<V>>>() {
             @Override
             public boolean hasNext() {

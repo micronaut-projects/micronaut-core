@@ -946,8 +946,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 @Override
                 protected boolean isAcceptable(ExecutableElement executableElement) {
+                    Set<Modifier> modifiers = executableElement.getModifiers();
                     int paramCount = executableElement.getParameters().size();
-                    return (paramCount == 1 || allowZeroArgs && paramCount == 0) && super.isAcceptable(executableElement) && isPrefixedWith(executableElement, prefixes);
+                    return modifiers.contains(Modifier.PUBLIC) && (paramCount == 1 || allowZeroArgs && paramCount == 0) && isPrefixedWith(executableElement, prefixes);
                 }
 
                 private boolean isPrefixedWith(Element enclosedElement, List<String> prefixes) {

@@ -40,6 +40,11 @@ public interface LocalFunctionRegistry {
      */
     String FUNCTION_CHARSET = "particle.function.charset";
     /**
+     * Prefix used to identify function names
+     */
+    String FUNCTION_PREFIX = "function:";
+
+    /**
      * Find the first available registered function
      * @return The {@link ExecutableMethod} method representing the function
      */
