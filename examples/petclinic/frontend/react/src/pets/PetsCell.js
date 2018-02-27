@@ -3,24 +3,9 @@ import config from "../config";
 import {Link} from "react-router-dom";
 
 const PetsCell = ({pet}) =>
-  <div className="col-sm" style={{
-    backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`,
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: 'cover',
-    margin: '10px',
-    minHeight: '300px'
-  }}>
-    <Link style={{position: 'absolute', top: 0, left: 0, height: '100%', width: '100%'}} to={`/pets/${pet.slug}`}>
-      <div style={{
-        position: 'absolute',
-        color: 'white',
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        padding: '10px',
-        width: '100%'
-      }}>
+  <div className="col-sm pet-card" style={{backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`}}>
+    <Link className="pet-link" to={`/pets/${pet.slug}`}>
+      <div className='pet-header'>
         <h4>
           {pet.name}
         </h4>
