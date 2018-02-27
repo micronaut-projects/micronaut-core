@@ -32,6 +32,9 @@ interface PetClient extends PetOperations<Pet> {
     Single<List<Pet>> byVendor(String name)
 
     @Override
+    Maybe<Pet> random()
+
+    @Override
     Maybe<Pet> find(String slug)
 
     @Override

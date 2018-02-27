@@ -17,15 +17,12 @@ package org.particleframework.http.netty;
 
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleMultiValues;
 import org.particleframework.core.convert.value.ConvertibleMultiValuesMap;
-import org.particleframework.core.type.Argument;
 import org.particleframework.http.HttpParameters;
 
 import java.util.*;
-import java.util.function.Function;
 
 /**
  * Implementation of {@link HttpParameters} for Netty
@@ -47,8 +44,8 @@ public class NettyHttpParameters implements HttpParameters {
 
 
     @Override
-    public Set<String> getNames() {
-        return values.getNames();
+    public Set<String> names() {
+        return values.names();
     }
 
     @Override

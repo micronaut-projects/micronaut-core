@@ -4,9 +4,6 @@ import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
 import io.reactivex.Flowable
 import io.reactivex.schedulers.Schedulers
-import okhttp3.MediaType
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.http.HttpHeaders
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse

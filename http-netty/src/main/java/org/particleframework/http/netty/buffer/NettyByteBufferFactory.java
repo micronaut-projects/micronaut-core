@@ -84,6 +84,11 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     }
 
     @Override
+    public ByteBuffer<ByteBuf> copiedBuffer(java.nio.ByteBuffer nioBuffer) {
+        return new NettyByteBuffer( Unpooled.copiedBuffer(nioBuffer) );
+    }
+
+    @Override
     public ByteBuffer<ByteBuf> wrap(ByteBuf existing) {
         return new NettyByteBuffer(existing);
     }

@@ -47,7 +47,6 @@ public class Publishers {
         Publishers.singleTypes.add(CompletableFuturePublisher.class);
         Publishers.singleTypes.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
-                "io.reactivex.Maybe",
                 "io.reactivex.Observable",
                 "reactor.core.publisher.Flux"
         );

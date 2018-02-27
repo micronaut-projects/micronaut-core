@@ -62,6 +62,7 @@ import org.particleframework.http.HttpResponse;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.client.exceptions.ContentLengthExceededException;
+import org.particleframework.http.client.exceptions.EmptyResponseException;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
@@ -96,6 +97,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -106,7 +108,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Prototype
-public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
+public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
@@ -381,25 +383,32 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
                                     pipeline.remove(HANDLER_AGGREGATOR);
                                     pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
+                                        AtomicBoolean received = new AtomicBoolean(false);
+
                                         @Override
                                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                                            emitter.onError(cause);
+                                            if(received.compareAndSet(false, true)) {
+                                                emitter.onError(cause);
+                                            }
                                         }
 
                                         @Override
                                         protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) throws Exception {
-                                            NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
-                                            if(LOG.isTraceEnabled()) {
-                                                LOG.trace("HTTP Client Streaming Response Received: {}", msg.status() );
-                                                traceHeaders(msg.headers());
-                                            }
+                                            if(received.compareAndSet(false, true)) {
+                                                NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                                                if(LOG.isTraceEnabled()) {
+                                                    LOG.trace("HTTP Client Streaming Response Received: {}", msg.status() );
+                                                    traceHeaders(msg.headers());
+                                                }
 
-                                            emitter.onNext(response);
-                                            emitter.onComplete();
+                                                emitter.onNext(response);
+                                                emitter.onComplete();
+                                            }
                                         }
                                     });
                                     if(LOG.isDebugEnabled()) {
                                         LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                                        LOG.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
                                     }
                                     if (LOG.isTraceEnabled()) {
                                         traceRequest(requestWrapper.get(), nettyRequest);
@@ -448,6 +457,7 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
                             prepareHttpHeaders(requestURI, finalRequest, nettyRequest, permitsBody);
                             if(LOG.isDebugEnabled()) {
                                 LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+                                LOG.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
                             }
                             if (LOG.isTraceEnabled()) {
                                 traceRequest(finalRequest, nettyRequest);
@@ -484,15 +494,30 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
     }
 
     protected <I> Publisher<URI> resolveRequestURI(HttpRequest<I> request) {
-        return Publishers.map(loadBalancer.select(null), server -> {
-                    Optional<String> authInfo = server.getMetadata().get(org.particleframework.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                    if(authInfo.isPresent() && request instanceof MutableHttpRequest) {
-                        ((MutableHttpRequest)request).getHeaders().auth(authInfo.get());
-                    }
-                    return server.resolve(request.getUri());
-                }
+        URI requestURI = request.getUri();
+        if(requestURI.getScheme() != null) {
+            // if the request URI includes a scheme then it is fully qualified so use the direct server
+            return Publishers.just(requestURI);
+        }
+        else {
 
-        );
+            return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
+                        Optional<String> authInfo = server.getMetadata().get(org.particleframework.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                        if(authInfo.isPresent() && request instanceof MutableHttpRequest) {
+                            ((MutableHttpRequest)request).getHeaders().auth(authInfo.get());
+                        }
+                        return server.resolve(requestURI);
+                    }
+
+            );
+        }
+    }
+
+    /**
+     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to null)
+     */
+    protected Object getLoadBalancerDiscriminator() {
+        return null;
     }
 
 
@@ -758,38 +783,45 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
 
     private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
+
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                HttpResponseStatus status = fullResponse.status();
-                if(LOG.isTraceEnabled()) {
-                    LOG.trace("HTTP Client Response Received: {}", status );
-                    traceHeaders(fullResponse.headers());
-                    traceBody(fullResponse.content());
-                }
-                int statusCode = status.code();
-                if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
-                    // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                    fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                }
-                boolean errorStatus = statusCode >= 400;
-                FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+                if(!completableFuture.isDone()) {
 
-                if (errorStatus) {
-                    completableFuture.completeExceptionally(new HttpClientResponseException(status.reasonPhrase(), response));
-                } else {
-                    completableFuture.complete(response);
+                    HttpResponseStatus status = fullResponse.status();
+                    if(LOG.isTraceEnabled()) {
+                        LOG.trace("HTTP Client Response Received: {}", status );
+                        traceHeaders(fullResponse.headers());
+                        traceBody(fullResponse.content());
+                    }
+                    int statusCode = status.code();
+                    if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
+                        // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                        fullResponse.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                    boolean errorStatus = statusCode >= 400;
+                    FullNettyClientHttpResponse<O> response
+                            = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+
+                    if (errorStatus) {
+                        completableFuture.completeExceptionally(new HttpClientResponseException(status.reasonPhrase(), response));
+                    } else {
+                        completableFuture.complete(response);
+                    }
                 }
             }
 
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                if (cause instanceof TooLongFrameException) {
-                    completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));
-                } else if (cause instanceof ReadTimeoutException) {
-                    completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
-                } else {
-                    completableFuture.completeExceptionally(new HttpClientException("Error occurred reading HTTP response: " + cause.getMessage(),cause));
+                if(!completableFuture.isDone()) {
+
+                    if (cause instanceof TooLongFrameException) {
+                        completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                    } else if (cause instanceof ReadTimeoutException) {
+                        completableFuture.completeExceptionally(org.particleframework.http.client.exceptions.ReadTimeoutException.TIMEOUT_EXCEPTION);
+                    } else {
+                        completableFuture.completeExceptionally(new HttpClientException("Error occurred reading HTTP response: " + cause.getMessage(),cause));
+                    }
                 }
             }
         });

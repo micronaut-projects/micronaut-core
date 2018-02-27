@@ -1,28 +1,74 @@
 .App {
-  text-align: center;
+    text-align: center;
 }
 
-.App-logo {
-  animation: App-logo-spin infinite 20s linear;
-  height: 80px;
+.micronaut-logo {
+    /*animation: App-logo-spin infinite 10s linear;*/
+    height: 80px;
 }
 
-.App-header {
-  background-color: #222;
-  height: 150px;
-  padding: 20px;
-  color: white;
+.about {
+    max-width: 400px
 }
 
-.App-title {
-  font-size: 1.5em;
+.vendor-card {
+    width: 18rem;
+    float: left;
+    margin: 10px
 }
 
-.App-intro {
-  font-size: large;
+.vendor-card img {
+    width: 18rem;
+    height: 18rem;
+    object-fit: cover;
+}
+
+.featured-card img {
+    height: 18rem;
+    object-fit: cover;
+}
+
+.offer-jumbotron {
+    background-position: center;
+    color: white
+}
+
+.offer-jumbotron-fallback {
+    min-height: 300px;
+    background-repeat: no-repeat;
+}
+
+.pet-card {
+    background: no-repeat center;
+    background-size: cover;
+    margin: 10px;
+    min-height: 300px;
+
+}
+
+.pet-header {
+    position: absolute;
+    color: white;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    width: 100%;
+}
+
+.pet-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
 }
 
 @keyframes App-logo-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

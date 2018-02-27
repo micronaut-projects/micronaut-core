@@ -17,7 +17,7 @@ const PetsGrid = ({pets}) => {
   
 
   return <div>
-    {pets.reduce(groupByThree, []).map((group, i) => <PetsRow key={i} pets={group}/>)}
+    {pets.reduce(groupByThree, []).map((group, i) => <PetsRow key={i} pets={group} />)}
   </div>
 }
 

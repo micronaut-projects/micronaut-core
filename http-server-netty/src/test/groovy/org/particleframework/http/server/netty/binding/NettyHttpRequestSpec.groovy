@@ -43,7 +43,7 @@ class NettyHttpRequestSpec extends Specification {
         fullURI == uri
         request.path.toString() == expectedPath
         request.method == HttpMethod."$method"
-        request.parameters.names == params as Set
+        request.parameters.names()== params as Set
 
         where:
         method | uri               | headers | content | params
@@ -66,7 +66,7 @@ class NettyHttpRequestSpec extends Specification {
         fullURI == uri
         request.path.toString() == expectedPath
         request.method == HttpMethod."$method"
-        request.cookies.names == names as Set
+        request.cookies.names() == names as Set
 
         where:
         method | uri        | headers                                                               | content | names

@@ -16,15 +16,15 @@
 package org.particleframework.function.web
 
 import groovy.transform.EqualsAndHashCode
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
 import org.particleframework.function.FunctionBean
 import org.particleframework.function.LocalFunctionRegistry
 import org.particleframework.http.HttpHeaders
+import org.particleframework.http.HttpRequest
+import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.MediaType
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -53,17 +53,14 @@ class WebFunctionSpec extends Specification {
     void "test string supplier"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        String server = "http://localhost:$embeddedServer.port"
-        OkHttpClient client = new OkHttpClient()
-        def request = new Request.Builder()
-                .url("$server/supplier/string")
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(request.build()).execute()
+        HttpResponse<String> response = client.toBlocking().exchange('/supplier/string', String)
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'value'
+        response.body() == 'value'
 
         cleanup:
         embeddedServer.stop()
@@ -72,17 +69,14 @@ class WebFunctionSpec extends Specification {
     void "test pojo supplier"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        String server = "http://localhost:$embeddedServer.port"
-        OkHttpClient client = new OkHttpClient()
-        def request = new Request.Builder()
-                .url("$server/supplier/pojo")
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(request.build()).execute()
+        HttpResponse<String> response = client.toBlocking().exchange('/supplier/pojo', String)
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == '{"title":"The Stand"}'
+        response.body() == '{"title":"The Stand"}'
         response.header(HttpHeaders.CONTENT_TYPE) == "application/json"
 
 
@@ -94,15 +88,11 @@ class WebFunctionSpec extends Specification {
     void "test string consumer with JSON"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        String server = "http://localhost:$embeddedServer.port"
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
         def data = '{"title":"The Stand"}'
-        def request = new Request.Builder()
-                .url("$server/consumer/string")
-                .post(RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), data))
 
         when:
-        def response = client.newCall(request.build()).execute()
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/string', data))
 
         then:
         response.code() == HttpStatus.OK.code
@@ -115,15 +105,14 @@ class WebFunctionSpec extends Specification {
     void "test string consumer with text plain"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        String server = "http://localhost:$embeddedServer.port"
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
         def data = 'The Stand'
-        def request = new Request.Builder()
-                .url("$server/consumer/string")
-                .post(RequestBody.create( MediaType.parse("text/plain"), data))
 
         when:
-        def response = client.newCall(request.build()).execute()
+        HttpResponse<?> response = client.toBlocking().exchange(
+                HttpRequest.POST('/consumer/string', data)
+                .contentType(MediaType.TEXT_PLAIN_TYPE)
+        )
 
         then:
         response.code() == HttpStatus.OK.code
@@ -136,13 +125,12 @@ class WebFunctionSpec extends Specification {
     void "test pojo consumer"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        String server = "http://localhost:$embeddedServer.port"
-        OkHttpClient client = new OkHttpClient()
-        def request = new Request.Builder()
-                .url("$server/consumer/pojo")
-                .post(RequestBody.create( MediaType.parse(org.particleframework.http.MediaType.APPLICATION_JSON), '{"title":"The Stand"}'))
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        def data = '{"title":"The Stand"}'
+
         when:
-        def response = client.newCall(request.build()).execute()
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/pojo', data))
+
 
         then:
         response.code() == HttpStatus.OK.code

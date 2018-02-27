@@ -1,8 +1,13 @@
 import React, {Component} from 'react';
 import {BrowserRouter as Router, Route, Link} from "react-router-dom";
 import Home from './home/index'
-import PetsLayout from './pets/index'
+import Pets from './pets/index'
 import Vendors from './vendors/index'
+import Pet from "./pets/Pet";
+import VendorPets from "./pets/VendorPets";
+import logo from './images/logo.png'
+import About from "./about";
+import './App.css'
 
 
 class App extends Component {
@@ -11,7 +16,8 @@ class App extends Component {
             <Router>
                 <div className="App">
                     <nav className="navbar navbar-expand-lg navbar-light bg-light">
-                        <Link to="/" className="navbar-brand">Micronaut PetStore</Link>
+                        <Link to="/" className="navbar-brand">
+                          <img src={logo} className='micronaut-logo' /> Micronaut PetStore</Link>
                         <button className="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
                                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                             <span className="navbar-toggler-icon"></span>
@@ -27,6 +33,9 @@ class App extends Component {
                                 <li className='nav-item'>
                                     <Link to="/vendors" className="nav-link">Vendors</Link>
                                 </li>
+                                <li className='nav-item'>
+                                    <Link to="/about" className="nav-link">About</Link>
+                                </li>
                             </ul>
                         </div>
                     </nav>
@@ -34,8 +43,11 @@ class App extends Component {
                     <div className="container">
 
                         <Route exact path="/" component={Home} />
-                        <Route exact path="/pets" component={PetsLayout} />
+                        <Route exact path="/pets" component={Pets} />
+                        <Route exact path="/pets/:slug" component={Pet} />
+                        <Route exact path="/pets/vendor/:vendor" component={VendorPets} />
                         <Route exact path="/vendors" component={Vendors} />
+                        <Route exact path="/about" component={About} />
                     </div>
 
 

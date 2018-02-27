@@ -55,7 +55,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     }
 
     @Override
-    public Set<String> getNames() {
+    public Set<String> names() {
         return map.keySet().stream().map(CharSequence::toString).collect(Collectors.toSet());
     }
 

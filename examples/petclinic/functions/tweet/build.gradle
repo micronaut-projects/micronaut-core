@@ -14,9 +14,14 @@ buildscript {
     }
 }
 
+plugins {
+    id 'nebula.provided-base' version '3.0.3' // if you want provided-base
+}
+
 apply plugin:"groovy"
 apply plugin: 'jp.classmethod.aws.lambda'
 mainClassName = "example.function.tweet.UpdateStatusFunction"
+
 
 dependencies {
     compileOnly "org.particleframework:inject-java:${projectVersion}"
@@ -24,9 +29,13 @@ dependencies {
 
     compile "org.particleframework:inject-groovy:${projectVersion}"
     compile "org.particleframework:function-groovy:${projectVersion}"
+
+
     runtime "com.amazonaws:aws-lambda-java-log4j2:1.0.0"
     runtime 'org.apache.logging.log4j:log4j-slf4j-impl:2.9.1'
-
+    provided "org.particleframework:discovery-client:${projectVersion}"
+    provided "org.particleframework:function-web:${projectVersion}"
+    provided "org.particleframework:http-server-netty:${projectVersion}"
 
     testCompile "org.particleframework:http-client:${projectVersion}"
     testRuntime "org.particleframework:function-web:${projectVersion}"

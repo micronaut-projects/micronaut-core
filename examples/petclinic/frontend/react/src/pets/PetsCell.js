@@ -1,26 +1,17 @@
 import React from 'react';
 import config from "../config";
+import {Link} from "react-router-dom";
 
 const PetsCell = ({pet}) =>
-    <div className="col-sm" style={{
-      backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`,
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: 'cover',
-      margin: '10px',
-      minHeight: '300px',
-      color: 'white'}}>
+  <div className="col-sm pet-card" style={{backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`}}>
+    <Link className="pet-link" to={`/pets/${pet.slug}`}>
+      <div className='pet-header'>
+        <h4>
+          {pet.name}
+        </h4>
 
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        padding: '10px',
-        width: '100%'}}>
-        <h4>{pet.name}</h4>
-        
       </div>
-    </div>
+    </Link>
+  </div>
 
 export default PetsCell;
