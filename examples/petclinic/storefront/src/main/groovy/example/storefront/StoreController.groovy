@@ -18,6 +18,8 @@ package example.storefront
 import example.api.v1.Offer
 import example.api.v1.Pet
 import example.api.v1.Vendor
+import example.storefront.client.v1.Comment
+import example.storefront.client.v1.CommentClient
 import example.storefront.client.v1.PetClient
 import example.storefront.client.v1.VendorClient
 import io.reactivex.Flowable
@@ -47,11 +49,13 @@ class StoreController {
     private final RxStreamingHttpClient httpClient
     private final VendorClient vendorClient
     private final PetClient petClient
+    private final CommentClient commentClient
 
-    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient, VendorClient vendorClient, PetClient petClient) {
+    StoreController(@Client(id = 'offers') RxStreamingHttpClient httpClient, VendorClient vendorClient, PetClient petClient, CommentClient commentClient) {
         this.httpClient = httpClient
         this.vendorClient = vendorClient
         this.petClient = petClient
+        this.commentClient = commentClient
     }
 
     @Produces(MediaType.TEXT_HTML)
@@ -94,5 +98,10 @@ class StoreController {
     Single<List<Vendor>> vendors() {
         vendorClient.list()
                     .onErrorReturnItem(Collections.emptyList())
+    }
+
+    @Get('/pets/{slug}/comments')
+    List<Comment> petComments(String slug) {
+        commentClient.list(slug)
     }
 }

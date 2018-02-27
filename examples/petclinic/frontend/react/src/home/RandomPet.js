@@ -21,8 +21,8 @@ class RandomPet extends Component {
   render() {
     const {pet} = this.state;
 
-    return pet ? <div className="card">
-      <img className="card-img-top" src={`${config.SERVER_URL}/images/${pet.image}`} style={{ height: '18rem', objectFit: 'cover'}} alt={pet.name} />
+    return pet ? <div className="card featured-card">
+      <img className="card-img-top" src={`${config.SERVER_URL}/images/${pet.image}`} alt={pet.name} />
       <div className="card-body">
         <h5 className="card-title">{pet.name}</h5>
         <Link to={`/pets/${pet.slug}`} className="btn btn-primary">More Info</Link>
