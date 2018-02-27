@@ -33,8 +33,10 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.Closeable;
+import java.io.IOException;
 import java.net.URI;
 import java.util.Optional;
 
@@ -45,10 +47,18 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class HttpFunctionExecutor<I,O> extends DefaultHttpClient implements FunctionInvoker<I,O>, Closeable, FunctionInvokerChooser {
+public class HttpFunctionExecutor<I,O>  implements FunctionInvoker<I,O>, Closeable, FunctionInvokerChooser {
+
+    private final DefaultHttpClient httpClient;
 
     public HttpFunctionExecutor(HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        super(LoadBalancer.empty(), configuration, codecRegistry, filters);
+        super();
+        this.httpClient = new DefaultHttpClient(
+                LoadBalancer.empty(),
+                configuration,
+                codecRegistry,
+                filters
+        );
     }
 
     @Override
@@ -67,13 +77,13 @@ public class HttpFunctionExecutor<I,O> extends DefaultHttpClient implements Func
                 request = HttpRequest.POST(uri.toString(), input);
             }
             if(Publishers.isPublisher(outputType.getType())) {
-                Publisher publisher = retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
+                Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
                 return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(()->
                         new FunctionExecutionException("Unsupported Reactive type: " + outputType.getType())
                 );
             }
             else {
-                return (O)toBlocking().retrieve(request, outputType);
+                return (O)httpClient.toBlocking().retrieve(request, outputType);
             }
         }
     }
@@ -86,5 +96,11 @@ public class HttpFunctionExecutor<I,O> extends DefaultHttpClient implements Func
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    @PreDestroy
+    public void close() throws IOException {
+        httpClient.close();
     }
 }
