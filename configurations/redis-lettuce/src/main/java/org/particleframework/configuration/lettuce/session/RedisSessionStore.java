@@ -566,7 +566,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             if(!isNew()) {
 
                 this.modifications.add(Modification.CLEARED);
-                Set<String> names = getNames();
+                Set<String> names = names();
                 this.removedKeys.addAll(names);
                 if(writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
                     byte[][] attributes = names.stream().map(this::getAttributeKey).toArray(byte[][]::new);

@@ -1,0 +1,11 @@
+dependencies {
+    compile project(":function")
+    compile project(":http-client")
+    compileOnly project(":inject-java")
+    compileOnly project(":function-aws")
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+
+    testCompile project(":function-aws")
+    testCompile project(":inject-groovy")
+    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+}

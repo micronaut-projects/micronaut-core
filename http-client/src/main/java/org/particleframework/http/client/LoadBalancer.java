@@ -17,6 +17,7 @@ package org.particleframework.http.client;
 
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.discovery.ServiceInstance;
+import org.particleframework.discovery.exceptions.NoAvailableServiceException;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -54,5 +55,9 @@ public interface LoadBalancer {
      */
     static LoadBalancer fixed(URL url) {
         return discriminator -> Publishers.just(ServiceInstance.of("Unknown", url));
+    }
+
+    static LoadBalancer empty() {
+        return discriminator -> Publishers.just(new NoAvailableServiceException("Load balancer contains no servers"));
     }
 }

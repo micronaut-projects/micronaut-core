@@ -53,7 +53,7 @@ public interface Cookies extends ConvertibleValues<Cookie> {
     }
 
     @Override
-    default Set<String> getNames() {
+    default Set<String> names() {
         return getAll().stream().map((Cookie::getName))
                                     .collect(Collectors.toSet());
     }

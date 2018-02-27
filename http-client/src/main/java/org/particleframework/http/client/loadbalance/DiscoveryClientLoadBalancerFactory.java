@@ -21,7 +21,8 @@ import org.particleframework.http.client.LoadBalancer;
 import javax.inject.Singleton;
 
 /**
- * A factory class that can be replaced at runtime for creating {@link LoadBalancer} instances
+ * A factory class that can be replaced at runtime for creating {@link LoadBalancer} instances that load balance
+ * between available clients provided by the {@link DiscoveryClient}
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -124,7 +124,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     }
 
     @Override
-    public Set<String> getNames() {
+    public Set<String> names() {
         return values.keySet().stream().map(CharSequence::toString).collect(Collectors.toSet());
     }
 

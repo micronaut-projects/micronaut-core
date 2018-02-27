@@ -44,6 +44,7 @@ class NameUtilsSpec extends Specification {
         "com.bar.FooBar"    | "com.bar.foo-bar"
         "Foo"               | 'foo'
         "FooBBar"           | 'foo-bbar'
+        "fooBBar"           | 'foo-bbar'
     }
 
     void "test hyphenate no lower case"() {

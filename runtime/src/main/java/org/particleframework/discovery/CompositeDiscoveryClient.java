@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  */
 public abstract class CompositeDiscoveryClient implements DiscoveryClient {
 
-    static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
+    static final String SETTINGS_CACHE_ENABLED = CacheConfiguration.PREFIX + ".discoveryClient.enabled";
 
     private final DiscoveryClient[] discoveryClients;
 
