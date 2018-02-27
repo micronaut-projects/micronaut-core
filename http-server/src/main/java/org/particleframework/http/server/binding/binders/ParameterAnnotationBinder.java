@@ -21,13 +21,12 @@ import org.particleframework.core.convert.ArgumentConversionContext;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleMultiValues;
 import org.particleframework.core.convert.value.ConvertibleValues;
+import org.particleframework.core.reflect.ClassUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.annotation.Parameter;
 import org.particleframework.core.type.Argument;
 
-import java.nio.charset.Charset;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -66,7 +65,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             if(body.isPresent()) {
                 result = doBind(context, body.get(), parameterName);
                 if(!result.getValue().isPresent()) {
-                    return () -> source.getBody(argument.getType());
+                    if (ClassUtils.isJavaLangType(argument.getType())) {
+                        return Optional::empty;
+                    } else {
+                        return () -> source.getBody(argument.getType());
+                    }
                 }
             }
             else {
