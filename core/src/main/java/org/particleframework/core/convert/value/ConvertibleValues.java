@@ -39,7 +39,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     /**
      * @return The names of the values
      */
-    Set<String> getNames();
+    Set<String> names();
 
     /**
      * @return The values
@@ -50,7 +50,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return Whether this values is empty
      */
     default boolean isEmpty() {
-        return this == ConvertibleValues.EMPTY || getNames().isEmpty();
+        return this == ConvertibleValues.EMPTY || names().isEmpty();
     }
 
     /**
@@ -84,7 +84,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     default void forEach(BiConsumer<String, V> action) {
         Objects.requireNonNull(action, "Consumer cannot be null");
 
-        Collection<String> headerNames = getNames();
+        Collection<String> headerNames = names();
         for (String headerName : headerNames) {
             Optional<V> vOptional = this.get(headerName, getValueType());
             vOptional.ifPresent(v -> action.accept(headerName, v));
@@ -159,7 +159,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     default Map<String, V> subMap(String prefix, ArgumentConversionContext<V> valueType) {
         // special handling for maps for resolving sub keys
         String finalPrefix = prefix + '.';
-        return getNames().stream()
+        return names().stream()
                 .filter(name-> name.startsWith(finalPrefix))
                 .collect(Collectors.toMap((name)->name.substring(finalPrefix.length()), (name) -> get(name, valueType).orElse(null)));
     }
@@ -167,7 +167,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     @SuppressWarnings("NullableProblems")
     @Override
     default Iterator<Map.Entry<String, V>> iterator() {
-        Iterator<String> names = getNames().iterator();
+        Iterator<String> names = names().iterator();
         return new Iterator<Map.Entry<String, V>>() {
             @Override
             public boolean hasNext() {

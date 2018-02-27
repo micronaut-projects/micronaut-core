@@ -18,10 +18,7 @@ package org.particleframework.http.netty;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.convert.ArgumentConversionContext;
-import org.particleframework.core.convert.ConversionContext;
 import org.particleframework.core.convert.ConversionService;
-import org.particleframework.core.type.Argument;
-import org.particleframework.http.HttpHeaders;
 import org.particleframework.http.MutableHttpHeaders;
 
 import java.util.*;
@@ -70,13 +67,13 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
-    public Set<String> getNames() {
+    public Set<String> names() {
         return nettyHeaders.names();
     }
 
     @Override
     public Collection<List<String>> values() {
-        Set<String> names = getNames();
+        Set<String> names = names();
         List<List<String>> values = new ArrayList<>();
         for (String name : names) {
             values.add(getAll(name));

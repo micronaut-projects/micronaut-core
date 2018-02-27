@@ -21,7 +21,7 @@ import org.particleframework.context.annotation.Requires;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import static org.particleframework.discovery.CompositeDiscoveryClient.SETTING_ENABLED;
+import static org.particleframework.discovery.CompositeDiscoveryClient.SETTINGS_CACHE_ENABLED;
 
 /**
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled
@@ -31,7 +31,6 @@ import static org.particleframework.discovery.CompositeDiscoveryClient.SETTING_E
  */
 @Primary
 @Singleton
-@Requires(property = SETTING_ENABLED, value = "false", defaultValue = "true")
 public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient{
     @Inject
     public DefaultCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {

@@ -103,7 +103,7 @@ class HealthEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         result.status == "UP"
-        result.details.size() == 1
+        result.details
         result.details.diskSpace.status == "UP"
         result.details.diskSpace.details.free > 0
         result.details.diskSpace.details.total > 0
@@ -125,7 +125,7 @@ class HealthEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         result.status == "DOWN"
-        result.details.size() == 1
+        result.details
         result.details.diskSpace.status == "DOWN"
         result.details.diskSpace.details.error.startsWith("Free disk space below threshold.")
 

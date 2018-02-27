@@ -39,7 +39,7 @@ class HttpResponseSpec extends AbstractParticleSpec {
         def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
-        for (name in response.headers.names) {
+        for (name in response.headers.names()) {
             actualHeaders.put(name.toLowerCase(), response.header(name))
         }
         def responseBody = response.body.orElse(null)
@@ -70,7 +70,7 @@ class HttpResponseSpec extends AbstractParticleSpec {
         def response = rxClient.exchange("/java/response/$action", String).onErrorReturn({t -> t.response }).blockingFirst()
 
         def actualHeaders = [:]
-        for (name in response.headers.names) {
+        for (name in response.headers.names()) {
             actualHeaders.put(name.toLowerCase(), response.header(name))
         }
         def responseBody = response.body.orElse(null)

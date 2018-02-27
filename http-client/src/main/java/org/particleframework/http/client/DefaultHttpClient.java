@@ -108,7 +108,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Prototype
-public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
+public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
@@ -494,15 +494,30 @@ public class    DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient
     }
 
     protected <I> Publisher<URI> resolveRequestURI(HttpRequest<I> request) {
-        return Publishers.map(loadBalancer.select(null), server -> {
-                    Optional<String> authInfo = server.getMetadata().get(org.particleframework.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                    if(authInfo.isPresent() && request instanceof MutableHttpRequest) {
-                        ((MutableHttpRequest)request).getHeaders().auth(authInfo.get());
-                    }
-                    return server.resolve(request.getUri());
-                }
+        URI requestURI = request.getUri();
+        if(requestURI.getScheme() != null) {
+            // if the request URI includes a scheme then it is fully qualified so use the direct server
+            return Publishers.just(requestURI);
+        }
+        else {
 
-        );
+            return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
+                        Optional<String> authInfo = server.getMetadata().get(org.particleframework.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                        if(authInfo.isPresent() && request instanceof MutableHttpRequest) {
+                            ((MutableHttpRequest)request).getHeaders().auth(authInfo.get());
+                        }
+                        return server.resolve(requestURI);
+                    }
+
+            );
+        }
+    }
+
+    /**
+     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to null)
+     */
+    protected Object getLoadBalancerDiscriminator() {
+        return null;
     }
 
 

@@ -821,7 +821,6 @@ public class DefaultBeanContext implements BeanContext {
                     .parallelStream()
                     .filter(reference -> {
                         Class<?> candidateType = reference.getBeanType();
-
                         return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
                     .map(ref -> (BeanDefinition<T>) ref.load(this));

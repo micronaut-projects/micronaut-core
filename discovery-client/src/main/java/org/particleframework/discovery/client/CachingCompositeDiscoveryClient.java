@@ -21,6 +21,7 @@ import org.particleframework.context.annotation.Primary;
 import org.particleframework.context.annotation.Replaces;
 import org.particleframework.context.annotation.Requires;
 import org.particleframework.discovery.CompositeDiscoveryClient;
+import org.particleframework.discovery.DefaultCompositeDiscoveryClient;
 import org.particleframework.discovery.DiscoveryClient;
 import org.particleframework.discovery.ServiceInstance;
 
@@ -34,6 +35,7 @@ import java.util.List;
  */
 @Primary
 @Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
+@Replaces(DefaultCompositeDiscoveryClient.class)
 public class CachingCompositeDiscoveryClient extends CompositeDiscoveryClient {
     public CachingCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
         super(discoveryClients);
