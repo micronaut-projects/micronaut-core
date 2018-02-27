@@ -43,6 +43,11 @@ public interface EmbeddedServer extends LifeCycle<EmbeddedServer> {
     String getHost();
 
     /**
+     * @return The scheme of the server (http/https)
+     */
+    String getScheme();
+
+    /**
      * @return The full URL to the server
      */
     URL getURL();

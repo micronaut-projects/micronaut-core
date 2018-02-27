@@ -117,6 +117,9 @@ public class ClassPathResourceLoader implements ResourceLoader {
     }
 
     private String prefixPath(String path) {
+        if (path.startsWith("classpath:")) {
+            path = path.substring(10);
+        }
         if (basePath != null) {
             if (path.startsWith("/")) {
                 return basePath + path.substring(1);

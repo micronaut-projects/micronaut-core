@@ -63,6 +63,11 @@ public class GreenLightningHttpServer implements EmbeddedServer {
     }
 
     @Override
+    public String getScheme() {
+        return particleGreenLightningApp.getScheme();
+    }
+
+    @Override
     public URL getURL() {
         return null;
     }

@@ -1,7 +1,9 @@
 package org.particleframework.core.io;
 
+import org.particleframework.core.io.file.FileSystemResourceLoader;
 import org.particleframework.core.io.scan.ClassPathResourceLoader;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -60,5 +62,25 @@ public interface ResourceLoader {
      */
     static ClassPathResourceLoader of(ClassLoader classLoader) {
         return new ClassPathResourceLoader(classLoader);
+    }
+
+    static Optional<ResourceLoader> forPath(String path, ClassLoader classLoader) {
+        if (path.startsWith("classpath:")) {
+            return Optional.of(new ClassPathResourceLoader(classLoader, path.substring(10)));
+        } else if (path.startsWith("file:")) {
+            return Optional.of(new FileSystemResourceLoader(new File(path.substring(5))));
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    static Optional<ResourceLoader> forResource(String path, ClassLoader classLoader) {
+        if (path.startsWith("classpath:")) {
+            return Optional.of(new ClassPathResourceLoader(classLoader, ""));
+        } else if (path.startsWith("file:")) {
+            return Optional.of(new FileSystemResourceLoader(new File(String.valueOf(path.charAt(5)))));
+        } else {
+            return Optional.empty();
+        }
     }
 }

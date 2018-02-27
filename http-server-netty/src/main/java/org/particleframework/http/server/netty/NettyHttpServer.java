@@ -22,6 +22,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
@@ -41,6 +42,7 @@ import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
+import org.particleframework.http.server.netty.ssl.NettySslBuilder;
 import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.ApplicationConfiguration;
@@ -99,6 +101,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final int serverPort;
     private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
     private final ApplicationContext applicationContext;
+    private final Optional<SslContext> sslContext;
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
@@ -116,6 +119,7 @@ public class NettyHttpServer implements EmbeddedServer {
             @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
             @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
+            NettySslBuilder nettySslBuilder,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -131,13 +135,14 @@ public class NettyHttpServer implements EmbeddedServer {
         this.serverConfiguration = serverConfiguration;
         this.router = router;
         this.ioExecutor = ioExecutor;
-        int port = serverConfiguration.getPort();
+        int port = serverConfiguration.getSsl().isEnabled() ? serverConfiguration.getSsl().getPort() : serverConfiguration.getPort();
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.binderRegistry = binderRegistry;
         this.staticResourceResolver = resourceResolver;
+        this.sslContext = nettySslBuilder.build();
     }
 
     @Override
@@ -165,6 +170,10 @@ public class NettyHttpServer implements EmbeddedServer {
                             ChannelPipeline pipeline = ch.pipeline();
 
                             RequestBinderRegistry binderRegistry = NettyHttpServer.this.binderRegistry;
+
+                            sslContext.ifPresent(ctx ->
+                                pipeline.addLast(ctx.newHandler(ch.alloc()))
+                            );
 
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
@@ -295,10 +304,14 @@ public class NettyHttpServer implements EmbeddedServer {
         return serverConfiguration.getHost().orElse("localhost");
     }
 
+    public String getScheme() {
+        return serverConfiguration.getSsl().isEnabled() ? "https" : "http";
+    }
+
     @Override
     public URL getURL() {
         try {
-            return new URL("http://" + getHost() + ':' + getPort());
+            return new URL(getScheme() + "://" + getHost() + ':' + getPort());
         } catch (MalformedURLException e) {
             throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
         }
@@ -308,7 +321,7 @@ public class NettyHttpServer implements EmbeddedServer {
     @Override
     public URI getURI() {
         try {
-            return new URI("http://" + getHost() + ':' + getPort());
+            return new URI(getScheme() + "://" + getHost() + ':' + getPort());
         } catch (URISyntaxException e) {
             throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
         }
@@ -381,8 +394,4 @@ public class NettyHttpServer implements EmbeddedServer {
             }
         }
     }
-
-
-
-
 }
