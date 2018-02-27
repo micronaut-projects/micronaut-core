@@ -5,7 +5,7 @@ aws.sourceEmail=verifiedemail@email.com
 aws.accessKeyId=XXXXAAAXXXX
 aws.secretKey=YYYYYZZZZXXXX
 
-To use Sendrid configure in `src/main/resources/application.properties`.
+To use SendGrid configure in `src/main/resources/application.properties`.
 
 sendgrid.apiKey=XXXXX
 sendgrid.fromEmail=sergio.delamo@softamo.com
