@@ -79,10 +79,10 @@ class StoreController {
         })
     }
 
-    @Get(uri = "/tweet/{message}")
-    Single<TweetClient.Result> tweet(String message) {
-        tweetClient.updateStatus(message)
-    }
+//    @Get(uri = "/tweet/{message}")
+//    Single<TweetClient.Result> tweet(String message) {
+//        tweetClient.updateStatus(message)
+//    }
 
     @Get('/pets')
     Single<List<Pet>> pets() {
