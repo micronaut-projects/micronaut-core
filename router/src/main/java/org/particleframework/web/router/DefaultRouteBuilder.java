@@ -145,6 +145,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status)) {
+            throw new RoutingException("Attempted to register multiple routes for http status " + String.valueOf(status.getCode()));
+        }
         Optional<MethodExecutionHandle<Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<Object> executableHandle = executionHandle.orElseThrow(() ->

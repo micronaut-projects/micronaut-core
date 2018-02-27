@@ -31,6 +31,7 @@ import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.io.buffer.ByteBuffer;
 import org.particleframework.core.type.Argument;
+import org.particleframework.core.util.StreamUtils;
 import org.particleframework.http.HttpMethod;
 import org.particleframework.http.HttpRequest;
 import org.particleframework.http.HttpResponse;
@@ -58,6 +59,7 @@ import org.particleframework.http.server.netty.types.NettyCustomizableResponseTy
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.scheduling.executor.ExecutorSelector;
 import org.particleframework.web.router.*;
+import org.particleframework.web.router.exceptions.DuplicateRouteException;
 import org.particleframework.web.router.exceptions.UnsatisfiedRouteException;
 import org.particleframework.web.router.qualifier.ConsumesMediaTypeQualifier;
 import org.particleframework.web.router.resource.StaticResourceResolver;
@@ -149,10 +151,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             LOG.debug("Matching route {} - {}", httpMethod, requestPath);
         }
 
-        // find a matching route
-        Optional<UriRouteMatch<Object>> routeMatch = router.find(httpMethod, requestPath)
+        Optional<UriRouteMatch<Object>> routeMatch = Optional.empty();
+
+        List<UriRouteMatch<Object>> uriRoutes = router
+                .find(httpMethod, requestPath)
                 .filter((match) -> match.test(request))
-                .findFirst();
+                .collect(StreamUtils.minAll(
+                        Comparator.comparingInt((match) -> match.getVariables().size()),
+                        Collectors.toList()));
+
+        if (uriRoutes.size() > 1) {
+            throw new DuplicateRouteException(requestPath, uriRoutes);
+        } else if (uriRoutes.size() == 1) {
+            routeMatch = Optional.of(uriRoutes.get(0));
+        }
 
         RouteMatch<?> route;
 
