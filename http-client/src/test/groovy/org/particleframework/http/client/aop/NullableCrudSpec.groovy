@@ -9,7 +9,6 @@ import org.particleframework.http.annotation.Post
 import org.particleframework.http.client.Client
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -17,7 +16,7 @@ import javax.annotation.Nullable
 import javax.inject.Singleton
 import java.util.concurrent.atomic.AtomicLong
 
-@Ignore
+
 class NullableCrudSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
@@ -74,7 +73,7 @@ class NullableCrudSpec extends Specification {
         client.delete(null)
 
         then:
-        noExceptionThrown() //HttpClientResponseException: Not Found, should throw httpclient exception. should never send request
+        noExceptionThrown()
     }
 
     void "test POST operation with null values"() {
@@ -126,7 +125,7 @@ class NullableCrudSpec extends Specification {
         AtomicLong currentId = new AtomicLong(0)
 
         @Override
-        NullableBook get(Long id) {
+        NullableBook get(@Nullable Long id) {
             return books.get(id)
         }
 
@@ -136,19 +135,19 @@ class NullableCrudSpec extends Specification {
         }
 
         @Override
-        void delete(Long id) {
+        void delete(@Nullable Long id) {
             books.remove(id)
         }
 
         @Override
-        NullableBook save(String title) {
+        NullableBook save(@Nullable String title) {
             NullableBook book = new NullableBook(title: title, id: currentId.incrementAndGet())
             books[book.id] = book
             return book
         }
 
         @Override
-        NullableBook update(Long id, String title) {
+        NullableBook update(Long id, @Nullable String title) {
             NullableBook book = books[id]
             if (book != null) {
                 book.title = title
@@ -159,7 +158,7 @@ class NullableCrudSpec extends Specification {
 
     static interface NullableBookApi {
 
-        @Get("{/id}")
+        @Get("/show/{/id}") // /show to avoid a duplicate route exception
         NullableBook get(@Nullable Long id)
 
         @Get('/')
