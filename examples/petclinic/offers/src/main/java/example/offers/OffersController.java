@@ -58,7 +58,7 @@ public class OffersController implements OffersOperations {
     public Flux<Offer> current() {
         return offersRepository
                     .random()
-                    .repeat()
+                    .repeat(100)
                     .delayElements(offerDelay);
     }
 
