@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * @author graemerocher
@@ -50,25 +51,19 @@ public class OffersRepository implements OffersOperations {
     }
 
     /**
+     * @return Returns all current offers
+     */
+    public Mono<List<Offer>> all() {
+        RedisReactiveCommands<String, String> commands = redisConnection.reactive();
+
+        return commands.keys("*").flatMap(keyToOffer(commands)).collectList();
+    }
+    /**
      * @return Obtain a random offer or return {@link Mono#empty()} if there is none
      */
     public Mono<Offer> random() {
-        RedisReactiveCommands<String, String> reactiveRedis = redisConnection.reactive();
-        return reactiveRedis.randomkey().flatMap(key -> {
-                Flux<KeyValue<String, String>> values = reactiveRedis.hmget(key, "price", "description");
-                Map<String, String> map = new HashMap<>(3);
-                return values.reduce(map, (all, keyValue) -> {
-                    all.put(keyValue.getKey(), keyValue.getValue());
-                    return all;
-                })
-                .map(ConvertibleValues::of)
-                .flatMap(entries -> {
-                    String description = entries.get("description", String.class).orElseThrow(() -> new IllegalStateException("No description"));
-                    BigDecimal price = entries.get("price", BigDecimal.class).orElseThrow(() -> new IllegalStateException("No price"));
-                    Flowable<Pet> findPetFlowable = petClient.find(key).toFlowable();
-                    return Mono.from(findPetFlowable).map(pet -> new Offer(pet, description, price));
-                });
-        });
+        RedisReactiveCommands<String, String> commands = redisConnection.reactive();
+        return commands.randomkey().flatMap(keyToOffer(commands));
     }
 
     /**
@@ -115,4 +110,22 @@ public class OffersRepository implements OffersOperations {
         return data;
     }
 
+
+    private Function<String, Mono<? extends Offer>> keyToOffer(RedisReactiveCommands<String, String> commands) {
+        return key -> {
+            Flux<KeyValue<String, String>> values = commands.hmget(key, "price", "description");
+            Map<String, String> map = new HashMap<>(3);
+            return values.reduce(map, (all, keyValue) -> {
+                all.put(keyValue.getKey(), keyValue.getValue());
+                return all;
+            })
+                    .map(ConvertibleValues::of)
+                    .flatMap(entries -> {
+                        String description = entries.get("description", String.class).orElseThrow(() -> new IllegalStateException("No description"));
+                        BigDecimal price = entries.get("price", BigDecimal.class).orElseThrow(() -> new IllegalStateException("No price"));
+                        Flowable<Pet> findPetFlowable = petClient.find(key).toFlowable();
+                        return Mono.from(findPetFlowable).map(pet -> new Offer(pet, description, price));
+                    });
+        };
+    }
 }

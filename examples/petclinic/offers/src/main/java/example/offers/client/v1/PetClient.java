@@ -17,8 +17,11 @@ package example.offers.client.v1;
 
 import example.api.v1.Pet;
 import io.reactivex.Maybe;
+import io.reactivex.Single;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.client.Client;
+
+import java.util.List;
 
 /**
  * @author graemerocher
@@ -29,4 +32,8 @@ public interface PetClient  {
 
     @Get("/{slug}")
     Maybe<Pet> find(String slug);
+
+    @Get("/")
+    Single<List<Pet>> list();
+
 }
