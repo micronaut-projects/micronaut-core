@@ -1,0 +1,85 @@
+version: '3'
+services:
+  neo4j-server:
+    image: neo4j
+    environment:
+      NEO4J_AUTH: none
+    ports:
+      - 7687:7687
+      - 7474:7474
+  mysql-server:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+  mongodb-server:
+    image: mongo
+    ports:
+      - 27017:27017
+  redis-server:
+    image: redis
+    ports:
+      - 6379:6379
+  consul-server:
+    image: consul
+    ports:
+      - 8500:8500
+  pets-service:
+    image: 18eeb906f28d
+    depends_on:
+      - mongodb-server
+      - consul-server
+    environment:
+      PARTICLE_SERVER_HOST: pets-service
+      MONGO_HOST: mongodb-server
+      MONGO_PORT: 27017
+      CONSUL_HOST: consul-server
+      CONSUL_PORT: 8500
+  vendors-service:
+    image: a0c82288f854
+    depends_on:
+      - mysql-server
+      - pets-service
+      - consul-server
+    environment:
+      PARTICLE_SERVER_HOST: vendors-service
+      CONSUL_HOST: consul-server
+      CONSUL_PORT: 8500
+  offers-service:
+    image: c64df2f4a8a2
+    depends_on:
+      - redis-server
+      - pets-service
+      - consul-server
+    environment:
+      PARTICLE_SERVER_HOST: offers-service
+      CONSUL_HOST: consul-server
+      CONSUL_PORT: 8500
+      REDIS_HOST: redis-server
+      REDIS_PORT: 6379
+  comments-service:
+    image: 09aaf22d3c76
+    links:
+      - neo4j-server
+    depends_on:
+      - neo4j-server
+      - consul-server
+    environment:
+      PARTICLE_SERVER_HOST: comments-service
+      NEO4J_HOST: neo4j-server
+      NEO4J_PORT: 7687
+      CONSUL_HOST: consul-server
+      CONSUL_PORT: 8500
+  storefront:
+    image: 55e6b1d073d1
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pets-service
+      - vendors-service
+      - offers-service
+      - comments-service
+    environment:
+      PARTICLE_SERVER_HOST: storefront
+      CONSUL_HOST: consul-server
+      CONSUL_PORT: 8500

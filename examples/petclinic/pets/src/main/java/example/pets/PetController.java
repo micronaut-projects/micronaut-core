@@ -84,14 +84,19 @@ public class PetController implements PetOperations<PetEntity> {
         return Flowable.fromPublisher(
                 getCollection()
                         .find(eq("slug", slug))
+                        .limit(1)
         ).firstElement();
     }
 
     @Override
     public Single<PetEntity> save(@Valid PetEntity pet) {
-        pet.slug(FriendlyUrl.sanitizeWithDashes(pet.getName()));
-        return Single.fromPublisher(getCollection().insertOne(pet))
-                     .map(success -> pet);
+        String slug = FriendlyUrl.sanitizeWithDashes(pet.getName());
+        pet.slug(slug);
+        return find(slug)
+                .switchIfEmpty(
+                        Single.fromPublisher(getCollection().insertOne(pet))
+                               .map(success -> pet)
+                );
     }
 
     private MongoCollection<PetEntity> getCollection() {

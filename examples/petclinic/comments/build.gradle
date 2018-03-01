@@ -1,4 +1,7 @@
 apply plugin: 'groovy'
+
+mainClassName = "example.comments.Application"
+
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
 }

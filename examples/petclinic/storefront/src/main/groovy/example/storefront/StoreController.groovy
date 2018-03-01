@@ -28,15 +28,19 @@ import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
+import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
+import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Parameter
+import org.particleframework.http.annotation.Post
 import org.particleframework.http.annotation.Produces
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.RxStreamingHttpClient
 import org.particleframework.http.sse.Event
 
+import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
@@ -79,11 +83,6 @@ class StoreController {
         })
     }
 
-//    @Get(uri = "/tweet/{message}")
-//    Single<TweetClient.Result> tweet(String message) {
-//        tweetClient.updateStatus(message)
-//    }
-
     @Get('/pets')
     Single<List<Pet>> pets() {
         petClient.list()
@@ -92,7 +91,7 @@ class StoreController {
 
     @Get('/pets/{slug}')
     Maybe<Pet> showPet(@Parameter('slug') String slug) {
-        petClient.find(slug)
+        petClient.find slug
     }
 
     @Get('/pets/random')
@@ -113,8 +112,4 @@ class StoreController {
                     .onErrorReturnItem(Collections.emptyList())
     }
 
-    @Get('/pets/{slug}/comments')
-    List<Comment> petComments(String slug) {
-        commentClient.list(slug)
-    }
 }
