@@ -1,5 +1,7 @@
 apply plugin: 'groovy'
 
+mainClassName = "example.storefront.Application"
+
 dependencies {
   compileOnly "org.particleframework:inject-groovy:${projectVersion}"
   compileOnly "org.particleframework:inject-java:${projectVersion}"

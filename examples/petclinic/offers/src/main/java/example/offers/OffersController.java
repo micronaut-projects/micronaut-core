@@ -31,6 +31,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * @author graemerocher
@@ -58,8 +59,17 @@ public class OffersController implements OffersOperations {
     public Flux<Offer> current() {
         return offersRepository
                     .random()
-                    .repeat()
+                    .repeat(100)
                     .delayElements(offerDelay);
+    }
+
+    /**
+     * A non-blocking infinite JSON stream of offers that change every 10 seconds
+     * @return A {@link Flux} stream of JSON objects
+     */
+    @Get(uri = "/all")
+    public Mono<List<Offer>> all() {
+        return offersRepository.all();
     }
 
     /**

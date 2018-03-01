@@ -463,7 +463,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 traceRequest(finalRequest, nettyRequest);
                             }
 
-                            addFullHttpResponseHandler(channel, completableFuture, bodyType);
+                            addFullHttpResponseHandler(request, channel, completableFuture, bodyType);
                             writeAndCloseRequest(channel, nettyRequest);
                         } catch (Exception e) {
                             completableFuture.completeExceptionally(e);
@@ -781,7 +781,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         });
     }
 
-    private <O> void addFullHttpResponseHandler(Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
+    private <O> void addFullHttpResponseHandler(HttpRequest<?> request, Channel channel, CompletableFuture<HttpResponse<O>> completableFuture, org.particleframework.core.type.Argument<O> bodyType) {
         channel.pipeline().addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
 
             @Override
@@ -790,7 +790,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
                     HttpResponseStatus status = fullResponse.status();
                     if(LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Response Received: {}", status );
+                        LOG.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri() );
+                        LOG.trace("Status Code: {}", status );
                         traceHeaders(fullResponse.headers());
                         traceBody(fullResponse.content());
                     }
@@ -814,6 +815,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 if(!completableFuture.isDone()) {
+                    if(LOG.isTraceEnabled()) {
+                        LOG.trace("HTTP Client exception ({}) occurred for request : {} {}", cause.getMessage(), request.getMethod(), request.getUri() );
+                    }
 
                     if (cause instanceof TooLongFrameException) {
                         completableFuture.completeExceptionally(new ContentLengthExceededException(configuration.getMaxContentLength()));

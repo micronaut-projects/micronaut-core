@@ -25,6 +25,8 @@ import org.particleframework.runtime.ApplicationConfiguration;
 import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -45,6 +47,8 @@ public class HttpServerConfiguration  {
     protected Optional<Integer> readTimeout;
     @ReadableBytes
     protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
+    protected Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
+    protected Duration writeIdleTime = Duration.of(60, ChronoUnit.SECONDS);
     protected SslConfiguration ssl = new SslConfiguration();
     protected MultipartConfiguration multipart =  new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
@@ -124,6 +128,20 @@ public class HttpServerConfiguration  {
      */
     public long getMaxRequestSize() {
         return maxRequestSize;
+    }
+
+    /**
+     * @return The default amount of time to allow read operation connections  to remain idle
+     */
+    public Duration getReadIdleTime() {
+        return readIdleTime;
+    }
+
+    /**
+     * @return The default amount of time to allow write operation connections to remain idle
+     */
+    public Duration getWriteIdleTime() {
+        return writeIdleTime;
     }
 
     /**

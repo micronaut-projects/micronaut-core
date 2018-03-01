@@ -1,37 +1,42 @@
-plugins {
-    id 'com.github.johnrengelman.shadow' version '2.0.2'
-    id 'java'
-    id "application"
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.2"
+    }
 }
-
-
-
 subprojects { project ->
 
     if(!project.path.contains(':frontend')) {
         apply plugin:"java"
-        apply plugin:"application"
-        apply plugin: 'com.github.johnrengelman.shadow'
-    }
 
-    repositories {
-        mavenLocal()
-        jcenter()
-    }
+        if(project.name != 'api' && project.name != 'functions') {
 
-    shadowJar {
-        mergeServiceFiles()
-    }
+            apply plugin:"application"
+            apply plugin: 'com.github.johnrengelman.shadow'
+            shadowJar {
+                mergeServiceFiles()
+            }
+        }
 
-    dependencies {
-        if(project.name != 'api' && !project.path.contains(':functions') && !project.path.contains(':frontend')) {
+        repositories {
+            mavenLocal()
+            jcenter()
+        }
 
-            compile "org.particleframework:discovery-client:${projectVersion}"
-            compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
-            runtime "org.particleframework:management:${projectVersion}"
-            runtime "ch.qos.logback:logback-classic:1.2.3"
+
+        dependencies {
+            if(project.name != 'api' && !project.path.contains(':functions') && !project.path.contains(':frontend')) {
+
+                compile "org.particleframework:discovery-client:${projectVersion}"
+                compile "org.particleframework.configuration:hibernate-validator:${projectVersion}"
+                runtime "org.particleframework:management:${projectVersion}"
+                runtime "ch.qos.logback:logback-classic:1.2.3"
+            }
         }
     }
-
 
 }

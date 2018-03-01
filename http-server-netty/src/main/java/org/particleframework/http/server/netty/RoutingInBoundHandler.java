@@ -24,6 +24,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.timeout.IdleStateEvent;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.core.annotation.Internal;
 import org.particleframework.core.async.publisher.Publishers;
@@ -138,6 +139,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
         NettyHttpRequest request = NettyHttpRequest.get(ctx);
         if (request != null) {
             request.release();
+        }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        try {
+            if(evt instanceof IdleStateEvent) {
+                ctx.close();
+            }
+        } finally {
+            super.userEventTriggered(ctx, evt);
         }
     }
 
