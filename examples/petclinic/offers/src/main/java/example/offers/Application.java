@@ -59,6 +59,10 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
         } catch (Exception e) {
             LOG.error("Error flushing Redis data: " +e.getMessage(), e);
         }
+        if(LOG.isInfoEnabled()) {
+            LOG.info("Creating Initial Offers for Pets: {}", petClient.list().blockingGet());
+
+        }
         petClient.find("harry")
                 .doOnError(throwable -> {
                     if (LOG.isErrorEnabled()) {
@@ -103,7 +107,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
                         }
                 );
 
-        petClient.find("Goyle")
+        petClient.find("goyle")
                 .doOnError(throwable -> {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("No pet found: " + throwable.getMessage(), throwable);
