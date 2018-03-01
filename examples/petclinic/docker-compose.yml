@@ -1,0 +1,22 @@
+version: '3'
+services:
+  mongodb:
+    image: mongo
+    ports:
+      - 27017:27017
+  consul:
+    image: consul
+    ports:
+      - 8500:8500
+  pets-service:
+    image: 885cac327317
+    ports:
+      - "8900:8900"
+    depends_on:
+      - mongodb
+      - consul
+    environment:
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
