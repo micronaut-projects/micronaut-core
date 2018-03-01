@@ -1,6 +1,4 @@
 particle:
-  server:
-    port: 8930
   application:
     name: offers
 redis:

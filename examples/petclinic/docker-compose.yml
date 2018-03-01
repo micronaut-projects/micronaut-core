@@ -25,9 +25,7 @@ services:
     ports:
       - 8500:8500
   pets-service:
-    image: 885cac327317
-    ports:
-      - "8900:8900"
+    image: 18eeb906f28d
     depends_on:
       - mongodb-server
       - consul-server
@@ -38,9 +36,7 @@ services:
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
   vendors-service:
-    image: 149b03cc52fc
-    ports:
-      - "8910:8910"
+    image: a0c82288f854
     depends_on:
       - mysql-server
       - pets-service
@@ -50,9 +46,7 @@ services:
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
   offers-service:
-    image: 087067e9e9d6
-    ports:
-      - "8930:8930"
+    image: c64df2f4a8a2
     depends_on:
       - redis-server
       - pets-service
@@ -64,11 +58,9 @@ services:
       REDIS_HOST: redis-server
       REDIS_PORT: 6379
   comments-service:
-    image: 311dc9cfcd05
+    image: 09aaf22d3c76
     links:
       - neo4j-server
-    ports:
-      - "8920:8920"
     depends_on:
       - neo4j-server
       - consul-server
@@ -79,7 +71,7 @@ services:
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
   storefront:
-    image: 786291f7f514
+    image: 55e6b1d073d1
     ports:
       - "8080:8080"
     depends_on:

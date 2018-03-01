@@ -44,7 +44,7 @@ class VendorControllerSpec extends Specification {
         List<example.api.v1.Vendor> vendors = vendorOperations.list().blockingGet()
 
         then:
-        vendors.size() == 3
+        vendors.size() == 0
     }
 
     void 'test save vendor'() {
@@ -54,7 +54,7 @@ class VendorControllerSpec extends Specification {
         then:
         v != null
         v.name == "Bob"
-        vendorOperations.list().blockingGet().size() == 4
+        vendorOperations.list().blockingGet().size() == 1
         vendorOperations.names().blockingGet().contains("Bob")
 
     }
