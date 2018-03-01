@@ -29,13 +29,11 @@ import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.context.env.Environment;
 import org.particleframework.context.exceptions.ConfigurationException;
-import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.discovery.cloud.ComputeInstanceMetadata;
 import org.particleframework.discovery.cloud.ComputeInstanceMetadataResolver;
 import org.particleframework.discovery.event.ServiceShutdownEvent;
 import org.particleframework.discovery.event.ServiceStartedEvent;
@@ -63,14 +61,11 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.HashMap;
+import java.net.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 /**
@@ -99,7 +94,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
     private final BeanLocator beanLocator;
-    private final int serverPort;
+    private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final Optional<SslContext> sslContext;
     private NioEventLoopGroup workerGroup;
@@ -205,35 +200,55 @@ public class NettyHttpServer implements EmbeddedServer {
 
             Optional<String> host = serverConfiguration.getHost();
 
-            ChannelFuture future;
+            bindServerToHost(serverBootstrap, host, new AtomicInteger(0));
 
-            if(LOG.isDebugEnabled()) {
-                LOG.debug("Binding server to port: {}", serverPort);
-            }
-            if(host.isPresent()) {
-                future = serverBootstrap.bind(host.get(), serverPort);
-            }
-            else {
-                future = serverBootstrap.bind(serverPort);
-            }
-
-            future.addListener(op -> {
-                if (!future.isSuccess()) {
-                    Throwable cause = op.cause();
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
-                    }
-                }
-            });
-            applicationContext.publishEvent(new ServerStartupEvent(this));
-            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-            applicationName.ifPresent(id -> {
-                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-            });
         }
 
         return this;
+    }
+
+    private void bindServerToHost(ServerBootstrap serverBootstrap, Optional<String> host, AtomicInteger attempts) {
+        ChannelFuture future;
+
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("Binding server to port: {}", serverPort);
+        }
+        if(host.isPresent()) {
+            future = serverBootstrap.bind(host.get(), serverPort);
+        }
+        else {
+            future = serverBootstrap.bind(serverPort);
+        }
+
+        future.addListener(op -> {
+            if (!future.isSuccess()) {
+                Throwable cause = op.cause();
+                if (LOG.isErrorEnabled()) {
+                    if(cause instanceof BindException) {
+                        LOG.error("Unable to start server. Port already {} in use.", serverPort);
+                    }
+                    else {
+                        LOG.error("Error starting Particle server: " + cause.getMessage(), cause);
+                    }
+                }
+                int attemptCount = attempts.getAndIncrement();
+                if(serverConfiguration.getPort() == -1 && attemptCount < 3) {
+                    serverPort = SocketUtils.findAvailableTcpPort();
+                    bindServerToHost(serverBootstrap, host, attempts);
+                }
+                else {
+                    stop();
+                }
+            }
+            else {
+                applicationContext.publishEvent(new ServerStartupEvent(this));
+                Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+                applicationName.ifPresent(id -> {
+                    this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+                    applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+                });
+            }
+        });
     }
 
     @Override

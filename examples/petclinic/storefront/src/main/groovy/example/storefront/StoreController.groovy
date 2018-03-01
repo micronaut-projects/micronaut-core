@@ -78,20 +78,13 @@ class StoreController {
 
     @Get(uri = "/offers", produces = MediaType.TEXT_EVENT_STREAM)
     Flowable<Event<Offer>> offers() {
-        println "offers..."
         httpClient.jsonStream(HttpRequest.GET('/v1/offers'), Offer).map({ offer ->
             Event.of(offer)
         })
     }
 
-//    @Get(uri = "/tweet/{message}")
-//    Single<TweetClient.Result> tweet(String message) {
-//        tweetClient.updateStatus(message)
-//    }
-
     @Get('/pets')
     Single<List<Pet>> pets() {
-        println "pets..."
         petClient.list()
                 .onErrorReturnItem(Collections.emptyList())
     }

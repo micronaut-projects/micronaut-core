@@ -69,6 +69,6 @@ class VendorController {
 
     @Post('/')
     Vendor save(@NotBlank String name) {
-        vendorService.save(name)
+        vendorService.findOrCreate(name)
     }
 }

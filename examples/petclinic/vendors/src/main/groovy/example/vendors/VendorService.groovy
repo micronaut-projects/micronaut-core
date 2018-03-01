@@ -24,23 +24,43 @@ import javax.validation.constraints.NotBlank
  * @since 1.0
  */
 @Service(Vendor)
-interface VendorService {
+abstract class VendorService {
     /**
      * List all of the vendors
      *
      * @return The vendors
      */
-    List<Vendor> list()
+    abstract List<Vendor> list()
 
     /**
      * @return list the vendor names
      */
-    List<String> listVendorName()
+    abstract List<String> listVendorName()
 
     /**
      * Save a new vendor
      * @param name The name of the vendor
      * @return The vendor instance
      */
-    Vendor save(@NotBlank String name)
+    abstract Vendor save(@NotBlank String name)
+
+    /**
+     * Finds a new vendor
+     * @param name The name of the vendor
+     * @return The vendor instance
+     */
+    abstract Vendor find(@NotBlank String name)
+
+    /**
+     * Find an existing vendor or create a new one
+     * @param name The name of the vendor
+     * @return The Vendor
+     */
+    Vendor findOrCreate(@NotBlank String name) {
+        Vendor v = find(name)
+        if(v == null) {
+            v = save(name)
+        }
+        return v
+    }
 }
