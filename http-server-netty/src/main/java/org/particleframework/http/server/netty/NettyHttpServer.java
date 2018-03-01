@@ -23,6 +23,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanLocator;
@@ -180,6 +181,10 @@ public class NettyHttpServer implements EmbeddedServer {
                                 pipeline.addLast(ctx.newHandler(ch.alloc()))
                             );
 
+                            pipeline.addLast(new IdleStateHandler(
+                                    (int)serverConfiguration.getReadIdleTime().getSeconds(),
+                                    (int)serverConfiguration.getWriteIdleTime().getSeconds(),
+                                    0));
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                             pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration));

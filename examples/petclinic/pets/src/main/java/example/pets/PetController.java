@@ -84,6 +84,7 @@ public class PetController implements PetOperations<PetEntity> {
         return Flowable.fromPublisher(
                 getCollection()
                         .find(eq("slug", slug))
+                        .limit(1)
         ).firstElement();
     }
 
