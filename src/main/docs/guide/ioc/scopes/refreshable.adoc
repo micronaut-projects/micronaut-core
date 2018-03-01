@@ -15,7 +15,7 @@ include::{testsdir}/scopes/RefreshEventSpec.groovy[tags=wheatherService, indent=
 <1> `WeatherService` is annotated with `@Refresable` scope. The publication of a `RefreshEvent` causes its destruction.
 <1> `WeatherController.evict` method publishes `RefreshEvent` in the Application Context.
 
-If you invoke the `/weather/evict` twice, you will see identical responses.
+If you invoke the `/weather/forecast` twice, you will see identical responses.
 
 :url: http://localhost:8080
 [source, bash, subs="attributes"]
