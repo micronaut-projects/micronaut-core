@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.net.URI;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +53,8 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     private AuthToken authToken;
     private String username;
     private String password;
+    private int retryCount = 3;
+    private Duration retryDelay = Duration.of(1, ChronoUnit.SECONDS);
     private Neo4jEmbeddedSettings embeddedSettings = new Neo4jEmbeddedSettings();
 
     public Neo4jBoltConfiguration() {
@@ -108,6 +112,32 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         if(uri != null) {
             this.uris = Collections.singletonList(uri);
         }
+    }
+
+    /**
+     * @return The number of times to retry establishing a connection to the server
+     */
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    /**
+     * @param retryCount The retry count
+     */
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    /**
+     * @return The delay between retry attempts
+     */
+    public Duration getRetryDelay() {
+        return retryDelay;
+    }
+
+    public void setRetryDelay(Duration retryDelay) {
+        if(retryDelay != null)
+            this.retryDelay = retryDelay;
     }
 
     /**
