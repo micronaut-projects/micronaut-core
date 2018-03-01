@@ -8,8 +8,12 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.http.server.netty.AbstractParticleSpec
+import org.particleframework.http.server.netty.types.files.FileTypeHandler
 import org.particleframework.http.server.netty.types.files.FileTypeHandlerConfiguration
+import org.particleframework.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
+import org.particleframework.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import org.particleframework.http.server.types.files.AttachedFile
+import org.particleframework.http.server.types.files.SystemFileCustomizableResponseType
 
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -96,6 +100,22 @@ class FileTypeHandlerSpec extends AbstractParticleSpec {
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT") )
         response.body() == "<html><head></head><body>HTML Page</body></html>"
+    }
+
+    void "test supports"() {
+        when:
+        FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
+
+        then:
+        fileTypeHandler.supports(type) == expected
+
+        where:
+        type                                      | expected
+        NettySystemFileCustomizableResponseType   | true
+        NettyStreamedFileCustomizableResponseType | true
+        SystemFileCustomizableResponseType        | true
+        File                                      | true
+        AttachedFile                              | true
     }
 
     @Controller

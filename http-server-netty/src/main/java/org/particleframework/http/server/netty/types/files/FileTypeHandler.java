@@ -94,7 +94,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @Override
     public boolean supports(Class<?> type) {
-        return File.class.isAssignableFrom(type) || SystemFileCustomizableResponseType.class.isAssignableFrom(type);
+        return File.class.isAssignableFrom(type) ||
+                SystemFileCustomizableResponseType.class.isAssignableFrom(type) ||
+                NettyFileCustomizableResponseType.class.isAssignableFrom(type);
     }
 
     protected MediaType getMediaType(String filename) {
