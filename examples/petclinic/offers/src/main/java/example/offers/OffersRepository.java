@@ -24,6 +24,8 @@ import io.lettuce.core.api.reactive.RedisReactiveCommands;
 import io.reactivex.Flowable;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.validation.Validated;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,6 +33,7 @@ import javax.inject.Singleton;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 
@@ -41,6 +44,7 @@ import java.util.function.Function;
 @Singleton
 @Validated
 public class OffersRepository implements OffersOperations {
+    private static final Logger LOG = LoggerFactory.getLogger(Application.class);
 
     private final PetClient petClient;
     private final StatefulRedisConnection<String, String> redisConnection;
@@ -102,7 +106,88 @@ public class OffersRepository implements OffersOperations {
          });
     }
 
-    Map<String, String> dataOf(BigDecimal price, String description, Currency currency) {
+    /**
+     * Create initial offers for the application
+     */
+    public void createInitialOffers() {
+        try {
+            redisConnection.sync().flushall();
+        } catch (Exception e) {
+            LOG.error("Error flushing Redis data: " +e.getMessage(), e);
+        }
+
+        if(LOG.isInfoEnabled()) {
+            LOG.info("Creating Initial Offers for Pets: {}", petClient.list().blockingGet());
+
+        }
+        petClient.find("harry")
+                .doOnError(throwable -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
+                    }
+                })
+                .onErrorComplete()
+                .subscribe(pet -> {
+                            Mono<Offer> savedOffer = save(
+                                    pet.getSlug(),
+                                    new BigDecimal("49.99"),
+                                    Duration.of(2, ChronoUnit.HOURS),
+                                    "Cute dog!");
+                            savedOffer.subscribe((offer) -> {
+                            }, throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
+                                }
+                            });
+                        }
+                );
+
+        petClient.find("malfoy")
+                .doOnError(throwable -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
+                    }
+                })
+                .onErrorComplete()
+                .subscribe(pet -> {
+                            Mono<Offer> savedOffer = save(
+                                    pet.getSlug(),
+                                    new BigDecimal("29.99"),
+                                    Duration.of(2, ChronoUnit.HOURS),
+                                    "Special Cat! Offer ends soon!");
+                            savedOffer.subscribe((offer) -> {
+                            }, throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
+                                }
+                            });
+                        }
+                );
+
+        petClient.find("goyle")
+                .doOnError(throwable -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
+                    }
+                })
+                .onErrorComplete()
+                .subscribe(pet -> {
+                            Mono<Offer> savedOffer = save(
+                                    pet.getSlug(),
+                                    new BigDecimal("39.99"),
+                                    Duration.of(1, ChronoUnit.DAYS),
+                                    "Carefree Cat! Low Maintenance! Looking for a Home!");
+                            savedOffer.subscribe((offer) -> {
+                            }, throwable -> {
+                                if (LOG.isErrorEnabled()) {
+                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
+                                }
+                            });
+                        }
+                );
+    }
+
+    private Map<String, String> dataOf(BigDecimal price, String description, Currency currency) {
         Map<String, String> data = new LinkedHashMap<>(4);
         data.put("currency", currency.getCurrencyCode());
         data.put("price", price.toString());

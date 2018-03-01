@@ -15,20 +15,15 @@
  */
 package example.offers;
 
-import example.api.v1.Offer;
-import example.offers.client.v1.PetClient;
-import io.lettuce.core.api.StatefulRedisConnection;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
 import org.particleframework.runtime.server.event.ServerStartupEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
+import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author graemerocher
@@ -36,16 +31,15 @@ import java.time.temporal.ChronoUnit;
  */
 @Singleton
 public class Application implements ApplicationEventListener<ServerStartupEvent> {
-    private static final Logger LOG = LoggerFactory.getLogger(Application.class);
-
-    private final PetClient petClient;
+    private final ScheduledExecutorService executorService;
     private final OffersRepository offersRepository;
-    private final StatefulRedisConnection<String, String> redisConnection;
 
-    public Application(PetClient petClient, OffersRepository offersRepository, StatefulRedisConnection<String, String> redisConnection) {
-        this.petClient = petClient;
+
+    public Application(
+            @Named(ScheduledExecutorServiceConfig.NAME) ScheduledExecutorService executorService,
+            OffersRepository offersRepository) {
+        this.executorService = executorService;
         this.offersRepository = offersRepository;
-        this.redisConnection = redisConnection;
     }
 
     public static void main(String... args) {
@@ -54,79 +48,8 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
     @Override
     public void onApplicationEvent(ServerStartupEvent event) {
-        try {
-            redisConnection.sync().flushall();
-        } catch (Exception e) {
-            LOG.error("Error flushing Redis data: " +e.getMessage(), e);
-        }
-        if(LOG.isInfoEnabled()) {
-            LOG.info("Creating Initial Offers for Pets: {}", petClient.list().blockingGet());
-
-        }
-        petClient.find("harry")
-                .doOnError(throwable -> {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
-                    }
-                })
-                .onErrorComplete()
-                .subscribe(pet -> {
-                            Mono<Offer> savedOffer = offersRepository.save(
-                                    pet.getSlug(),
-                                    new BigDecimal("49.99"),
-                                    Duration.of(2, ChronoUnit.HOURS),
-                                    "Cute dog!");
-                            savedOffer.subscribe((offer) -> {
-                            }, throwable -> {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
-                                }
-                            });
-                        }
-                );
-
-        petClient.find("malfoy")
-                .doOnError(throwable -> {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
-                    }
-                })
-                .onErrorComplete()
-                .subscribe(pet -> {
-                            Mono<Offer> savedOffer = offersRepository.save(
-                                    pet.getSlug(),
-                                    new BigDecimal("29.99"),
-                                    Duration.of(2, ChronoUnit.HOURS),
-                                    "Special Cat! Offer ends soon!");
-                            savedOffer.subscribe((offer) -> {
-                            }, throwable -> {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
-                                }
-                            });
-                        }
-                );
-
-        petClient.find("goyle")
-                .doOnError(throwable -> {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("No pet found: " + throwable.getMessage(), throwable);
-                    }
-                })
-                .onErrorComplete()
-                .subscribe(pet -> {
-                            Mono<Offer> savedOffer = offersRepository.save(
-                                    pet.getSlug(),
-                                    new BigDecimal("39.99"),
-                                    Duration.of(1, ChronoUnit.DAYS),
-                                    "Carefree Cat! Low Maintenance! Looking for a Home!");
-                            savedOffer.subscribe((offer) -> {
-                            }, throwable -> {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Error occurred saving offer: " + throwable.getMessage(), throwable);
-                                }
-                            });
-                        }
-                );
+        // this is not really representative of a real system where data would probably exist,
+        // but we need this delay as pets are created on startup in pets service
+        executorService.schedule(offersRepository::createInitialOffers, 20, TimeUnit.SECONDS);
     }
 }
