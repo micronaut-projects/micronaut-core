@@ -50,7 +50,7 @@ services:
       CONSUL_HOST: consul-server
       CONSUL_PORT: 8500
   offers-service:
-    image: f9366d1ac868
+    image: 087067e9e9d6
     ports:
       - "8930:8930"
     depends_on:
