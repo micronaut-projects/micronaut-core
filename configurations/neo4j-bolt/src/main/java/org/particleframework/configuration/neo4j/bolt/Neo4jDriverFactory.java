@@ -19,10 +19,13 @@ import org.neo4j.driver.v1.AuthToken;
 import org.neo4j.driver.v1.AuthTokens;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.GraphDatabase;
+import org.neo4j.driver.v1.exceptions.ServiceUnavailableException;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.net.URI;
@@ -37,38 +40,60 @@ import java.util.Optional;
  */
 @Factory
 public class Neo4jDriverFactory {
-
+    private static final Logger LOG = LoggerFactory.getLogger(Neo4jDriverFactory.class);
 
     @Singleton
     @Bean(preDestroy = "close")
     public Driver boltDriver(Neo4jBoltConfiguration configuration) {
-        List<URI> uris = configuration.getUris();
-        Optional<AuthToken> configuredAuthToken = configuration.getAuthToken();
-        AuthToken authToken = configuredAuthToken.orElse(null);
-        if(uris.size() == 1) {
-            URI uri = uris.get(0);
-            String userInfo = uri.getUserInfo();
-            if(authToken == null && StringUtils.hasText(userInfo)) {
-                String[] info = userInfo.split(":");
-                if(info.length == 2) {
-                    authToken = AuthTokens.basic(info[0], info[1]);
+        return buildDriver(configuration, 0);
+    }
+
+    private Driver buildDriver(Neo4jBoltConfiguration configuration, int attempts) {
+        try {
+            List<URI> uris = configuration.getUris();
+            Optional<AuthToken> configuredAuthToken = configuration.getAuthToken();
+            AuthToken authToken = configuredAuthToken.orElse(null);
+            if(uris.size() == 1) {
+                URI uri = uris.get(0);
+                String userInfo = uri.getUserInfo();
+                if(authToken == null && StringUtils.hasText(userInfo)) {
+                    String[] info = userInfo.split(":");
+                    if(info.length == 2) {
+                        authToken = AuthTokens.basic(info[0], info[1]);
+                    }
+                }
+                return GraphDatabase.driver(
+                        uri,
+                        authToken,
+                        configuration.getConfig()
+                );
+            }
+            else if(!uris.isEmpty()) {
+                return GraphDatabase.routingDriver(
+                        uris,
+                        authToken,
+                        configuration.getConfig()
+                );
+            }
+            else {
+                throw new ConfigurationException("At least one Neo4j URI should be specified eg. neo4j.uri=" + Neo4jBoltConfiguration.DEFAULT_URI);
+            }
+        } catch (ServiceUnavailableException e) {
+            if(attempts < configuration.getRetryCount()) {
+                try {
+                    long delay = configuration.getRetryDelay().toMillis();
+                    if(LOG.isInfoEnabled()) {
+                        LOG.info("Neo4j Server Unavailable. Retrying in {}ms", delay);
+                    }
+                    Thread.sleep(delay);
+                    return buildDriver(configuration, ++attempts);
+                } catch (InterruptedException e1) {
+                    throw e;
                 }
             }
-            return GraphDatabase.driver(
-                    uri,
-                    authToken,
-                    configuration.getConfig()
-            );
-        }
-        else if(!uris.isEmpty()) {
-            return GraphDatabase.routingDriver(
-                    uris,
-                    authToken,
-                    configuration.getConfig()
-            );
-        }
-        else {
-            throw new ConfigurationException("At least one Neo4j URI should be specified eg. neo4j.uri=" + Neo4jBoltConfiguration.DEFAULT_URI);
+            else {
+                throw e;
+            }
         }
     }
 }

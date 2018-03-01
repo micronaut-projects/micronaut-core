@@ -64,7 +64,7 @@ services:
       REDIS_HOST: redis-server
       REDIS_PORT: 6379
   comments-service:
-    image: 8a905893d0e1
+    image: 311dc9cfcd05
     links:
       - neo4j-server
     ports:
