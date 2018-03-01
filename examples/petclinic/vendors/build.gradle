@@ -1,5 +1,5 @@
 apply plugin: 'groovy'
-
+mainClassName = "example.vendors.Application"
 dependencies {
     compileOnly "org.particleframework:inject-groovy:${projectVersion}"
 

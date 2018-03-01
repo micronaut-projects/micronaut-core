@@ -1,5 +1,10 @@
 version: '3'
 services:
+  mysql:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example
   mongodb:
     image: mongo
     ports:
@@ -16,7 +21,19 @@ services:
       - mongodb
       - consul
     environment:
+      PARTICLE_SERVER_HOST: pets-service
       MONGO_HOST: mongodb
       MONGO_PORT: 27017
+      CONSUL_HOST: consul
+      CONSUL_PORT: 8500
+  vendors-service:
+    image: 149b03cc52fc
+    ports:
+      - "8910:8910"
+    depends_on:
+      - mysql
+      - pets-service
+    environment:
+      PARTICLE_SERVER_HOST: vendors-service
       CONSUL_HOST: consul
       CONSUL_PORT: 8500
