@@ -18,6 +18,7 @@ package org.particleframework.runtime.executor
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.env.PropertySource
 import org.particleframework.inject.qualifiers.Qualifiers
+import org.particleframework.scheduling.Schedulers
 import org.particleframework.scheduling.executor.ExecutorConfiguration
 import org.particleframework.scheduling.executor.IOExecutorServiceConfig
 import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig
@@ -67,8 +68,8 @@ class ExecutorServiceConfigSpec extends Specification {
         then:
         executorServices.size() == 4
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) // the default IO executor
-        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(ScheduledExecutorServiceConfig.NAME)) // the default IO executor
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) // the default IO executor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(Schedulers.SCHEDULED)) // the default IO executor
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 
@@ -122,8 +123,8 @@ class ExecutorServiceConfigSpec extends Specification {
         then:
         executorServices.size() == 4
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) instanceof ThreadPoolExecutor
-        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(ScheduledExecutorServiceConfig.NAME)) instanceof ScheduledExecutorService
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) instanceof ThreadPoolExecutor
+        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(Schedulers.SCHEDULED)) instanceof ScheduledExecutorService
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 
@@ -165,7 +166,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
         then:
         executorServices.size() == 3
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(IOExecutorServiceConfig.NAME)) instanceof ThreadPoolExecutor
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(Schedulers.IO)) instanceof ThreadPoolExecutor
 
         when:
         if(invalidateCache) {

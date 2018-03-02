@@ -45,6 +45,7 @@ import org.particleframework.http.server.netty.ssl.NettySslBuilder;
 import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.ApplicationConfiguration;
+import org.particleframework.scheduling.Schedulers;
 import org.particleframework.scheduling.executor.ExecutorSelector;
 import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
@@ -111,9 +112,8 @@ public class NettyHttpServer implements EmbeddedServer {
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
             StaticResourceResolver resourceResolver,
-            @javax.inject.Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor,
+            @javax.inject.Named(Schedulers.IO) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
-            @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
             NettySslBuilder nettySslBuilder,
             ChannelOutboundHandler... outboundHandlers
     ) {

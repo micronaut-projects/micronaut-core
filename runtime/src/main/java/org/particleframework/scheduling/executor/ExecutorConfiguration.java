@@ -25,6 +25,21 @@ import java.util.concurrent.ThreadFactory;
  */
 public interface ExecutorConfiguration {
     /**
+     * The prefix used for configuration
+     */
+    String PREFIX = "particle.server.executors";
+
+    /**
+     * The prefix used for I/O pool configuration
+     */
+    String PREFIX_IO = PREFIX + ".io";
+
+    /**
+     * The prefix used for Scheduled task configuration
+     */
+    String PREFIX_SCHEDULED = PREFIX + ".scheduled";
+
+    /**
      * @return The {@link ExecutorType}
      */
     ExecutorType getType();

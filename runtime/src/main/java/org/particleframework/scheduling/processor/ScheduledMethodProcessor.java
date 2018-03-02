@@ -22,6 +22,7 @@ import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.scheduling.TaskScheduler;
 import org.particleframework.scheduling.annotation.Scheduled;
 import org.particleframework.scheduling.exceptions.SchedulerConfigurationException;
 
@@ -61,16 +62,16 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             String fixedRate = scheduledAnnotation.fixedRate();
 
             String initialDelayStr = scheduledAnnotation.initialDelay();
-            long initialDelay = 0;
+            Duration initialDelay = null;
             if(StringUtils.hasText(initialDelayStr)) {
-                initialDelay = conversionService.convert(initialDelayStr, Duration.class).map(Duration::toMillis).orElseThrow(()->
+                initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(()->
                         new SchedulerConfigurationException(method, "Invalid initial delay definition: " + initialDelayStr)
                 );
             }
 
 
-            ExecutorService executorService = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduledAnnotation.scheduler()))
-                    .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type ScheduledExecutorService configured for name: " + scheduledAnnotation.scheduler()));
+            TaskScheduler taskScheduler = beanContext.findBean(TaskScheduler.class, Qualifiers.byName(scheduledAnnotation.scheduler()))
+                    .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduledAnnotation.scheduler()));
 
 
             Runnable task = () -> {
@@ -83,27 +84,21 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
             };
 
-            ScheduledExecutorService scheduledExecutorService;
-
-            if(executorService instanceof ScheduledExecutorService) {
-                scheduledExecutorService = (ScheduledExecutorService) executorService;
+            String cronExpr = scheduledAnnotation.cron();
+            if(StringUtils.isNotEmpty(cronExpr)) {
+                taskScheduler.schedule(cronExpr, task);
             }
-            else {
-                throw new SchedulerConfigurationException(method, "No scheduler of type ScheduledExecutorService configured for name: " + scheduledAnnotation.scheduler());
-            }
-
-            if(StringUtils.isNotEmpty(fixedRate)) {
+            else if(StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
                 Duration duration = converted.orElseThrow(()->
                     new SchedulerConfigurationException(method, "Invalid fixed rate definition: " + fixedRate)
                 );
 
 
-                ScheduledFuture<?> scheduledFuture = scheduledExecutorService.scheduleAtFixedRate(
-                        task,
+                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(
                         initialDelay,
-                        duration.toMillis(),
-                        TimeUnit.MILLISECONDS
+                        duration,
+                        task
                 );
                 scheduledTasks.add(scheduledFuture);
             }
@@ -116,11 +111,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     );
 
 
-                    ScheduledFuture<?> scheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(
-                            task,
+                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(
                             initialDelay,
-                            duration.toMillis(),
-                            TimeUnit.MILLISECONDS
+                            duration,
+                            task
                     );
                     scheduledTasks.add(scheduledFuture);
 

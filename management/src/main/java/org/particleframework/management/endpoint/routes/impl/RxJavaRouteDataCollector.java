@@ -29,7 +29,7 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
     private final ExecutorService executorService;
 
     public RxJavaRouteDataCollector(RouteData routeData,
-                                    @Named(IOExecutorServiceConfig.NAME) ExecutorService executorService) {
+                                    @Named(org.particleframework.scheduling.Schedulers.IO) ExecutorService executorService) {
         this.routeData = routeData;
         this.executorService = executorService;
     }
@@ -41,9 +41,9 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
 
         return Flowable.fromIterable(routeList)
                 .subscribeOn(Schedulers.from(executorService))
-                .collectInto(routeMap, (map, route) -> {
-                    map.put(getRouteKey(route), routeData.getData(route));
-                }).toFlowable();
+                .collectInto(routeMap, (map, route) ->
+                        map.put(getRouteKey(route), routeData.getData(route))
+                ).toFlowable();
     }
 
     protected String getRouteKey(UriRoute route) {

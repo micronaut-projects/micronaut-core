@@ -18,6 +18,7 @@ package org.particleframework.scheduling.executor;
 import org.particleframework.core.annotation.NonBlocking;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.inject.MethodReference;
+import org.particleframework.scheduling.Schedulers;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -37,7 +38,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     private final ExecutorService ioExecutor;
 
-    protected DefaultExecutorSelector(@Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor) {
+    protected DefaultExecutorSelector(@Named(Schedulers.IO) ExecutorService ioExecutor) {
         this.ioExecutor = ioExecutor;
     }
 
