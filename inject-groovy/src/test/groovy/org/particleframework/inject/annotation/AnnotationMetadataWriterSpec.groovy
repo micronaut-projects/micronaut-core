@@ -15,8 +15,19 @@
  */
 package org.particleframework.inject.annotation
 
+import groovy.transform.NotYetImplemented
 import org.particleframework.AbstractBeanDefinitionSpec
+import org.particleframework.aop.Around
+import org.particleframework.context.annotation.Primary
+import org.particleframework.context.annotation.Requirements
+import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
+
+import javax.inject.Qualifier
+import javax.inject.Scope
+import javax.inject.Singleton
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
 
 /**
  * @author graemerocher
@@ -52,4 +63,146 @@ class Test {
         then:
         topLevel.nested().num() == 10
     }
+
+    void "test read enum constants"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(sdk=Requires.Sdk.JAVA, version="1.8")
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
+        metadata.getValue(Requires, "version").get() == "1.8"
+    }
+
+    void "test read external constants"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+import org.particleframework.context.annotation.*;
+import org.particleframework.core.annotation.AnnotationMetadata;
+@Requires(property=AnnotationMetadata.VALUE_MEMBER)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'value'
+    }
+
+    void "test read constants defined in class"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property=Test.TEST)
+class Test {
+    public static final String TEST = "blah";
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == 'blah'
+
+    }
+
+    @NotYetImplemented
+    void "test build repeatable annotations"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+import org.particleframework.context.annotation.*;
+
+@Requires(property="blah")
+@Requires(classes=Test.class)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasDeclaredAnnotation(Requirements)
+        metadata.getValue(Requirements).get().size() == 2
+        metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
+        metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+
+        when:
+        Requires[] requires = metadata.getAnnotation(Requirements).value()
+
+        then:
+        requires.size() == 2
+        requires[0].property() == 'blah'
+
+        when:
+        requires = metadata.getAnnotationsByType(Requires)
+
+        then:
+        requires.size() == 2
+        requires[0].property() == 'blah'
+
+    }
+
+    void "test write first level stereotype data"() {
+
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+@org.particleframework.context.annotation.Primary
+class Test {
+}
+''')
+
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata.getAnnotation(Primary) instanceof Primary
+        metadata.declaredAnnotations.size() == 1
+        metadata != null
+        metadata.hasDeclaredAnnotation(Primary)
+        !metadata.hasDeclaredAnnotation(Singleton)
+        metadata.hasAnnotation(Primary)
+        !metadata.hasStereotype(Documented) // ignore internal annotations
+        !metadata.hasStereotype(Retention) // ignore internal annotations
+        metadata.hasStereotype(Qualifier)
+        !metadata.hasStereotype(Singleton)
+    }
+
+
 }
