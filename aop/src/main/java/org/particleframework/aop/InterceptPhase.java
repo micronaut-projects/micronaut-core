@@ -28,11 +28,15 @@ public enum InterceptPhase {
     /**
      * Validation phase of execution
      */
-    VALIDATE(-60),
+    VALIDATE(-120),
     /**
      * Caching phase of execution
      */
-    CACHE(-40),
+    CACHE(-80),
+    /**
+     * Caching phase of execution
+     */
+    RETRY(-80),
     /**
      * Transaction phase of execution
      */

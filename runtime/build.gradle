@@ -13,6 +13,7 @@ dependencies {
     compileOnly "io.projectreactor:reactor-core:$reactorVersion"
 
     compileOnly project(":inject-java")
+    testCompile "io.projectreactor:reactor-core:$reactorVersion"
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
 
