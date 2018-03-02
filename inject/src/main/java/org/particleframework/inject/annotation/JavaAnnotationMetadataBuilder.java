@@ -307,6 +307,10 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
+            if(a instanceof javax.lang.model.element.AnnotationValue) {
+                AnnotationValue value = readNestedAnnotationValue(a);
+                annotationValues.put(memberName, value);
+            }
             return null;
         }
 

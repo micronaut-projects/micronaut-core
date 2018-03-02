@@ -33,6 +33,25 @@ import javax.inject.Singleton
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test read annotation with annotation value"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+
+@TopLevel(nested=@Nested(num=10))
+class Test {
+}
+''')
+        expect:
+        metadata != null
+        metadata.hasAnnotation(TopLevel)
+        metadata.getValue(TopLevel, "nested").isPresent()
+        metadata.getValue(TopLevel, "nested", Nested).isPresent()
+        metadata.getValue(TopLevel, "nested", Nested).get().num() == 10
+    }
+
     void "test read external constants"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\

@@ -34,6 +34,35 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test read annotation with annotation value"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+
+@TopLevel(nested=@Nested(num=10))
+class Test {
+}
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasAnnotation(TopLevel)
+        metadata.getValue(TopLevel, "nested").isPresent()
+        metadata.getValue(TopLevel, "nested", Nested).isPresent()
+        metadata.getValue(TopLevel, "nested", Nested).get().num() == 10
+
+        when:
+        TopLevel topLevel = metadata.getAnnotation(TopLevel)
+
+        then:
+        topLevel.nested().num() == 10
+    }
+
     void "test read enum constants"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\

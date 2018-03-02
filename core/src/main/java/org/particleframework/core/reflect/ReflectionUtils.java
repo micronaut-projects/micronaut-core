@@ -94,13 +94,13 @@ public class ReflectionUtils {
     }
 
     /**
-     * Obtain the wrapper type for the given primitive type
+     * Obtain the primitive type for the given wrapper type
      *
      * @param wrapperType The primitive type
      * @return The wrapper type
      */
     public static Class getPrimitiveType(Class wrapperType) {
-        Class<?> wrapper = PRIMITIVES_TO_WRAPPERS.get(wrapperType);
+        Class<?> wrapper = WRAPPER_TO_PRIMITIVE.get(wrapperType);
         if (wrapper != null) {
             return wrapper;
         } else {
