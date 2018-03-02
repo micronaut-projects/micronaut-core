@@ -55,6 +55,15 @@ public class RxJavaConverterRegistrar implements TypeConverterRegistrar{
                 Observable.class, Publisher.class,
                 (Function<Observable, Publisher>) observable -> observable.toFlowable(BackpressureStrategy.BUFFER)
         );
+        conversionService.addConverter(
+                Observable.class, Single.class,
+                (Function<Observable, Single>) Observable::firstOrError
+        );
+        conversionService.addConverter(
+                Observable.class, Maybe.class,
+                (Function<Observable, Maybe>) Observable::firstElement
+        );
+
 
         // Single
         conversionService.addConverter(
