@@ -28,7 +28,7 @@ include::{testsuite}/server/sse/HeadlineController.java[tags=class, indent=0]
 <2> For each version of Particle a headline is emitted
 <3> The rx:Flowable[] type's `generate` method is used to generate a rs:Publisher[]. The `generate` method accepts an initial value and a lambda that accepts the value and a rx:Emitter[].  Note that this example executes on the same thread as the controller action, but you could use `subscribeOn` or map and existing "hot" rx:Flowable[].
 <4> The rx:Emitter[] interface's `onNext` method is used to emit objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method is used to construct the event.
-<5> he rx:Emitter[] interface's `onComplete` method is used to indicate when to finish sending server sent events.
+<5> The rx:Emitter[] interface's `onComplete` method is used to indicate when to finish sending server sent events.
 
 The above example will send back a response of type `text/event-stream` and for each  api:http.sse.Event[] emitted the `Headline` type previously will be converted to JSON resulting in responses such as:
 
