@@ -17,7 +17,7 @@ package org.particleframework.management.health.indicator;
 
 import org.particleframework.core.async.publisher.AsyncSingleResultPublisher;
 import org.particleframework.health.HealthStatus;
-import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
+import org.particleframework.scheduling.Schedulers;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Inject;
@@ -38,7 +38,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
     protected HealthStatus healthStatus;
 
     @Inject
-    public void setExecutorService(@Named(IOExecutorServiceConfig.NAME) ExecutorService executorService) {
+    public void setExecutorService(@Named(Schedulers.IO) ExecutorService executorService) {
         this.executorService = executorService;
     }
 

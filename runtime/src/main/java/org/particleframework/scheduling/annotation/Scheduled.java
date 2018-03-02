@@ -16,6 +16,7 @@
 package org.particleframework.scheduling.annotation;
 
 import org.particleframework.context.annotation.Executable;
+import org.particleframework.scheduling.Schedulers;
 import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 
 import java.lang.annotation.*;
@@ -34,6 +35,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Executable(preprocess = true)
 @Repeatable(Schedules.class)
 public @interface Scheduled {
+
+    /**
+     * @return The CRON expression
+     */
+    String cron() default "";
 
     /**
      * A String representation of the {@link java.time.Duration} between the time of the last execution and the beginning of the next. For example 10m == 10 minutes
@@ -58,5 +64,5 @@ public @interface Scheduled {
     /**
      * @return The name of a {@link javax.inject.Named} bean that is a {@link java.util.concurrent.ScheduledExecutorService} to use to schedule the task
      */
-    String scheduler() default ScheduledExecutorServiceConfig.NAME;
+    String scheduler() default Schedulers.SCHEDULED;
 }

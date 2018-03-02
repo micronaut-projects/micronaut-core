@@ -30,7 +30,6 @@ import org.particleframework.function.client.FunctionInvoker;
 import org.particleframework.function.client.FunctionInvokerChooser;
 import org.particleframework.function.client.exceptions.FunctionExecutionException;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
-import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -58,7 +57,7 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
             AWSLambdaAsync asyncClient,
             ByteBufferFactory byteBufferFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
-            @Named(IOExecutorServiceConfig.NAME) ExecutorService ioExecutor) {
+            @Named(org.particleframework.scheduling.Schedulers.IO) ExecutorService ioExecutor) {
         this.asyncClient = asyncClient;
         this.byteBufferFactory = byteBufferFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;

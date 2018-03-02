@@ -23,7 +23,6 @@ import org.particleframework.inject.BeanDefinition;
 import org.particleframework.management.endpoint.beans.BeanDefinitionData;
 import org.particleframework.management.endpoint.beans.BeanDefinitionDataCollector;
 import org.particleframework.management.endpoint.beans.BeansEndpoint;
-import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Named;
@@ -49,7 +48,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
     private ExecutorService executorService;
 
     RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData,
-                                      @Named(IOExecutorServiceConfig.NAME) ExecutorService executorService) {
+                                      @Named(org.particleframework.scheduling.Schedulers.IO) ExecutorService executorService) {
         this.beanDefinitionData = beanDefinitionData;
         this.executorService = executorService;
     }
@@ -68,8 +67,8 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
 
         return Flowable.fromIterable(definitions)
                 .subscribeOn(Schedulers.from(executorService))
-                .collectInto(beans, (map, definition) -> {
-            map.put(definition.getClass().getName(), beanDefinitionData.getData(definition));
-        });
+                .collectInto(beans, (map, definition) ->
+                        map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))
+                );
     }
 }

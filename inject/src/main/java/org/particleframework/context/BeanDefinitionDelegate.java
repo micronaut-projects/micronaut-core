@@ -27,6 +27,7 @@ import org.particleframework.core.value.ValueResolver;
 import org.particleframework.core.naming.NameResolver;
 import org.particleframework.core.naming.Named;
 import org.particleframework.inject.*;
+import org.particleframework.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -167,9 +168,18 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
                 if(named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>();
                     for (Argument argument : requiredArguments) {
-                        Optional result = ConversionService.SHARED.convert(named, argument.getType());
+                        Class argumentType = argument.getType();
+                        Optional result = ConversionService.SHARED.convert(named, argumentType);
+                        String argumentName = argument.getName();
                         if(result.isPresent()) {
-                            fulfilled.put(argument.getName(), result.get());
+                            fulfilled.put(argumentName, result.get());
+                        }
+                        else {
+                            // attempt bean lookup to full argument
+                            Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
+                            if(bean.isPresent()) {
+                                fulfilled.put(argumentName, bean.get());
+                            }
                         }
                     }
                     return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);

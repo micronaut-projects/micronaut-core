@@ -22,6 +22,7 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author graemerocher
@@ -37,7 +38,7 @@ class ScheduledFixedRateSpec extends Specification {
                 'scheduled-test.task.enabled':true
         )
 
-        PollingConditions conditions = new PollingConditions()
+        PollingConditions conditions = new PollingConditions(timeout: 10)
 
         when:
         MyTask myTask = beanContext.getBean(MyTask)
@@ -53,6 +54,7 @@ class ScheduledFixedRateSpec extends Specification {
         and:
         conditions.eventually {
             myTask.wasRun
+            myTask.cronEvents.get() == 2
             myTask.wasDelayedRun
             beanContext.getBean(MyJavaTask).wasRun
         }
@@ -65,10 +67,16 @@ class ScheduledFixedRateSpec extends Specification {
         boolean wasDelayedRun = false
         boolean fixedDelayWasRun = false
         boolean configuredWasRun = false
+        AtomicInteger cronEvents = new AtomicInteger(0)
 
         @Scheduled(fixedRate = '10ms')
         void runSomething() {
             wasRun = true
+        }
+
+        @Scheduled(cron = '1/3 0/1 * 1/1 * ?')
+        void runCron() {
+            cronEvents.incrementAndGet()
         }
 
         @Scheduled(fixedRate = '${some.configuration}')

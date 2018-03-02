@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadFactory;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(value = "particle.server.executors")
+@EachProperty(value = ExecutorConfiguration.PREFIX)
 public class UserExecutorConfiguration implements ExecutorConfiguration{
 
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();

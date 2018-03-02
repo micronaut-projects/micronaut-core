@@ -35,6 +35,7 @@ import org.particleframework.core.serialize.JdkSerializer;
 import org.particleframework.core.serialize.ObjectSerializer;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.particleframework.scheduling.Schedulers;
 import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
 import org.particleframework.session.*;
 import org.particleframework.session.event.SessionCreatedEvent;
@@ -106,7 +107,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             RedisHttpSessionConfiguration sessionConfiguration,
             BeanLocator beanLocator,
             ConversionService<?> conversionService,
-            @Named(ScheduledExecutorServiceConfig.NAME) ExecutorService scheduledExecutorService,
+            @Named(Schedulers.SCHEDULED) ExecutorService scheduledExecutorService,
             ApplicationEventPublisher eventPublisher) {
         this.writeMode = sessionConfiguration.getWriteMode();
         this.sessionIdGenerator = sessionIdGenerator;

@@ -1,0 +1,120 @@
+/*
+ * Copyright 2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.particleframework.scheduling;
+
+import org.particleframework.context.annotation.Primary;
+import org.particleframework.scheduling.cron.CronExpression;
+
+import javax.inject.Named;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.concurrent.*;
+import java.util.function.Supplier;
+
+import static org.particleframework.core.util.ArgumentUtils.check;
+
+/**
+ * Simple abstraction over {@link ScheduledExecutorService}
+ *
+ * @author graemerocher
+ * @since 1.0
+ */
+@Primary
+public class ScheduledExecutorTaskScheduler implements TaskScheduler {
+    private final ScheduledExecutorService executorService;
+
+    public ScheduledExecutorTaskScheduler(@Named(Schedulers.SCHEDULED) ExecutorService executorService) {
+        if(!(executorService instanceof ScheduledExecutorService)) {
+            throw new IllegalStateException("Cannot schedule tasks on ExecutorService that is not a ScheduledExecutorService: " + executorService);
+        }
+        this.executorService = (ScheduledExecutorService) executorService;
+    }
+
+    @Override
+    public ScheduledFuture<?> schedule(String cron, Runnable command) {
+        Supplier<Duration> delaySupplier = buildCronDelaySupplier(cron);
+        return new ReschedulingTask<>(() -> {
+            command.run();
+            return null;
+        }, this, delaySupplier);
+    }
+
+    @Override
+    public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
+        Supplier<Duration> delaySupplier = buildCronDelaySupplier(cron);
+        return new ReschedulingTask<>(command, this, delaySupplier);
+    }
+
+    @Override
+    public ScheduledFuture<?> schedule(Duration delay, Runnable command) {
+        check("delay", delay).notNull();
+        check("command", command).notNull();
+
+        return executorService.schedule(
+                command,
+                delay.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
+    }
+
+    @Override
+    public <V> ScheduledFuture<V> schedule(Duration delay, Callable<V> callable) {
+        check("delay", delay).notNull();
+        check("callable", callable).notNull();
+        return executorService.schedule(
+                callable,
+                delay.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleAtFixedRate(Duration initialDelay, Duration period, Runnable command) {
+        check("period", period).notNull();
+        check("command", command).notNull();
+        long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;
+        return executorService.scheduleAtFixedRate(
+                command,
+                initialDelayMillis,
+                period.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(Duration initialDelay, Duration delay, Runnable command) {
+        check("delay", delay).notNull();
+        check("command", command).notNull();
+        long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;
+        return executorService.scheduleWithFixedDelay(
+                command,
+                initialDelayMillis,
+                delay.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
+    }
+
+    private Supplier<Duration> buildCronDelaySupplier(String cron) {
+        CronExpression cronExpression = CronExpression.create(cron);
+        return () -> {
+            ZonedDateTime now = ZonedDateTime.now();
+            ZonedDateTime zonedDateTime = cronExpression.nextTimeAfter(now);
+            return Duration.ofMillis(
+                    zonedDateTime.toInstant().toEpochMilli() - ZonedDateTime.now().toInstant().toEpochMilli()
+            );
+        };
+    }
+}

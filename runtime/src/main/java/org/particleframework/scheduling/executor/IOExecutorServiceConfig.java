@@ -18,6 +18,7 @@ package org.particleframework.scheduling.executor;
 import org.particleframework.context.annotation.Bean;
 import org.particleframework.context.annotation.Factory;
 import org.particleframework.context.annotation.Requires;
+import org.particleframework.scheduling.Schedulers;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -28,18 +29,13 @@ import javax.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(missingProperty = "particle.server.executors.io")
+@Requires(missingProperty = ExecutorConfiguration.PREFIX_IO)
 @Factory
 public class IOExecutorServiceConfig {
 
-    /**
-     * The name of the default IO executor service
-     */
-    public static final String NAME = "io";
-
     @Singleton
     @Bean
-    @Named(IOExecutorServiceConfig.NAME)
+    @Named(Schedulers.IO)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.CACHED);
     }
