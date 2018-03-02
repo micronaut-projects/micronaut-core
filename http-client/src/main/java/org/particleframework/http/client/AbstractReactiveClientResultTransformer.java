@@ -41,7 +41,7 @@ public abstract class AbstractReactiveClientResultTransformer implements Reactiv
             NoAvailableServiceException nase = (NoAvailableServiceException) exception;
             if(LOG.isErrorEnabled()) {
                 LOG.debug(nase.getMessage(), nase);
-                LOG.error("HTTP @Client [{}] invocation [{}] attempting to resolve fallback for unavailable service [{}]", invocation.getDeclaringType().getName(), invocation, nase.getServiceID());
+                LOG.error("HTTP @Client [{}] invocation not available [{}]. Attempting to resolve fallback for unavailable service [{}]", invocation.getDeclaringType().getName(), invocation, nase.getServiceID());
             }
 
         }
