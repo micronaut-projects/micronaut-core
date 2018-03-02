@@ -16,11 +16,18 @@
 package org.particleframework
 
 import groovy.transform.CompileStatic
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.builder.AstBuilder
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.particleframework.ast.groovy.InjectTransform
+import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import org.particleframework.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.core.naming.NameUtils
 import org.particleframework.inject.BeanDefinition
+import org.particleframework.inject.annotation.AnnotationMetadataWriter
 import spock.lang.Specification
 
 /**
@@ -38,5 +45,45 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
         classLoader.parseClass(classStr)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
+        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+
+        ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
+        AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
+        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+
+        ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
+        MethodNode method = element.getMethods(methodName)[0]
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
+        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        return metadata
+    }
+
+
+    protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
+        def stream = new ByteArrayOutputStream()
+        new AnnotationMetadataWriter(className, toWrite)
+                .writeTo(stream)
+        className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
+        ClassLoader classLoader = new ClassLoader() {
+            @Override
+            protected Class<?> findClass(String name) throws ClassNotFoundException {
+                if (name == className) {
+                    def bytes = stream.toByteArray()
+                    return defineClass(name, bytes, 0, bytes.length)
+                }
+                return super.findClass(name)
+            }
+        }
+
+        AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
+        return metadata
     }
 }

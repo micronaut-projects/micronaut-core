@@ -85,7 +85,15 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
         if(annotationValue instanceof ConstantExpression) {
-            annotationValues.put(memberName, ((ConstantExpression)annotationValue).value)
+            if(annotationValue instanceof  AnnotationConstantExpression) {
+                AnnotationConstantExpression ann = (AnnotationConstantExpression)annotationValue
+                AnnotationNode value = (AnnotationNode)ann.getValue()
+                annotationValues.put(memberName, readNestedAnnotationValue(value))
+            }
+            else {
+                annotationValues.put(memberName, ((ConstantExpression)annotationValue).value)
+            }
+
         }
         else if(annotationValue instanceof PropertyExpression) {
             PropertyExpression pe = (PropertyExpression)annotationValue

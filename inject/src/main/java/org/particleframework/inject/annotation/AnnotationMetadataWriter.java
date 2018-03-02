@@ -230,7 +230,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     );
                 }
             }
-            // invoke the AbstractBeanDefinition.createMap method
+            // invoke the StringUtils.mapOf method
             methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
