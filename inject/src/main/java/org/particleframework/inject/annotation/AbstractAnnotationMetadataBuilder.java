@@ -16,14 +16,17 @@
 package org.particleframework.inject.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
+import org.particleframework.context.annotation.DefaultScope;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.AnnotationUtil;
 import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 
+import javax.inject.Scope;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}
@@ -247,6 +250,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
 
+        }
+        if(!annotationMetadata.hasDeclaredStereotype(Scope.class) && annotationMetadata.hasDeclaredStereotype(DefaultScope.class)) {
+            Optional<String> value = annotationMetadata.getValue(DefaultScope.class, String.class);
+            value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
         return annotationMetadata;
     }

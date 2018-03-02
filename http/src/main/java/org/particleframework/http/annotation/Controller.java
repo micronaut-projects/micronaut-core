@@ -17,9 +17,11 @@ package org.particleframework.http.annotation;
 
 import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Bean;
+import org.particleframework.context.annotation.DefaultScope;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.http.MediaType;
 
+import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -41,6 +43,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Bean
 @Executable
+@DefaultScope(Singleton.class)
 public @interface Controller {
     /**
      * <p>This attribute returns the base URI of the controller. If not specified the URI will be

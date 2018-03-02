@@ -7,10 +7,6 @@ The following features are a TODO list of things to do on Particle before launch
 ### Core Features
 
 
-#### @DefaultScope annotation
-
-We need a meta annotation to allow specifying the default scope to fallback to if no scope is defined
-
 #### Generate ConfigurationProperties documentation
 
 We should generate asciidoc documentation for @ConfigurationProperties
@@ -49,7 +45,16 @@ We need to implement AOP annotations for:
 
 #### Configuration Sharing
 
-Need a mechanism for configuration discovery and sharing across the federation
+Need a mechanism for configuration discovery and sharing across the federation. Configuration sharing should initially support:
+
+* Consul
+* Google Cloud (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
+* AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
+
+#### Service Discovery
+
+* Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
+* Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
 
 ### Management Features
 
@@ -58,15 +63,12 @@ Need a mechanism for configuration discovery and sharing across the federation
 We need endpoints for managing and/or exposing information about:
 
 - logging
+- info
 
-These should be built on the `Endpoint` API
+These should be built on the `Endpoint` API.
 
 ### HTTP Server
 
-
-#### HTTPS Support
-
-HTTPS must be supported
 
 #### Content Negotiation
 
@@ -83,11 +85,9 @@ Some view technology support and port GSON views to Particle.
 
 ### HTTP Client
 
-
 #### Distributed Tracing
 
 Built in distributed tracing should be activated by default and allow integration with third-part tools (zipkin etc.)
-
 
 ### HTTP Gateway
 
