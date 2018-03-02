@@ -313,13 +313,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static EnvironmentsAndPackage deduceEnvironments() {
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        Set<String> enviroments = environmentsAndPackage.enviroments;
         for (StackTraceElement stackTraceElement : stackTrace) {
             String methodName = stackTraceElement.getMethodName();
             if(methodName.contains("$spock_")) {
                 String className = stackTraceElement.getClassName();
                 String packageName = NameUtils.getPackageName(className);
                 environmentsAndPackage.aPackage = Package.getPackage(packageName);
-                environmentsAndPackage.enviroments.add(Environment.TEST);
+                enviroments.add(Environment.TEST);
             }
             else if("main".equals(methodName)) {
                 String packageName = NameUtils.getPackageName(stackTraceElement.getClassName());
@@ -330,10 +331,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             else {
                 String className = stackTraceElement.getClassName();
                 if(Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                    environmentsAndPackage.enviroments.add(Environment.TEST);
+                    enviroments.add(Environment.TEST);
                 }
                 else if(className.startsWith("com.android")) {
-                    environmentsAndPackage.enviroments.add(Environment.ANDROID);
+                    enviroments.add(Environment.ANDROID);
                 }
             }
         }
@@ -342,19 +343,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             switch (computePlatform) {
                 case GOOGLE_COMPUTE:
                     //instantiate bean for GC metadata discovery
-                    environmentsAndPackage.enviroments.add(Environment.GOOGLE_COMPUTE);
+                    enviroments.add(Environment.GOOGLE_COMPUTE);
                     break;
                 case AMAZON_EC2:
                     //instantiate bean for ec2 metadata discovery
-                    environmentsAndPackage.enviroments.add(Environment.AMAZON_EC2);
+                    enviroments.add(Environment.AMAZON_EC2);
                     break;
                 case AZURE:
                     // not implemented
-                    environmentsAndPackage.enviroments.add(Environment.AZURE);
+                    enviroments.add(Environment.AZURE);
                     break;
                 case IBM:
                     // not implemented
-                    environmentsAndPackage.enviroments.add(Environment.IBM);
+                    enviroments.add(Environment.IBM);
                     break;
                 case OTHER:
                     // do nothing here
@@ -362,8 +363,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
 
         }
-        if(LOG.isInfoEnabled()) {
-            LOG.info("Established active environments: {}", environmentsAndPackage.enviroments);
+        if(LOG.isInfoEnabled() && !enviroments.isEmpty()) {
+            LOG.info("Established active environments: {}", enviroments);
         }
 
         return environmentsAndPackage;
