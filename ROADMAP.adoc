@@ -43,7 +43,7 @@ We need to implement AOP annotations for:
 - Retry
 - Hystrix
 
-#### Configuration Sharing
+### Configuration Sharing
 
 Need a mechanism for configuration discovery and sharing across the federation. Configuration sharing should initially support:
 
@@ -51,10 +51,22 @@ Need a mechanism for configuration discovery and sharing across the federation. 
 * Google Cloud (https://cloud.google.com/deployment-manager/runtime-configurator/reference/rest/)
 * AWS Systems Manager Parameter Store (https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-paramstore.html and Example https://gist.github.com/ariesmcrae/b72aa0f986f87977ffc2de42481c8885)
 
-#### Service Discovery
+### Service Discovery
 
 * Amazon Route 53 (see https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html)
 * Google Cloud Metadata Server (see https://cloud.google.com/compute/docs/storing-retrieving-metadata?hl=en)
+
+### Auto Configurations
+
+We still need auto-configurations for the following:
+
+* GORM for MongoDB
+* Apache Kafka
+* Cassandra
+
+### Security / JWT Token Solution
+
+Need to implement support for JWT token based authorization
 
 ### Management Features
 
@@ -66,6 +78,14 @@ We need endpoints for managing and/or exposing information about:
 - info
 
 These should be built on the `Endpoint` API.
+
+#### Health Checks
+
+Health checks still to be implemented:
+
+* JDBC/SQL
+* Neo4j Driver
+
 
 ### HTTP Server
 
