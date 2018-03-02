@@ -1,6 +1,6 @@
 `@Refreshable` scope is a custom scope that allows a bean’s state to be refreshed via:
 
-- /refresh endpoint.
+- `/refresh` endpoint.
 - Publication of a `RefreshEvent`.
 
 The next example, illustrates the `@Refreshable` scope behavior.
