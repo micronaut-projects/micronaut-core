@@ -158,7 +158,7 @@ class NullableCrudSpec extends Specification {
 
     static interface NullableBookApi {
 
-        @Get("/show/{/id}") // /show to avoid calling list instead
+        @Get("/show{/id}") // /show to avoid calling list instead
         NullableBook get(@Nullable Long id)
 
         @Get('/')

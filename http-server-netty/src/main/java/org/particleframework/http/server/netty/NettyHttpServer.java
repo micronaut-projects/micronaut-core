@@ -34,20 +34,19 @@ import org.particleframework.core.naming.Named;
 import org.particleframework.core.order.OrderUtil;
 import org.particleframework.core.reflect.GenericTypeUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
-import org.particleframework.discovery.cloud.ComputeInstanceMetadataResolver;
 import org.particleframework.discovery.event.ServiceShutdownEvent;
 import org.particleframework.discovery.event.ServiceStartedEvent;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.server.binding.RequestBinderRegistry;
 import org.particleframework.http.server.netty.configuration.NettyHttpServerConfiguration;
 import org.particleframework.http.server.netty.decoders.HttpRequestDecoder;
-import org.particleframework.http.server.netty.ssl.NettySslBuilder;
+import org.particleframework.http.server.netty.ssl.NettyServerSslBuilder;
 import org.particleframework.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
+import org.particleframework.http.ssl.SslConfiguration;
 import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.runtime.ApplicationConfiguration;
 import org.particleframework.scheduling.Schedulers;
 import org.particleframework.scheduling.executor.ExecutorSelector;
-import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.particleframework.runtime.server.EmbeddedServer;
 import org.particleframework.runtime.server.EmbeddedServerInstance;
 import org.particleframework.runtime.server.event.ServerShutdownEvent;
@@ -57,7 +56,6 @@ import org.particleframework.web.router.resource.StaticResourceResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
@@ -90,6 +88,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
+    private final SslConfiguration sslConfiguration;
     private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
     private final Router router;
@@ -114,7 +113,7 @@ public class NettyHttpServer implements EmbeddedServer {
             StaticResourceResolver resourceResolver,
             @javax.inject.Named(Schedulers.IO) ExecutorService ioExecutor,
             ExecutorSelector executorSelector,
-            NettySslBuilder nettySslBuilder,
+            NettyServerSslBuilder nettyServerSslBuilder,
             ChannelOutboundHandler... outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -127,16 +126,17 @@ public class NettyHttpServer implements EmbeddedServer {
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
+        this.sslConfiguration = nettyServerSslBuilder.getSslConfiguration();
         this.router = router;
         this.ioExecutor = ioExecutor;
-        int port = serverConfiguration.getSsl().isEnabled() ? serverConfiguration.getSsl().getPort() : serverConfiguration.getPort();
+        int port = sslConfiguration.isEnabled() ? sslConfiguration.getPort() : serverConfiguration.getPort();
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.binderRegistry = binderRegistry;
         this.staticResourceResolver = resourceResolver;
-        this.sslContext = nettySslBuilder.build();
+        this.sslContext = nettyServerSslBuilder.build();
     }
 
     /**
@@ -295,8 +295,9 @@ public class NettyHttpServer implements EmbeddedServer {
         return serverConfiguration.getHost().orElse("localhost");
     }
 
+    @Override
     public String getScheme() {
-        return serverConfiguration.getSsl().isEnabled() ? "https" : "http";
+        return sslConfiguration.isEnabled() ? "https" : "http";
     }
 
     @Override

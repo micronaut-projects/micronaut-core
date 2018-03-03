@@ -19,10 +19,10 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import org.particleframework.http.server.HttpServerConfiguration;
-import org.particleframework.http.server.ssl.ClientAuthentication;
-import org.particleframework.http.server.ssl.SslBuilder;
-import org.particleframework.http.server.ssl.SslConfigurationException;
+import org.particleframework.http.ssl.ClientAuthentication;
+import org.particleframework.http.ssl.SslBuilder;
+import org.particleframework.http.ssl.SslConfiguration;
+import org.particleframework.http.ssl.SslConfigurationException;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
@@ -32,16 +32,20 @@ import java.util.Optional;
 
 /**
  * The Netty implementation of {@link SslBuilder} that generates
- * an {@link SslContext} to create a handler with to support SSL.
+ * an {@link SslContext} to create a server handler with to support SSL.
  *
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-public class NettySslBuilder extends SslBuilder<SslContext> {
+public class NettyServerSslBuilder extends SslBuilder<SslContext> {
 
-    public NettySslBuilder(HttpServerConfiguration.SslConfiguration ssl) {
+    public NettyServerSslBuilder(SslConfiguration ssl) {
         super(ssl);
+    }
+
+    public SslConfiguration getSslConfiguration() {
+        return ssl;
     }
 
     @Override

@@ -62,14 +62,15 @@ import org.particleframework.http.HttpResponse;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Filter;
 import org.particleframework.http.client.exceptions.ContentLengthExceededException;
-import org.particleframework.http.client.exceptions.EmptyResponseException;
 import org.particleframework.http.client.exceptions.HttpClientException;
 import org.particleframework.http.client.exceptions.HttpClientResponseException;
+import org.particleframework.http.client.ssl.NettyClientSslBuilder;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.ClientFilterChain;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.particleframework.http.netty.buffer.NettyByteBufferFactory;
+import org.particleframework.http.ssl.SslConfiguration;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
 import org.particleframework.jackson.codec.JsonStreamMediaTypeCodec;
@@ -85,7 +86,6 @@ import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLException;
 import java.io.Closeable;
 import java.net.Proxy.Type;
 import java.net.SocketAddress;
@@ -116,6 +116,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
 
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
+    private final Optional<SslContext> sslContext;
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
     private final HttpClientFilter[] filters;
@@ -134,12 +135,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     @Inject
     public DefaultHttpClient(@Argument LoadBalancer loadBalancer,
                              @Argument HttpClientConfiguration configuration,
+                             NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
+        this.sslContext = nettyClientSslBuilder.build();
         this.group = createEventLoopGroup(configuration);
         this.bootstrap.group(group)
                 .channel(NioSocketChannel.class)
@@ -156,12 +159,16 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
         this.filters = filters;
     }
 
-    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, codecRegistry, filters);
+    public DefaultHttpClient(URL url,
+                             HttpClientConfiguration configuration,
+                             NettyClientSslBuilder nettyClientSslBuilder,
+                             MediaTypeCodecRegistry codecRegistry,
+                             HttpClientFilter... filters) {
+        this(LoadBalancer.fixed(url), configuration, nettyClientSslBuilder, codecRegistry, filters);
     }
 
     public DefaultHttpClient(LoadBalancer loadBalancer) {
-        this(loadBalancer, new DefaultHttpClientConfiguration(), createDefaultMediaTypeRegistry());
+        this(loadBalancer, new DefaultHttpClientConfiguration(), new NettyClientSslBuilder(new SslConfiguration()), createDefaultMediaTypeRegistry());
     }
 
 
@@ -593,7 +600,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
-            sslCtx = buildSslContext(configuration);
+            sslCtx = sslContext.orElse(null);
         } else {
             sslCtx = null;
         }
@@ -644,26 +651,6 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
             }
         }
         return filterList;
-    }
-
-    /**
-     * Builds an {@link SslContext} from the {@link HttpClientConfiguration}
-     *
-     * @param configuration The configuration instance
-     * @return The {@link SslContext} instance
-     */
-    protected SslContext buildSslContext(HttpClientConfiguration configuration) {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
-                .sslProvider(configuration.getSslProvider());
-        configuration.getSslSessionCacheSize().ifPresent(sslContextBuilder::sessionCacheSize);
-        configuration.getSslSessionTimeout().ifPresent(duration -> sslContextBuilder.sessionTimeout(duration.getSeconds()));
-        configuration.getSslTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-
-        try {
-            return sslContextBuilder.build();
-        } catch (SSLException e) {
-            throw new HttpClientException("Error constructing SSL context: " + e.getMessage(), e);
-        }
     }
 
     /**
