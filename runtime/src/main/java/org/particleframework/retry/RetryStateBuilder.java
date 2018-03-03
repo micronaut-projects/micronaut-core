@@ -13,28 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.scheduling;
-
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.scheduling.annotation.Scheduled;
-
-import javax.inject.Singleton;
+package org.particleframework.retry;
 
 /**
+ * The retry state builder
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
-public class MyJavaTask {
-    private boolean wasRun = false;
-
-    @Scheduled(fixedRate = "10ms")
-    public void runSomething() {
-        wasRun = true;
-    }
-
-    public boolean isWasRun() {
-        return wasRun;
-    }
+@FunctionalInterface
+public interface RetryStateBuilder {
+    /**
+     * @return Builds retry state
+     */
+    RetryState build();
 }

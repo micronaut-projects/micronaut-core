@@ -17,6 +17,7 @@ package org.particleframework.http;
 
 import org.particleframework.http.cookie.Cookie;
 
+import javax.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.time.ZonedDateTime;
 import java.util.Collections;
@@ -47,7 +48,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      */
     @Override
-    MutableHttpResponse<B> body(B body);
+    MutableHttpResponse<B> body(@Nullable B body);
 
     /**
      * Sets the response status

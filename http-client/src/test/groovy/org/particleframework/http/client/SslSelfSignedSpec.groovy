@@ -12,7 +12,6 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
-@Ignore
 class SslSelfSignedSpec extends Specification {
 
     @Shared

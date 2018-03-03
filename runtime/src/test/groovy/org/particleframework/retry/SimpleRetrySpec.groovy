@@ -18,6 +18,8 @@ package org.particleframework.retry
 import io.reactivex.Single
 import org.particleframework.context.ApplicationContext
 import org.particleframework.retry.annotation.Retry
+import org.particleframework.retry.event.RetryEvent
+import org.particleframework.retry.event.RetryEventListener
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
@@ -33,14 +35,17 @@ class SimpleRetrySpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
         int result = counterService.getCount()
 
         then:"It executes until successful"
         result == 3
+        listener.events.size() == 2
 
         when:"The threshold can never be met"
+        listener.reset()
         counterService.countThreshold = 10
         counterService.count = 0
         counterService.getCount()
@@ -57,14 +62,17 @@ class SimpleRetrySpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
         int result = counterService.getCountSingle().blockingGet()
 
         then:"It executes until successful"
+        listener.events.size() == 2
         result == 3
 
         when:"The threshold can never be met"
+        listener.reset()
         counterService.countThreshold = 10
         counterService.count = 0
         def single = counterService.getCountSingle()
@@ -82,14 +90,17 @@ class SimpleRetrySpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
 
         when:"A method is annotated retry"
         int result = counterService.getCountMono().block()
 
         then:"It executes until successful"
+        listener.events.size() == 2
         result == 3
 
         when:"The threshold can never be met"
+        listener.reset()
         counterService.countThreshold = 10
         counterService.count = 0
         def single = counterService.getCountMono()
@@ -103,6 +114,19 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    @Singleton
+    static class MyRetryListener implements RetryEventListener {
+
+        List<RetryEvent> events = []
+
+        void reset() {
+            events.clear()
+        }
+        @Override
+        void onApplicationEvent(RetryEvent event) {
+            events.add(event)
+        }
+    }
     @Singleton
     static class CounterService {
         int count = 0

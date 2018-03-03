@@ -63,6 +63,13 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
     R proceed() throws RuntimeException;
 
     /**
+     * Repeats the previous interceptor in the chain without advancing the chain. Mainly useful for {@link Introduction} advise where you want to
+     * invoke the target multiple times
+     *
+     * @return The return value of the method
+     */
+    R repeat() throws RuntimeException;
+    /**
      * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
      * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
      *

@@ -39,6 +39,12 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * @return The HTTP status
+     */
+    default HttpStatus status() {
+        return getStatus();
+    }
+    /**
      * @return The response status code
      */
     default int code() {

@@ -34,9 +34,9 @@ public enum InterceptPhase {
      */
     CACHE(-80),
     /**
-     * Caching phase of execution
+     * Retry phase of execution
      */
-    RETRY(-80),
+    RETRY(-60),
     /**
      * Transaction phase of execution
      */
