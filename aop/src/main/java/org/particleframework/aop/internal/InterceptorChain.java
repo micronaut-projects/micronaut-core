@@ -16,6 +16,7 @@
 package org.particleframework.aop.internal;
 
 import org.particleframework.aop.*;
+import org.particleframework.aop.exceptions.UnimplementedAdviceException;
 import org.particleframework.context.ApplicationContext;
 import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Type;
@@ -31,6 +32,7 @@ import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -45,7 +47,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
-    protected final MutableConvertibleValues attributes;
+    protected final MutableConvertibleValues attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>());
     protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
     private final boolean isIntroduction;
     private int index = 0;
@@ -56,15 +58,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
                             Object...originalParameters) {
         this.target = target;
         this.executionHandle = method;
-        this.attributes = AopAttributes.get(method.getDeclaringType(),
-                                            method.getMethodName(),
-                                            method.getArgumentTypes());
         this.interceptors = new Interceptor[interceptors.length+1];
         System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
         this.isIntroduction = target instanceof Introduced;
         if(isIntroduction) {
             this.interceptors[this.interceptors.length-1] = context -> {
-                throw new UnsupportedOperationException("Introduction advice reached the end of the chain and no possible implementations were found");
+                throw new UnimplementedAdviceException(method);
             };
         }
         else {
@@ -115,34 +114,26 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         if(len == 0) {
             throw new IllegalStateException("At least one interceptor is required when calling proceed on the interceptor chain!");
         }
-        boolean last = false;
         int size = len - 1;
         if(index == size) {
-            last = true;
             interceptor = this.interceptors[size];
         }
         else {
-            if(isIntroduction && index == size -1) {
-                // the last interceptor in the chain for @Introduction advise throws UnsupportedException, so we consider it the last
-                // this ensures cleanup before the exception is thrown
-                last = true;
-            }
             interceptor = this.interceptors[index++];
         }
-        try {
-            return interceptor.intercept(this);
-        }
-        catch (RuntimeException t) {
-            AopAttributes.remove(executionHandle.getDeclaringType(), executionHandle.getMethodName(), executionHandle.getArgumentTypes());
-            throw t;
-        }
-        finally {
-            if(last) {
-                AopAttributes.remove(executionHandle.getDeclaringType(), executionHandle.getMethodName(), executionHandle.getArgumentTypes());
-            }
-        }
+        return interceptor.intercept(this);
     }
 
+    @Override
+    public R repeat() throws RuntimeException {
+        if(isIntroduction) {
+            Interceptor<B, R> interceptor = this.interceptors[index-1];
+            return interceptor.intercept(this);
+        }
+        else {
+            return proceed();
+        }
+    }
 
 
     /**

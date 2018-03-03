@@ -13,28 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.scheduling;
+package org.particleframework.retry.event;
 
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.scheduling.annotation.Scheduled;
-
-import javax.inject.Singleton;
+import org.particleframework.context.event.ApplicationEvent;
+import org.particleframework.inject.ExecutableMethod;
 
 /**
+ * An event fired when a Circuit is {@link org.particleframework.retry.CircuitState#CLOSED} and has resumed
+ * accepting requests
+ *
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
-public class MyJavaTask {
-    private boolean wasRun = false;
+public class CircuitClosedEvent extends ApplicationEvent {
 
-    @Scheduled(fixedRate = "10ms")
-    public void runSomething() {
-        wasRun = true;
+    public CircuitClosedEvent(
+            ExecutableMethod<?,?> source) {
+        super(source);
     }
 
-    public boolean isWasRun() {
-        return wasRun;
+    /**
+     * @return The method that represents the circuit
+     */
+    @Override
+    public ExecutableMethod<?,?> getSource() {
+        return (ExecutableMethod<?, ?>) super.getSource();
     }
 }

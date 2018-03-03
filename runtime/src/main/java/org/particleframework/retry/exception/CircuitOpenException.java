@@ -13,28 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.scheduling;
-
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.scheduling.annotation.Scheduled;
-
-import javax.inject.Singleton;
+package org.particleframework.retry.exception;
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
-public class MyJavaTask {
-    private boolean wasRun = false;
-
-    @Scheduled(fixedRate = "10ms")
-    public void runSomething() {
-        wasRun = true;
+public class CircuitOpenException extends RetryException {
+    public CircuitOpenException(String message) {
+        super(message);
     }
 
-    public boolean isWasRun() {
-        return wasRun;
+    public CircuitOpenException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

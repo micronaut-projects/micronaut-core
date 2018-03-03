@@ -13,28 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.scheduling;
+package org.particleframework.aop.exceptions;
 
-import org.particleframework.context.annotation.Requires;
-import org.particleframework.scheduling.annotation.Scheduled;
-
-import javax.inject.Singleton;
+import org.particleframework.inject.ExecutableMethod;
 
 /**
+ * An exception thrown when {@link org.particleframework.aop.Introduction} advise cannot be implemented
+ *
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
-public class MyJavaTask {
-    private boolean wasRun = false;
+public class UnimplementedAdviceException extends UnsupportedOperationException{
 
-    @Scheduled(fixedRate = "10ms")
-    public void runSomething() {
-        wasRun = true;
-    }
-
-    public boolean isWasRun() {
-        return wasRun;
+    public UnimplementedAdviceException(ExecutableMethod<?,?> method) {
+        super("All possible Introduction advise exhausted and no implementation found for method: " + method);
     }
 }

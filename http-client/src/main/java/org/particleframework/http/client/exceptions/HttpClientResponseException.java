@@ -43,6 +43,17 @@ public class HttpClientResponseException extends HttpClientException{
         initResponse(response);
     }
 
+    @Override
+    public String getMessage() {
+        Optional<VndError> body = getResponse().getBody(VndError.class);
+        if(body.isPresent()) {
+            return body.get().getMessage();
+        }
+        else {
+            return super.getMessage();
+        }
+    }
+
     /**
      * @return The {@link HttpResponse}
      */

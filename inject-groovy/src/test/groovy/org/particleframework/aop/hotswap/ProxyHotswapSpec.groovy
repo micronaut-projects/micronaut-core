@@ -16,7 +16,6 @@
 package org.particleframework.aop.hotswap
 
 import org.particleframework.aop.HotSwappableInterceptedProxy
-import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import spock.lang.Specification
@@ -34,7 +33,6 @@ class ProxyHotswapSpec extends Specification {
 
         when:
         HotswappableProxyingClass foo = beanContext.getBean(HotswappableProxyingClass)
-        def attrs = AopAttributes.get(HotswappableProxyingClass, "test", String)
         then:
         foo instanceof HotSwappableInterceptedProxy
         foo.interceptedTarget().getClass() == HotswappableProxyingClass
@@ -46,12 +44,5 @@ class ProxyHotswapSpec extends Specification {
         foo.interceptedTarget().invocationCount == 0
         foo.interceptedTarget() != foo
         foo.interceptedTarget().is(newInstance)
-        AopAttributes.@attributes.get().values().first().values == attrs
-
-        when:
-        AopAttributes.remove(HotswappableProxyingClass, "test", String)
-
-        then:
-        AopAttributes.@attributes.get() == null
     }
 }

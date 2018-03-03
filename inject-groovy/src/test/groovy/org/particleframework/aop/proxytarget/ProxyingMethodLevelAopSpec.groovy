@@ -17,7 +17,6 @@ package org.particleframework.aop.proxytarget
 
 import org.particleframework.aop.Intercepted
 import org.particleframework.aop.InterceptedProxy
-import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
@@ -91,29 +90,7 @@ class ProxyingMethodLevelAopSpec extends Specification {
         // should not be a reflection based method
         !beanContext.findExecutableMethod(ProxyingClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get() == null
 
     }
 
-    void "test AOP setup attributes"() {
-        given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-
-        when:
-        ProxyingClass foo = beanContext.getBean(ProxyingClass)
-        def attrs = AopAttributes.get(ProxyingClass, "test", String)
-        then:
-        foo instanceof InterceptedProxy
-        foo.interceptedTarget().getClass() == ProxyingClass
-        foo.test("test") == "Name is changed"
-        foo.interceptedTarget().invocationCount == 1
-        foo.interceptedTarget() != foo
-        AopAttributes.@attributes.get().values().first().values == attrs
-
-        when:
-        AopAttributes.remove(ProxyingClass, "test", String)
-
-        then:
-        AopAttributes.@attributes.get() == null
-    }
 }

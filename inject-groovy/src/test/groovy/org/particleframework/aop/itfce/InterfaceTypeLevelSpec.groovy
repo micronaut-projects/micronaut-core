@@ -16,7 +16,6 @@
 package org.particleframework.aop.itfce
 
 import org.particleframework.aop.Intercepted
-import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
@@ -83,32 +82,8 @@ class InterfaceTypeLevelSpec extends Specification {
         // should not be a reflection based method
         !beanContext.findExecutableMethod(InterfaceTypeLevel, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get() == null
 
-        cleanup:
-        AopAttributes.remove(InterfaceTypeLevel, "test", String)
     }
 
-    void "test AOP setup attributes"() {
-        given:
-        BeanContext beanContext = new DefaultBeanContext().start()
-
-        when:
-        InterfaceTypeLevel foo = beanContext.getBean(InterfaceTypeLevel)
-        def attrs = AopAttributes.get(InterfaceTypeLevel, "test", String)
-        then:
-        foo instanceof Intercepted
-        foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get().values().first().values == attrs
-
-        when:
-        AopAttributes.remove(InterfaceTypeLevel, "test", String)
-
-        then:
-        AopAttributes.@attributes.get() == null
-
-        cleanup:
-        AopAttributes.remove(InterfaceTypeLevel, "test", String)
-    }
 }
 

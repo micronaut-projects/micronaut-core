@@ -22,6 +22,7 @@ import org.particleframework.health.HealthStatus
 import org.particleframework.http.HttpStatus
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author graemerocher
@@ -35,6 +36,7 @@ class ConsulMockHealthStatusSpec extends Specification {
                 [(MockConsulServer.ENABLED):true]
         )
 
+        when:
         String serviceId = 'myService'
         EmbeddedServer application = ApplicationContext.run(
                 EmbeddedServer,
@@ -42,10 +44,15 @@ class ConsulMockHealthStatusSpec extends Specification {
                  'consul.client.port': consulServer.getPort(),
                  'particle.application.name': serviceId] // short heart beat interval
         )
+        PollingConditions conditions = new PollingConditions()
+        ConsulClient consulClient = application.getApplicationContext().getBean(ConsulClient)
+        then:
+        conditions.eventually {
+            Flowable.fromPublisher(consulClient.getInstances(serviceId)).blockingFirst().size() == 1
+        }
 
         when:"An application is set to fail"
 
-        ConsulClient consulClient = application.getApplicationContext().getBean(ConsulClient)
         HttpStatus status = Flowable.fromPublisher(consulClient.fail("service:myService:${application.port}")).blockingFirst()
 
         then:"The status is ok"
