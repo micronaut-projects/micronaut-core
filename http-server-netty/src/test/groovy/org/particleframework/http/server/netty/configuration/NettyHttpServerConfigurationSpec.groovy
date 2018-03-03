@@ -39,8 +39,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
                 'particle.server.netty.worker.threads':8,
                 'particle.server.netty.parent.threads':8,
                 'particle.server.multipart.maxFileSize':2048,
-                'particle.server.maxRequestSize':'2MB',
-                'particle.server.ssl.port':8888]
+                'particle.server.maxRequestSize':'2MB']
 
         ))
         beanContext.start()
@@ -53,7 +52,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         then:
         server != null
         config.maxRequestSize == 2097152
-        config.ssl.port == 8888
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption

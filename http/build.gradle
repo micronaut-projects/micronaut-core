@@ -1,5 +1,6 @@
 dependencies {
     compile project(":inject")
+    compileOnly project(":inject-java")
 
     testCompile project(":inject-groovy")
 }

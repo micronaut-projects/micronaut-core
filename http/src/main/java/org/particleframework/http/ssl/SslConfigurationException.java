@@ -13,23 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.ssl;
+package org.particleframework.http.ssl;
 
 /**
- * An enum describing the type of client authentication
+ * An exception thrown while configuring SSL
  *
  * @author James Kleeh
  * @since 1.0
  */
-public enum ClientAuthentication {
+public class SslConfigurationException extends RuntimeException {
 
-    /**
-     * Required
-     */
-    NEED,
+    public SslConfigurationException(String message) {
+        super(message);
+    }
 
-    /**
-     * Desired but not required
-     */
-    WANT
+    public SslConfigurationException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public SslConfigurationException(Throwable cause) {
+        super("An error occurred configuring SSL", cause);
+    }
 }
