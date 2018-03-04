@@ -40,7 +40,6 @@ At compile time we know the types but at runtime the lambda loses type informati
 
 We need to implement AOP annotations for:
 
-- Retry
 - Hystrix
 
 ### Configuration Sharing
@@ -97,7 +96,6 @@ Content negotiation must be supported
 #### WebSocket Support
 
 WebSocket Support must be implemented
-
 
 #### Support for Views
 
