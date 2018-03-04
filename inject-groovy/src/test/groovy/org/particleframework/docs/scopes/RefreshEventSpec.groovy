@@ -113,7 +113,7 @@ curl -X "POST" "{url}/weather/evict"
 
     }
 
-    //tag::wheatherService[]
+    //tag::weatherService[]
     @Refreshable // <1>
     static class WeatherService {
 
@@ -125,12 +125,12 @@ curl -X "POST" "{url}/weather/evict"
         }
 
         String latestForecast() {
-            forecast
+            return forecast
         }
     }
-    //end::wheatherService[]
+    //end::weatherService[]
 
-    //tag::wheatherController[]
+    //tag::weatherController[]
     @Controller('/weather')
     static class WeatherController {
         @Inject
@@ -150,7 +150,7 @@ curl -X "POST" "{url}/weather/evict"
             ok([msg: 'OK']) as HttpResponse<Map<String, String>>
         }
     }
-    //end::wheatherController[]
+    //end::weatherController[]
 
 
 }

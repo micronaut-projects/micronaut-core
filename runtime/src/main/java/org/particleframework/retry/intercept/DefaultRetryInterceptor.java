@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry;
+package org.particleframework.retry.intercept;
 
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
@@ -26,10 +26,10 @@ import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.convert.value.MutableConvertibleValues;
 import org.particleframework.core.type.ReturnType;
+import org.particleframework.retry.RetryState;
 import org.particleframework.retry.annotation.CircuitBreaker;
-import org.particleframework.retry.annotation.Retry;
+import org.particleframework.retry.annotation.Retryable;
 import org.particleframework.retry.event.RetryEvent;
-import org.particleframework.retry.exception.RetryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link MethodInterceptor} that retries an operation according to the specified
- * {@link org.particleframework.retry.annotation.Retry} annotation
+ * {@link Retryable} annotation
  *
  * @author graemerocher
  * @since 1.0
@@ -67,7 +67,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        ConvertibleValues<?> retry = context.getValues(Retry.class);
+        ConvertibleValues<?> retry = context.getValues(Retryable.class);
         boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
         if (retry != null) {
             MutableRetryState retryState;

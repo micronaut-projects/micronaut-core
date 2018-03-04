@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry;
+package org.particleframework.retry.intercept;
 
 import org.particleframework.context.event.ApplicationEventPublisher;
 import org.particleframework.inject.ExecutableMethod;
+import org.particleframework.retry.CircuitState;
+import org.particleframework.retry.RetryStateBuilder;
 import org.particleframework.retry.event.CircuitClosedEvent;
 import org.particleframework.retry.event.CircuitOpenEvent;
 import org.particleframework.retry.exception.CircuitOpenException;
@@ -167,7 +169,7 @@ class CircuitBreakerRetry implements MutableRetryState {
             throw new IllegalArgumentException("Exception cause cannot be null");
         }
         if(LOG.isDebugEnabled()) {
-            LOG.debug("Opening circuit [{}] due to error: {}", method, cause.getMessage());
+            LOG.debug("Opening Circuit Breaker [{}] due to error: {}", method, cause.getMessage());
         }
         this.childState = (MutableRetryState) retryStateBuilder.build();
         this.lastError = cause;
@@ -194,7 +196,7 @@ class CircuitBreakerRetry implements MutableRetryState {
      */
     private CircuitState closeCircuit() {
         if(LOG.isDebugEnabled()) {
-            LOG.debug("Closing Circuit [{}]", method);
+            LOG.debug("Closing Circuit Breaker [{}]", method);
         }
 
         time = System.currentTimeMillis();
@@ -221,6 +223,9 @@ class CircuitBreakerRetry implements MutableRetryState {
      * @return The current state
      */
     private CircuitState halfOpenCircuit() {
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("Half Opening Circuit Breaker [{}]", method);
+        }
         lastError = null;
         this.childState = (MutableRetryState) retryStateBuilder.build();
         return state.getAndSet(CircuitState.HALF_OPEN);

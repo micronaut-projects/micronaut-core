@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry;
+package org.particleframework.retry.intercept;
 
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.convert.value.ConvertibleValues;
 import org.particleframework.core.type.Argument;
-import org.particleframework.retry.annotation.Retry;
+import org.particleframework.retry.RetryState;
+import org.particleframework.retry.RetryStateBuilder;
+import org.particleframework.retry.annotation.Retryable;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -46,7 +48,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
     @Override
     public RetryState build() {
-        ConvertibleValues<?> retry = annotationMetadata.getValues(Retry.class);
+        ConvertibleValues<?> retry = annotationMetadata.getValues(Retryable.class);
         int attempts = retry.get(ATTEMPTS, Integer.class).orElse(3);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
         Set<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);

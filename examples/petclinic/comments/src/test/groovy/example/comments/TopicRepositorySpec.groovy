@@ -36,7 +36,8 @@ import spock.lang.Stepwise
 class TopicRepositorySpec extends Specification{
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['neo4j.uri': "bolt://localhost:${SocketUtils.findAvailableTcpPort()}",
+            ["consul.client.registration.enabled":false,
+            'neo4j.uri': "bolt://localhost:${SocketUtils.findAvailableTcpPort()}",
             'neo4j.embedded.ephemeral':true]
     )
 

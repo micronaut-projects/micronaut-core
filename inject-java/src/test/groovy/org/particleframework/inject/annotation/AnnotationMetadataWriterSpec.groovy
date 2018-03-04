@@ -16,11 +16,14 @@
 package org.particleframework.inject.annotation
 
 import org.particleframework.aop.Around
+import org.particleframework.aop.introduction.StubIntroducer
 import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
+import org.particleframework.context.annotation.Type
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.AbstractTypeElementSpec
+import org.particleframework.retry.annotation.Recoverable
 
 import javax.inject.Qualifier
 import javax.inject.Scope
@@ -34,6 +37,30 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test annotation metadata inherited stereotypes"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+
+@MyStereotype
+class Test {
+}
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasAnnotation(MyStereotype)
+        // the value of @Type should be the the one declared on the the @MyStereotype annotation not the one declared on @Recoverable
+        metadata.getValue(Type.class, String.class).get() == StubIntroducer.class.getName()
+        // the stereotypes should include meta annotation stereotypes
+        metadata.getAnnotationNamesByStereotype(Around.class).contains(Recoverable.class.getName())
+    }
+    
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
@@ -303,7 +330,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name] as Set
     }
 
 }

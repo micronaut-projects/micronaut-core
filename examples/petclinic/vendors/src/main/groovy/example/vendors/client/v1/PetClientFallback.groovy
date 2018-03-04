@@ -21,7 +21,7 @@ import io.reactivex.Maybe
 import io.reactivex.Single
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Get
-import org.particleframework.http.client.Fallback
+import org.particleframework.retry.annotation.Fallback
 
 import javax.inject.Singleton
 import javax.validation.Valid

@@ -25,7 +25,6 @@ import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.annotation.AbstractAnnotationMetadataBuilder
-import org.particleframework.inject.annotation.AnnotationValue
 
 /**
  * Groovy implementation of {@link AbstractAnnotationMetadataBuilder}
@@ -83,15 +82,25 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
+    protected void readAnnotationRawValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
+        if(!annotationValues.containsKey(memberName)) {
+            def v = readAnnotationValue(memberName, annotationValue)
+            if(v != null ) {
+                annotationValues.put(memberName, v)
+            }
+        }
+    }
+
+    @Override
+    protected Object readAnnotationValue(String memberName, Object annotationValue) {
         if(annotationValue instanceof ConstantExpression) {
             if(annotationValue instanceof  AnnotationConstantExpression) {
                 AnnotationConstantExpression ann = (AnnotationConstantExpression)annotationValue
                 AnnotationNode value = (AnnotationNode)ann.getValue()
-                annotationValues.put(memberName, readNestedAnnotationValue(value))
+                return readNestedAnnotationValue(value)
             }
             else {
-                annotationValues.put(memberName, ((ConstantExpression)annotationValue).value)
+                return ((ConstantExpression)annotationValue).value
             }
 
         }
@@ -104,7 +113,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     try {
                         def value = typeClass[pe.propertyAsString]
                         if(value != null) {
-                            annotationValues.put(memberName, value)
+                            return value
                         }
                     } catch (e) {
                         // ignore
@@ -113,7 +122,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             }
         }
         else if(annotationValue instanceof ClassExpression) {
-            annotationValues.put(memberName, ((ClassExpression)annotationValue).type.name)
+            return ((ClassExpression)annotationValue).type.name
         }
         else if(annotationValue instanceof ListExpression) {
             ListExpression le = (ListExpression)annotationValue
@@ -131,12 +140,13 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                     converted.add(((ClassExpression)exp).type.name)
                 }
             }
-            annotationValues.put(memberName, converted)
+            return converted
         }
+        return null
     }
 
     @Override
-    protected Map<? extends AnnotatedNode, ?> readAnnotationValues(AnnotationNode annotationMirror) {
+    protected Map<? extends AnnotatedNode, ?> readAnnotationRawValues(AnnotationNode annotationMirror) {
         Map<String, Expression> members = annotationMirror.getMembers()
         Map<? extends AnnotatedNode, Object> values = [:]
         ClassNode annotationClassNode = annotationMirror.classNode
@@ -153,7 +163,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             AnnotationNode ann = anns[0]
             Map<CharSequence, Object> converted = new LinkedHashMap<>();
             for(annMember in ann.members) {
-                readAnnotationValues(annMember.key, annMember.value, converted)
+                readAnnotationRawValues(annMember.key, annMember.value, converted)
             }
             return OptionalValues.of(Object.class, converted)
         }

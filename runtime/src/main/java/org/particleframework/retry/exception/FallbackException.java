@@ -13,25 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
-
-import org.particleframework.context.annotation.Executable;
-import org.particleframework.context.annotation.Secondary;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+package org.particleframework.retry.exception;
 
 /**
- * An annotation that can be applied to types to indicate that the type provides a Fallback implementation for a {@link Client}
+ * An exception thrown when an error occurs in the {@link org.particleframework.retry.annotation.Fallback} system
  *
  * @author graemerocher
  * @since 1.0
  */
-@Secondary
-@Documented
-@Retention(RUNTIME)
-@Executable
-public @interface Fallback {
+public class FallbackException extends RetryException {
+
+    public FallbackException(String message) {
+        super(message);
+    }
+
+    public FallbackException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

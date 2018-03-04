@@ -23,10 +23,7 @@ import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.core.value.OptionalValues;
 
 import javax.inject.Scope;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.Element;
 import java.util.*;
-import java.util.function.Consumer;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}
@@ -88,6 +85,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract String getAnnotationTypeName(A annotationMirror);
 
+
+
+
     /**
      * Obtain the annotations for the given type
      * @param element The type element
@@ -111,15 +111,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param annotationValue The value
      * @param annotationValues The values to populate
      */
-    protected abstract void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues);
+    protected abstract void readAnnotationRawValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues);
 
+    /**
+     * Read the given member and value, applying conversions if necessary, and place the data in the given map
+     * @param memberName The member
+     * @param annotationValue The value
+     */
+    protected abstract Object readAnnotationValue(String memberName, Object annotationValue);
     /**
      * Read the raw annotation values from the given annoatation
      *
      * @param annotationMirror The annotation
      * @return The values
      */
-    protected abstract Map<? extends T, ?> readAnnotationValues(A annotationMirror);
+    protected abstract Map<? extends T, ?> readAnnotationRawValues(A annotationMirror);
 
     /**
      * Resolve the annotations values from the given member for the given type
@@ -138,7 +144,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     protected AnnotationValue readNestedAnnotationValue(A annotationMirror) {
         AnnotationValue av;
-        Map<? extends T, ?> annotationValues = readAnnotationValues(annotationMirror);
+        Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationMirror);
         if(annotationValues.isEmpty()) {
             av = new AnnotationValue(getAnnotationTypeName(annotationMirror));
         }
@@ -153,10 +159,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Optional<?> aliasAnnotation = values.get("annotation");
                 if(aliasMember.isPresent() && !aliasAnnotation.isPresent()) {
                     String aliasedNamed = aliasMember.get().toString();
-                    readAnnotationValues(aliasedNamed, annotationValue, resolvedValues);
+                    readAnnotationRawValues(aliasedNamed, annotationValue, resolvedValues);
                 }
                 String memberName = getAnnotationMemberName(member);
-                readAnnotationValues(memberName, annotationValue, resolvedValues);
+                readAnnotationRawValues(memberName, annotationValue, resolvedValues);
             }
             av = new AnnotationValue(getAnnotationTypeName(annotationMirror), resolvedValues);
         }
@@ -167,18 +173,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Populate the annotation data for the given annotation
      * @param annotationMirror The annotation
-     * @param annotationData The annotation data
+     * @param metadata the metadata
+     * @param isDeclared Is the annotation a declared annotation
      */
-    protected Map<CharSequence, Object> populateAnnotationData(A annotationMirror, Map<String, Map<CharSequence, Object>> annotationData, Map<String, Map<CharSequence, Object>> stereotypes) {
+    protected Map<CharSequence, Object> populateAnnotationData(
+            A annotationMirror,
+            DefaultAnnotationMetadata metadata,
+            boolean isDeclared) {
         String annotationName = getAnnotationTypeName(annotationMirror);
-        Map<? extends T, ?> elementValues = readAnnotationValues(annotationMirror);
+        Set<String> parentAnnotations = CollectionUtils.setOf(annotationName);
+        Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
         if(CollectionUtils.isEmpty(elementValues)) {
-            if(!annotationData.containsKey(annotationName)) {
-                annotationData.put(annotationName, Collections.emptyMap());
-            }
+            return Collections.emptyMap();
         }
         else {
-            Map<CharSequence, Object> annotationValues = resolveAnnotationData(annotationData, annotationName, elementValues);
+            Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
                 OptionalValues<?> values = getAnnotationValues(member, AliasFor.class);
@@ -187,22 +196,44 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if(aliasAnnotation.isPresent()) {
                     Optional<?> aliasMember = values.get("member");
                     if(aliasMember.isPresent()) {
-                        Map<CharSequence, Object> data = resolveAnnotationData(stereotypes, aliasAnnotation.get().toString(), elementValues);
-                        readAnnotationValues(aliasMember.get().toString(), annotationValue, data);
+                        String aliasedAnnotationName = aliasAnnotation.get().toString();
+                        String aliasedMemberName = aliasMember.get().toString();
+                        Object v = readAnnotationValue(aliasedMemberName, annotationValue);
+                        if(v != null) {
+
+
+                            if(isDeclared) {
+                                metadata.addDeclaredStereotype(
+                                        parentAnnotations,
+                                        aliasedAnnotationName,
+                                        Collections.singletonMap(aliasedMemberName, v)
+                                );
+                            }
+                            else {
+                                metadata.addStereotype(
+                                        parentAnnotations,
+                                        aliasedAnnotationName,
+                                        Collections.singletonMap(aliasedMemberName, v)
+                                );
+                            }
+                        }
                     }
                 }
                 else {
                     Optional<?> aliasMember = values.get("member");
                     if(aliasMember.isPresent()) {
                         String aliasedNamed = aliasMember.get().toString();
-                        readAnnotationValues(aliasedNamed, annotationValue, annotationValues);
+                        Object v = readAnnotationValue(aliasedNamed, annotationValue);
+                        if(v != null) {
+                            annotationValues.put(aliasedNamed, v);
+                        }
+                        readAnnotationRawValues(aliasedNamed, annotationValue, annotationValues);
                     }
                 }
-                readAnnotationValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
             }
             return annotationValues;
         }
-        return Collections.emptyMap();
     }
 
     private AnnotationMetadata buildInternal(T parent, T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
@@ -210,44 +241,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if(parent != null) {
             hierarchy.add(0, parent);
         }
+        Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {
             List<? extends A> annotationHierarchy =
                     getAnnotationsForType(currentElement);
 
             if(annotationHierarchy.isEmpty()) continue;
+            boolean isDeclared = currentElement == element;
 
-            Map<String, Map<CharSequence, Object>> annotationValues = new LinkedHashMap<>();
 
-            for (A a : annotationHierarchy) {
-                String annotationName = getAnnotationTypeName(a);
+            for (A annotationMirror : annotationHierarchy) {
+                String annotationName = getAnnotationTypeName(annotationMirror);
                 if(AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) continue;
 
-                Map<String, Map<CharSequence, Object>> stereotypes = new LinkedHashMap<>();
-                List<A> stereotypeHierarchy = new ArrayList<>();
-                buildStereotypeHierarchy(getTypeForAnnotation(a), stereotypeHierarchy);
-                Collections.reverse(stereotypeHierarchy);
-                for (A stereotype : stereotypeHierarchy) {
-                    populateAnnotationData(stereotype, stereotypes, stereotypes);
-                }
+                Map<CharSequence, Object> annotationValues = populateAnnotationData(annotationMirror, annotationMetadata, isDeclared);
 
-                Map<CharSequence, Object> values = populateAnnotationData(a, annotationValues, stereotypes);
+                if(isDeclared) {
+                    annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
 
-                if(currentElement == element) {
-                    annotationMetadata.addDeclaredAnnotation(annotationName, values);
-                    if(!stereotypes.isEmpty()) {
-                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                            annotationMetadata.addDeclaredStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
-                        }
-                    }
                 }
                 else {
-                    annotationMetadata.addAnnotation(annotationName, values);
-                    if(!stereotypes.isEmpty()) {
-                        for (Map.Entry<String, Map<CharSequence, Object>> stereotype : stereotypes.entrySet()) {
-                            annotationMetadata.addStereotype(annotationName, stereotype.getKey(), stereotype.getValue());
-                        }
-                    }
+                    annotationMetadata.addAnnotation(annotationName, annotationValues);
                 }
+            }
+            for (A annotationMirror : annotationHierarchy) {
+                String parentAnnotationName = getAnnotationTypeName(annotationMirror);
+                T annotationType = getTypeForAnnotation(annotationMirror);
+                buildStereotypeHierarchy(
+                        CollectionUtils.setOf(parentAnnotationName),
+                        annotationType,
+                        annotationMetadata,
+                        isDeclared
+                );
             }
 
         }
@@ -258,26 +283,43 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationMetadata;
     }
 
-    private Map<CharSequence, Object> resolveAnnotationData(Map<String, Map<CharSequence, Object>> annotationData, String annotationName, Map<? extends T, ?> elementValues) {
-        int size = elementValues.size();
-        Map<CharSequence, Object> resolved = annotationData.computeIfAbsent(annotationName, s -> new LinkedHashMap<>(size));
-        if(resolved.isEmpty() && size > 0) {
-            resolved = new LinkedHashMap<>(size);
-            annotationData.put(annotationName, resolved);
-        }
-        return resolved;
-    }
 
-
-    private void buildStereotypeHierarchy(T element, List<A> hierarchy) {
+    private void buildStereotypeHierarchy(Set<String> parents , T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
-        for (A annotationMirror : annotationMirrors) {
+        if(!annotationMirrors.isEmpty()) {
 
-            String annotationName = getAnnotationTypeName(annotationMirror);
-            if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
-                T annotationType = getTypeForAnnotation(annotationMirror);
-                hierarchy.add(annotationMirror);
-                buildStereotypeHierarchy(annotationType, hierarchy);
+            // first add the top level annotations
+            List<A> topLevel = new ArrayList<>();
+            for (A annotationMirror : annotationMirrors) {
+
+                String annotationName = getAnnotationTypeName(annotationMirror);
+                if(!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                    topLevel.add(annotationMirror);
+
+                    Map<CharSequence, Object> data = populateAnnotationData(annotationMirror, metadata, isDeclared);
+                    if(isDeclared) {
+                        metadata.addDeclaredStereotype(
+                                parents,
+                                annotationName,
+                                data
+                        );
+                    }
+                    else {
+                        metadata.addStereotype(
+                                parents,
+                                annotationName,
+                                data
+                        );
+                    }
+                }
+            }
+            // now add meta annotations
+            for (A annotationMirror : topLevel) {
+                T typeForAnnotation = getTypeForAnnotation(annotationMirror);
+                String annotationTypeName = getAnnotationTypeName(annotationMirror);
+                Set<String> stereoTypeParents = CollectionUtils.setOf(annotationTypeName);
+                stereoTypeParents.addAll(parents);
+                buildStereotypeHierarchy(stereoTypeParents, typeForAnnotation, metadata, isDeclared);
             }
         }
     }

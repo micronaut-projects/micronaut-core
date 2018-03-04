@@ -50,7 +50,6 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
-    public static final String PARTICLE_DEFINE_CLASSES = 'particle.define.classes'
     CompilationUnit unit
 
     @Override
