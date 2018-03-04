@@ -1,5 +1,5 @@
 import React from 'react'
-
+import {shape, string, bool, func} from 'prop-types'
 
 const Comment = ({comment, isThread, expand, close, expanded}) => <div className="card-body">
     <div className='row'>
@@ -11,11 +11,19 @@ const Comment = ({comment, isThread, expand, close, expanded}) => <div className
         {isThread && !expanded ? <button className='btn btn-success' onClick={expand} style={{float: 'right'}}>+</button> :
           isThread && expanded ? <button className='btn btn-danger' onClick={close} style={{float: 'right'}}>-</button> : null}
       </div>
-
     </div>
-
-
   </div>
+
+Comment.propTypes = {
+  comment: shape({
+    poster: string,
+    content: string
+  }),
+  isThread: bool,
+  expand: func,
+  close: func,
+  expanded: bool
+}
 
 
 export default Comment;
