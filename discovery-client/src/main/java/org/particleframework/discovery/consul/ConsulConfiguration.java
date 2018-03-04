@@ -173,6 +173,9 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     public static class ConsulRegistrationConfiguration extends RegistrationConfiguration{
+
+        public static final String PREFIX = ConsulConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
+
         private List<String> tags = Collections.emptyList();
         private CheckConfiguration check = new CheckConfiguration();
 

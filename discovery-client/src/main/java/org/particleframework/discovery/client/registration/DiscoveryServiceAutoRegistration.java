@@ -48,11 +48,12 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
             String discoveryService,
             RegistrationConfiguration registration,
             ServiceInstance instance,
-            Observable<HttpStatus> registrationObservable) {
-            registrationObservable.subscribe(new Observer<HttpStatus>() {
-                @Override
-                public void onSubscribe(Disposable d) {
+            Publisher<HttpStatus> registrationObservable) {
+            registrationObservable.subscribe(new Subscriber<HttpStatus>() {
 
+                @Override
+                public void onSubscribe(Subscription s) {
+                    s.request(1);
                 }
 
                 @Override

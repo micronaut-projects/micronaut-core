@@ -173,8 +173,7 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
             validateApplicationName(instanceInfo.getApp());
 
             Publisher<HttpStatus> registerPublisher = eurekaClient.register(instanceInfo.getApp(), instanceInfo);
-            Observable<HttpStatus> registerObservable = applyRetryPolicy(registration, registerPublisher);
-            performRegistration(EUREKA_SERVICE_NAME, registration, instance, registerObservable);
+            performRegistration(EUREKA_SERVICE_NAME, registration, instance, registerPublisher);
         }
     }
 

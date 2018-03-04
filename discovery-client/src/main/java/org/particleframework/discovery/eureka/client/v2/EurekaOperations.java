@@ -15,8 +15,10 @@
  */
 package org.particleframework.discovery.eureka.client.v2;
 
+import org.particleframework.discovery.eureka.EurekaConfiguration;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.*;
+import org.particleframework.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
 import javax.validation.Valid;
@@ -40,6 +42,10 @@ public interface EurekaOperations {
      * @return A status of {@link HttpStatus#NO_CONTENT} on success
      */
     @Post("/apps/{appId}")
+    @Retryable(
+            attempts = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
+            delay = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+    )
     Publisher<HttpStatus> register(@NotBlank String appId, @Valid @NotNull @Body InstanceInfo instance);
 
     /**
@@ -50,6 +56,10 @@ public interface EurekaOperations {
      * @return A status of {@link HttpStatus#OK} on success
      */
     @Delete("/apps/{appId}/{instanceId}")
+    @Retryable(
+            attempts = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
+            delay = "${"+ EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+    )
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId);
 
     /**
