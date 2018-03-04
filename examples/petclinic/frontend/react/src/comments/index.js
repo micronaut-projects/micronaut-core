@@ -13,12 +13,20 @@ class Comments extends Component {
       reply: {
         poster: '',
         content: ''
-      }
+      },
+      enabled: false
     }
   }
 
   componentDidMount() {
-    this.fetchThreads()
+
+    fetch(`${config.SERVER_URL}/comment/health`)
+      .then(r => r.json())
+      .then(json => {
+        this.setState({enabled: json.status === 'UP'},
+          () => this.state.enabled ? this.fetchThreads() : null)
+      })
+      .catch(e => console.warn(e))
   }
 
   fetchThreads = () => {
@@ -119,8 +127,9 @@ class Comments extends Component {
   }
 
   render() {
-    const {threads, reply} = this.state
-    return <div>
+    const {threads, reply, enabled} = this.state
+
+    return enabled ? <div>
       <h2>Join the discussion!</h2>
 
       {threads.length > 0 ? threads.map(t => <Thread thread={t} key={t.id}
@@ -137,7 +146,7 @@ class Comments extends Component {
                                         expand={this.expandForm}
                                         expanded={this.threadIsExpanded()}/></div>
 
-    </div>
+    </div> : null
   }
 }
 
