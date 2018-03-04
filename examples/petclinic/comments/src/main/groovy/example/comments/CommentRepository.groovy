@@ -117,14 +117,12 @@ abstract class CommentRepository {
         Topic t = topicRepository.findTopic(topic)
         if(t == null) {
             t = new Topic(title: topic)
-            t.save(failOnError:true, flush:true)
         }
 
 
-        def comment = new Comment(poster: poster, content: content).save(failOnError:true)
+        def comment = new Comment(poster: poster, content: content)
         t.addToComments(comment)
         t.save(failOnError:true)
-
         return comment
     }
 
