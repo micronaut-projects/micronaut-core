@@ -103,26 +103,5 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
         }
     }
 
-    protected Observable<HttpStatus> applyRetryPolicy(RegistrationConfiguration registration, Publisher<HttpStatus> registerFlowable) {
-        Observable<HttpStatus> registrationObservable = Flowable
-                .fromPublisher(registerFlowable)
-                .toObservable();
-
-        Optional<Duration> timeout = registration.getTimeout();
-        if (timeout.isPresent()) {
-            registrationObservable = registrationObservable.timeout(timeout.get().toMillis(), TimeUnit.MILLISECONDS);
-        }
-        int retryCount = registration.getRetryCount();
-        boolean doRetry = retryCount > 1;
-        if (doRetry) {
-            registrationObservable = registrationObservable.retryWhen(attempts ->
-                    attempts.zipWith(Observable.range(1, retryCount), (n, i) -> i).flatMap(i ->
-                            Observable.timer(registration.getRetryDelay().toMillis(), TimeUnit.MILLISECONDS)
-                    )
-            );
-        }
-        return registrationObservable;
-    }
-
 
 }

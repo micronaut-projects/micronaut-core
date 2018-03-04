@@ -15,10 +15,13 @@
  */
 package org.particleframework.discovery.consul.client.v1;
 
+import org.particleframework.discovery.consul.ConsulConfiguration;
+import org.particleframework.discovery.registration.RegistrationConfiguration;
 import org.particleframework.http.HttpStatus;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Get;
 import org.particleframework.http.annotation.Put;
+import org.particleframework.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
 import javax.validation.constraints.NotNull;
@@ -91,6 +94,10 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/agent/service/register")
+    @Retryable(
+            attempts = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
+            delay = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+    )
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
 
     /**
@@ -100,6 +107,10 @@ public interface ConsulOperations {
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
     @Put("/agent/service/deregister/{service}")
+    @Retryable(
+            attempts = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
+            delay = "${"+ ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+    )
     Publisher<HttpStatus> deregister(@NotNull String service);
 
     /**

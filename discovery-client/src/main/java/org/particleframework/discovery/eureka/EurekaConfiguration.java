@@ -110,6 +110,8 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
     public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
 
+        public static final String PREFIX = EurekaConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
+
         public static final String IP_ADDRESS =
                 EurekaConfiguration.PREFIX + '.' +
                 RegistrationConfiguration.PREFIX + '.' +

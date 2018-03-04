@@ -233,8 +233,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
                 customizeServiceEntry(instance, serviceEntry);
                 Publisher<HttpStatus> registerFlowable = consulClient.register(serviceEntry);
-                Observable<HttpStatus> registrationObservable = applyRetryPolicy(registration, registerFlowable);
-                performRegistration("Consul", registration, instance, registrationObservable);
+                performRegistration("Consul", registration, instance, registerFlowable);
             }
         }
     }
