@@ -2,7 +2,7 @@ import React, {Component} from 'react';
 import config from "../config";
 import Offer from "./Offer";
 import Alert from "../display/Alert";
-import RandomPet from "./RandomPet";
+import FeaturedPet from "./FeaturedPet";
 
 
 class Home extends Component {
@@ -48,10 +48,10 @@ class Home extends Component {
       <h2>Check out our Popular Pets!</h2>
       <div className='row'>
         <div className='col-md-6'>
-          <RandomPet />
+          <FeaturedPet />
         </div>
         <div className='col-md-6'>
-          <RandomPet />
+          <FeaturedPet />
         </div>
       </div>
       
