@@ -2,6 +2,7 @@ import React, {Component} from 'react'
 import config from "../config";
 import Mail from "../mail";
 import {Link} from "react-router-dom";
+import Comments from "../comments";
 
 class Pet extends Component {
 
@@ -32,6 +33,7 @@ class Pet extends Component {
         <p><Link to={`/pets/vendor/${pet.vendor}`} className="btn btn-primary">More Pets from {pet.vendor}</Link></p>
 
         <Mail pet={pet}/>
+        <Comments topic={pet.slug} />
 
       </div>
       <div className='col-md-6'>
