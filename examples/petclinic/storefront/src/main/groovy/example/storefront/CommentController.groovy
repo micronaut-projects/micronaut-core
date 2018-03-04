@@ -22,23 +22,23 @@ class CommentController {
 
     @Inject protected CommentClient commentClient
 
-    @Get('/{topic}/comments')
-    List<Comment> comments(@Parameter String topic) {
+    @Get('/{topic}')
+    List<Comment> topics(@Parameter String topic) {
         commentClient.list topic
     }
 
-    @Get('/{topic}/thread/{id}')
+    @Get('/{topic}/{id}')
     Map<String, Object> thread(Long id) {
         commentClient.expand id
     }
 
-    @Post('/{topic}/comments')
-    HttpStatus addTopic(@Parameter String topic, @Body String poster, @Body String content) {
-        commentClient.add topic, poster, content
+    @Post('/{topic}')
+    HttpStatus addTopic(String topic, @Body Comment comment) {
+        commentClient.add topic, comment.poster, comment.content
     }
 
-    @Post('/{topic}/comments')
-    HttpStatus addReply(@Parameter String topic, @Body String poster, @Body String content) {
-        commentClient.add topic, poster, content
+    @Post('/{topic}/{id}')
+    HttpStatus addReply(@Parameter Long id, @Body Comment comment) {
+        commentClient.addReply id, comment.poster, comment.content
     }
 }
