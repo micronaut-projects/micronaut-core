@@ -3,7 +3,7 @@ import config from "../config";
 import Price from "../display/Price";
 import banner from '../images/banner.png';
 
-const Offer = ({offer}) => offer ? <div id="offers">
+const Offer = ({offer}) => (offer && offer.pet) ? <div id="offers">
 
 
   <div className="jumbotron jumbotron-fluid offer-jumbotron" style={{
