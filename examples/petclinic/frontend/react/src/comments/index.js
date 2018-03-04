@@ -2,6 +2,7 @@ import React, {Component} from 'react'
 import Thread from "./Thread";
 import AddComment from "./AddComment";
 import config from "../config";
+import {string} from 'prop-types'
 
 class Comments extends Component {
 
@@ -148,6 +149,10 @@ class Comments extends Component {
 
     </div> : null
   }
+}
+
+Comments.propTypes = {
+  topic: string.required
 }
 
 export default Comments

@@ -1,6 +1,7 @@
 import React, {Component} from 'react'
-import Alert from "../display/Alert";
-import config from "../config";
+import Alert from "../display/Alert"
+import config from "../config"
+import {shape, string} from 'prop-types'
 
 class Mail extends Component {
 
@@ -67,6 +68,12 @@ class Mail extends Component {
       <Alert message={message} level={level}/>
     </div> : null
   }
+}
+
+Mail.propTypes = {
+  pet: shape({
+    name: string
+  })
 }
 
 export default Mail

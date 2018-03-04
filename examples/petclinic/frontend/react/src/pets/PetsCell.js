@@ -1,6 +1,7 @@
 import React from 'react';
 import config from "../config";
 import {Link} from "react-router-dom";
+import {shape, string} from 'prop-types'
 
 const PetsCell = ({pet}) =>
   <div className="col-sm pet-card" style={{backgroundImage: `url(${config.SERVER_URL}/images/${pet.image})`}}>
@@ -13,5 +14,13 @@ const PetsCell = ({pet}) =>
       </div>
     </Link>
   </div>
+
+PetsCell.propTypes = {
+  pets: shape({
+    image: string,
+    slug: string,
+    name: string
+  })
+}
 
 export default PetsCell;

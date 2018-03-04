@@ -1,4 +1,5 @@
 import React from 'react'
+import {number, string} from 'prop-types'
 
 const Price = ({price, currency}) => {
 
@@ -20,6 +21,11 @@ const Price = ({price, currency}) => {
 
 
   return <span className="badge badge-secondary">{localPrice}</span>
+}
+
+Price.propTypes = {
+  price: number.required,
+  currency: string
 }
 
 export default Price
