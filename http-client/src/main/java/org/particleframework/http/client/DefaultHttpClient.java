@@ -340,7 +340,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                                 LOG.trace("HTTP Client JSON Streaming Response Received Chunk");
                                 traceBody(chunk);
                             }
-                            return ByteBufUtil.getBytes(chunk);
+                            try {
+                                return ByteBufUtil.getBytes(chunk);
+                            } finally {
+                                chunk.release();
+                            }
                         }).subscribe(this);
                         super.subscribe(downstreamSubscriber);
                     }
@@ -964,6 +968,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                             );
                         } catch (Exception e) {
                             jacksonProcessor.onError(e);
+                        } finally {
+                            message.release();
                         }
                     }
 
