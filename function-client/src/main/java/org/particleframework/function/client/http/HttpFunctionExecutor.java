@@ -29,6 +29,7 @@ import org.particleframework.http.client.DefaultHttpClient;
 import org.particleframework.http.client.HttpClient;
 import org.particleframework.http.client.HttpClientConfiguration;
 import org.particleframework.http.client.LoadBalancer;
+import org.particleframework.http.client.ssl.NettyClientSslBuilder;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import org.reactivestreams.Publisher;
@@ -51,11 +52,12 @@ public class HttpFunctionExecutor<I,O>  implements FunctionInvoker<I,O>, Closeab
 
     private final DefaultHttpClient httpClient;
 
-    public HttpFunctionExecutor(HttpClientConfiguration configuration, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
+    public HttpFunctionExecutor(HttpClientConfiguration configuration, NettyClientSslBuilder nettyClientSslBuilder, MediaTypeCodecRegistry codecRegistry, HttpClientFilter... filters) {
         super();
         this.httpClient = new DefaultHttpClient(
                 LoadBalancer.empty(),
                 configuration,
+                nettyClientSslBuilder,
                 codecRegistry,
                 filters
         );

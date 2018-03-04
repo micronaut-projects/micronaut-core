@@ -16,6 +16,7 @@
 package org.particleframework.scheduling;
 
 import org.particleframework.context.annotation.Primary;
+import org.particleframework.core.util.StringUtils;
 import org.particleframework.scheduling.cron.CronExpression;
 
 import javax.inject.Named;
@@ -45,6 +46,11 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     @Override
     public ScheduledFuture<?> schedule(String cron, Runnable command) {
+        if(StringUtils.isEmpty(cron)) {
+            throw new IllegalArgumentException("Blank cron expression not allowed");
+        }
+        check("command", command).notNull();
+
         Supplier<Duration> delaySupplier = buildCronDelaySupplier(cron);
         return new ReschedulingTask<>(() -> {
             command.run();
@@ -54,6 +60,11 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     @Override
     public <V> ScheduledFuture<V> schedule(String cron, Callable<V> command) {
+        if(StringUtils.isEmpty(cron)) {
+            throw new IllegalArgumentException("Blank cron expression not allowed");
+        }
+        check("command", command).notNull();
+
         Supplier<Duration> delaySupplier = buildCronDelaySupplier(cron);
         return new ReschedulingTask<>(command, this, delaySupplier);
     }

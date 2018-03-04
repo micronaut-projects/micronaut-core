@@ -32,6 +32,7 @@ import org.particleframework.http.HttpResponse;
 import org.particleframework.http.client.DefaultHttpClient;
 import org.particleframework.http.client.HttpClientConfiguration;
 import org.particleframework.http.client.LoadBalancer;
+import org.particleframework.http.client.ssl.NettyClientSslBuilder;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.filter.HttpClientFilter;
 import rx.Observable;
@@ -61,10 +62,11 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
     public RibbonRxHttpClient(
             @org.particleframework.context.annotation.Argument LoadBalancer loadBalancer,
             @org.particleframework.context.annotation.Argument HttpClientConfiguration configuration,
+            NettyClientSslBuilder nettyClientSslBuilder,
             MediaTypeCodecRegistry codecRegistry,
             RibbonExecutionListenerAdapter[] executionListeners,
             HttpClientFilter... filters) {
-        super(loadBalancer, configuration, codecRegistry, filters);
+        super(loadBalancer, configuration, nettyClientSslBuilder, codecRegistry, filters);
         this.executionListeners = Arrays.asList(executionListeners);
         if (loadBalancer instanceof RibbonLoadBalancer) {
             this.loadBalancer = (RibbonLoadBalancer) loadBalancer;

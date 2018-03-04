@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.ssl;
+package org.particleframework.aop.exceptions;
+
+import org.particleframework.inject.ExecutableMethod;
 
 /**
- * An exception thrown while configuring SSL
+ * An exception thrown when {@link org.particleframework.aop.Introduction} advise cannot be implemented
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public class SslConfigurationException extends RuntimeException {
+public class UnimplementedAdviceException extends UnsupportedOperationException{
 
-    public SslConfigurationException(String message) {
-        super(message);
-    }
-
-    public SslConfigurationException(String message, Throwable cause) {
-        super(message, cause);
+    public UnimplementedAdviceException(ExecutableMethod<?,?> method) {
+        super("All possible Introduction advise exhausted and no implementation found for method: " + method);
     }
 }

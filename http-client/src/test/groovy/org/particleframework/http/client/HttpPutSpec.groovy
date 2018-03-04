@@ -58,7 +58,7 @@ class HttpPutSpec extends Specification {
 
         then:
         def e = thrown(HttpClientException)
-        e.message == "Method Not Allowed"
+        e.message == "Method [PATCH] not allowed. Allowed methods: [PUT]"
     }
     void "test simple post request with JSON"() {
         given:

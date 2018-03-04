@@ -1,9 +1,15 @@
 package org.particleframework.core.reflect;
 
+import org.particleframework.core.util.ArrayUtils;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Utility methods for dealing with generic types
@@ -150,20 +156,19 @@ public class GenericTypeUtils {
      * @return The type arguments to the interface
      */
     public static Class[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
-        Type[] genericInterfaces = type.getGenericInterfaces();
-        for (Type genericInterface : genericInterfaces) {
-            if(genericInterface instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) genericInterface;
-                if( pt.getRawType() == interfaceType ) {
-                    return resolveTypeArguments(genericInterface);
-                }
-            }
-        }
-        Class superClass = type.getSuperclass();
-        if (superClass != null && superClass != Object.class) {
-            return resolveInterfaceTypeArguments(superClass, interfaceType);
-        }
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        Optional<Type> resolvedType = getAllGenericInterfaces(type)
+                .stream()
+                .filter(t -> {
+                            if (t instanceof ParameterizedType) {
+                                ParameterizedType pt = (ParameterizedType) t;
+                                return pt.getRawType() == interfaceType;
+                            }
+                            return false;
+                        }
+                )
+                .findFirst();
+        return resolvedType.map(GenericTypeUtils::resolveTypeArguments)
+                           .orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
 
@@ -187,6 +192,32 @@ public class GenericTypeUtils {
             superclass = superType.getGenericSuperclass();
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    public static Set<Type> getAllGenericInterfaces(Class<?> aClass) {
+        Set<Type> interfaces = new HashSet<>();
+        return populateInterfaces(aClass, interfaces);
+    }
+
+    protected static Set<Type> populateInterfaces(Class<?> aClass, Set<Type> interfaces) {
+        Type[] theInterfaces = aClass.getGenericInterfaces();
+        interfaces.addAll(Arrays.asList(theInterfaces));
+        for (Type theInterface : theInterfaces) {
+            if(theInterface instanceof Class) {
+                Class<?> i = (Class<?>) theInterface;
+                if(ArrayUtils.isNotEmpty(i.getGenericInterfaces())) {
+                    populateInterfaces(i, interfaces);
+                }
+            }
+        }
+        if(!aClass.isInterface()) {
+            Class<?> superclass = aClass.getSuperclass();
+            while(superclass != null) {
+                populateInterfaces(superclass, interfaces);
+                superclass = superclass.getSuperclass();
+            }
+        }
+        return interfaces;
     }
 
     private static Class[] resolveParameterizedType(ParameterizedType pt) {

@@ -52,28 +52,8 @@ public abstract class HttpClientConfiguration {
      * The thread factory to use for creating threads
      */
     private Class<? extends ThreadFactory> threadFactory;
-    /**
-     * The SSL provider to use
-     */
-    private SslProvider sslProvider = SslContext.defaultClientProvider();
-
-    /**
-     * The default session cache size
-     */
-    private Long sslSessionCacheSize;
-
-    /**
-     * The SSL timeout period
-     */
-    private Duration sslSessionTimeout;
-
 
     private Duration readTimeout = Duration.ofSeconds(10);
-
-    /**
-     * The default trust manager factory
-     */
-    private TrustManagerFactory sslTrustManagerFactory = InsecureTrustManagerFactory.INSTANCE;
 
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
 
@@ -132,22 +112,6 @@ public abstract class HttpClientConfiguration {
 
     public Optional<Class<? extends ThreadFactory>> getThreadFactory() {
         return Optional.ofNullable(threadFactory);
-    }
-
-    public SslProvider getSslProvider() {
-        return sslProvider;
-    }
-
-    public OptionalLong getSslSessionCacheSize() {
-        return sslSessionCacheSize != null ? OptionalLong.of(sslSessionCacheSize) : OptionalLong.empty();
-    }
-
-    public Optional<Duration> getSslSessionTimeout() {
-        return Optional.ofNullable(sslSessionTimeout);
-    }
-
-    public Optional<TrustManagerFactory> getSslTrustManagerFactory() {
-        return Optional.ofNullable(sslTrustManagerFactory);
     }
 
     /**
@@ -215,24 +179,8 @@ public abstract class HttpClientConfiguration {
         this.threadFactory = threadFactory;
     }
 
-    public void setSslProvider(SslProvider sslProvider) {
-        this.sslProvider = sslProvider;
-    }
-
-    public void setSslSessionCacheSize(Long sslSessionCacheSize) {
-        this.sslSessionCacheSize = sslSessionCacheSize;
-    }
-
-    public void setSslSessionTimeout(Duration sslSessionTimeout) {
-        this.sslSessionTimeout = sslSessionTimeout;
-    }
-
     public void setReadTimeout(Duration readTimeout) {
         this.readTimeout = readTimeout;
-    }
-
-    public void setSslTrustManagerFactory(TrustManagerFactory sslTrustManagerFactory) {
-        this.sslTrustManagerFactory = sslTrustManagerFactory;
     }
 
     /**
