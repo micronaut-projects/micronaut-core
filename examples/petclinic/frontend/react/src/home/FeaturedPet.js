@@ -2,7 +2,7 @@ import React, {Component} from 'react'
 import config from "../config";
 import {Link} from "react-router-dom";
 
-class RandomPet extends Component {
+class FeaturedPet extends Component {
 
   constructor() {
     super()
@@ -22,7 +22,9 @@ class RandomPet extends Component {
     const {pet} = this.state;
 
     return pet ? <div className="card featured-card">
-      <img className="card-img-top" src={`${config.SERVER_URL}/images/${pet.image}`} alt={pet.name} />
+      <Link to={`/pets/${pet.slug}`}>
+        <img className="card-img-top" src={`${config.SERVER_URL}/images/${pet.image}`} alt={pet.name} />
+      </Link>
       <div className="card-body">
         <h5 className="card-title">{pet.name}</h5>
         <Link to={`/pets/${pet.slug}`} className="btn btn-primary">More Info</Link>
@@ -32,4 +34,4 @@ class RandomPet extends Component {
 
 }
 
-export default RandomPet
+export default FeaturedPet

@@ -53,7 +53,7 @@ class Mail extends Component {
 
     return enabled ? <div>
       <div className="jumbotron">
-        <p><b>Request Info about {pet.name}</b></p>
+        <h4>Request Info about {pet.name}</h4>
         <form className="form-group" onSubmit={valid ? this.submitEmail : this.displayError}>
           <label htmlFor="inputEmail">Email address</label>
           <input type="email" className="form-control" name="email" id="inputEmail" placeholder="Enter email"
