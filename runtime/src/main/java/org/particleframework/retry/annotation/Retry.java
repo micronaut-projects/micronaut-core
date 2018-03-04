@@ -37,7 +37,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Around
 @Type(DefaultRetryInterceptor.class)
 public @interface Retry {
@@ -71,5 +71,5 @@ public @interface Retry {
      * @return The multiplier to use to calculate the delay
      */
     @Digits(integer = 2, fraction = 2)
-    String multiplier() default "0";
+    String multiplier() default "1.0";
 }

@@ -21,6 +21,7 @@ import com.ociweb.gl.api.GreenRuntime;
 import com.ociweb.gl.api.RestListener;
 import org.particleframework.core.io.socket.SocketUtils;
 import org.particleframework.http.server.HttpServerConfiguration;
+import org.particleframework.http.ssl.SslConfiguration;
 import org.particleframework.web.router.Router;
 
 import javax.inject.Inject;
@@ -36,14 +37,14 @@ public class ParticleGreenLightningApp implements GreenApp {
     protected final Optional<Router> router;
 
     @Inject
-    public ParticleGreenLightningApp(HttpServerConfiguration serverConfiguration, Optional<Router> router) {
+    public ParticleGreenLightningApp(HttpServerConfiguration serverConfiguration, SslConfiguration sslConfiguration, Optional<Router> router) {
         this.router = router;
 
         int serverPort = serverConfiguration.getPort();
         this.port = serverPort == -1 ? SocketUtils.findAvailableTcpPort() : serverPort;
 
         this.host = serverConfiguration.getHost().orElse("localhost");
-        this.scheme = serverConfiguration.getSsl().isEnabled() ? "https" : "http";
+        this.scheme = sslConfiguration.isEnabled() ? "https" : "http";
     }
 
     @Override

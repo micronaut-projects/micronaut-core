@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.ssl;
+package org.particleframework.http.ssl;
 
 import org.particleframework.core.io.ResourceLoader;
-import org.particleframework.http.server.HttpServerConfiguration.SslConfiguration;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.URL;
@@ -36,6 +34,8 @@ import java.util.Optional;
 abstract public class SslBuilder<T> {
 
     protected final SslConfiguration ssl;
+    private KeyStore keyStoreCache = null;
+    private KeyStore trustStoreCache = null;
 
     public SslBuilder(SslConfiguration ssl) {
         this.ssl = ssl;
@@ -52,17 +52,20 @@ abstract public class SslBuilder<T> {
             return trustManagerFactory;
         }
         catch (Exception ex) {
-            throw new IllegalStateException(ex);
+            throw new SslConfigurationException(ex);
         }
     }
 
     protected Optional<KeyStore> getTrustStore() throws Exception {
-        SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
-        if (!trustStore.getPath().isPresent()) {
-            return Optional.empty();
+        if (trustStoreCache == null) {
+            SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
+            if (!trustStore.getPath().isPresent()) {
+                return Optional.empty();
+            }
+            trustStoreCache = load(trustStore.getType(),
+                    trustStore.getPath().get(), trustStore.getPassword());
         }
-        return Optional.of(load(trustStore.getType(),
-                trustStore.getPath().get(), trustStore.getPassword()));
+        return Optional.of(trustStoreCache);
     }
 
     protected KeyManagerFactory getKeyManagerFactory() {
@@ -79,17 +82,20 @@ abstract public class SslBuilder<T> {
             return keyManagerFactory;
         }
         catch (Exception ex) {
-            throw new IllegalStateException(ex);
+            throw new SslConfigurationException(ex);
         }
     }
 
     protected Optional<KeyStore> getKeyStore() throws Exception {
-        SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
-        if (!keyStore.getPath().isPresent()) {
-            return Optional.empty();
+        if (keyStoreCache == null) {
+            SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
+            if (!keyStore.getPath().isPresent()) {
+                return Optional.empty();
+            }
+            keyStoreCache = load(keyStore.getType(),
+                    keyStore.getPath().get(), keyStore.getPassword());
         }
-        return Optional.of(load(keyStore.getType(),
-                keyStore.getPath().get(), keyStore.getPassword()));
+        return Optional.of(keyStoreCache);
     }
 
     protected KeyStore load(Optional<String> optionalType,

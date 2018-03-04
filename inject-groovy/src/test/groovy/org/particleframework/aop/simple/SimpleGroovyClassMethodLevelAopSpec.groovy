@@ -16,7 +16,6 @@
 package org.particleframework.aop.simple
 
 import org.particleframework.aop.Intercepted
-import org.particleframework.aop.internal.AopAttributes
 import org.particleframework.context.BeanContext
 import org.particleframework.context.DefaultBeanContext
 import org.particleframework.inject.BeanDefinition
@@ -88,7 +87,6 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
         // should not be a reflection based method
         !beanContext.findExecutableMethod(SimpleGroovyClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get() == null
 
     }
 
@@ -98,16 +96,8 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
 
         when:
         SimpleGroovyClass foo = beanContext.getBean(SimpleGroovyClass)
-        def attrs = AopAttributes.get(SimpleGroovyClass, "test", String)
         then:
         foo instanceof Intercepted
         foo.test("test") == "Name is changed"
-        AopAttributes.@attributes.get().values().first().values == attrs
-
-        when:
-        AopAttributes.remove(SimpleGroovyClass, "test", String)
-
-        then:
-        AopAttributes.@attributes.get() == null
     }
 }

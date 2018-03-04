@@ -63,7 +63,7 @@ class MockConsulServer implements ConsulOperations {
     Publisher<HttpStatus> pass(String checkId, Optional<String> note) {
         passingReports.add(checkId)
         String service = nameFromCheck(checkId)
-        checks.get(service).setStatus(Check.Status.PASSING.name().toLowerCase())
+        checks.get(service)?.setStatus(Check.Status.PASSING.name().toLowerCase())
 
         return Publishers.just(HttpStatus.OK)
     }
@@ -76,7 +76,7 @@ class MockConsulServer implements ConsulOperations {
     @Override
     Publisher<HttpStatus> fail(String checkId, Optional<String> note) {
         String service = nameFromCheck(checkId)
-        checks.get(service).setStatus(Check.Status.CRITICAL.name().toLowerCase())
+        checks.get(service)?.setStatus(Check.Status.CRITICAL.name().toLowerCase())
         return Publishers.just(HttpStatus.OK)
     }
 

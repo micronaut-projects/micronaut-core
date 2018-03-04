@@ -15,6 +15,7 @@
  */
 package org.particleframework.scheduling;
 
+import org.particleframework.context.annotation.Requires;
 import org.particleframework.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
@@ -24,6 +25,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
+@Requires(property = "scheduled-test.task.enabled", value = "true")
 public class MyJavaTask {
     private boolean wasRun = false;
 

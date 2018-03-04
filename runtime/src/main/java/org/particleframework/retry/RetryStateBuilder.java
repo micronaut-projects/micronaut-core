@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 original authors
+ * Copyright 2018 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.server.ssl;
+package org.particleframework.retry;
 
 /**
- * An enum describing the type of client authentication
+ * The retry state builder
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public enum ClientAuthentication {
-
+@FunctionalInterface
+public interface RetryStateBuilder {
     /**
-     * Required
+     * @return Builds retry state
      */
-    NEED,
-
-    /**
-     * Desired but not required
-     */
-    WANT
+    RetryState build();
 }
