@@ -158,7 +158,11 @@ class AstGenericUtils {
                 }
                 else {
                     if(classNode.isResolved() || ClassHelper.isPrimitiveType(classNode)) {
-                        return classNode.typeClass
+                        try {
+                            return classNode.typeClass
+                        } catch (ClassNotFoundException ignored) {
+                            return classNode.name
+                        }
                     }
                     else {
                         String redirectName = classNode.redirect().name
@@ -182,7 +186,11 @@ class AstGenericUtils {
                 }
             }
 
-            return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
+            try {
+                return classNode.isResolved() || ClassHelper.isPrimitiveType(classNode) ? classNode.typeClass : classNode.name
+            } catch (ClassNotFoundException ignored) {
+                return classNode.name
+            }
         }
     }
 
