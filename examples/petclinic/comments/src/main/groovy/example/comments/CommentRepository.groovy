@@ -117,7 +117,7 @@ abstract class CommentRepository {
         Topic t = topicRepository.findTopic(topic)
         if(t == null) {
             t = new Topic(title: topic)
-            t.save(failOnError:true)
+            t.save(failOnError:true, flush:true)
         }
 
 
