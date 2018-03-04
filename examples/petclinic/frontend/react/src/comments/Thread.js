@@ -16,7 +16,9 @@ const Thread = ({
     <Comment comment={thread} expand={expand} close={close} expanded={thread.expanded} isThread={true}/>
 
     {thread.expanded ? <div className="card replies-card">
-      {thread.replies ? <div className='card-title comment-title'><i>Replies</i></div> :
+      {thread.replies ? <div className='card-title comment-title'>
+          <i>{thread.replies.length} {thread.replies.length > 1 ? 'Replies' : 'Reply'}</i>
+        </div> :
         <div className='card-title comment-title'><i>Be the first to reply!</i></div>}
       <ul className='list-group list-group-flush'>
         {thread.replies ? thread.replies.map(r => <li className='list-group-item reply-item' key={r.id}>
