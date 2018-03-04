@@ -1,8 +1,9 @@
 import React from 'react'
-import config from "../config";
-import Price from "../display/Price";
-import banner from '../images/banner.png';
-import {Link} from "react-router-dom";
+import config from "../config"
+import Price from "../display/Price"
+import banner from '../images/banner.png'
+import {Link} from "react-router-dom"
+import {shape, object, string, number} from 'prop-types'
 
 const Offer = ({offer}) => (offer && offer.pet) ? <div id="offers">
 
@@ -25,5 +26,14 @@ const Offer = ({offer}) => (offer && offer.pet) ? <div id="offers">
   <div className="container">
   </div>
 </div>
+
+Offer.propTypes = {
+  offer: shape({
+    pet: object,
+    description: string,
+    currency: string,
+    price: number
+  })
+}
 
 export default Offer;

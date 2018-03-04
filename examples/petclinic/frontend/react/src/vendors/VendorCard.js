@@ -1,6 +1,7 @@
 import React from 'react'
 import config from "../config";
 import {Link} from "react-router-dom";
+import {shape, array, string}  from 'prop-types'
 
 const VendorCard = ({vendor}) => <div className="card vendor-card">
   <Link to={`/pets/vendor/${vendor.name}`}>
@@ -13,6 +14,13 @@ const VendorCard = ({vendor}) => <div className="card vendor-card">
     <p className="card-text">Pets: {vendor.pets.length}</p>
     <Link to={`/pets/vendor/${vendor.name}`} className="btn btn-primary">See all Pets</Link>
   </div>
-</div>;
+</div>
+
+VendorCard.propTypes = {
+  vendor: shape({
+    name: string,
+    pets: array
+  })
+}
 
 export default VendorCard

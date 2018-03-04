@@ -1,4 +1,5 @@
 import React from 'react'
+import {func, shape, string, bool} from 'prop-types'
 
 const AddContent = ({submit, expand, comment, update, reply, expanded}) => <form onSubmit={expanded ? submit : expand}
                                                                                  className='card-body'>
@@ -26,5 +27,16 @@ const AddContent = ({submit, expand, comment, update, reply, expanded}) => <form
   </div>
 </form>
 
+AddContent.propTypes = {
+  submit: func,
+  expand: func,
+  comment: shape({
+    poster: string,
+    content: string
+  }),
+  update: func,
+  reply: bool,
+  expanded: bool
+}
 
 export default AddContent

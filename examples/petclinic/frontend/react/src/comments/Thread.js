@@ -1,6 +1,7 @@
 import React from 'react'
-import Comment from "./Comment";
-import AddComment from "./AddComment";
+import Comment from "./Comment"
+import AddComment from "./AddComment"
+import {shape, bool, array, func, object} from 'prop-types'
 
 const Thread = ({
                   thread,
@@ -28,7 +29,18 @@ const Thread = ({
 
   </div>
 
-
 </div>
+
+Thread.propTypes =  {
+  thread: shape({
+    expanded: bool,
+    replies: array
+  }),
+  expand: func,
+  close: func,
+  reply: object,
+  submitReply: func,
+  updateReply: func
+}
 
 export default Thread;

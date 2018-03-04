@@ -1,6 +1,7 @@
 import React, {Component} from 'react'
 import {Route} from "react-router-dom";
 import PetsGrid from "./PetsGrid";
+import {array} from 'prop-types'
 
 class PetsLayout extends Component {
 
@@ -35,8 +36,8 @@ class PetsLayout extends Component {
 
 
   render() {
-    const {tab} = this.state;
-    const {match, header} = this.props;
+    const {tab} = this.state
+    const {match, header} = this.props
 
     return <div>
       <Route exact path={match.url}
@@ -55,7 +56,7 @@ class PetsLayout extends Component {
                  </li>
                  <li className="nav-item">
                    <span className={`nav-link ${tab === 2 ? 'active' : ''}`}
-                         onClick={() => this.switchTab(2)}>Dogs</span>
+                         onClick={() => this.switchTab( 2)}>Dogs</span>
                  </li>
                </ul>
 
@@ -66,5 +67,10 @@ class PetsLayout extends Component {
     </div>
   }
 }
+
+PetsLayout.propTypes = {
+  pets: array
+}
+
 
 export default PetsLayout
