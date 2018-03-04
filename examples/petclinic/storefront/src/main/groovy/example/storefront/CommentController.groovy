@@ -1,7 +1,9 @@
 package example.storefront
 
+import example.api.v1.HealthStatus
 import example.storefront.client.v1.Comment
 import example.storefront.client.v1.CommentClient
+import io.reactivex.Single
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Body
 import org.particleframework.http.annotation.Controller
@@ -20,7 +22,13 @@ import javax.inject.Singleton
 @Controller("/comment")
 class CommentController {
 
-    @Inject protected CommentClient commentClient
+    @Inject 
+    CommentClient commentClient
+
+    @Get('/health')
+    Single<HealthStatus> health() {
+        commentClient.health().onErrorReturn({ new HealthStatus('DOWN') })
+    }
 
     @Get('/{topic}')
     List<Comment> topics(@Parameter String topic) {
