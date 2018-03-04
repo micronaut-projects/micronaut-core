@@ -20,7 +20,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * A {@link Qualifier} that allows restricting injection by type. Useful when injection lists of instances that need to be isolated by type
+ * Allows restricting injection by type. Useful when injection lists of instances that need to be isolated by type
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -15,13 +15,10 @@
  */
 package org.particleframework.retry.annotation;
 
-
 import org.particleframework.aop.Around;
-import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.retry.DefaultRetryInterceptor;
+import org.particleframework.retry.intercept.RecoveryInterceptor;
 
-import javax.validation.constraints.Digits;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -30,7 +27,9 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * AOP Advice that can be applied to any method
+ * <p>AOP around advice that can be applied to any type or method that requires {@link Fallback} handling.</p>
+ *
+ * <p>When applied to a type if an exception occurs this advice will attempt to resolve an implementation of the class that is annotated with {@link Fallback}</p>
  *
  * @author graemerocher
  * @since 1.0
@@ -39,37 +38,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Around
-@Type(DefaultRetryInterceptor.class)
-public @interface Retry {
-    /**
-     * @return The exception types to include (defaults to all)
-     */
-    Class<? extends Throwable>[] includes() default {};
-
-    /**
-     * @return The exception types to exclude (defaults to none)
-     */
-    Class<? extends Throwable>[] excludes() default {};
-
-    /**
-     * @return The maximum number of retry attempts
-     */
-    @Digits(integer = 4, fraction = 0)
-    String attempts() default "3";
-
-    /**
-     * @return The delay between retry attempts
-     */
-    String delay() default "1s";
-
-    /**
-     * @return The maximum overall delay
-     */
-    String maxDelay() default "";
-
-    /**
-     * @return The multiplier to use to calculate the delay
-     */
-    @Digits(integer = 2, fraction = 2)
-    String multiplier() default "1.0";
+@Type(RecoveryInterceptor.class)
+public @interface Recoverable {
 }

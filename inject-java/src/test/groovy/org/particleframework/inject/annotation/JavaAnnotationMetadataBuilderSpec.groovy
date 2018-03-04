@@ -16,12 +16,15 @@
 package org.particleframework.inject.annotation
 
 import org.particleframework.aop.Around
+import org.particleframework.context.annotation.ConfigurationReader
 import org.particleframework.context.annotation.Infrastructure
 import org.particleframework.context.annotation.Primary
 import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.AbstractTypeElementSpec
+import org.particleframework.runtime.context.scope.Refreshable
+import org.particleframework.runtime.context.scope.ScopedProxy
 
 import javax.inject.Qualifier
 import javax.inject.Scope
@@ -32,6 +35,40 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
+
+    void "test annotation names by stereotype"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.runtime.context.scope.*;
+@Refreshable
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getAnnotationNamesByStereotype(Around).contains(Refreshable.name)
+        metadata.getAnnotationNamesByStereotype(Around).contains(ScopedProxy.name)
+    }
+
+    void "test alias for has correct value for aliased member"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import org.particleframework.inject.annotation.*;
+
+@MyStereotype("test")
+class Test {
+}
+''')
+        expect:
+        metadata != null
+        metadata.hasDeclaredStereotype(ConfigurationReader)
+        metadata.getValue(ConfigurationReader, String).get() == 'test'
+    }
 
     void "test read annotation with annotation value"() {
         given:
@@ -361,7 +398,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name] as Set
     }
 
 

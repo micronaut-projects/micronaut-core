@@ -18,7 +18,6 @@ package org.particleframework.http.client.interceptor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import io.reactivex.Flowable;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.context.BeanContext;
@@ -27,13 +26,11 @@ import org.particleframework.core.async.subscriber.CompletionAwareSubscriber;
 import org.particleframework.core.beans.BeanMap;
 import org.particleframework.core.convert.ConversionService;
 import org.particleframework.core.naming.NameUtils;
-import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
-import org.particleframework.discovery.exceptions.NoAvailableServiceException;
 import org.particleframework.http.*;
 import org.particleframework.http.annotation.Body;
 import org.particleframework.http.annotation.Consumes;
@@ -45,8 +42,6 @@ import org.particleframework.http.client.exceptions.HttpClientResponseException;
 import org.particleframework.http.codec.MediaTypeCodec;
 import org.particleframework.http.codec.MediaTypeCodecRegistry;
 import org.particleframework.http.uri.UriMatchTemplate;
-import org.particleframework.inject.MethodExecutionHandle;
-import org.particleframework.inject.qualifiers.Qualifiers;
 import org.particleframework.jackson.ObjectMapperFactory;
 import org.particleframework.jackson.annotation.JacksonFeatures;
 import org.particleframework.jackson.codec.JsonMediaTypeCodec;
@@ -66,7 +61,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 
 /**
  * Introduction advice that implements the {@link Client} annotation
@@ -270,32 +264,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + t.getMessage(), t);
                             }
 
-                            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(methodDeclaringType, context);
-                            if(fallbackMethod.isPresent()) {
-
-                                if(LOG.isDebugEnabled()) {
-                                    LOG.debug("Client [{}] resolved fallback: {}", methodDeclaringType.getName(), fallbackMethod.get() );
-                                }
-
-                                try {
-                                    CompletableFuture<Object> resultingFuture = (CompletableFuture) fallbackMethod.get()
-                                                                                                        .invoke(context.getParameterValues());
-                                    resultingFuture.whenComplete((o, throwable) -> {
-                                        if(throwable == null) {
-                                            future.complete(o);
-                                        }
-                                        else {
-                                            future.completeExceptionally(throwable);
-                                        }
-                                    });
-                                } catch (Exception e) {
-                                    future.completeExceptionally(new HttpClientException("Error invoking fallback for type ["+ methodDeclaringType +"]: " + e.getMessage() ,e));
-                                }
-
-                            }
-                            else {
-                                future.completeExceptionally(t);
-                            }
+                            future.completeExceptionally(t);
                         }
 
                         @Override
@@ -310,7 +279,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
                     );
                     for (ReactiveClientResultTransformer transformer : transformers) {
-                        finalPublisher = transformer.transform(finalPublisher, ()-> findFallbackMethod(methodDeclaringType, context), context, context.getParameterValues());
+                        finalPublisher = transformer.transform(finalPublisher);
                     }
                     return finalPublisher;
                 }
@@ -324,12 +293,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     );
                 }
                 else if(void.class == javaReturnType) {
-                    try {
-                        blockingHttpClient.exchange(request);
-                        return null;
-                    } catch (RuntimeException e) {
-                        return handleFallback(context, methodDeclaringType, e);
-                    }
+                    blockingHttpClient.exchange(request);
+                    return null;
                 }
                 else {
                     try {
@@ -343,61 +308,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             }
                             return null;
                         }
-                        return handleFallback(context, methodDeclaringType, t);
+                        else {
+                            throw t;
+                        }
                     }
                 }
             }
         }
         // try other introduction advice
         return context.proceed();
-    }
-
-    protected Object handleFallback(MethodInvocationContext<Object, Object> context, Class<Object> methodDeclaringType, RuntimeException exception) throws HttpClientException {
-        if(exception instanceof NoAvailableServiceException) {
-            NoAvailableServiceException nase = (NoAvailableServiceException) exception;
-            if(LOG.isErrorEnabled()) {
-                LOG.debug(nase.getMessage(), nase);
-                LOG.error("Client [{}] attempting to resolve fallback for unavailable service [{}]", methodDeclaringType.getName(), nase.getServiceID());
-            }
-
-        }
-        else {
-            if(LOG.isErrorEnabled()) {
-                LOG.error("Client ["+ methodDeclaringType.getName()+"] received HTTP error response: " + exception.getMessage(), exception);
-            }
-        }
-
-        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(methodDeclaringType, context);
-        if(fallback.isPresent())  {
-            MethodExecutionHandle<Object> fallbackMethod = fallback.get();
-            try {
-                if(LOG.isDebugEnabled()) {
-                    LOG.debug("Client [{}] resolved fallback: {}", methodDeclaringType.getName(), fallbackMethod );
-                }
-                return fallbackMethod.invoke(context.getParameterValues());
-            } catch (Exception e) {
-                throw new HttpClientException("Error invoking fallback for type ["+ methodDeclaringType +"]: " + e.getMessage() ,e);
-            }
-        }
-        else {
-            throw exception;
-        }
-    }
-
-    protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(Class<Object> declaringType, MethodInvocationContext<Object, Object> context) {
-        Optional<MethodExecutionHandle<Object>> result = beanContext
-                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-        if(!result.isPresent()) {
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
-            for (Class i : allInterfaces) {
-                result = beanContext
-                            .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-                if(result.isPresent()) {
-                    return result;
-                }
-            }
-        }
-        return result;
     }
 
     private ClientRegistration getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {

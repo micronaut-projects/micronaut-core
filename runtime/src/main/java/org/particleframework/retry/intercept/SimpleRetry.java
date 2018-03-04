@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry;
+package org.particleframework.retry.intercept;
 
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.retry.RetryState;
+import org.particleframework.retry.annotation.Retryable;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -26,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A context object for {@link org.particleframework.retry.annotation.Retry} operations
+ * A context object for {@link Retryable} operations
  *
  * @author graemerocher
  * @since 1.0

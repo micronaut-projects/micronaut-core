@@ -25,7 +25,7 @@ import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Patch
 import org.particleframework.http.annotation.Post
 import org.particleframework.http.client.Client
-import org.particleframework.http.client.Fallback
+import org.particleframework.retry.annotation.Fallback
 import org.particleframework.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup

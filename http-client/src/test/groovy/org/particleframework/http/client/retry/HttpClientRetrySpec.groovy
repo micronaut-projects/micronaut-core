@@ -21,7 +21,7 @@ import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.client.Client
 import org.particleframework.http.client.exceptions.HttpClientResponseException
-import org.particleframework.retry.annotation.Retry
+import org.particleframework.retry.annotation.Retryable
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -83,7 +83,7 @@ class HttpClientRetrySpec extends Specification {
     }
 
     @Client("/retry-test")
-    @Retry(attempts = '5', delay = '5ms')
+    @Retryable(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
 
     }

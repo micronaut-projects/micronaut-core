@@ -18,7 +18,8 @@ package example.offers
 import example.api.v1.Pet
 import example.offers.client.v1.PetClient
 import io.reactivex.Maybe
-import org.particleframework.http.client.Fallback
+import io.reactivex.Single
+import org.particleframework.retry.annotation.Fallback
 
 import javax.inject.Singleton
 
@@ -43,5 +44,10 @@ class TestPetClientFallback implements PetClient {
             return Maybe.just(pet)
         }
         return Maybe.empty()
+    }
+
+    @Override
+    Single<List<Pet>> list() {
+        return Single.just(Collections.emptyList())
     }
 }

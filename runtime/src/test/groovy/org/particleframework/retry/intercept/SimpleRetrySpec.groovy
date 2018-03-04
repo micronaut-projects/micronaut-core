@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry
+package org.particleframework.retry.intercept
 
 import io.reactivex.Single
 import org.particleframework.context.ApplicationContext
-import org.particleframework.retry.annotation.Retry
+import org.particleframework.retry.annotation.Retryable
 import org.particleframework.retry.event.RetryEvent
 import org.particleframework.retry.event.RetryEventListener
 import reactor.core.publisher.Mono
@@ -134,7 +134,7 @@ class SimpleRetrySpec extends Specification {
         int countReact = 0
         int countThreshold = 3
 
-        @Retry(attempts = '5', delay = '5ms')
+        @Retryable(attempts = '5', delay = '5ms')
         int getCount() {
             count++
             if(count < countThreshold) {
@@ -143,7 +143,7 @@ class SimpleRetrySpec extends Specification {
             return count
         }
 
-        @Retry(attempts = '5', delay = '5ms')
+        @Retryable(attempts = '5', delay = '5ms')
         Single<Integer> getCountSingle() {
             Single.fromCallable({->
                 countRx++
@@ -154,7 +154,7 @@ class SimpleRetrySpec extends Specification {
             })
         }
 
-        @Retry(attempts = '5', delay = '5ms')
+        @Retryable(attempts = '5', delay = '5ms')
         Mono<Integer> getCountMono() {
             Mono.fromCallable({->
                 countReact++

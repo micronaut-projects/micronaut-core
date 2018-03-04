@@ -16,6 +16,8 @@
 package org.particleframework.retry.exception;
 
 /**
+ * An exception thrown if there is something at miss with the Retry system
+ *
  * @author graemerocher
  * @since 1.0
  */

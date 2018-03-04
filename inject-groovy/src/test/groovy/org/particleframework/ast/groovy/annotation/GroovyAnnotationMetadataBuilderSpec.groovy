@@ -26,6 +26,8 @@ import org.particleframework.context.annotation.Requirements
 import org.particleframework.context.annotation.Requires
 import org.particleframework.core.annotation.AnnotationMetadata
 import org.particleframework.inject.annotation.AnnotationValue
+import org.particleframework.runtime.context.scope.Refreshable
+import org.particleframework.runtime.context.scope.ScopedProxy
 import spock.lang.Ignore
 import spock.lang.Specification
 
@@ -38,6 +40,24 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class GroovyAnnotationMetadataBuilderSpec extends Specification {
+
+    void "test annotation names by stereotype"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import org.particleframework.runtime.context.scope.*;
+@Refreshable
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getAnnotationNamesByStereotype(Around).contains(Refreshable.name)
+        metadata.getAnnotationNamesByStereotype(Around).contains(ScopedProxy.name)
+    }
+
 
     void "test read external constants"() {
         given:

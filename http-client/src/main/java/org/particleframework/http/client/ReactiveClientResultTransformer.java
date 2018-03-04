@@ -15,13 +15,6 @@
  */
 package org.particleframework.http.client;
 
-import org.particleframework.inject.ExecutableMethod;
-import org.particleframework.inject.MethodExecutionHandle;
-
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.function.Supplier;
-
 /**
  * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization per reactive framework
  *
@@ -37,10 +30,7 @@ public interface ReactiveClientResultTransformer {
      * @return The transformed result
      */
     Object transform(
-            Object publisherResult,
-            Supplier<Optional<MethodExecutionHandle<Object>>> fallbackResolver,
-            ExecutableMethod<Object, Object> invocation,
-            Object...parameters);
+            Object publisherResult);
 
 
 }

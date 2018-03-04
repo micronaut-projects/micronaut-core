@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.retry
+package org.particleframework.retry.intercept
 
 import org.particleframework.core.util.CollectionUtils
 import org.particleframework.discovery.exceptions.DiscoveryException
+import org.particleframework.retry.intercept.SimpleRetry
 import spock.lang.Specification
 
 import java.time.Duration

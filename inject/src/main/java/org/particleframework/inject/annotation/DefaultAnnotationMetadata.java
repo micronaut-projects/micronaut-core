@@ -281,10 +281,10 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param stereotype The annotation
      * @param values The values
      */
-    void addStereotype(String annotation, String stereotype, Map<CharSequence, Object> values) {
+    void addStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if(stereotype != null) {
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            getAnnotationsByStereotypeInternal(stereotype).add(annotation);
+            getAnnotationsByStereotypeInternal(stereotype).addAll(parentAnnotations);
             addAnnotation(stereotype, values, null, allStereotypes, false);
         }
     }
@@ -295,11 +295,11 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
      * @param stereotype The annotation
      * @param values The values
      */
-    void addDeclaredStereotype(String annotation, String stereotype, Map<CharSequence, Object> values) {
+    void addDeclaredStereotype(Set<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if(stereotype != null) {
             Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
             Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            getAnnotationsByStereotypeInternal(stereotype).add(annotation);
+            getAnnotationsByStereotypeInternal(stereotype).addAll(parentAnnotations);
             addAnnotation(stereotype, values, declaredStereotypes, allStereotypes, true);
         }
     }
@@ -338,11 +338,15 @@ public class DefaultAnnotationMetadata implements AnnotationMetadata, AnnotatedE
                 existing = new LinkedHashMap<>();
                 currentAnnotationValues.put(annotation, existing);
             }
-            existing.putAll(values);
+            for (CharSequence key : values.keySet()) {
+                if(!existing.containsKey(key)) {
+                    existing.put(key, values.get(key));
+                }
+            }
         }
         else {
             if(!hasValues) {
-                existing = Collections.emptyMap();
+                existing = existing == null ? Collections.emptyMap() : existing;
             }
             else {
                 existing = new LinkedHashMap<>(values.size());

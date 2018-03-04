@@ -15,8 +15,8 @@
  */
 package org.particleframework.retry.annotation;
 
+
 import org.particleframework.aop.Around;
-import org.particleframework.context.annotation.AliasFor;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.retry.intercept.DefaultRetryInterceptor;
 
@@ -29,8 +29,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Variation of {@link Retryable} that implements the Circuit Breaker pattern. Has higher overhead than
- * {@link Retryable} as a {@link org.particleframework.retry.CircuitState} has to be maintained for each method call
+ * AOP Advice that can be applied to any method
  *
  * @author graemerocher
  * @since 1.0
@@ -40,52 +39,36 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Around
 @Type(DefaultRetryInterceptor.class)
-public @interface CircuitBreaker {
-
+public @interface Retryable {
     /**
      * @return The exception types to include (defaults to all)
      */
-    @AliasFor(annotation = Retryable.class, member = "includes")
     Class<? extends Throwable>[] includes() default {};
 
     /**
      * @return The exception types to exclude (defaults to none)
      */
-    @AliasFor(annotation = Retryable.class, member = "excludes")
     Class<? extends Throwable>[] excludes() default {};
 
     /**
      * @return The maximum number of retry attempts
      */
     @Digits(integer = 4, fraction = 0)
-    @AliasFor(annotation = Retryable.class, member = "attempts")
     String attempts() default "3";
 
     /**
      * @return The delay between retry attempts
      */
-    @AliasFor(annotation = Retryable.class, member = "delay")
-    String delay() default "500ms";
+    String delay() default "1s";
 
     /**
-     * @return The multiplier to use to calculate the delay between retries
-     */
-    @Digits(integer = 2, fraction = 2)
-    @AliasFor(annotation = Retryable.class, member = "multiplier")
-    String multiplier() default "0";
-
-    /**
-     * The maximum overall delay for an operation to complete until the Circuit state is set to {@link org.particleframework.retry.CircuitState#OPEN}
-     *
      * @return The maximum overall delay
      */
-    @AliasFor(annotation = Retryable.class, member = "maxDelay")
-    String maxDelay() default "5s";
+    String maxDelay() default "";
 
     /**
-     * Sets the {@link java.time.Duration} of time before resetting the circuit to {@link org.particleframework.retry.CircuitState#HALF_OPEN} allowing a single retry
-     *
-     * @return The {@link java.time.Duration} of time before reset
+     * @return The multiplier to use to calculate the delay
      */
-    String reset() default "20s";
+    @Digits(integer = 2, fraction = 2)
+    String multiplier() default "1.0";
 }

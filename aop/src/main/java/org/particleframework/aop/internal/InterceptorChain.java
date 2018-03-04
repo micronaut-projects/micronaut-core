@@ -33,6 +33,7 @@ import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -180,6 +181,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
         Set<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
 
         Set<Class> applicableClasses = annotations.stream()
+                .filter(aClass -> {
+                    if(annotationType == Around.class && aClass.getAnnotation(Introduction.class) != null) {
+                        return false;
+                    }
+                    else if(annotationType == Introduction.class && aClass.getAnnotation(Around.class) != null) {
+                        return false;
+                    }
+                    return true;
+                })
                 .map(type-> type.getAnnotation(Type.class))
                 .filter(Objects::nonNull)
                 .flatMap(type ->

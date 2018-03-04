@@ -95,7 +95,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
 
     @Override
-    protected Map<? extends Element, ?> readAnnotationValues(AnnotationMirror annotationMirror) {
+    protected Map<? extends Element, ?> readAnnotationRawValues(AnnotationMirror annotationMirror) {
         return annotationMirror.getElementValues();
     }
 
@@ -105,12 +105,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         String annotationName = annotationType.getName();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             if ( annotationMirror.getAnnotationType().toString().endsWith(annotationName) ) {
-                Map<? extends Element, ?> values = readAnnotationValues(annotationMirror);
+                Map<? extends Element, ?> values = readAnnotationRawValues(annotationMirror);
                 Map<CharSequence, Object> converted = new LinkedHashMap<>();
                 for (Map.Entry<? extends Element, ?> entry : values.entrySet()) {
                     Element key = entry.getKey();
                     Object value = entry.getValue();
-                    readAnnotationValues(key.getSimpleName().toString(), value, converted);
+                    readAnnotationRawValues(key.getSimpleName().toString(), value, converted);
                 }
                 return OptionalValues.of(Object.class, converted);
             }
@@ -119,10 +119,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected void readAnnotationValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
+    protected void readAnnotationRawValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
         if(memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
-            ((javax.lang.model.element.AnnotationValue)annotationValue).accept(new MetadataAnnotationValueVisitor(annotationValues, memberName), this);
+            if(!annotationValues.containsKey(memberName)) {
+                ((javax.lang.model.element.AnnotationValue)annotationValue).accept(new MetadataAnnotationValueVisitor(annotationValues, memberName), this);
+
+            }
         }
+    }
+
+    @Override
+    protected Object readAnnotationValue(String memberName, Object annotationValue) {
+        if(memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
+            HashMap<CharSequence, Object> result = new HashMap<>(1);
+            ((javax.lang.model.element.AnnotationValue)annotationValue).accept(new MetadataAnnotationValueVisitor(result, memberName), this);
+            return result.get(memberName);
+        }
+        return null;
     }
 
     @Override

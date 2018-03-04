@@ -18,7 +18,7 @@ package example.offers;
 import org.particleframework.context.event.ApplicationEventListener;
 import org.particleframework.runtime.ParticleApplication;
 import org.particleframework.runtime.server.event.ServerStartupEvent;
-import org.particleframework.scheduling.executor.ScheduledExecutorServiceConfig;
+import org.particleframework.scheduling.Schedulers;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -36,7 +36,7 @@ public class Application implements ApplicationEventListener<ServerStartupEvent>
 
 
     public Application(
-            @Named(ScheduledExecutorServiceConfig.NAME) ScheduledExecutorService executorService,
+            @Named(Schedulers.SCHEDULED) ScheduledExecutorService executorService,
             OffersRepository offersRepository) {
         this.executorService = executorService;
         this.offersRepository = offersRepository;

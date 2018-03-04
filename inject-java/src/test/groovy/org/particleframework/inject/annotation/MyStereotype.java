@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.inject.annotation;
 
+import org.particleframework.aop.Around;
 import org.particleframework.aop.Introduction;
+import org.particleframework.aop.introduction.StubIntroducer;
 import org.particleframework.context.annotation.AliasFor;
+import org.particleframework.context.annotation.ConfigurationReader;
 import org.particleframework.context.annotation.Type;
-import org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice;
 import org.particleframework.retry.annotation.Recoverable;
-import org.particleframework.runtime.context.scope.ScopedProxy;
 
 import javax.inject.Scope;
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -32,39 +32,22 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A custom {@link Scope} for injecting {@link HttpClient} implementations
- *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
+@Recoverable
+@Introduction
+@Scope
 @Documented
 @Retention(RUNTIME)
-@Scope
-@Introduction
-@Type(HttpClientIntroductionAdvice.class)
-@Recoverable
-@Singleton
-public @interface Client {
+@Target({ElementType.TYPE})
+@Type(StubIntroducer.class)
+@ConfigurationReader
+public @interface MyStereotype {
     /**
-     * @return The URL or service ID of the remote service
+     * @return The prefix to use to resolve the properties
      */
-    String[] value() default "";
+    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    String value() default "";
 
-    /**
-     * @return The ID of the client
-     */
-    @AliasFor(member = "value")
-    String id() default "";
-
-    /**
-     * The base URI for the client
-     *
-     * @return The base URI
-     */
-    String path() default "";
-
-    /**
-     * @return The http client configuration bean to use
-     */
-    Class<? extends HttpClientConfiguration> configuration() default HttpClientConfiguration.class;
 }

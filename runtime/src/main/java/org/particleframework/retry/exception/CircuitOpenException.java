@@ -16,6 +16,8 @@
 package org.particleframework.retry.exception;
 
 /**
+ * Runtime exception that wraps a non-runtime exception in the case of an error
+ *
  * @author graemerocher
  * @since 1.0
  */

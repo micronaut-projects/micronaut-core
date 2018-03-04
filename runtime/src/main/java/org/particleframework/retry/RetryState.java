@@ -15,13 +15,15 @@
  */
 package org.particleframework.retry;
 
+import org.particleframework.retry.annotation.Retryable;
+
 import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * An interface that encapsulates the current state of a {@link org.particleframework.retry.annotation.Retry} operation
+ * An interface that encapsulates the current state of a {@link Retryable} operation
  *
  * @author graemerocher
  * @since 1.0
