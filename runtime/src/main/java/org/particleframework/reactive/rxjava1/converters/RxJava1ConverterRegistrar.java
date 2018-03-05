@@ -72,11 +72,14 @@ public class RxJava1ConverterRegistrar implements TypeConverterRegistrar {
         conversionService.addConverter(io.reactivex.Single.class, Observable.class, single ->
                 RxJavaInterop.toV1Single(single).toObservable()
         );
-        conversionService.addConverter(io.reactivex.Maybe.class, Observable.class, single ->
-                RxJavaInterop.toV1Observable(single.toObservable(), BackpressureStrategy.BUFFER)
-        );
         conversionService.addConverter(Publisher.class, Single.class, publisher ->
                 RxJavaInterop.toV1Observable(publisher).toSingle()
         );
+
+        // Maybe
+        conversionService.addConverter(io.reactivex.Maybe.class, Observable.class, single ->
+                RxJavaInterop.toV1Observable(single.toObservable(), BackpressureStrategy.BUFFER)
+        );
+        conversionService.addConverter(io.reactivex.Maybe.class, Single.class, RxJavaInterop::toV1Single);
     }
 }
