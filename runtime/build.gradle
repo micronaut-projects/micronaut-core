@@ -11,10 +11,10 @@ dependencies {
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly "io.projectreactor:reactor-core:$reactorVersion"
-    compileOnly "com.github.akarnokd:rxjava2-interop:0.12.1"
+    compileOnly "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
 
     compileOnly project(":inject-java")
-    testCompile "com.github.akarnokd:rxjava2-interop:0.12.1"
+    testCompile "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
     testCompile "io.projectreactor:reactor-core:$reactorVersion"
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")

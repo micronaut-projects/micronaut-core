@@ -1,0 +1,14 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":configurations:netflix-archaius")
+    compile 'com.netflix.hystrix:hystrix-core:1.5.12'
+
+    runtime "io.reactivex:rxjava:$rxJava1Version"
+    runtime project(":runtime")
+    runtime "com.github.akarnokd:rxjava2-interop:$rxJavaInteropVersion"
+
+    testCompile project(":discovery-client")
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+}

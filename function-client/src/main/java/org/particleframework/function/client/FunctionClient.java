@@ -19,6 +19,7 @@ import org.particleframework.aop.Introduction;
 import org.particleframework.context.annotation.Type;
 import org.particleframework.function.client.aop.FunctionClientAdvice;
 import org.particleframework.http.client.interceptor.HttpClientIntroductionAdvice;
+import org.particleframework.retry.annotation.Recoverable;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
@@ -37,6 +38,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Singleton
 @Introduction
+@Recoverable
 @Type(FunctionClientAdvice.class)
 public @interface FunctionClient {
 }
