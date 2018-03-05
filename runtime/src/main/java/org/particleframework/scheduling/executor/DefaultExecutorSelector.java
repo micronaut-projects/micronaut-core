@@ -49,7 +49,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
         }
         else {
             Class returnType = method.getReturnType().getType();
-            if(Publishers.isPublisher(returnType) || CompletableFuture.class.isAssignableFrom(returnType)) {
+            if(Publishers.isConvertibleToPublisher(returnType) || CompletableFuture.class.isAssignableFrom(returnType)) {
                 return Optional.empty();
             }
         }

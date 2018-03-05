@@ -71,13 +71,13 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 if(result instanceof CompletableFuture) {
                     return fallbackForFuture(context, (CompletableFuture) result);
                 }
-                else if(Publishers.isPublisher(result.getClass())) {
+                else if(Publishers.isConvertibleToPublisher(result.getClass())) {
                     return fallbackForReactiveType(context, result);
                 }
             }
             return result;
         } catch (RuntimeException e) {
-            return handleFallback(context, e);
+            return resolveFallback(context, e);
         }
     }
 
@@ -114,6 +114,28 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
         return (T) ConversionService.SHARED.convert(recoveryFlowable, context.getReturnType().asArgument())
                                        .orElseThrow(()-> new FallbackException("Unsupported Reactive type: " + result));
+    }
+
+    /**
+     * Finds a fallback method for the given context
+     * @param context The context
+     * @return The fallback method if it is present
+     */
+    public Optional<MethodExecutionHandle<Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
+        Class<?> declaringType = context.getTarget().getClass();
+        Optional<MethodExecutionHandle<Object>> result = beanContext
+                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        if(!result.isPresent()) {
+            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
+            for (Class i : allInterfaces) {
+                result = beanContext
+                        .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+                if(result.isPresent()) {
+                    return result;
+                }
+            }
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -167,7 +189,14 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     }
 
 
-    private Object handleFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception)  {
+    /**
+     * Resolves a fallback for the given execution context and exception
+     *
+     * @param context The context
+     * @param exception The exception
+     * @return Returns the fallback value or throws the original exception
+     */
+    protected Object resolveFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception)  {
         if(exception instanceof NoAvailableServiceException) {
             NoAvailableServiceException nase = (NoAvailableServiceException) exception;
             if(LOG.isErrorEnabled()) {
@@ -197,22 +226,5 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         else {
             throw exception;
         }
-    }
-
-    protected Optional<MethodExecutionHandle<Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.getTarget().getClass();
-        Optional<MethodExecutionHandle<Object>> result = beanContext
-                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-        if(!result.isPresent()) {
-            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
-            for (Class i : allInterfaces) {
-                result = beanContext
-                        .findExecutionHandle(i, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
-                if(result.isPresent()) {
-                    return result;
-                }
-            }
-        }
-        return result;
     }
 }

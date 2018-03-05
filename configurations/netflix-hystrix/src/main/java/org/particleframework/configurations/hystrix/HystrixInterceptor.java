@@ -19,15 +19,26 @@ import com.netflix.hystrix.*;
 import org.particleframework.aop.InterceptPhase;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
+import org.particleframework.context.annotation.Property;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.async.publisher.Publishers;
 import org.particleframework.core.convert.ConversionService;
+import org.particleframework.core.naming.NameUtils;
+import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.ReturnType;
+import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.retry.intercept.RecoveryInterceptor;
 import rx.Observable;
 import rx.SingleSubscriber;
 
 import javax.inject.Singleton;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -39,9 +50,16 @@ import java.util.concurrent.ExecutionException;
 @Singleton
 public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
-    public static final String MEMBER_THREAD_POOL = "threadPool";
-    public static final String MEMBER_GROUP = "group";
     public static final int POSITION = InterceptPhase.RETRY.getPosition() + 10;
+
+    private final Map<Method, HystrixCommand.Setter> setterMap = new ConcurrentHashMap<>();
+    private final Map<Method, HystrixObservableCommand.Setter> observableSetterMap = new ConcurrentHashMap<>();
+
+    private final RecoveryInterceptor recoveryInterceptor;
+
+    public HystrixInterceptor(RecoveryInterceptor recoveryInterceptor) {
+        this.recoveryInterceptor = recoveryInterceptor;
+    }
 
     @Override
     public int getOrder() {
@@ -71,8 +89,11 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
             Class<Object> javaReturnType = returnType.getType();
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
-            if(Publishers.isPublisher(javaReturnType) || isFuture) {
-                HystrixObservableCommand.Setter setter = buildObservableSetter(hystrixGroup, commandName);
+            if(Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
+                String finalCommandName = commandName;
+                HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getTargetMethod(), method ->
+                        buildObservableSetter(hystrixGroup, finalCommandName,settings)
+                );
 
                 HystrixObservableCommand<Object> command = new HystrixObservableCommand<Object>(setter) {
                     @SuppressWarnings("unchecked")
@@ -85,11 +106,21 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                     @Override
                     protected boolean isFallbackUserDefined() {
-                        return super.isFallbackUserDefined();
+                        return recoveryInterceptor.findFallbackMethod(context).isPresent();
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     protected Observable<Object> resumeWithFallback() {
+                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        if(fallbackMethod.isPresent()) {
+                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            Object result = handle.invoke(context.getParameterValues());
+                            Optional<Observable> converted = ConversionService.SHARED.convert(result, Observable.class);
+                            if(converted.isPresent()) {
+                                return converted.get();
+                            }
+                        }
                         return super.resumeWithFallback();
                     }
 
@@ -119,11 +150,10 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                 }
             }
             else {
-                HystrixCommand.Setter setter = HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
-                setter.andCommandKey(HystrixCommandKey.Factory.asKey(commandName));
-                if(StringUtils.isNotEmpty(threadPool)) {
-                    setter.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey(threadPool));
-                }
+                String finalCommandName = commandName;
+                HystrixCommand.Setter setter = setterMap.computeIfAbsent(context.getTargetMethod(), method ->
+                        buildSetter(hystrixGroup, finalCommandName, threadPool, settings)
+                );
 
                 HystrixCommand<Object> hystrixCommand = new HystrixCommand<Object>(setter) {
                     @Override
@@ -133,11 +163,16 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                     @Override
                     protected boolean isFallbackUserDefined() {
-                        return super.isFallbackUserDefined();
+                        return recoveryInterceptor.findFallbackMethod(context).isPresent();
                     }
 
                     @Override
                     protected Object getFallback() {
+                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        if(fallbackMethod.isPresent()) {
+                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            return handle.invoke(context.getParameterValues());
+                        }
                         return super.getFallback();
                     }
 
@@ -166,9 +201,99 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private HystrixObservableCommand.Setter buildObservableSetter(String hystrixGroup, String commandName) {
+    @SuppressWarnings("Duplicates")
+    private HystrixCommand.Setter buildSetter(String hystrixGroup, String commandName, String threadPool, org.particleframework.configurations.hystrix.annotation.Hystrix settings) {
+        HystrixCommand.Setter setter = HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
+        HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
+        setter.andCommandKey(commandKey);
+        if(StringUtils.isNotEmpty(threadPool)) {
+            setter.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey(threadPool));
+        }
+        if(settings != null) {
+            Property[] properties = settings.commandProperties();
+            if (ArrayUtils.isNotEmpty(properties)) {
+
+                HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
+                setter.andCommandPropertiesDefaults(
+                        instance
+                );
+            }
+            Property[] threadPoolProps = settings.threadPoolProperties();
+            if (ArrayUtils.isNotEmpty(threadPoolProps)) {
+
+                HystrixThreadPoolProperties.Setter threadPoolPropsInstance = buildThreadPoolProperties(properties);
+                setter.andThreadPoolPropertiesDefaults(
+                        threadPoolPropsInstance
+                );
+
+            }
+        }
+        return setter;
+    }
+
+    private HystrixCommandProperties.Setter buildCommandProperties(Property[] properties) {
+        Class<HystrixCommandProperties.Setter> setterClass = HystrixCommandProperties.Setter.class;
+        HystrixCommandProperties.Setter instance = HystrixCommandProperties.defaultSetter();
+        return buildPropertiesDynamic(properties, setterClass, instance);
+    }
+
+    private HystrixThreadPoolProperties.Setter buildThreadPoolProperties(Property[] properties) {
+        return buildPropertiesDynamic(
+                properties,
+                HystrixThreadPoolProperties.Setter.class,
+                HystrixThreadPoolProperties.defaultSetter());
+    }
+
+    private <T> T buildPropertiesDynamic(Property[] properties, Class<T> setterClass, T instance) {
+        for (Property property : properties) {
+            String name = property.name();
+            if(StringUtils.isNotEmpty(name)) {
+                String value = property.value();
+                if(StringUtils.isNotEmpty(value)) {
+                    String methodName = "with" + NameUtils.capitalize(name);
+                    Optional<Method> method = ReflectionUtils.findMethodsByName(setterClass, methodName)
+                            .findFirst();
+                    if(method.isPresent()) {
+                        Method m = method.get();
+                        Class<?>[] parameterTypes = m.getParameterTypes();
+                        if(parameterTypes.length == 1) {
+                            Optional<?> converted = ConversionService.SHARED.convert(value, parameterTypes[0]);
+                            if(converted.isPresent()) {
+
+                                try {
+                                    Object v = converted.get();
+                                    ReflectionUtils.invokeMethod(instance, m, v);
+                                } catch (Exception e) {
+                                    throw new ConfigurationException("Invalid Hystrix Property: " + name);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+        return instance;
+    }
+
+    @SuppressWarnings("Duplicates")
+    private HystrixObservableCommand.Setter buildObservableSetter(String hystrixGroup, String commandName, org.particleframework.configurations.hystrix.annotation.Hystrix settings) {
         HystrixObservableCommand.Setter setter = HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
-        return setter.andCommandKey(HystrixCommandKey.Factory.asKey(commandName));
+        HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
+        setter.andCommandKey(commandKey);
+
+        if(settings != null) {
+            Property[] properties = settings.commandProperties();
+            if(ArrayUtils.isNotEmpty(properties)) {
+
+                HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
+                setter.andCommandPropertiesDefaults(
+                        instance
+                );
+            }
+
+        }
+        return setter;
     }
 
     private String resolveHystrixGroup(MethodInvocationContext<Object, Object> context,

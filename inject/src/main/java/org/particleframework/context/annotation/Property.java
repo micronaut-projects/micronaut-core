@@ -13,24 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.particleframework.http.client;
+package org.particleframework.context.annotation;
+
+import java.lang.annotation.*;
 
 /**
- * Allows hooking modifying the resulting publisher prior to returning it from the client. Useful for customization per reactive framework
+ * A property that can be contained within a {@link PropertySource} or used generally throughout the system
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface ReactiveClientResultTransformer {
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Repeatable(PropertySource.class)
+public @interface Property {
+    /**
+     * @return The name of the property
+     */
+    String name();
 
     /**
-     * Transform the publisher result
-     *
-     * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isConvertibleToPublisher(Class)}
-     * @return The transformed result
+     * @return The value of the property
      */
-    Object transform(
-            Object publisherResult);
-
-
+    String value();
 }

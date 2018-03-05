@@ -40,13 +40,13 @@ public class HystrixConfiguration {
 
     /**
      * Allows defining the {@link HystrixCommandExecutionHook} as a bean
-     * @param commandExecutationHook The command execution hook
+     * @param commandExecutionHook The command execution hook
      */
     @Inject
-    void setCommandExecutationHook(@Nullable HystrixCommandExecutionHook commandExecutationHook) {
-        if(commandExecutationHook != null) {
+    void setCommandExecutationHook(@Nullable HystrixCommandExecutionHook commandExecutionHook) {
+        if(commandExecutionHook != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
-            instance.registerCommandExecutionHook(commandExecutationHook);
+            instance.registerCommandExecutionHook(commandExecutionHook);
         }
     }
 
@@ -67,7 +67,7 @@ public class HystrixConfiguration {
      * @param concurrencyStrategy The command execution hook
      */
     @Inject
-    void setMetricsPublisher(@Nullable HystrixConcurrencyStrategy concurrencyStrategy) {
+    void setConcurrencyStrategy(@Nullable HystrixConcurrencyStrategy concurrencyStrategy) {
         if(concurrencyStrategy != null) {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerConcurrencyStrategy(concurrencyStrategy);

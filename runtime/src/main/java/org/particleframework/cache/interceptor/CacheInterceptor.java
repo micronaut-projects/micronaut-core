@@ -32,7 +32,6 @@ import org.particleframework.core.type.MutableArgumentValue;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.scheduling.Schedulers;
-import org.particleframework.scheduling.executor.IOExecutorServiceConfig;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -91,7 +90,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             Class returnType = returnTypeObject.getType();
             if (CompletableFuture.class.isAssignableFrom(returnType)) {
                 return interceptCompletableFuture(context, returnTypeObject, returnType);
-            } else if (Publishers.isPublisher(returnType)) {
+            } else if (Publishers.isConvertibleToPublisher(returnType)) {
                 return interceptPublisher(context, returnTypeObject, returnType);
             } else {
                 return interceptSync(context, returnTypeObject, returnType);
