@@ -70,7 +70,7 @@ public class AWSLambdaFunctionExecutor<I, O> implements FunctionInvoker<I, O>, F
             throw new IllegalArgumentException("Function definition must be a AWSInvokeRequestDefinition");
         }
         InvokeRequest invokeRequest = ((AWSInvokeRequestDefinition) definition).getInvokeRequest().clone();
-        boolean isReactiveType = Publishers.isPublisher(outputType.getType());
+        boolean isReactiveType = Publishers.isConvertibleToPublisher(outputType.getType());
         if (isReactiveType) {
             Flowable<Object> invokeFlowable = Flowable.just(invokeRequest)
                     .flatMap(req -> {

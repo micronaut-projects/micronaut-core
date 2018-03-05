@@ -693,7 +693,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             Optional<MediaType> responseMediaType = defaultResponse.getContentType();
 
             Publisher<Object> publisher;
-            if (Publishers.isPublisher(bodyType)) {
+            if (Publishers.isConvertibleToPublisher(bodyType)) {
                 // if the return type is a reactive type we need to subscribe to Publisher in order to emit
                 // an appropriate response
                 bodyType = resolveBodyType(route, bodyType);
@@ -722,7 +722,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             } else {
                 // if the transfer encoding is not chunked then we must send a content length header so subscribe the
                 // publisher, encode the result as a io.netty.handler.codec.http.FullHttpResponse
-                boolean isPublisher = Publishers.isPublisher(body.getClass());
+                boolean isPublisher = Publishers.isConvertibleToPublisher(body.getClass());
                 boolean isSingle = !isPublisher || Publishers.isSingle(body.getClass()) || HttpResponse.class.isAssignableFrom(bodyType);
                 if (isSingle) {
                     publisher.subscribe(new ContextCompletionAwareSubscriber<Object>(context) {

@@ -17,7 +17,6 @@ package org.particleframework.function.client.aop;
 
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
-import io.reactivex.functions.Function;
 import org.particleframework.aop.MethodInterceptor;
 import org.particleframework.aop.MethodInvocationContext;
 import org.particleframework.core.async.publisher.Publishers;
@@ -31,19 +30,10 @@ import org.particleframework.function.client.FunctionInvoker;
 import org.particleframework.function.client.FunctionInvokerChooser;
 import org.particleframework.function.client.exceptions.FunctionExecutionException;
 import org.particleframework.function.client.exceptions.FunctionNotFoundException;
-import org.particleframework.function.client.http.HttpFunctionExecutor;
-import org.particleframework.function.executor.FunctionExecutor;
 import org.particleframework.http.annotation.Body;
-import org.particleframework.http.client.DefaultHttpClient;
-import org.particleframework.http.client.HttpClientConfiguration;
-import org.particleframework.http.client.LoadBalancer;
-import org.particleframework.http.codec.MediaTypeCodecRegistry;
-import org.particleframework.http.filter.HttpClientFilter;
-import org.reactivestreams.Publisher;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.net.URL;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -91,7 +81,7 @@ public class FunctionClientAdvice  implements MethodInterceptor<Object,Object> {
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));
         ReturnType<Object> returnType = context.getReturnType();
         Class<Object> javaReturnType = returnType.getType();
-        if(Publishers.isPublisher(javaReturnType)) {
+        if(Publishers.isConvertibleToPublisher(javaReturnType)) {
 
             Maybe flowable = functionDefinition.firstElement().flatMap(def -> {
                 FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));

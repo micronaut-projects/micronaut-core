@@ -46,12 +46,18 @@ public class RxJava1ConverterRegistrar implements TypeConverterRegistrar {
 
         conversionService.addConverter(Observable.class, io.reactivex.Single.class, observable -> RxJavaInterop.toV2Single(observable.toSingle()));
 
+        conversionService.addConverter(Observable.class, io.reactivex.Maybe.class, observable -> RxJavaInterop.toV2Observable(observable).firstElement());
+
         conversionService.addConverter(Observable.class, io.reactivex.Observable.class, RxJavaInterop::toV2Observable);
 
         conversionService.addConverter(Publisher.class, Observable.class, RxJavaInterop::toV1Observable);
 
         conversionService.addConverter(io.reactivex.Observable.class, Single.class, observable ->
                 RxJavaInterop.toV1Observable(observable, BackpressureStrategy.BUFFER).toSingle()
+        );
+
+        conversionService.addConverter(io.reactivex.Observable.class, Observable.class, observable ->
+                RxJavaInterop.toV1Observable(observable, BackpressureStrategy.BUFFER)
         );
 
         // Single
@@ -65,6 +71,9 @@ public class RxJava1ConverterRegistrar implements TypeConverterRegistrar {
 
         conversionService.addConverter(io.reactivex.Single.class, Observable.class, single ->
                 RxJavaInterop.toV1Single(single).toObservable()
+        );
+        conversionService.addConverter(io.reactivex.Maybe.class, Observable.class, single ->
+                RxJavaInterop.toV1Observable(single.toObservable(), BackpressureStrategy.BUFFER)
         );
         conversionService.addConverter(Publisher.class, Single.class, publisher ->
                 RxJavaInterop.toV1Observable(publisher).toSingle()
