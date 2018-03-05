@@ -15,6 +15,8 @@
  */
 package org.particleframework.configurations.hystrix.annotation;
 
+import org.particleframework.context.annotation.Property;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -54,4 +56,16 @@ public @interface Hystrix {
      * @return Whether to wrap exceptions
      */
     boolean wrapExceptions() default false;
+
+    /**
+     * @return Global properties to apply to all commands
+     * @see com.netflix.hystrix.HystrixCommandProperties
+     */
+    Property[] commandProperties() default {};
+
+    /**
+     * @return Thread pool properties to apply to blocking commands
+     * @see com.netflix.hystrix.HystrixThreadPoolProperties
+     */
+    Property[] threadPoolProperties() default {};
 }

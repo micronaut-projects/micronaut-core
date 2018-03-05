@@ -126,15 +126,18 @@ public class InterceptorChain<B, R> implements InvocationContext<B,R> {
     }
 
     @Override
-    public R repeat() throws RuntimeException {
-        if(isIntroduction) {
-            Interceptor<B, R> interceptor = this.interceptors[index-1];
-            return interceptor.intercept(this);
+    public R proceed(Interceptor from) throws RuntimeException {
+        for (int i = 0; i < interceptors.length; i++) {
+            Interceptor<B, R> interceptor = interceptors[i];
+            if(interceptor == from) {
+                index = i + 1;
+                return proceed();
+
+            }
         }
-        else {
-            return proceed();
-        }
+        throw new IllegalArgumentException("Argument ["+from+"] is not within the interceptor chain");
     }
+
 
 
     /**
