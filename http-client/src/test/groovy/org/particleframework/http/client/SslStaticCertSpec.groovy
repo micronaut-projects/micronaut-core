@@ -12,7 +12,6 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
-@Ignore
 class SslStaticCertSpec extends Specification {
 
     @Shared
@@ -21,7 +20,8 @@ class SslStaticCertSpec extends Specification {
             'particle.ssl.enabled': true,
             'particle.ssl.keyStore.path': 'classpath:keystore.p12',
             'particle.ssl.keyStore.password': 'foobar',
-            'particle.ssl.keyStore.type': 'PKCS12'
+            'particle.ssl.keyStore.type': 'PKCS12',
+            'particle.ssl.ciphers': 'TLS_DH_anon_WITH_AES_128_CBC_SHA'
     ])
 
     @Shared
