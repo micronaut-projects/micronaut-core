@@ -113,6 +113,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
     protected static final String HANDLER_STREAM = "stream-handler";
+    protected static final String HANDLER_DECODER = "http-decoder";
 
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -1045,6 +1046,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, C
                 }
             });
             p.addLast("http-client-codec", new HttpClientCodec());
+
+            p.addLast(HANDLER_DECODER, new HttpContentDecompressor());
+
             int maxContentLength = configuration.getMaxContentLength();
             p.addLast(HANDLER_AGGREGATOR, new HttpObjectAggregator(maxContentLength) {
                 @Override
