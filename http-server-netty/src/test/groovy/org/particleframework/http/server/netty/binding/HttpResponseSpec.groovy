@@ -16,6 +16,7 @@
 package org.particleframework.http.server.netty.binding
 
 import org.particleframework.http.HttpMessage
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.MediaType
@@ -91,6 +92,17 @@ class HttpResponseSpec extends AbstractParticleSpec {
         "createdBody"      | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
         "createdUri"       | HttpStatus.CREATED            | null                       | [connection:'close','location': 'http://test.com']
         "accepted"         | HttpStatus.ACCEPTED           | null                       | [connection:'close']
+    }
+
+    void "test content encoding"() {
+        when:
+        def response = rxClient.exchange(HttpRequest.GET("/java/response/okWithBody").header("Accept-Encoding", "gzip"), String).onErrorReturn({t -> t.response }).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == "some text" //decoded by the client
+        response.header("Content-Length") == "9" // changed by the decoder
+        response.header("Content-Encoding") == null // removed by the decoder
     }
 
     @Controller

@@ -44,7 +44,7 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/simple")
+                HttpRequest.GET("/get/simple").header("Accept-Encoding", "gzip")
         ))
         Optional<String> body = flowable.map({res ->
             res.getBody(String)}
@@ -53,7 +53,6 @@ class HttpGetSpec extends Specification {
         then:
         body.isPresent()
         body.get() == 'success'
-
     }
 
 
