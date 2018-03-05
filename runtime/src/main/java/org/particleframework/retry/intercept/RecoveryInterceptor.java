@@ -72,43 +72,48 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                     return fallbackForFuture(context, (CompletableFuture) result);
                 }
                 else if(Publishers.isPublisher(result.getClass())) {
-                    Flowable<Object> recoveryFlowable = ConversionService.SHARED.convert(result, Flowable.class)
-                                                                        .orElseThrow(()-> new FallbackException("Unsupported Reactive type: " + result));
-
-                    recoveryFlowable = recoveryFlowable.onErrorResumeNext(throwable -> {
-                        Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context);
-                        if(fallbackMethod.isPresent()) {
-                            MethodExecutionHandle<Object> fallbackHandle = fallbackMethod.get();
-                            if(LOG.isDebugEnabled()) {
-                                LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
-                            }
-
-                            Object fallbackResult;
-                            try {
-                                fallbackResult = fallbackHandle.invoke(context.getParameterValues());
-                            } catch (Exception e) {
-                                return Flowable.error(throwable);
-                            }
-                            if(fallbackResult == null) {
-                                return Flowable.error(new FallbackException("Fallback handler ["+fallbackHandle+"] returned null value"));
-                            }
-                            else {
-                                return ConversionService.SHARED.convert(fallbackResult, Publisher.class)
-                                        .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
-                            }
-
-                        }
-                        return Flowable.error(throwable);
-                    });
-
-                    return ConversionService.SHARED.convert(recoveryFlowable, context.getReturnType().asArgument())
-                                                   .orElseThrow(()-> new FallbackException("Unsupported Reactive type: " + result));
+                    return fallbackForReactiveType(context, result);
                 }
             }
             return result;
         } catch (RuntimeException e) {
             return handleFallback(context, e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T fallbackForReactiveType(MethodInvocationContext<Object, Object> context, T result) {
+        Flowable<Object> recoveryFlowable = ConversionService.SHARED.convert(result, Flowable.class)
+                                                            .orElseThrow(()-> new FallbackException("Unsupported Reactive type: " + result));
+
+        recoveryFlowable = recoveryFlowable.onErrorResumeNext(throwable -> {
+            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context);
+            if(fallbackMethod.isPresent()) {
+                MethodExecutionHandle<Object> fallbackHandle = fallbackMethod.get();
+                if(LOG.isDebugEnabled()) {
+                    LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
+                }
+
+                Object fallbackResult;
+                try {
+                    fallbackResult = fallbackHandle.invoke(context.getParameterValues());
+                } catch (Exception e) {
+                    return Flowable.error(throwable);
+                }
+                if(fallbackResult == null) {
+                    return Flowable.error(new FallbackException("Fallback handler ["+fallbackHandle+"] returned null value"));
+                }
+                else {
+                    return ConversionService.SHARED.convert(fallbackResult, Publisher.class)
+                            .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
+                }
+
+            }
+            return Flowable.error(throwable);
+        });
+
+        return (T) ConversionService.SHARED.convert(recoveryFlowable, context.getReturnType().asArgument())
+                                       .orElseThrow(()-> new FallbackException("Unsupported Reactive type: " + result));
     }
 
     @SuppressWarnings("unchecked")

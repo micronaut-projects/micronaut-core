@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.neo4j.dbms.DatabaseManagementSystemSettings.data_directory;
-import static org.neo4j.graphdb.factory.GraphDatabaseSettings.BoltConnector.EncryptionLevel.DISABLED;
 
 /**
  * Starts an embedded Neo4j server is no server is running for the configured settings
@@ -230,7 +229,7 @@ public class EmbeddedNeo4jServer implements BeanCreatedEventListener<Neo4jBoltCo
         TestServerBuilder serverBuilder = TestServerBuilders.newInProcessBuilder()
                 .withConfig(new BoltConnector("0").enabled, "true")
                 .withConfig(new BoltConnector("0").type, GraphDatabaseSettings.Connector.ConnectorType.BOLT.name())
-                .withConfig(new BoltConnector("0").encryption_level, DISABLED.name())
+                .withConfig(new BoltConnector("0").encryption_level, BoltConnector.EncryptionLevel.DISABLED.name())
                 .withConfig(new BoltConnector("0").listen_address, myBoltAddress);
         if(dataLocation != null) {
             serverBuilder = serverBuilder.withConfig(data_directory,  dataLocation.getPath());
