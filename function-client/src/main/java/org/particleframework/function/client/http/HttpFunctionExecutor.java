@@ -78,7 +78,7 @@ public class HttpFunctionExecutor<I,O>  implements FunctionInvoker<I,O>, Closeab
             else {
                 request = HttpRequest.POST(uri.toString(), input);
             }
-            if(Publishers.isPublisher(outputType.getType())) {
+            if(Publishers.isConvertibleToPublisher(outputType.getType())) {
                 Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
                 return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(()->
                         new FunctionExecutionException("Unsupported Reactive type: " + outputType.getType())

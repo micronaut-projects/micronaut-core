@@ -94,7 +94,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
             ReturnType<Object> returnType = context.getReturnType();
             Class<Object> javaReturnType = returnType.getType();
-            if (Publishers.isPublisher(javaReturnType)) {
+            if (Publishers.isConvertibleToPublisher(javaReturnType)) {
                 ConversionService<?> conversionService = ConversionService.SHARED;
                 Object result = context.proceed();
                 if (result == null) {

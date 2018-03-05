@@ -220,7 +220,7 @@ public class Publishers {
      * @param type The type to check
      * @return True if it is
      */
-    public static boolean isPublisher(Class<?> type) {
+    public static boolean isConvertibleToPublisher(Class<?> type) {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {

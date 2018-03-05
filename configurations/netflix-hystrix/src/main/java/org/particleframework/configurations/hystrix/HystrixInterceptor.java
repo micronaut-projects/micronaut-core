@@ -28,6 +28,8 @@ import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.ReturnType;
 import org.particleframework.core.util.ArrayUtils;
 import org.particleframework.core.util.StringUtils;
+import org.particleframework.inject.MethodExecutionHandle;
+import org.particleframework.retry.intercept.RecoveryInterceptor;
 import rx.Observable;
 import rx.SingleSubscriber;
 
@@ -52,6 +54,13 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
     private final Map<Method, HystrixCommand.Setter> setterMap = new ConcurrentHashMap<>();
     private final Map<Method, HystrixObservableCommand.Setter> observableSetterMap = new ConcurrentHashMap<>();
+
+    private final RecoveryInterceptor recoveryInterceptor;
+
+    public HystrixInterceptor(RecoveryInterceptor recoveryInterceptor) {
+        this.recoveryInterceptor = recoveryInterceptor;
+    }
+
     @Override
     public int getOrder() {
         return POSITION;
@@ -80,7 +89,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
             Class<Object> javaReturnType = returnType.getType();
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
-            if(Publishers.isPublisher(javaReturnType) || isFuture) {
+            if(Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
                 String finalCommandName = commandName;
                 HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getTargetMethod(), method ->
                         buildObservableSetter(hystrixGroup, finalCommandName,settings)
@@ -97,11 +106,21 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                     @Override
                     protected boolean isFallbackUserDefined() {
-                        return super.isFallbackUserDefined();
+                        return recoveryInterceptor.findFallbackMethod(context).isPresent();
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     protected Observable<Object> resumeWithFallback() {
+                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        if(fallbackMethod.isPresent()) {
+                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            Object result = handle.invoke(context.getParameterValues());
+                            Optional<Observable> converted = ConversionService.SHARED.convert(result, Observable.class);
+                            if(converted.isPresent()) {
+                                return converted.get();
+                            }
+                        }
                         return super.resumeWithFallback();
                     }
 
@@ -144,11 +163,16 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                     @Override
                     protected boolean isFallbackUserDefined() {
-                        return super.isFallbackUserDefined();
+                        return recoveryInterceptor.findFallbackMethod(context).isPresent();
                     }
 
                     @Override
                     protected Object getFallback() {
+                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        if(fallbackMethod.isPresent()) {
+                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            return handle.invoke(context.getParameterValues());
+                        }
                         return super.getFallback();
                     }
 

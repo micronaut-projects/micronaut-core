@@ -26,7 +26,7 @@ public interface ReactiveClientResultTransformer {
     /**
      * Transform the publisher result
      *
-     * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isPublisher(Class)}
+     * @param publisherResult The publisher result that is an object that conforms to {@link org.particleframework.core.async.publisher.Publishers#isConvertibleToPublisher(Class)}
      * @return The transformed result
      */
     Object transform(

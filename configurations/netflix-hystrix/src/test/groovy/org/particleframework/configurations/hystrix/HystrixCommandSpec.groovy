@@ -19,11 +19,14 @@ import com.netflix.hystrix.HystrixInvokable
 import com.netflix.hystrix.exception.HystrixRuntimeException
 import com.netflix.hystrix.strategy.executionhook.HystrixCommandExecutionHook
 import io.reactivex.Flowable
+import io.reactivex.Maybe
+import io.reactivex.Observable
 import io.reactivex.Single
 import org.particleframework.configurations.hystrix.annotation.Hystrix
 import org.particleframework.configurations.hystrix.annotation.HystrixCommand
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Property
+import org.particleframework.retry.annotation.Fallback
 import org.particleframework.retry.annotation.Retryable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -143,14 +146,60 @@ class HystrixCommandSpec extends Specification {
 
     }
 
+    void "test hystrix fallback"() {
+        given:
+        BookOperations bookOperations = applicationContext.getBean(BookOperations)
+
+        MyHook myHook = applicationContext.getBean(MyHook)
+        myHook.reset()
+
+        when:
+        String value = bookOperations.findTitle("The Stand")
+
+        then:
+        value == "Default Title"
+        myHook.executed.size() == 1
+        myHook.fallbacks.size() == 1
+
+        when:
+        myHook.reset()
+        value = bookOperations.findTitleRx("The Stand").blockingFirst()
+
+        then:
+        value == "Default Rx"
+        myHook.executed.size() == 1
+        myHook.fallbacks.size() == 1
+
+        when:
+        myHook.reset()
+        value = bookOperations.findTitleMaybe("The Stand").blockingGet()
+
+        then:"the maybe doesn't emit a value so we only receive onFallbackStart event"
+        value == null
+        myHook.errors.size() == 0
+        myHook.fallbacks.size() == 0
+        myHook.executed.size() == 1
+
+    }
+
     @Singleton
     static class MyHook extends HystrixCommandExecutionHook {
         List<HystrixInvokable> executed = []
         List emitted = []
+        List fallbacks = []
         List<Exception> errors = []
+
+        @Override
+        def <T> void onFallbackStart(HystrixInvokable<T> commandInstance) {
+            if(!executed.contains(commandInstance))
+                executed.add(commandInstance)
+            super.onFallbackStart(commandInstance)
+        }
+
         @Override
         def <T> T onEmit(HystrixInvokable<T> commandInstance, T value) {
-            executed.add(commandInstance)
+            if(!executed.contains(commandInstance))
+                executed.add(commandInstance)
             emitted.add(value)
             return super.onEmit(commandInstance, value)
         }
@@ -158,14 +207,71 @@ class HystrixCommandSpec extends Specification {
         @Override
         def <T> Exception onError(HystrixInvokable<T> commandInstance, HystrixRuntimeException.FailureType failureType, Exception e) {
             errors.add(e)
-            executed.add(commandInstance)
+            if(!executed.contains(commandInstance))
+                executed.add(commandInstance)
             return super.onError(commandInstance, failureType, e)
         }
 
+        @Override
+        def <T> T onFallbackEmit(HystrixInvokable<T> commandInstance, T value) {
+            fallbacks.add(value)
+            return super.onFallbackEmit(commandInstance, value)
+        }
+
         void reset() {
+            fallbacks.clear()
             errors.clear()
             executed.clear()
             emitted.clear()
+        }
+    }
+
+    static interface BookOperations {
+        String findTitle(String author)
+
+        Observable<String> findTitleRx(String author)
+
+        Maybe<String> findTitleMaybe(String author)
+    }
+
+    @Fallback
+    static class BookServiceFallback implements BookOperations {
+
+        @Override
+        String findTitle(String author) {
+            return "Default Title"
+        }
+
+        @Override
+        Observable<String> findTitleRx(String author) {
+            return Observable.just("Default Rx")
+        }
+
+        @Override
+        Maybe<String> findTitleMaybe(String author) {
+            return Maybe.empty()
+        }
+    }
+
+    @Singleton
+    static class BookService implements BookOperations {
+
+        @Override
+        @HystrixCommand
+        String findTitle(String author) {
+            throw new IllegalStateException("Down")
+        }
+
+        @Override
+        @HystrixCommand
+        Observable<String> findTitleRx(String author) {
+            return Observable.error(new IllegalStateException("Down"))
+        }
+
+        @Override
+        @HystrixCommand
+        Maybe<String> findTitleMaybe(String author) {
+            return Maybe.error(new IllegalStateException("Down"))
         }
     }
 
