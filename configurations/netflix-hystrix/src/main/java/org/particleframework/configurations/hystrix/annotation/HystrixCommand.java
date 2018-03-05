@@ -18,6 +18,7 @@ package org.particleframework.configurations.hystrix.annotation;
 import org.particleframework.aop.Around;
 import org.particleframework.configurations.hystrix.HystrixInterceptor;
 import org.particleframework.context.annotation.AliasFor;
+import org.particleframework.context.annotation.Property;
 import org.particleframework.context.annotation.Type;
 
 import java.lang.annotation.Documented;
@@ -81,4 +82,12 @@ public @interface HystrixCommand {
      */
     @AliasFor(annotation = Hystrix.class, member = "threadPool")
     String threadPool() default "";
+
+
+    /**
+     * @return Additional command specific Hystrix properties
+     * @see com.netflix.hystrix.HystrixCommandProperties
+     */
+    @AliasFor(annotation = Hystrix.class, member = "commandProperties")
+    Property[] properties() default {};
 }

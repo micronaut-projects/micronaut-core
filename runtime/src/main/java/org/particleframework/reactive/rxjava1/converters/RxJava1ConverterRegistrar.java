@@ -44,6 +44,8 @@ public class RxJava1ConverterRegistrar implements TypeConverterRegistrar {
         // Observable
         conversionService.addConverter(Observable.class, Publisher.class, RxJavaInterop::toV2Flowable);
 
+        conversionService.addConverter(Observable.class, io.reactivex.Single.class, observable -> RxJavaInterop.toV2Single(observable.toSingle()));
+
         conversionService.addConverter(Observable.class, io.reactivex.Observable.class, RxJavaInterop::toV2Observable);
 
         conversionService.addConverter(Publisher.class, Observable.class, RxJavaInterop::toV1Observable);
@@ -61,6 +63,9 @@ public class RxJava1ConverterRegistrar implements TypeConverterRegistrar {
 
         conversionService.addConverter(io.reactivex.Single.class, Single.class, RxJavaInterop::toV1Single);
 
+        conversionService.addConverter(io.reactivex.Single.class, Observable.class, single ->
+                RxJavaInterop.toV1Single(single).toObservable()
+        );
         conversionService.addConverter(Publisher.class, Single.class, publisher ->
                 RxJavaInterop.toV1Observable(publisher).toSingle()
         );

@@ -114,14 +114,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 }
 
             } else {
-                boolean first = true;
                 while (true) {
                     try {
-                        Object result = first ? context.proceed() : context.repeat();
+                        Object result = context.proceed(this);
                         retryState.close(null);
                         return result;
                     } catch (RuntimeException e) {
-                        first = false;
                         if (!retryState.canRetry(e)) {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
