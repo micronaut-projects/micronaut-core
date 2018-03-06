@@ -34,7 +34,7 @@ public class NamedMongoClientFactory {
 
     @Bean(preDestroy = "close")
     @EachBean(NamedMongoConfiguration.class)
-    @Refreshable
+    @Refreshable(MongoSettings.PREFIX)
     MongoClient mongoClient(NamedMongoConfiguration configuration) {
         return MongoClients.create(configuration.buildSettings());
     }
