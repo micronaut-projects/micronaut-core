@@ -704,7 +704,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     bodyType = resolveBodyType(route, bodyType);
                     publisher = Publishers.fromCompletableFuture(() -> (CompletableFuture<Object>) body);
                 } else {
-                    publisher = Publishers.fromCompletableFuture(() -> CompletableFuture.completedFuture(body));
+                    publisher = Publishers.just(body);
                 }
             }
 
@@ -730,7 +730,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         @Override
                         protected void onComplete(Object message) {
                             try {
-                                if (message != null) {
+                                boolean isOpen = context.channel().isOpen();
+                                if(!isOpen) {
+                                    subscription.cancel();
+                                }
+                                else if (message != null) {
 
                                     Object body;
                                     FullHttpResponse fullHttpResponse;
@@ -777,7 +781,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 }
                             } finally {
                                 // final read required to complete request
-                                context.read();
+                                if(context.channel().isOpen()) {
+                                    context.read();
+                                }
                             }
                         }
                     });
@@ -918,16 +924,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             httpContentPublisher = Publishers.onComplete(httpContentPublisher, () -> {
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 if (request == null || !request.getHeaders().isKeepAlive()) {
-                    context.pipeline()
-                            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
-                            .addListener(f -> {
-                                        if (f.isSuccess()) {
-                                            future.complete(null);
-                                        } else {
-                                            future.completeExceptionally(f.cause());
+                    if(context.channel().isOpen()) {
+
+                        context.pipeline()
+                                .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                                .addListener(f -> {
+                                            if (f.isSuccess()) {
+                                                future.complete(null);
+                                            } else {
+                                                future.completeExceptionally(f.cause());
+                                            }
                                         }
-                                    }
-                            );
+                                );
+                    }
                 }
                 return future;
             });
