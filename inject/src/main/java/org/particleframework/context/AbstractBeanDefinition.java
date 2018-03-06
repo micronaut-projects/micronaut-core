@@ -40,6 +40,8 @@ import org.particleframework.core.util.CollectionUtils;
 import org.particleframework.inject.*;
 import org.particleframework.inject.annotation.DefaultAnnotationMetadata;
 import org.particleframework.inject.qualifiers.Qualifiers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -70,6 +72,7 @@ import java.util.stream.Stream;
  */
 @Internal
 public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinition.class);
 
     private final Class<T> type;
     private final boolean isAbstract;
@@ -296,7 +299,30 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         });
     }
 
+    /**
+     * Allows printing warning messages produced by the compiler
+     *
+     * @param message The message
+     */
+    @Internal
+    protected void warn(String message) {
+        if(LOG.isWarnEnabled()) {
+            LOG.warn(message);
+        }
+    }
 
+    /**
+     * Allows printing warning messages produced by the compiler
+     *
+     * @param type The type
+     * @param property The property
+     */
+    @Internal
+    protected void warnMissingProperty(Class type, String method, String property) {
+        if(LOG.isWarnEnabled()) {
+            LOG.warn("Configuration property [{}] could not be set as the underlying method [{}] does not exist on builder [{}]. This usually indicates the configuration option was deprecated and has been removed by the builder implementation (potentially a third-party library).", property, method, type);
+        }
+    }
     /**
      * Resolves the proxied bean instance for this bean
      *

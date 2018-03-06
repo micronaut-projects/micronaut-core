@@ -16,7 +16,9 @@
 package org.particleframework.inject.writer;
 
 import org.objectweb.asm.Type;
+import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.annotation.Internal;
+import org.particleframework.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -24,34 +26,37 @@ import javax.annotation.concurrent.Immutable;
  * Stores data to be used when visiting a configuration builder method
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Immutable
 @Internal
-public class ConfigBuilder {
+class ConfigBuilderState {
 
-    private String name;
+    private final String name;
     private final Type type;
-    private boolean invokeMethod;
+    private final boolean invokeMethod;
+    private final ConfigurationMetadataBuilder metadataBuilder;
+    private final AnnotationMetadata annotationMetadata;
 
     /**
      * Constructs a config builder
-     *
      * @param type The builder type
+     * @param name The name of the field or method
+     * @param isMethod Is the configuration builder resolver a method
+     * @param annotationMetadata The annotation metadata
+     * @param metadataBuilder The metadata builder
      */
-    public ConfigBuilder(Object type) {
+    ConfigBuilderState(Object type, String name, boolean isMethod, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
         this.type = AbstractClassFileWriter.getTypeReference(type);
+        this.name = name;
+        this.invokeMethod = isMethod;
+        this.metadataBuilder = metadataBuilder;
+        this.annotationMetadata = annotationMetadata;
     }
 
-    public ConfigBuilder forField(String field) {
-        this.name = field;
-        return this;
-    }
-
-    public ConfigBuilder forMethod(String field) {
-        this.invokeMethod = true;
-        this.name = field;
-        return this;
+    public ConfigurationMetadataBuilder<?> getMetadataBuilder() {
+        return metadataBuilder;
     }
 
     public String getName() {
@@ -62,7 +67,11 @@ public class ConfigBuilder {
         return type;
     }
 
-    public boolean isInvokeMethod() {
+    public boolean isMethod() {
         return invokeMethod;
+    }
+
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
     }
 }
