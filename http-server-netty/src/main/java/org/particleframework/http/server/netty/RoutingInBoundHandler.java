@@ -24,6 +24,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.particleframework.context.BeanLocator;
 import org.particleframework.core.annotation.Internal;
@@ -146,7 +147,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         try {
             if(evt instanceof IdleStateEvent) {
-                ctx.close();
+                IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
+                IdleState state = idleStateEvent.state();
+                if(state == IdleState.ALL_IDLE) {
+                    ctx.close();
+                }
             }
         } finally {
             super.userEventTriggered(ctx, evt);
@@ -704,7 +709,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                     bodyType = resolveBodyType(route, bodyType);
                     publisher = Publishers.fromCompletableFuture(() -> (CompletableFuture<Object>) body);
                 } else {
-                    publisher = Publishers.fromCompletableFuture(() -> CompletableFuture.completedFuture(body));
+                    publisher = Publishers.just(body);
                 }
             }
 
@@ -730,7 +735,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                         @Override
                         protected void onComplete(Object message) {
                             try {
-                                if (message != null) {
+                                boolean isOpen = context.channel().isOpen();
+                                if(!isOpen) {
+                                    subscription.cancel();
+                                }
+                                else if (message != null) {
 
                                     Object body;
                                     FullHttpResponse fullHttpResponse;
@@ -777,7 +786,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
                                 }
                             } finally {
                                 // final read required to complete request
-                                context.read();
+                                if(context.channel().isOpen()) {
+                                    context.read();
+                                }
                             }
                         }
                     });
@@ -918,16 +929,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<HttpRequest<?>> 
             httpContentPublisher = Publishers.onComplete(httpContentPublisher, () -> {
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 if (request == null || !request.getHeaders().isKeepAlive()) {
-                    context.pipeline()
-                            .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
-                            .addListener(f -> {
-                                        if (f.isSuccess()) {
-                                            future.complete(null);
-                                        } else {
-                                            future.completeExceptionally(f.cause());
+                    if(context.channel().isOpen()) {
+
+                        context.pipeline()
+                                .writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT))
+                                .addListener(f -> {
+                                            if (f.isSuccess()) {
+                                                future.complete(null);
+                                            } else {
+                                                future.completeExceptionally(f.cause());
+                                            }
                                         }
-                                    }
-                            );
+                                );
+                    }
                 }
                 return future;
             });

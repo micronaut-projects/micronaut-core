@@ -20,6 +20,7 @@ import org.particleframework.context.BeanContext;
 import org.particleframework.context.annotation.Executable;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.inject.BeanDefinition;
+import org.particleframework.inject.configuration.ConfigurationMetadataBuilder;
 
 import java.io.File;
 import java.io.IOException;
@@ -337,10 +338,33 @@ public interface BeanDefinitionVisitor {
     /**
      * Begin defining a configuration builder
      *
-     * @param configBuilder The configuration builder information
+     * @param type The type of the builder
+     * @param field The name of the field that represents the builder
+     * @param annotationMetadata The annotation metadata associated with the field
+     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
      * @see org.particleframework.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderStart(ConfigBuilder configBuilder);
+    void visitConfigBuilderField(
+            Object type,
+            String field,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder);
+
+    /**
+     * Begin defining a configuration builder
+
+     * @param type The type of the builder
+     * @param methodName The name of the method that returns the builder
+     * @param annotationMetadata The annotation metadata associated with the field
+     * @param metadataBuilder The {@link ConfigurationMetadataBuilder}
+
+     * @see org.particleframework.context.annotation.ConfigurationBuilder
+     */
+    void visitConfigBuilderMethod(
+            Object type,
+            String methodName,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder);
 
     /**
      * Visit a configuration builder method
@@ -360,7 +384,20 @@ public interface BeanDefinitionVisitor {
             String methodName,
             Object paramType,
             Map<String, Object> generics);
-
+    /**
+     * Visit a configuration builder method that accepts a long and a TimeUnit
+     *
+     * @param prefix The prefix used for the method
+     * @param configurationPrefix The prefix used to retrieve the configuration value
+     * @param returnType The return type
+     * @param methodName The method name
+     * @see org.particleframework.context.annotation.ConfigurationBuilder
+     */
+    void visitConfigBuilderDurationMethod(
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName);
     /**
      * Finalize a configuration builder field
      *

@@ -48,6 +48,7 @@ public class HttpServerConfiguration  {
     protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
     protected Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
     protected Duration writeIdleTime = Duration.of(60, ChronoUnit.SECONDS);
+    protected Duration idleTime = Duration.of(60, ChronoUnit.SECONDS);
     protected MultipartConfiguration multipart =  new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
 
@@ -133,6 +134,13 @@ public class HttpServerConfiguration  {
      */
     public Duration getWriteIdleTime() {
         return writeIdleTime;
+    }
+
+    /**
+     * @return The time to allow an idle connection for
+     */
+    public Duration getIdleTime() {
+        return idleTime;
     }
 
     /**
