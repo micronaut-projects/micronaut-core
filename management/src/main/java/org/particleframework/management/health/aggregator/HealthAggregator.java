@@ -16,6 +16,7 @@
 package org.particleframework.management.health.aggregator;
 
 import org.particleframework.management.health.indicator.HealthIndicator;
+import org.particleframework.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
 /**
@@ -28,7 +29,16 @@ public interface HealthAggregator<T> {
 
     /**
      * @param indicators The health indicators to aggregate.
+     *
      * @return An aggregated response.
      */
     Publisher<T> aggregate(HealthIndicator[] indicators);
+
+    /**
+     * @param name The name of the new health result
+     * @param results The health results to aggregate.
+     *
+     * @return An aggregated {@link HealthResult}.
+     */
+    Publisher<HealthResult> aggregate(String name, Publisher<HealthResult> results);
 }

@@ -1,10 +1,8 @@
 package org.particleframework.management.endpoint.beans
 
-import groovy.json.JsonSlurper
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.particleframework.context.ApplicationContext
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Ignore
 import spock.lang.Specification
@@ -19,11 +17,11 @@ class BeansEndpointSpec extends Specification {
     void "test beans endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/beans")).build()).execute()
-        Map result = new JsonSlurper().parseText(response.body().string())
+        def response = rxClient.exchange("/beans", Map).blockingFirst()
+        Map result = response.body()
         Map<String, Map<String, Object>> beans = result.beans
 
         then:
