@@ -87,7 +87,7 @@ public String hello(@Header Optional<String> contentType) {
 
 An empty `Optional` will be passed if the header is absent from the request.
 
-Additionally, any `DateTime` that conforms to link:{jdkapi}/api/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/org/particleframework/core/convert/format/Format.html[Format] annotation:
+Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter, alternatively the format can be customized with the link:{api}/org/particleframework/core/convert/format/Format.html[Format] annotation:
 
 [source,java]
 ----

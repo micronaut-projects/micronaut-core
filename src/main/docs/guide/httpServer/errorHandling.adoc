@@ -12,7 +12,7 @@ include::{testsuite}/server/json/PersonController.java[tags=localError, indent=0
 <2> An instance of api:http.hateos.VndError[] is returned which outputs the error in https://github.com/blongden/vnd.error[application/vnd.error+json].
 <3> A custom response is returned to handle the error
 
-Note that the previous example will only handle errors thrown from the declaring controller. To handle errors globally with the api:web.router.annotation.Error[] annotation:
+Note that the previous example will only handle errors thrown from the declaring controller. To handle errors globally with the api:http.annotation.Error[] annotation:
 
 .Handling Global Errors
 [source,java]
@@ -20,11 +20,11 @@ Note that the previous example will only handle errors thrown from the declaring
 include::{testsuite}/server/json/PersonController.java[tags=globalError, indent=0]
 ----
 
-<1> The api:web.router.annotation.Error[] is used to declare the method a global error handler
+<1> The api:http.annotation.Error[] is used to declare the method a global error handler
 <2> A api:http.hateos.VndError[] instance is returned for all errors
 <3> An api:http.HttpStatus#INTERNAL_SERVER_ERROR[] response is returned
 
-TIP: You can also specify an exception type to the api:web.router.annotation.Error[] to add a more specific exception handler
+TIP: You can also specify an exception type to the api:http.annotation.Error[] to add a more specific exception handler
 
 Finally, you can also add global handlers for error status responses:
 
@@ -34,6 +34,6 @@ Finally, you can also add global handlers for error status responses:
 include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=0]
 ----
 
-<1> The api:web.router.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
+<1> The api:http.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
 <2> A api:http.hateos.VndError[] instance is returned for all 404 responses
 <3> An api:http.HttpStatus#NOT_FOUND[] response is returned
