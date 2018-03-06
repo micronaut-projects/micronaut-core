@@ -244,7 +244,7 @@ class HystrixCommandSpec extends Specification {
 
         @Override
         Observable<String> findTitleRx(String author) {
-            return Observable.just("Default Rx")
+            return Observable.just( "Default Rx")
         }
 
         @Override
