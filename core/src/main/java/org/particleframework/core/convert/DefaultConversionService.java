@@ -559,7 +559,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 targetComponentType = Object.class;
                 List list = new ArrayList();
                 for (Object o : object) {
-                    list.add(convert(o, targetComponentType, newContext));
+                    Optional<?> converted = convert(o, targetComponentType, newContext);
+                    if(converted.isPresent()) {
+                        list.add(converted.get());
+                    }
                 }
                 return CollectionUtils.convertCollection((Class) targetType, list);
             }
@@ -593,6 +596,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             return Optional.of(results.toArray((Object[]) Array.newInstance(targetComponentType, results.size())));
         });
+
+        addConverter(Object[].class, Iterable.class, (object, targetType, context) ->
+                convert(Arrays.asList(object), targetType, context)
+        );
 
 
         addConverter(Object.class, Object[].class, (object, targetType, context) -> {

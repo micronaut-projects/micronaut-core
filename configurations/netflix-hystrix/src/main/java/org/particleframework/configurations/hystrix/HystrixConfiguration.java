@@ -15,6 +15,7 @@
  */
 package org.particleframework.configurations.hystrix;
 
+import com.netflix.hystrix.Hystrix;
 import com.netflix.hystrix.strategy.HystrixPlugins;
 import com.netflix.hystrix.strategy.concurrency.HystrixConcurrencyStrategy;
 import com.netflix.hystrix.strategy.eventnotifier.HystrixEventNotifier;
@@ -25,8 +26,11 @@ import org.particleframework.context.annotation.Context;
 import org.particleframework.context.annotation.Factory;
 
 import javax.annotation.Nullable;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.Closeable;
+import java.io.IOException;
 
 /**
  * This class allows hooking into {@link HystrixPlugins} simply by defining beans
@@ -35,8 +39,12 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Context
-public class HystrixConfiguration {
+public class HystrixConfiguration implements Closeable{
 
+    /**
+     * Whether the /hystrix.stream is enabled
+     */
+    public static final String HYSTRIX_STREAM_ENABLED = "hystrix.stream.enabled";
 
     /**
      * Allows defining the {@link HystrixCommandExecutionHook} as a bean
@@ -84,5 +92,11 @@ public class HystrixConfiguration {
             HystrixPlugins instance = HystrixPlugins.getInstance();
             instance.registerMetricsPublisher(metricsPublisher);
         }
+    }
+
+    @Override
+    @PreDestroy
+    public void close() throws IOException {
+        Hystrix.reset();
     }
 }

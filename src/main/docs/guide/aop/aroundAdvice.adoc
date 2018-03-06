@@ -13,7 +13,7 @@ include::{testsjava}/aop/around/NotNullInterceptor.java[tags=interceptor, indent
 ----
 
 <1> An interceptor implements the link:{api}/org/particleframework/aop/MethodInterceptor.html[MethodInterceptor] interface
-<2> The passed link:{api}/org/particleframework/aop/MethodInterceptor.html[MethodInvocationContext] is used to find the first parameter that is `null`
+<2> The passed link:{api}/org/particleframework/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
 <3> If a `null` parameter is found an exception is thrown
 <4> Otherwise link:{api}/org/particleframework/aop/InvocationContext.html#proceed--[proceed()] is called to proceed with the method invocation.
 

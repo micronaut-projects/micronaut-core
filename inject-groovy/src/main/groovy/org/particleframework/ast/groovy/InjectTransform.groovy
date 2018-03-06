@@ -16,6 +16,7 @@ import org.particleframework.aop.Interceptor
 import org.particleframework.aop.Introduction
 import org.particleframework.aop.writer.AopProxyWriter
 import org.particleframework.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
+import org.particleframework.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import org.particleframework.ast.groovy.utils.AstAnnotationUtils
 import org.particleframework.ast.groovy.utils.AstGenericUtils
 import org.particleframework.ast.groovy.utils.AstMessageUtils
@@ -29,6 +30,7 @@ import org.particleframework.core.naming.NameUtils
 import org.particleframework.core.util.ArrayUtils
 import org.particleframework.core.value.OptionalValues
 import org.particleframework.inject.annotation.AnnotationMetadataReference
+import org.particleframework.inject.configuration.ConfigurationMetadataBuilder
 import org.particleframework.inject.writer.*
 
 import javax.annotation.PostConstruct
@@ -51,6 +53,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
+    ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder = new GroovyConfigurationMetadataBuilder()
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -80,12 +83,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 continue
             } else if (classNode.isInterface()) {
                 if (AstAnnotationUtils.hasStereotype(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
-                    InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                    InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
                     injectVisitor.visitClass(classNode)
                     beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
                 }
             } else {
-                InjectVisitor injectVisitor = new InjectVisitor(source, classNode)
+                InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
                 injectVisitor.visitClass(classNode)
                 beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
             }
@@ -186,17 +189,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isExecutableType
         final boolean isAopProxyType
         final OptionalValues<Boolean> aopSettings
+        final ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
 
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         private BeanDefinitionVisitor beanWriter
         BeanDefinitionVisitor aopProxyWriter
 
-        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode) {
-            this(sourceUnit, targetClassNode, null)
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
+            this(sourceUnit, targetClassNode, null, configurationMetadataBuilder)
         }
 
-        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, Boolean configurationProperties) {
+        InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, Boolean configurationProperties, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
             this.sourceUnit = sourceUnit
+            this.configurationMetadataBuilder = configurationMetadataBuilder
             this.concreteClass = targetClassNode
             def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(targetClassNode)
             this.annotationMetadata = annotationMetadata
@@ -706,8 +711,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Object fieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
 
                         if(isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                            ConfigBuilder configBuilder = new ConfigBuilder(fieldType).forField(fieldName)
-                            getBeanWriter().visitConfigBuilderStart(configBuilder)
+                            getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
                             try {
                                 visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                             } finally {
@@ -806,8 +810,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                         Object resolvedFieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
-                        ConfigBuilder configBuilder = new ConfigBuilder(resolvedFieldType).forMethod(getGetterName(propertyNode))
-                        getBeanWriter().visitConfigBuilderStart(configBuilder)
+                        getBeanWriter().visitConfigBuilderMethod(
+                                resolvedFieldType,
+                                getGetterName(propertyNode),
+                                fieldAnnotationMetadata,
+                                configurationMetadataBuilder)
                         try {
                             visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                         } finally {

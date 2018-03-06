@@ -77,7 +77,7 @@ public @interface Requires {
     String defaultValue() default "";
 
     /**
-     * Used in combination with {@link #configuration()}, {@link #classes()} or {@link #beans()} to express a minimum version of the configuration or classes
+     * Used in combination with {@link #sdk()}, {@link #configuration()}, {@link #classes()} or {@link #beans()} to express a minimum version of the SDK, configuration or classes
      *
      * @return The minimum version
      */

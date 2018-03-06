@@ -35,6 +35,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface ConfigurationBuilder {
 
     /**
+     * @see #configurationPrefix()
+     * @return The configuration prefix
+     */
+    String value() default "";
+
+    /**
      * <p>The default is for {@link ConfigurationBuilder} to look for public JavaBean-style setters. Many APIs however use a builder-style or other style to for constructing configuration.</p>
      *
      * <p>This method allows overriding this behaviour. For example if the builder you are authoring for prefixes write operations with the word "with" by setting the value of this attribute to "with" you can process methods such as {@code withDebug(true)}</p>
@@ -51,6 +57,7 @@ public @interface ConfigurationBuilder {
      *
      * @return The configuration prefix to use
      */
+    @AliasFor(member = "value")
     String configurationPrefix() default "";
 
     /**
@@ -61,5 +68,25 @@ public @interface ConfigurationBuilder {
      * @return True if zero arg setters should be processed
      */
     boolean allowZeroArgs() default false;
+
+    /**
+     * @return The name of a static factory method used to create the builder
+     */
+    String factoryMethod() default "";
+
+    /**
+     * @return The names of the properties that are child builders
+     */
+    String[] children() default {};
+
+    /**
+     * @return The names of the properties to include
+     */
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    String[] excludes() default {};
 
 }
