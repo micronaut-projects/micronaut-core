@@ -13,6 +13,8 @@ dependencies {
 
     compile "org.particleframework:runtime:${projectVersion}"
 
+    compile "org.particleframework.configuration:netflix-hystrix:${projectVersion}"
+
     testCompile "junit:junit:4.12"
     testCompile "org.particleframework:inject-java:${projectVersion}"
     testCompile "org.particleframework:http-client:${projectVersion}"
