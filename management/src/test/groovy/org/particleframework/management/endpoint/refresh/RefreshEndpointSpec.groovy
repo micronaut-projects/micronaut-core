@@ -15,15 +15,15 @@
  */
 package org.particleframework.management.endpoint.refresh
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
+
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.ConfigurationProperties
 import org.particleframework.context.annotation.Value
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
 import org.particleframework.http.annotation.Get
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.context.scope.Refreshable
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -39,37 +39,31 @@ class RefreshEndpointSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-        OkHttpClient client = new OkHttpClient()
 
         when:
-        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/refreshTest")).build()).execute()
+        def response = rxClient.exchange("/refreshTest", String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'test test'
+        response.body() == 'test test'
 
         when:
         System.setProperty("foo.bar", "changed")
-        RequestBody reqbody = RequestBody.create(null, new byte[0])
-        def request = new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/refresh"))
-                .post(reqbody)
+        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockingFirst()
 
-        response = client.newCall(
-                request.build()
-        ).execute()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string().contains('"foo.bar"')
+        response.body().contains('"foo.bar"')
 
         when:
-        response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/refreshTest")).build()).execute()
+        response = rxClient.exchange("/refreshTest", String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == 'changed changed'
+        response.body() == 'changed changed'
 
         cleanup:
         embeddedServer.close()
@@ -78,7 +72,7 @@ class RefreshEndpointSpec extends Specification {
 
     @Controller("/refreshTest")
     static class TestController {
-        private final RefreshBean refreshBean;
+        private final RefreshBean refreshBean
 
         TestController(RefreshBean refreshBean) {
             this.refreshBean = refreshBean

@@ -15,12 +15,11 @@
  */
 package org.particleframework.management.endpoint.stop
 
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
 import org.particleframework.context.ApplicationContext
+import org.particleframework.http.HttpRequest
 import org.particleframework.http.HttpStatus
+import org.particleframework.http.client.RxHttpClient
+import org.particleframework.http.client.exceptions.HttpClientResponseException
 import org.particleframework.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -34,30 +33,28 @@ class ServerStopEndpointSpec extends Specification {
     void "test the endpoint is disabled by default"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, 'test')
-
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/stop")).build()).execute()
+        rxClient.exchange("/stop").blockingFirst()
 
         then:
-        response.code() == HttpStatus.NOT_FOUND.code
+        HttpClientResponseException ex = thrown()
+        ex.response.code() == HttpStatus.NOT_FOUND.code
     }
 
     void "test the server is stopped after exercising the endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true], 'test')
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
         def conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
 
         when:
-        def response = client.newCall(new Request.Builder()
-                .url(new URL(embeddedServer.getURL(), "/stop"))
-                .post(RequestBody.create(MediaType.parse("text/plain"), "")).build()).execute()
+        def response = rxClient.exchange(HttpRequest.POST("/stop", ""), String).blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
-        response.body().string() == '{"message":"Server shutdown started"}'
+        response.body() == '{"message":"Server shutdown started"}'
         conditions.eventually {
             assert !embeddedServer.isRunning()
         }

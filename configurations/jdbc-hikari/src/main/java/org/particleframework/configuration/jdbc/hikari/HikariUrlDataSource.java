@@ -15,23 +15,30 @@
  */
 package org.particleframework.configuration.jdbc.hikari;
 
+import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import org.particleframework.context.annotation.Bean;
-import org.particleframework.context.annotation.EachBean;
-import org.particleframework.context.annotation.Factory;
 
 /**
- * Creates a Hikari data source for each configuration bean
+ * Extends the Hikari data source to add getUrl/setUrl to be
+ * more compliant with the other datasource types.
  *
  * @author James Kleeh
  * @since 1.0
  */
-@Factory
-public class DatasourceFactory {
+public class HikariUrlDataSource extends HikariDataSource {
 
-    @EachBean(DatasourceConfiguration.class)
-    @Bean(preDestroy = "close")
-    public HikariDataSource dataSource(DatasourceConfiguration datasourceConfiguration) {
-        return new HikariUrlDataSource(datasourceConfiguration);
+    public HikariUrlDataSource(HikariConfig configuration) {
+        super(configuration);
+    }
+
+    /**
+     * Used by the JDBC health indicator when an exception occurs.
+     */
+    public String getUrl() {
+        return getJdbcUrl();
+    }
+
+    public void setUrl(String url) {
+        setJdbcUrl(url);
     }
 }

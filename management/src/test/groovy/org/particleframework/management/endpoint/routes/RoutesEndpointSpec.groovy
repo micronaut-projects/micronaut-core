@@ -15,14 +15,12 @@
  */
 package org.particleframework.management.endpoint.routes
 
-import groovy.json.JsonSlurper
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.particleframework.context.ApplicationContext
 import org.particleframework.context.annotation.Requires
 import org.particleframework.http.HttpResponse
 import org.particleframework.http.HttpStatus
 import org.particleframework.http.annotation.Controller
+import org.particleframework.http.client.RxHttpClient
 import org.particleframework.runtime.server.EmbeddedServer
 import org.particleframework.http.annotation.Get
 import org.particleframework.http.annotation.Post
@@ -38,11 +36,11 @@ class RoutesEndpointSpec extends Specification {
     void "test routes endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName])
-        OkHttpClient client = new OkHttpClient()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        def response = client.newCall(new Request.Builder().url(new URL(embeddedServer.getURL(), "/routes")).build()).execute()
-        def result = new JsonSlurper().parseText(response.body().string())
+        def response = rxClient.exchange("/routes", Map).blockingFirst()
+        def result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
