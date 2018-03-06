@@ -20,6 +20,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.ssl.SslContext;
@@ -78,6 +79,7 @@ import java.util.function.BiConsumer;
 public class NettyHttpServer implements EmbeddedServer {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CODEC = "http-codec";
+    public static final String HTTP_COMPRESSOR = "http-compressor";
     public static final String PARTICLE_HANDLER = "particle-inbound-handler";
     public static final String OUTBOUND_KEY = "-outbound-";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -181,6 +183,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                     (int)serverConfiguration.getWriteIdleTime().getSeconds(),
                                     (int)serverConfiguration.getIdleTime().getSeconds()));
                             pipeline.addLast(HTTP_CODEC, new HttpServerCodec());
+                            pipeline.addLast(HTTP_COMPRESSOR, new HttpContentCompressor());
                             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                             pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration));
                             pipeline.addLast(PARTICLE_HANDLER, new RoutingInBoundHandler(

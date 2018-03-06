@@ -15,12 +15,12 @@
  */
 package org.particleframework.docs.qualifiers.annotation
 
-// tag:imports[]
+// tag::imports[]
 import javax.inject.Qualifier
 import java.lang.annotation.Retention
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME
-// end:imports[]
+// end::imports[]
 
 /**
  * @author Graeme Rocher
