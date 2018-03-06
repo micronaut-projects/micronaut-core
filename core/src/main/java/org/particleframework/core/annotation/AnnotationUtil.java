@@ -19,7 +19,6 @@ public class AnnotationUtil {
 
     public static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
             Retention.class.getName(),
-            Deprecated.class.getName(),
             Inherited.class.getName(),
             SuppressWarnings.class.getName(),
             Override.class.getName(),

@@ -97,6 +97,34 @@ public abstract class ConfigurationMetadataBuilder<T> {
         return metadata;
     }
 
+    /**
+     * Visit a configuration property on the last declared properties instance
+     *
+     * @param propertyType  The property type
+     * @param name          The property name
+     * @param description   A description for the property
+     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers, enums etc.)
+     * @return This property metadata or null if no existing configuration is active
+     */
+    public PropertyMetadata visitProperty(String propertyType,
+                                          String name,
+                                          @Nullable String description,
+                                          @Nullable String defaultValue) {
+
+        if(!configurations.isEmpty()) {
+            ConfigurationMetadata last = configurations.get(configurations.size() - 1);
+            PropertyMetadata metadata = new PropertyMetadata();
+            metadata.declaringType = last.type;
+            metadata.name = name;
+            metadata.path = last.name + "." + name;
+            metadata.type = propertyType;
+            metadata.description = description;
+            metadata.defaultValue = defaultValue;
+            properties.add(metadata);
+            return metadata;
+        }
+        return null;
+    }
 
     /**
      * <p>Build a property path for the given declaring type and property name</p>

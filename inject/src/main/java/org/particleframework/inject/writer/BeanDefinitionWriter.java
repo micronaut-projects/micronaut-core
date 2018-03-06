@@ -5,14 +5,17 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 import org.particleframework.context.*;
+import org.particleframework.context.annotation.ConfigurationBuilder;
 import org.particleframework.context.annotation.ConfigurationProperties;
 import org.particleframework.context.annotation.Value;
+import org.particleframework.context.exceptions.ConfigurationException;
 import org.particleframework.core.annotation.AnnotationMetadata;
 import org.particleframework.core.naming.NameUtils;
 import org.particleframework.core.reflect.ReflectionUtils;
 import org.particleframework.core.type.Argument;
 import org.particleframework.core.util.StringUtils;
 import org.particleframework.inject.*;
+import org.particleframework.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -21,8 +24,11 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * <p>Responsible for building bean definitions at compile time. Uses ASM build the class definition.</p>
@@ -206,7 +212,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private Type superType = TYPE_ABSTRACT_BEAN_DEFINITION;
     private boolean isSuperFactory = false;
     private final AnnotationMetadata annotationMetadata;
-    private ConfigBuilder currentConfigBuilder;
+    private ConfigBuilderState currentConfigBuilderState;
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
     private GeneratorAdapter staticInit;
@@ -803,39 +809,80 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderStart(ConfigBuilder configBuilder) {
-        this.currentConfigBuilder = configBuilder;
+    public void visitConfigBuilderField(Object type, String field, AnnotationMetadata annotationMetadata,ConfigurationMetadataBuilder metadataBuilder) {
+        String factoryMethod = annotationMetadata.getValue(
+                ConfigurationBuilder.class,
+                "factoryMethod",
+                String.class
+
+        ).orElse(null);
+        if(StringUtils.isNotEmpty(factoryMethod)) {
+            Type builderType = getTypeReference(type);
+
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+            injectMethodVisitor.invokeStatic(
+                    builderType,
+                    org.objectweb.asm.commons.Method.getMethod(
+                            builderType.getClassName() + " " + factoryMethod + "()"
+                    )
+            );
+
+            injectMethodVisitor.putField(beanType, field, builderType);
+        }
+
+        this.currentConfigBuilderState = new ConfigBuilderState(
+                type,
+                field,
+                false,
+                annotationMetadata,
+                metadataBuilder);
     }
 
     @Override
-    public void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
-        if (currentConfigBuilder != null) {
-            Type builderType = currentConfigBuilder.getType();
-            String builderName = currentConfigBuilder.getName();
-            boolean invokeMethod = currentConfigBuilder.isInvokeMethod();
+    public void visitConfigBuilderMethod(Object type, String methodName, AnnotationMetadata annotationMetadata,ConfigurationMetadataBuilder metadataBuilder) {
+        this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder);
+    }
 
+    @Override
+    public void visitConfigBuilderDurationMethod(String prefix, String configurationPrefix, Object returnType, String methodName) {
+        visitConfigBuilderMethodInternal(
+                prefix,
+                configurationPrefix,
+                returnType,
+                methodName,
+                Duration.class,
+                Collections.emptyMap(),
+                true
+        );
+    }
+
+    @Override
+    public void visitConfigBuilderMethod(
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName,
+            Object paramType,
+            Map<String, Object> generics) {
+        visitConfigBuilderMethodInternal(prefix, configurationPrefix, returnType, methodName, paramType, generics, false);
+    }
+
+    private void visitConfigBuilderMethodInternal(
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName,
+            Object paramType,
+            Map<String, Object> generics,
+            boolean isDurationWithTimeUnit) {
+        if (currentConfigBuilderState != null) {
+            Type builderType = currentConfigBuilderState.getType();
+            String builderName = currentConfigBuilderState.getName();
+            boolean isResolveBuilderViaMethodCall = currentConfigBuilderState.isMethod();
+            ConfigurationMetadataBuilder<?> metadataBuilder = currentConfigBuilderState.getMetadataBuilder();
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
             String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
-
-            injectMethodVisitor.loadThis();
-            injectMethodVisitor.loadArg(0); // the resolution context
-            injectMethodVisitor.loadArg(1); // the bean context
-            boolean zeroArgs = paramType == null;
-            if (zeroArgs) {
-                // if the parameter type is null this is a zero args method that expects a boolean flag
-                buildArgument(
-                        injectMethodVisitor,
-                        propertyName,
-                        Boolean.class
-                );
-            } else {
-                buildArgumentWithGenerics(
-                        injectMethodVisitor,
-                        propertyName,
-                        Collections.singletonMap(paramType, generics)
-                );
-            }
             // at some point we may want to support nested builders, hence the arrays and property path resolution
             String[] propertyPath;
             if (StringUtils.isNotEmpty(configurationPrefix)) {
@@ -843,16 +890,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 propertyPath = new String[]{propertyName};
             }
-            int propertyPathLength = propertyPath.length;
-            pushNewArray(injectMethodVisitor, String.class, propertyPathLength);
+            boolean zeroArgs = paramType == null;
+            Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
 
-            for (int i = 0; i < propertyPathLength; i++) {
-                pushStoreStringInArray(injectMethodVisitor, i, propertyPathLength, propertyPath[i]);
-            }
+            // visit the property metadata
+            metadataBuilder.visitProperty(
+                    paramTypeRef != null ? paramTypeRef.getClassName() : Boolean.class.getName(),
+                    Arrays.stream(propertyPath).collect(Collectors.joining(".")),
+                    null,
+                    null
+            );
+
             // Optional optional = AbstractBeanDefinition.getValueForPath(...)
-            injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
-            injectMethodVisitor.visitVarInsn(ASTORE, optionalInstanceIndex);
-            injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+            pushGetValueForPathCall(injectMethodVisitor, paramType, propertyName, propertyPath, zeroArgs, generics);
+
             Label ifEnd = new Label();
             // if(optional.isPresent())
             injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
@@ -864,22 +915,37 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
 
-            if (invokeMethod) {
+            if (isResolveBuilderViaMethodCall) {
                 String desc = builderType.getClassName() + " " + builderName + "()";
                 injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(desc));
             } else {
                 injectMethodVisitor.getField(beanType, builderName, builderType);
             }
 
-            Type returnTypeRef = getTypeReference(returnType);
-            Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
-            String desc = returnTypeRef.getClassName() + " " + methodName + "(" + (!zeroArgs ? paramTypeRef.getClassName() : "") + ")";
+
+            String methodDescriptor;
+            if(zeroArgs) {
+                methodDescriptor = getMethodDescriptor(returnType, Collections.emptyList());
+            }
+            else if(isDurationWithTimeUnit) {
+                methodDescriptor = getMethodDescriptor(returnType, Arrays.asList(long.class, TimeUnit.class));
+            }
+            else {
+                methodDescriptor = getMethodDescriptor(returnType, Collections.singleton(paramType));
+            }
             injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
             // get the value: optional.get()
             injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Optional.class, "get")
             ));
             pushCastToType(injectMethodVisitor, !zeroArgs ? paramType : boolean.class);
+
+
+            Label tryStart = new Label();
+            Label tryEnd = new Label();
+            Label exceptionHandler = new Label();
+
+            injectMethodVisitor.visitLabel(tryStart);
             if (zeroArgs) {
                 Label zeroArgsEnd = new Label();
                 injectMethodVisitor.push(false);
@@ -887,27 +953,88 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 injectMethodVisitor.visitLabel(new Label());
                 injectMethodVisitor.invokeVirtual(
                         builderType,
-                        org.objectweb.asm.commons.Method.getMethod(desc)
+                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
                 );
 
                 injectMethodVisitor.visitLabel(zeroArgsEnd);
-            } else {
+            }
+            else if(isDurationWithTimeUnit) {
+                injectMethodVisitor.invokeVirtual(Type.getType(Duration.class), org.objectweb.asm.commons.Method.getMethod(
+                        ReflectionUtils.getRequiredMethod(Duration.class, "toMillis")
+                ));
+                Type tu = Type.getType(TimeUnit.class);
+                injectMethodVisitor.getStatic(tu, "MILLISECONDS", tu);
                 injectMethodVisitor.invokeVirtual(
                         builderType,
-                        org.objectweb.asm.commons.Method.getMethod(desc)
+                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
+                );
+
+            }
+            else {
+                injectMethodVisitor.invokeVirtual(
+                        builderType,
+                        new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
                 );
             }
             if (returnType != void.class) {
                 injectMethodVisitor.pop();
             }
+            injectMethodVisitor.visitJumpInsn(GOTO, tryEnd);
+            injectMethodVisitor.visitLabel(exceptionHandler);
+            injectMethodVisitor.pop();
+            injectMethodVisitor.loadThis();
+            injectMethodVisitor.push(builderType);
+            injectMethodVisitor.push(methodName);
+            injectMethodVisitor.push(propertyName);
+            pushInvokeMethodOnSuperClass(injectMethodVisitor, ReflectionUtils.getRequiredInternalMethod(
+                    AbstractBeanDefinition.class,
+                    "warnMissingProperty",
+                    Class.class,
+                    String.class,
+                    String.class
+            ));
+
+            injectMethodVisitor.visitLabel(tryEnd);
+            injectMethodVisitor.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(NoSuchMethodError.class));
 
             injectMethodVisitor.visitLabel(ifEnd);
         }
     }
 
+    private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, Object propertyType, String propertyName, String[] propertyPath, boolean zeroArgs, Map<String, Object> generics) {
+        injectMethodVisitor.loadThis();
+        injectMethodVisitor.loadArg(0); // the resolution context
+        injectMethodVisitor.loadArg(1); // the bean context
+        if (zeroArgs) {
+            // if the parameter type is null this is a zero args method that expects a boolean flag
+            buildArgument(
+                    injectMethodVisitor,
+                    propertyName,
+                    Boolean.class
+            );
+        } else {
+            buildArgumentWithGenerics(
+                    injectMethodVisitor,
+                    propertyName,
+                    Collections.singletonMap(propertyType, generics)
+            );
+        }
+
+        int propertyPathLength = propertyPath.length;
+        pushNewArray(injectMethodVisitor, String.class, propertyPathLength);
+
+        for (int i = 0; i < propertyPathLength; i++) {
+            pushStoreStringInArray(injectMethodVisitor, i, propertyPathLength, propertyPath[i]);
+        }
+        // Optional optional = AbstractBeanDefinition.getValueForPath(...)
+        injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
+        injectMethodVisitor.visitVarInsn(ASTORE, optionalInstanceIndex);
+        injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+    }
+
     @Override
     public void visitConfigBuilderEnd() {
-        currentConfigBuilder = null;
+        currentConfigBuilderState = null;
     }
 
     @Override

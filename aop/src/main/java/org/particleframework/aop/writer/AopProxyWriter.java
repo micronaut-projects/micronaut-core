@@ -32,6 +32,7 @@ import org.particleframework.core.value.OptionalValues;
 import org.particleframework.inject.BeanDefinition;
 import org.particleframework.inject.ExecutableMethod;
 import org.particleframework.inject.ProxyBeanDefinition;
+import org.particleframework.inject.configuration.ConfigurationMetadataBuilder;
 import org.particleframework.inject.writer.*;
 
 import java.io.File;
@@ -926,13 +927,23 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderStart(ConfigBuilder configBuilder) {
-        proxyBeanDefinitionWriter.visitConfigBuilderStart(configBuilder);
+    public void visitConfigBuilderField(Object type, String field, AnnotationMetadata annotationMetadata,ConfigurationMetadataBuilder metadataBuilder) {
+        proxyBeanDefinitionWriter.visitConfigBuilderField(type, field, annotationMetadata,metadataBuilder);
+    }
+
+    @Override
+    public void visitConfigBuilderMethod(Object type, String methodName,AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+        proxyBeanDefinitionWriter.visitConfigBuilderMethod(type, methodName,annotationMetadata, metadataBuilder);
     }
 
     @Override
     public void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
         proxyBeanDefinitionWriter.visitConfigBuilderMethod(prefix, configurationPrefix, returnType, methodName, paramType, generics);
+    }
+
+    @Override
+    public void visitConfigBuilderDurationMethod(String prefix, String configurationPrefix, Object returnType, String methodName) {
+        proxyBeanDefinitionWriter.visitConfigBuilderDurationMethod(prefix, configurationPrefix, returnType, methodName);
     }
 
     @Override

@@ -48,6 +48,7 @@ import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.*;
@@ -204,7 +205,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
-
+            if(isConfigurationPropertiesType) {
+                metadataBuilder.visitProperties(concreteClass, null);
+            }
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
             this.aopSettings = isAopProxyType ? annotationUtils.getAnnotationMetadata(concreteClass).getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
             this.isExecutableType = isAopProxyType || annotationUtils.hasStereotype(concreteClass, Executable.class);
@@ -849,8 +852,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 String fieldName = field.getSimpleName().toString();
                 if(annotationUtils.hasStereotype(field, ConfigurationBuilder.class)) {
-                    ConfigBuilder configBuilder = new ConfigBuilder(fieldType).forField(fieldName);
-                    writer.visitConfigBuilderStart(configBuilder);
+                    writer.visitConfigBuilderField(fieldType, fieldName, annotationUtils.getAnnotationMetadata(field),metadataBuilder);
 
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);
@@ -926,29 +928,63 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false);
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(new String[]{"set"}));
             String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("");
+            Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet());
+            Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet());
+
             PublicMethodVisitor visitor = new PublicMethodVisitor() {
                 @Override
                 protected void accept(DeclaredType type, ExecutableElement method, Object o) {
                     List<? extends VariableElement> params = method.getParameters();
                     String methodName = method.getSimpleName().toString();
                     String prefix = getMethodPrefix(prefixes, methodName);
-                    VariableElement paramType = params.size() == 1 ? params.get(0) : null;
-                    Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
-                    writer.visitConfigBuilderMethod(
-                            prefix,
-                            configurationPrefix,
-                            modelUtils.resolveTypeReference(method.getReturnType()),
-                            methodName,
-                            expectedType,
-                            paramType != null ? genericUtils.resolveGenericTypes(paramType.asType(), Collections.emptyMap()) : null
-                    );
+                    String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
+                    if(!includes.isEmpty() && !includes.contains(propertyName)) {
+                        return;
+                    }
+                    if(!excludes.isEmpty() && excludes.contains(propertyName)) {
+                        return;
+                    }
+
+                    int paramCount = params.size();
+                    if(paramCount < 2) {
+
+                        VariableElement paramType = paramCount == 1 ? params.get(0) : null;
+                        Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
+                        writer.visitConfigBuilderMethod(
+                                prefix,
+                                configurationPrefix,
+                                modelUtils.resolveTypeReference(method.getReturnType()),
+                                methodName,
+                                expectedType,
+                                paramType != null ? genericUtils.resolveGenericTypes(paramType.asType(), Collections.emptyMap()) : null
+                        );
+                    }
+                    else if(paramCount == 2){
+                        // check the params are a long and a TimeUnit
+                        VariableElement first = params.get(0);
+                        VariableElement second = params.get(1);
+                        TypeMirror tu = elementUtils.getTypeElement(TimeUnit.class.getName()).asType();
+                        TypeMirror typeMirror = first.asType();
+                        if( typeMirror.toString().equals("long") && typeUtils.isAssignable(second.asType(), tu)) {
+                            writer.visitConfigBuilderDurationMethod(
+                                    prefix,
+                                    configurationPrefix,
+                                    modelUtils.resolveTypeReference(method.getReturnType()),
+                                    methodName
+                            );
+                        }
+                    }
                 }
 
                 @Override
                 protected boolean isAcceptable(ExecutableElement executableElement) {
+                    // ignore deprecated methods
+                    if( annotationUtils.hasStereotype(executableElement, Deprecated.class) ) {
+                        return false;
+                    }
                     Set<Modifier> modifiers = executableElement.getModifiers();
                     int paramCount = executableElement.getParameters().size();
-                    return modifiers.contains(Modifier.PUBLIC) && (paramCount == 1 || allowZeroArgs && paramCount == 0) && isPrefixedWith(executableElement, prefixes);
+                    return modifiers.contains(Modifier.PUBLIC) && ((paramCount > 0 && paramCount < 3) || allowZeroArgs && paramCount == 0) && isPrefixedWith(executableElement, prefixes);
                 }
 
                 private boolean isPrefixedWith(Element enclosedElement, List<String> prefixes) {
