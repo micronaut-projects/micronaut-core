@@ -82,7 +82,6 @@ These should be built on the `Endpoint` API.
 
 Health checks still to be implemented:
 
-* JDBC/SQL (kleeh in progress)
 * Neo4j Driver
 
 
