@@ -15,11 +15,9 @@
  */
 package io.micronaut.configuration.jdbc.tomcat;
 
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
 
@@ -42,7 +40,7 @@ public class DatasourceConfiguration extends PoolProperties implements BasicJdbc
 
     private CalculatedSettings calculatedSettings;
 
-    public DatasourceConfiguration(@Argument String name) {
+    public DatasourceConfiguration(@Parameter String name) {
         super();
         this.setName(name);
         this.calculatedSettings = new CalculatedSettings(this);

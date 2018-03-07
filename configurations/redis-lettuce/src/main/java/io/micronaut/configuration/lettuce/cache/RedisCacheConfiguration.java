@@ -18,7 +18,7 @@ package io.micronaut.configuration.lettuce.cache;
 import io.micronaut.cache.CacheConfiguration;
 import io.micronaut.cache.serialize.DefaultStringKeySerializer;
 import io.micronaut.configuration.lettuce.RedisSetting;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -40,7 +40,7 @@ public class RedisCacheConfiguration extends CacheConfiguration {
 
     protected Class<ObjectSerializer> valueSerializer;
 
-    public RedisCacheConfiguration(@Argument String cacheName, ApplicationConfiguration applicationConfiguration) {
+    public RedisCacheConfiguration(@Parameter String cacheName, ApplicationConfiguration applicationConfiguration) {
         super(cacheName, applicationConfiguration);
     }
 

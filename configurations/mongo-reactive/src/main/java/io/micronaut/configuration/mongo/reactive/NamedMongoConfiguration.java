@@ -17,11 +17,7 @@ package io.micronaut.configuration.mongo.reactive;
 
 import com.mongodb.async.client.MongoClientSettings;
 import com.mongodb.connection.*;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.Environment;
@@ -56,7 +52,7 @@ public class NamedMongoConfiguration extends AbstractMongoConfiguration {
     protected SslSettings.Builder sslSettings = SslSettings.builder();
 
 
-    public NamedMongoConfiguration(@Argument String serverName, ApplicationConfiguration applicationConfiguration) {
+    public NamedMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.serverName = serverName;
     }

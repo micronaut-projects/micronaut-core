@@ -1,9 +1,6 @@
 package io.micronaut.inject.factory.parameterizedfactory;
 
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 
@@ -56,7 +53,7 @@ public class BFactory {
     }
 
     @Bean
-    C buildC(B b, @Argument int count) {
+    C buildC(B b, @Parameter int count) {
         return new C(b, count);
     }
 

@@ -15,9 +15,8 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -27,14 +26,19 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * <p>The core BeanContext abstraction which which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
+ * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with {@link javax.inject.Inject}.</p>
  *
  * <p>Apart of the standard {@link javax.inject} annotations for dependency injection, additional annotations within the {@link io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLocator, BeanLocator, BeanDefinitionRegistry, ApplicationEventPublisher {
+public interface BeanContext extends
+        LifeCycle<BeanContext>,
+        ExecutionHandleLocator,
+        BeanLocator,
+        BeanDefinitionRegistry,
+        ApplicationEventPublisher {
 
     @Override
     <T> BeanContext registerSingleton(Class<T> type, T singleton);
@@ -74,7 +78,7 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      *
-     * <p>If the bean defines any {@link Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
      *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -89,7 +93,7 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      *
-     * <p>If the bean defines any {@link Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
      *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -104,7 +108,7 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      *
-     * <p>If the bean defines any {@link Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
      *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
@@ -120,7 +124,7 @@ public interface BeanContext extends LifeCycle<BeanContext>, ExecutionHandleLoca
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
      *
-     * <p>If the bean defines any {@link Argument} values then the values passed in the {@code argumentValues} parameter will be used</p>
+     * <p>If the bean defines any {@link Parameter} values then the values passed in the {@code argumentValues} parameter will be used</p>
      *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *

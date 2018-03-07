@@ -16,11 +16,7 @@
 package io.micronaut.configuration.jdbc.hikari;
 
 import com.zaxxer.hikari.HikariConfig;
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.jdbc.BasicJdbcConfiguration;
-import io.micronaut.jdbc.CalculatedSettings;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.jdbc.BasicJdbcConfiguration;
 import io.micronaut.jdbc.CalculatedSettings;
@@ -45,7 +41,7 @@ public class DatasourceConfiguration extends HikariConfig implements BasicJdbcCo
     private CalculatedSettings calculatedSettings;
     private String name;
 
-    public DatasourceConfiguration(@Argument String name) {
+    public DatasourceConfiguration(@Parameter String name) {
         super();
         this.name = name;
         this.calculatedSettings = new CalculatedSettings(this);

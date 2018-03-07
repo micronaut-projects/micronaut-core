@@ -36,7 +36,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>In the above example a new {@code ExampleConfiguration} bean will be created for each item under the {@code foo.bar} key in application configuration</p>
  *
- * <p>A reference to the configuration entry name can be obtained with the {@link Argument} annotation applied to a constructor argument:</p>
+ * <p>A reference to the configuration entry name can be obtained with the {@link Parameter} annotation applied to a constructor argument:</p>
  *
  * <pre><code>
  *  {@literal @}EachProperty("foo.bar")

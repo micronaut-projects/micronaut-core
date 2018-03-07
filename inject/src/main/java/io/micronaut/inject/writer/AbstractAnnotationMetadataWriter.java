@@ -21,8 +21,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 
 /**
  * Base class for types that also write {@link io.micronaut.core.annotation.AnnotationMetadata}
@@ -36,7 +34,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected final Type targetClassType;
     protected final AnnotationMetadata annotationMetadata;
 
-    public AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
+    protected AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
         this.targetClassType = getTypeReference(className);
         this.annotationMetadataWriter = annotationMetadata instanceof AnnotationMetadataReference ? null : new AnnotationMetadataWriter(className, annotationMetadata);
         this.annotationMetadata = annotationMetadata;

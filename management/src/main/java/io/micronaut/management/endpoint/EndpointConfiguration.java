@@ -15,9 +15,7 @@
  */
 package io.micronaut.management.endpoint;
 
-import io.micronaut.context.annotation.Argument;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Argument;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.util.Toggleable;
 
@@ -40,7 +38,7 @@ public class EndpointConfiguration implements Toggleable {
 
     private EndpointDefaultConfiguration defaultConfiguration;
 
-    public EndpointConfiguration(@Argument String id, EndpointDefaultConfiguration defaultConfiguration) {
+    public EndpointConfiguration(@Parameter String id, EndpointDefaultConfiguration defaultConfiguration) {
         this.id = id;
         this.defaultConfiguration = defaultConfiguration;
     }

@@ -19,8 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
