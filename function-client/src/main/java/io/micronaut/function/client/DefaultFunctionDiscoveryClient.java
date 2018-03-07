@@ -26,6 +26,7 @@ import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.net.URI;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -42,11 +43,17 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
     private final DiscoveryClient discoveryClient;
     private final Map<String, FunctionDefinition> functionDefinitionMap;
 
-    public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinition...definitions) {
+    public DefaultFunctionDiscoveryClient(DiscoveryClient discoveryClient, FunctionDefinitionProvider[] providers, FunctionDefinition...definitions) {
         this.discoveryClient = discoveryClient;
         this.functionDefinitionMap = new HashMap<>(definitions.length);
         for (FunctionDefinition definition : definitions) {
             functionDefinitionMap.put(definition.getName(), definition);
+        }
+        for (FunctionDefinitionProvider provider : providers) {
+            Collection<FunctionDefinition> functionDefinitions = provider.getFunctionDefinitions();
+            for (FunctionDefinition definition : functionDefinitions) {
+                functionDefinitionMap.put(definition.getName(), definition);
+            }
         }
     }
 

@@ -15,15 +15,24 @@
  */
 package example
 
-import groovy.transform.Field
+import groovy.transform.CompileStatic
+import io.micronaut.context.annotation.Value
+
+import javax.inject.Singleton
+import javax.validation.constraints.NotNull
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Singleton
+@CompileStatic
+class HelloService {
 
-@Field BookService bookService
+    @Value('${hello.greeting:Hello}')
+    String greeting = "Hello"
 
-Book toUpperCase(Book book) {
-    bookService.toUpperCase(book)
+    Message hello(@NotNull Person person) {
+        return new Message(text: "$greeting $person.name!")
+    }
 }

@@ -18,6 +18,8 @@ package io.micronaut.function;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
 
+import java.net.URI;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -44,6 +46,13 @@ public interface LocalFunctionRegistry {
      * Prefix used to identify function names
      */
     String FUNCTION_PREFIX = "function:";
+
+    /**
+     * A map of available functions with the key being the function name and the value being the function URI
+     *
+     * @return A map of functions
+     */
+    Map<String, URI> getAvailableFunctions();
 
     /**
      * Find the first available registered function

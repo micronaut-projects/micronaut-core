@@ -32,10 +32,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.net.URI;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -83,6 +81,11 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
                     return Stream.of(method);
                 })
                 .findFirst();
+    }
+
+    @Override
+    public Map<String, URI> getAvailableFunctions() {
+        return Collections.emptyMap();
     }
 
     @SuppressWarnings("unchecked")
