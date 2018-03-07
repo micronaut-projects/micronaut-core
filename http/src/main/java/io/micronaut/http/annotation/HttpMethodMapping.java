@@ -46,7 +46,8 @@ public @interface HttpMethodMapping {
     String value() default "";
 
     /**
-     * @return The URI of the PATCH route if not specified inferred from the method name and arguments
+     * @return An alias for {@link #value()}
+     * @see #value()
      */
     @AliasFor(member = "value")
     String uri() default "";

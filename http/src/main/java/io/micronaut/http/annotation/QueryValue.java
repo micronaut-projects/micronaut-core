@@ -21,10 +21,15 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.net.URI;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * Indicates that the parameter to a method should be bound from a value in the query string of the URI
+ *
+ * @see URI#getQuery()
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -32,7 +37,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER})
 @Bindable
-public @interface Parameter {
+public @interface QueryValue {
     /**
      * @return The name of the parameter
      */

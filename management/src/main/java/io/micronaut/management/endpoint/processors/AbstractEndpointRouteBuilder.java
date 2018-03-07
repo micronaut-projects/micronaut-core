@@ -19,16 +19,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.async.subscriber.Completable;
-import io.micronaut.http.annotation.Parameter;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
@@ -103,6 +99,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     }
 
     protected boolean isPathParameter(Argument argument) {
-        return argument.getAnnotations().length == 0 || argument.getAnnotation(Parameter.class) != null;
+        return argument.getAnnotations().length == 0 || argument.getAnnotation(QueryValue.class) != null;
     }
 }

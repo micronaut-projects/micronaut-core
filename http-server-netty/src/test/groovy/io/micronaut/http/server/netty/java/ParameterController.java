@@ -15,13 +15,9 @@
  */
 package io.micronaut.http.server.netty.java;
 
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Parameter;
-import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Parameter;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
@@ -43,17 +39,17 @@ public class ParameterController {
     }
 
     @Get
-    String simple(@Parameter Integer max) {
+    String simple(@QueryValue Integer max) {
         return "Parameter Value: " + max;
     }
 
     @Get
-    String named(@Parameter("maximum") Integer max) {
+    String named(@QueryValue("maximum") Integer max) {
         return "Parameter Value: " + max;
     }
 
     @Get
-    String optional(@Parameter Optional<Integer> max) {
+    String optional(@QueryValue Optional<Integer> max) {
         return "Parameter Value: " + max.orElse(10);
     }
 

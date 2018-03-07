@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.server.binding.binders;
 
-import io.micronaut.http.annotation.Parameter;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -25,43 +27,74 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.annotation.Parameter;
 import io.micronaut.core.type.Argument;
 
 import java.util.Optional;
 
 /**
- * An {@link AnnotatedArgumentBinder} implementation that uses the {@link Parameter}
+ * An {@link AnnotatedArgumentBinder} implementation that uses the {@link QueryValue}
  * to trigger binding from an HTTP request parameter
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Parameter, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Parameter, T> {
+public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<QueryValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<QueryValue, T> {
     public ParameterAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
 
     @Override
-    public Class<Parameter> getAnnotationType() {
-        return Parameter.class;
+    public Class<QueryValue> getAnnotationType() {
+        return QueryValue.class;
     }
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getParameters();
         Argument<T> argument = context.getArgument();
-        Parameter annotation = argument.getAnnotation(Parameter.class);
-        boolean hasAnnotation = annotation != null;
-        String parameterName = hasAnnotation ? annotation.value() : argument.getName();
+        HttpMethod httpMethod = source.getMethod();
+        boolean permitsRequestBody = HttpMethod.permitsRequestBody(httpMethod);
 
-        BindingResult<T> result = doBind(context, parameters, parameterName);
+
+        QueryValue annotation = argument.getAnnotation(QueryValue.class);
+        boolean hasAnnotation = annotation != null;
+        String parameterName = argument.getName();
+        if(hasAnnotation) {
+            String value = annotation.value();
+            if(StringUtils.isNotEmpty(value)) {
+                parameterName = value;
+            }
+        }
+        else {
+            Parameter p = argument.getAnnotation(Parameter.class);
+            if(p != null) {
+                String value = p.value();
+                if(StringUtils.isNotEmpty(value)) {
+                    parameterName = value;
+                }
+            }
+        }
+
+        BindingResult<T> result;
+        // if the annotation is present or the HTTP method doesn't allow a request body
+        // attempt to bind from request parameters. This avoids allowing the request URI to
+        // be manipulated to override POST or JSON variables
+        if(hasAnnotation || !permitsRequestBody) {
+            result = doBind(context, parameters, parameterName);
+        }
+        else {
+            //noinspection unchecked
+            result = BindingResult.EMPTY;
+        }
         Optional<T> val = result.getValue();
         if(!val.isPresent() && !hasAnnotation) {
             // try attribute
             result = doBind(context, source.getAttributes(), parameterName);
         }
-        if(!result.getValue().isPresent() && !hasAnnotation && HttpMethod.requiresRequestBody(source.getMethod())) {
+
+        // If there is still no value at this point and no annotation is specified and
+        // the HTTP method allows a request body try and bind from the body
+        if(!result.getValue().isPresent() && !hasAnnotation && permitsRequestBody) {
             Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
             if(body.isPresent()) {
                 result = doBind(context, body.get(), parameterName);
