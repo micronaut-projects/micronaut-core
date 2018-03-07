@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 /**
@@ -39,7 +40,7 @@ class HelloWorldFunctionSpec extends Specification {
         HelloClient client = server.getApplicationContext().getBean(HelloClient)
 
         when:
-        Message message = client.hello(new Person(name: "Fred")).blockingGet()
+        Message message = client.hello("Fred").blockingGet()
         
         then:
         message.text == "Hello Fred!"
@@ -47,5 +48,27 @@ class HelloWorldFunctionSpec extends Specification {
         cleanup:
         if(server != null)
             server.stop()
+    }
+
+    @IgnoreIf({
+        return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
+    })
+    void "run execute function as lambda"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'aws.lambda.functions.hello.functionName':'hello-world',
+                'aws.lambda.region':'us-east-1'
+        )
+        HelloClient client = applicationContext.getBean(HelloClient)
+
+        when:
+        Message message = client.hello("Fred").blockingGet()
+
+        then:
+        message.text == "Hello Fred!"
+
+        cleanup:
+        if(applicationContext != null)
+            applicationContext.stop()
     }
 }
