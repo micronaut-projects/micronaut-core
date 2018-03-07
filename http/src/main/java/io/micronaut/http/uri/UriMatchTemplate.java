@@ -131,7 +131,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     @Override
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
-        Pattern newPattern = Pattern.compile(isRoot ? pattern.toString() : this.matchPattern.toString() + pattern.toString());
+        Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
         List<String> newList = new ArrayList<>();
         newList.addAll(Arrays.asList(variables));
         newList.addAll(variableList);

@@ -35,6 +35,9 @@ class UriTemplateSpec extends Specification {
 
         where:
         template       | nested               | arguments                               | result
+        '/'            | '/hello/{name}'      | [name: 'Fred']                          | '/hello/Fred'
+        ''             | '/hello/{name}'      | [name: 'Fred']                          | '/hello/Fred'
+        '/test/'       | '/hello/{name}'      | [name: 'Fred']                          | '/test/hello/Fred'
         '{var}'        | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
         '/book{/id}'   | '/author{/authorId}' | [id: 'foo', authorId: 'bar']            | '/book/foo/author/bar'
         '{var}/'       | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
