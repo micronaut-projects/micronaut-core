@@ -1,3 +1,5 @@
+import com.amazonaws.services.lambda.model.InvocationType
+import jp.classmethod.aws.gradle.lambda.AWSLambdaInvokeTask
 import jp.classmethod.aws.gradle.lambda.AWSLambdaMigrateFunctionTask
 import com.amazonaws.services.lambda.model.Runtime
 
@@ -24,9 +26,10 @@ apply plugin: 'jp.classmethod.aws.lambda'
 
 mainClassName = "example.HelloWorldFunction"
 applicationDefaultJvmArgs = [""]
+
 jar {
     manifest {
-        attributes 'Main-Class': "example.HelloWorldFunction"
+        attributes 'Main-Class': mainClassName
     }
 }
 repositories {
@@ -57,10 +60,19 @@ shadowJar {
 
 task deploy(type: AWSLambdaMigrateFunctionTask, dependsOn: shadowJar) {
     functionName = "hello-world"
-    handler = "example.HelloWorldFunction::toUpperCase"
+    handler = "example.HelloWorldFunction::hello"
     role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution"
     runtime = Runtime.Java8
     zipFile = shadowJar.archivePath
-    memorySize = 192
+    memorySize = 256
     timeout = 60
+}
+
+task invoke(type: AWSLambdaInvokeTask) {
+    functionName = "hello-world"
+    invocationType = InvocationType.RequestResponse
+    payload = '{"name":"Fred"}'
+    doLast {
+        println "Lambda function result: " + new String(invokeResult.payload.array(), "UTF-8")
+    }
 }
